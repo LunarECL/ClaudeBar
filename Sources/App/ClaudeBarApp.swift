@@ -45,6 +45,10 @@ struct ClaudeBarApp: App {
 
     @Environment(\.openWindow) private var openWindow
 
+    /// Receives `claudebar://` URLs. Lives outside SwiftUI's scene routing,
+    /// which cannot reach a MenuBarExtra (see AppDelegate).
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     /// The hook HTTP server that receives events from Claude Code
     private let hookServer = HookHTTPServer()
 
@@ -303,21 +307,18 @@ struct ClaudeBarApp: App {
     }
 
     @MainActor
-    private func handleIncomingURL(_ url: URL) {
-        let action = url.host ?? url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    private func handle(_ action: URLSchemeAction) {
         switch action {
-        case "refresh":
+        case .refresh:
             Task {
                 await monitor.refreshAll()
             }
-        case "open":
+        case .open:
             isMenuPresented = true
             NSApp.activate(ignoringOtherApps: true)
-        case "settings":
+        case .settings:
             openWindow(id: "settings")
             NSApp.activate(ignoringOtherApps: true)
-        default:
-            AppLog.ui.info("Received unhandled URL: \(url.absoluteString)")
         }
     }
 
@@ -343,9 +344,6 @@ struct ClaudeBarApp: App {
             // re-assert the menu-bar pixels on both edges.
             .onAppear { statusItemDriver.reassertPresentation() }
             .onDisappear { statusItemDriver.reassertPresentation() }
-            .onOpenURL { url in
-                handleIncomingURL(url)
-            }
         } label: {
             // Deliberately static: the menu-bar pixels are drawn by
             // StatusItemLabelDriver into the status item's button image,
@@ -353,6 +351,13 @@ struct ClaudeBarApp: App {
             // re-evaluating after system sleep (issue #192). The placeholder
             // only gives the scene a label to anchor the dropdown to.
             Color.clear.frame(width: 1, height: 1)
+                // The label is the one view hosted from launch, so this is
+                // where the URL handler meets the App's state (`isMenuPresented`,
+                // `openWindow`). The popover content would only be live while
+                // the dropdown is open. The handler keeps working even if this
+                // hosting later goes dead (issue #192): it captures the state
+                // wrappers, not the view.
+                .onAppear { appDelegate.onAction = handle }
         }
         // Must be the first scene modifier (extends MenuBarExtra, not Scene).
         .menuBarExtraAccess(isPresented: $isMenuPresented) { statusItem in
@@ -382,6 +387,11 @@ struct ClaudeBarApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 980, height: 660)
         .windowResizability(.contentMinSize)
+        // Without this, the Settings window is the only window scene and
+        // SwiftUI presents it to deliver *every* incoming URL, including
+        // claudebar://open. AppDelegate routes the URLs; this only stops
+        // SwiftUI from opening Settings for ones that are not about it.
+        .handlesExternalEvents(matching: ["settings"])
     }
 
 }
