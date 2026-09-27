@@ -389,9 +389,9 @@ struct ClaudeBarApp: App {
         .windowResizability(.contentMinSize)
         // Without this, the Settings window is the only window scene and
         // SwiftUI presents it to deliver *every* incoming URL, including
-        // claudebar://open. AppDelegate routes the URLs; this only stops
-        // SwiftUI from opening Settings for ones that are not about it.
-        .handlesExternalEvents(matching: ["settings"])
+        // claudebar://open. AppDelegate routes every URL, so this window
+        // claims none: an empty set matches nothing.
+        .handlesExternalEvents(matching: [])
     }
 
 }
