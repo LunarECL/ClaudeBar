@@ -12,7 +12,7 @@ ClaudeBar registers the `claudebar://` URL scheme, so anything that can open a U
 | `claudebar://refresh` | Refreshes every enabled provider now | `open claudebar://refresh` |
 | `claudebar://settings` | Opens the Settings window | `open claudebar://settings` |
 
-There are no other actions and no parameters. Anything else, such as `claudebar://foo`, is ignored and logged as "Received unhandled URL" in the [log](../../troubleshooting.md).
+There are no other actions and no parameters. Anything else, such as `claudebar://foo`, `claudebar://open/` or `claudebar://refresh?now=1`, is ignored and logged as "Received unhandled URL" in the [log](../../troubleshooting.md).
 
 ## Examples
 

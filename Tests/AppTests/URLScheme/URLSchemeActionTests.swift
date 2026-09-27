@@ -10,7 +10,7 @@ struct URLSchemeActionTests {
         ("claudebar://refresh", .refresh),
         ("claudebar://settings", .settings),
     ])
-    func `action is the URL host`(string: String, expected: URLSchemeAction) {
+    func `the documented URLs are actions`(string: String, expected: URLSchemeAction) {
         let url = URL(string: string)!
         #expect(URLSchemeAction(url: url) == expected)
     }
@@ -18,41 +18,38 @@ struct URLSchemeActionTests {
     @Test(arguments: [
         ("claudebar:///open", URLSchemeAction.open),
         ("claudebar:///refresh", .refresh),
-        ("claudebar:///settings/", .settings),
+        ("claudebar:///settings", .settings),
     ])
-    func `action can also be given as the path`(string: String, expected: URLSchemeAction) {
+    func `the three-slash spelling is the same action`(string: String, expected: URLSchemeAction) {
         let url = URL(string: string)!
         #expect(URLSchemeAction(url: url) == expected)
     }
 
-    @Test(arguments: ["claudebar://foo", "claudebar://", "claudebar:///"])
-    func `unknown actions are nil`(string: String) {
-        let url = URL(string: string)!
-        #expect(URLSchemeAction(url: url) == nil)
-    }
-
-    @Test(arguments: [
-        "claudebar://refresh/other?unexpected=1",
-        "claudebar://open?x=1",
-        "claudebar://open#top",
-        "claudebar://open/extra",
-        "claudebar:///open/extra",
-        "claudebar:///settings?x=1",
-    ])
-    func `URLs with extra components are nil`(string: String) {
-        let url = URL(string: string)!
-        #expect(URLSchemeAction(url: url) == nil)
-    }
-
     @Test
-    func `a bare trailing slash after the host is still the action`() {
-        let url = URL(string: "claudebar://open/")!
+    func `scheme and action are matched case-insensitively`() {
+        let url = URL(string: "CLAUDEBAR://Open")!
         #expect(URLSchemeAction(url: url) == .open)
     }
 
-    @Test
-    func `other schemes are nil even with a known host`() {
-        let url = URL(string: "https://open")!
+    @Test(arguments: [
+        "claudebar://foo",
+        "claudebar://",
+        "claudebar:///",
+        "claudebar://refresh/other?unexpected=1",
+        "claudebar://open?x=1",
+        "claudebar://open#top",
+        "claudebar://open/",
+        "claudebar://open/extra",
+        "claudebar:///open/extra",
+        "claudebar:///settings/",
+        "claudebar:///settings?x=1",
+        "claudebar://guest@refresh",
+        "claudebar://refresh:443",
+        "claudebar://user:pass@settings",
+        "https://open",
+    ])
+    func `anything that is not exactly a documented URL is nil`(string: String) {
+        let url = URL(string: string)!
         #expect(URLSchemeAction(url: url) == nil)
     }
 }
