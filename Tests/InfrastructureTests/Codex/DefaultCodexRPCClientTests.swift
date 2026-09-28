@@ -185,7 +185,7 @@ struct DefaultCodexRPCClientTests {
         #expect(result.additional.first?.primary?.usedPercent == 40)
         #expect(result.additional.first?.primary?.resetsAt == Date(timeIntervalSince1970: 1735100000))
         #expect(result.additional.first?.secondary?.usedPercent == 20)
-        #expect(result.additional.first?.secondary?.windowDuration == 10080 * 60)
+        #expect(result.additional.first?.secondary?.windowDuration == TimeInterval(10080 * 60))
 
         let snapshot = try CodexUsageProbe.mapRateLimitsToSnapshot(result)
         #expect(snapshot.quotas.count == 4)

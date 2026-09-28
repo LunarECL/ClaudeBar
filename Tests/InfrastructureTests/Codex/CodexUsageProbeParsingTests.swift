@@ -173,7 +173,7 @@ struct CodexUsageProbeParsingTests {
         #expect(snapshot.quotas[2].resetText == "Resets in 1h")
         #expect(snapshot.quotas[3].quotaType == .timeLimit("Spark 7d"))
         #expect(snapshot.quotas[3].percentRemaining == 80)
-        #expect(snapshot.quotas[3].windowDuration == 7 * 24 * 3600)
+        #expect(snapshot.quotas[3].windowDuration == TimeInterval(7 * 24 * 3600))
     }
 
     @Test
