@@ -166,6 +166,78 @@ struct DefaultCodexRPCClientTests {
         }
     }
 
+    // MARK: - Additional Rate Limit Buckets (#178)
+
+    @Test
+    func `fetchRateLimits parses additional buckets from rateLimitsByLimitId`() async throws {
+        let mockTransport = MockRPCTransport()
+        let mockExecutor = MockCLIExecutor()
+        setupMockTransport(mockTransport, rateLimitsResponse: """
+        {"id":2,"result":{"rateLimits":{"planType":"pro","primary":{"usedPercent":30,"resetsAt":1735000000},"secondary":{"usedPercent":10}},"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":30,"resetsAt":1735000000}},"codex_spark":{"limitId":"codex_spark","limitName":"Codex Spark","primary":{"usedPercent":40,"resetsAt":1735100000},"secondary":{"usedPercent":20,"windowDurationMins":10080}}}}}
+        """)
+
+        let client = DefaultCodexRPCClient(transport: mockTransport, cliExecutor: mockExecutor)
+
+        let result = try await client.fetchRateLimits()
+
+        #expect(result.additional.count == 1)
+        #expect(result.additional.first?.name == "Codex Spark")
+        #expect(result.additional.first?.primary?.usedPercent == 40)
+        #expect(result.additional.first?.primary?.resetsAt == Date(timeIntervalSince1970: 1735100000))
+        #expect(result.additional.first?.secondary?.usedPercent == 20)
+        #expect(result.additional.first?.secondary?.windowDuration == 10080 * 60)
+
+        let snapshot = try CodexUsageProbe.mapRateLimitsToSnapshot(result)
+        #expect(snapshot.quotas.count == 4)
+        #expect(snapshot.quotas.first?.quotaType == .session)
+        #expect(snapshot.quotas[2].quotaType == .timeLimit("Spark"))
+        #expect(snapshot.quotas[2].percentRemaining == 60)
+        #expect(snapshot.quotas[3].quotaType == .timeLimit("Spark 7d"))
+        #expect(snapshot.quotas[3].percentRemaining == 80)
+    }
+
+    @Test
+    func `fetchRateLimits skips the main bucket and entries without windows`() async throws {
+        let mockTransport = MockRPCTransport()
+        let mockExecutor = MockCLIExecutor()
+        setupMockTransport(mockTransport, rateLimitsResponse: """
+        {"id":2,"result":{"rateLimits":{"planType":"pro","primary":{"usedPercent":30}},"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":30}},"codex_spark":{"limitId":"codex_spark","limitName":"Codex Spark"},"codex_other":{"limitId":"codex_other","limitName":"Other","primary":{"usedPercent":5}}}}}
+        """)
+
+        let client = DefaultCodexRPCClient(transport: mockTransport, cliExecutor: mockExecutor)
+
+        let result = try await client.fetchRateLimits()
+
+        #expect(result.additional.count == 1)
+        #expect(result.additional.first?.name == "Other")
+        #expect(result.additional.first?.primary?.usedPercent == 5)
+    }
+
+    @Test
+    func `fetchRateLimits without rateLimitsByLimitId leaves additional empty`() async throws {
+        let mockTransport = MockRPCTransport()
+        let mockExecutor = MockCLIExecutor()
+        setupMockTransport(mockTransport, rateLimitsResponse: """
+        {"id":2,"result":{"rateLimits":{"planType":"pro","primary":{"usedPercent":30}}}}
+        """)
+
+        let client = DefaultCodexRPCClient(transport: mockTransport, cliExecutor: mockExecutor)
+
+        let result = try await client.fetchRateLimits()
+
+        #expect(result.additional.isEmpty)
+        #expect(result.primary?.usedPercent == 30)
+    }
+
+    @Test
+    func `parseAdditionalLimits returns empty for missing or malformed map`() {
+        let client = DefaultCodexRPCClient(transport: MockRPCTransport())
+
+        #expect(client.parseAdditionalLimits(nil).isEmpty)
+        #expect(client.parseAdditionalLimits([String: Any]()).isEmpty)
+        #expect(client.parseAdditionalLimits("junk").isEmpty)
+    }
+
     // MARK: - parseWindow Tests
 
     @Test

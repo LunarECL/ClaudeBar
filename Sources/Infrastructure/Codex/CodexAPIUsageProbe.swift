@@ -269,6 +269,33 @@ public struct CodexAPIUsageProbe: UsageProbe, @unchecked Sendable {
             }
         }
 
+        // Additional rate limits (e.g. GPT-5.3-Codex-Spark), appended after
+        // the main session/weekly quotas so `quotas.first` stays primary.
+        if let additionalLimits = responseDict["additional_rate_limits"] as? [[String: Any]] {
+            for entry in additionalLimits {
+                guard let window = entry["rate_limit"] as? [String: Any],
+                      let usedPercent = window["used_percent"] as? Double else {
+                    continue
+                }
+                guard let rawName = [entry["limit_name"], entry["metered_feature"]]
+                    .compactMap({ $0 as? String })
+                    .first(where: { !$0.isEmpty }) else {
+                    continue
+                }
+                let label = CodexUsageProbe.menuLabel(for: rawName)
+                guard !label.isEmpty else { continue }
+
+                let reset = resetsAtDate(nowSeconds: nowSeconds, window: window)
+                quotas.append(UsageQuota(
+                    percentRemaining: max(0, 100 - usedPercent),
+                    quotaType: .timeLimit(label),
+                    providerId: "codex",
+                    resetsAt: reset,
+                    resetText: formatResetText(reset)
+                ))
+            }
+        }
+
         // Parse credits
         var costUsage: CostUsage?
         let creditsHeader = readHeaderDouble(httpResponse, key: "x-codex-credits-balance")
