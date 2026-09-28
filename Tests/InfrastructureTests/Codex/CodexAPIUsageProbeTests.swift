@@ -208,11 +208,16 @@ struct CodexAPIUsageProbeTests {
             {
               "limit_name": "Codex Spark",
               "metered_feature": "codex_spark",
-              "rate_limit": { "used_percent": 15.0, "reset_after_seconds": 7200 }
+              "rate_limit": {
+                "allowed": true,
+                "limit_reached": false,
+                "primary_window": { "used_percent": 15.0, "reset_after_seconds": 7200, "limit_window_seconds": 18000 },
+                "secondary_window": { "used_percent": 80.0, "reset_after_seconds": 86400 }
+              }
             },
             {
               "metered_feature": "codex_research",
-              "rate_limit": { "used_percent": 5.0 }
+              "rate_limit": { "allowed": true, "primary_window": { "used_percent": 5.0 } }
             },
             { "limit_name": "No Data", "metered_feature": "x", "rate_limit": null },
             { "metered_feature": "empty" }
@@ -234,7 +239,7 @@ struct CodexAPIUsageProbeTests {
 
         let snapshot = try await probe.probe()
 
-        #expect(snapshot.quotas.count == 4)
+        #expect(snapshot.quotas.count == 5)
         #expect(snapshot.quotas[0].quotaType == .session)
         #expect(snapshot.quotas[0].percentRemaining == 70.0)
         #expect(snapshot.quotas[1].quotaType == .weekly)
@@ -244,9 +249,13 @@ struct CodexAPIUsageProbeTests {
         #expect(snapshot.quotas[2].percentRemaining == 85.0)
         let sparkReset = try #require(snapshot.quotas[2].resetsAt)
         #expect(abs(sparkReset.timeIntervalSinceNow - 7200) < 5)
+        #expect(snapshot.quotas[2].windowDuration == 18000)
 
-        #expect(snapshot.quotas[3].quotaType == .timeLimit("Research"))
-        #expect(snapshot.quotas[3].percentRemaining == 95.0)
+        #expect(snapshot.quotas[3].quotaType == .timeLimit("Spark 7d"))
+        #expect(snapshot.quotas[3].percentRemaining == 20.0)
+
+        #expect(snapshot.quotas[4].quotaType == .timeLimit("Research"))
+        #expect(snapshot.quotas[4].percentRemaining == 95.0)
     }
 
     @Test
