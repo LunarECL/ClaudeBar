@@ -194,6 +194,7 @@ struct CodexUsageProbeParsingTests {
     func `additional limit without windows produces no quota`() throws {
         let limits = CodexRateLimitsResponse(
             primary: CodexRateLimitWindow(usedPercent: 30, resetDescription: nil),
+            secondary: nil,
             additional: [CodexAdditionalLimit(name: "Codex Spark")]
         )
 
