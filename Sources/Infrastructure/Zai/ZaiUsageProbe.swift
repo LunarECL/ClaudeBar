@@ -15,6 +15,7 @@ public struct ZaiUsageProbe: UsageProbe {
     private let cliExecutor: any CLIExecutor
     private let networkClient: any NetworkClient
     private let settingsRepository: any ZaiSettingsRepository
+    private let loginShellEnvironment: LoginShellEnvironment
     private let timeout: TimeInterval
 
     // Claude config file location
@@ -34,9 +35,11 @@ public struct ZaiUsageProbe: UsageProbe {
         settingsRepository: any ZaiSettingsRepository,
         timeout: TimeInterval = 10.0
     ) {
-        self.cliExecutor = cliExecutor ?? DefaultCLIExecutor()
+        let executor = cliExecutor ?? DefaultCLIExecutor()
+        self.cliExecutor = executor
         self.networkClient = networkClient ?? URLSession.shared
         self.settingsRepository = settingsRepository
+        self.loginShellEnvironment = LoginShellEnvironment(cliExecutor: executor, timeout: timeout)
         self.timeout = timeout
     }
 
@@ -83,7 +86,7 @@ public struct ZaiUsageProbe: UsageProbe {
             throw ProbeError.authenticationRequired
         }
 
-        let apiKey = try extractAPIKeyWithFallback(from: config, configPath: configPath)
+        let apiKey = try await extractAPIKeyWithFallback(from: config, configPath: configPath)
         AppLog.probes.debug("Zai: Detected platform: \(platform.rawValue)")
 
         let baseURL = platform.rawValue
@@ -157,7 +160,7 @@ public struct ZaiUsageProbe: UsageProbe {
         return (result.output, configPath.path)
     }
 
-    private func extractAPIKeyWithFallback(from config: String, configPath: String) throws -> String {
+    private func extractAPIKeyWithFallback(from config: String, configPath: String) async throws -> String {
         if let configApiKey = Self.extractAPIKey(from: config) {
             AppLog.probes.debug("Zai: Using API key from config file")
             return configApiKey
@@ -169,13 +172,18 @@ public struct ZaiUsageProbe: UsageProbe {
             throw ProbeError.authenticationRequired
         }
 
-        guard let envValue = ProcessInfo.processInfo.environment[envVarName], !envValue.isEmpty else {
-            AppLog.probes.error("Zai probe failed: No API key found (config file: \(configPath), env var: \(envVarName) not set)")
-            throw ProbeError.authenticationRequired
+        if let envValue = ProcessInfo.processInfo.environment[envVarName], !envValue.isEmpty {
+            AppLog.probes.debug("Zai: Using env var '\(envVarName)' from process environment")
+            return envValue
         }
 
-        AppLog.probes.debug("Zai: API key not in config, using env var '\(envVarName)'")
-        return envValue
+        if let shellValue = await loginShellEnvironment.value(ofEnvVar: envVarName) {
+            AppLog.probes.debug("Zai: Using env var '\(envVarName)' resolved via login shell")
+            return shellValue
+        }
+
+        AppLog.probes.error("Zai probe failed: No API key found (config file: \(configPath), env var: \(envVarName) not set)")
+        throw ProbeError.authenticationRequired
     }
 
     // MARK: - Static Parsing Helpers
