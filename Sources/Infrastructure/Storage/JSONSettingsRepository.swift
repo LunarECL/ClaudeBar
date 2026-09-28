@@ -370,6 +370,24 @@ public final class JSONSettingsRepository:
         store.write(value: envVar, key: "zai.glmAuthEnvVar")
     }
 
+    // Z.ai Credentials (UserDefaults for now)
+
+    public func saveZaiApiKey(_ key: String) {
+        credentials.set(key, forKey: "com.claudebar.credentials.zai-api-key")
+    }
+
+    public func getZaiApiKey() -> String? {
+        credentials.string(forKey: "com.claudebar.credentials.zai-api-key")
+    }
+
+    public func deleteZaiApiKey() {
+        credentials.removeObject(forKey: "com.claudebar.credentials.zai-api-key")
+    }
+
+    public func hasZaiApiKey() -> Bool {
+        getZaiApiKey() != nil
+    }
+
     // MARK: - CopilotSettingsRepository
 
     public func copilotProbeMode() -> CopilotProbeMode {
