@@ -78,6 +78,22 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(envVar, forKey: Keys.glmAuthEnvVar)
     }
 
+    public func saveZaiApiKey(_ key: String) {
+        userDefaults.set(key, forKey: Keys.zaiApiKey)
+    }
+
+    public func getZaiApiKey() -> String? {
+        userDefaults.string(forKey: Keys.zaiApiKey)
+    }
+
+    public func deleteZaiApiKey() {
+        userDefaults.removeObject(forKey: Keys.zaiApiKey)
+    }
+
+    public func hasZaiApiKey() -> Bool {
+        userDefaults.object(forKey: Keys.zaiApiKey) != nil
+    }
+
     // MARK: - CopilotSettingsRepository (Probe Mode)
 
     public func copilotProbeMode() -> CopilotProbeMode {
@@ -463,6 +479,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let kimiProbeMode = "providerConfig.kimiProbeMode"
         static let zaiConfigPath = "providerConfig.zaiConfigPath"
         static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
+        static let zaiApiKey = "com.claudebar.credentials.zai-api-key"
         static let copilotProbeMode = "providerConfig.copilotProbeMode"
         static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"
         static let copilotMonthlyLimit = "providerConfig.copilotMonthlyLimit"

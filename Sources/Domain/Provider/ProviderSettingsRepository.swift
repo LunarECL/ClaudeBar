@@ -37,6 +37,18 @@ public protocol ZaiSettingsRepository: ProviderSettingsRepository {
 
     /// Sets the environment variable name for GLM auth token
     func setGlmAuthEnvVar(_ envVar: String)
+
+    /// Saves the Z.ai GLM API key (for Settings UI input)
+    func saveZaiApiKey(_ key: String)
+
+    /// Retrieves the Z.ai GLM API key
+    func getZaiApiKey() -> String?
+
+    /// Deletes the Z.ai GLM API key
+    func deleteZaiApiKey()
+
+    /// Checks if a Z.ai GLM API key is saved
+    func hasZaiApiKey() -> Bool
 }
 
 /// Copilot-specific settings repository, extending base ProviderSettingsRepository.
