@@ -56,6 +56,12 @@ public struct ZaiUsageProbe: UsageProbe {
             return false
         }
 
+        // An API key saved in ClaudeBar settings works without any endpoint in the config
+        if settingsApiKey() != nil {
+            AppLog.probes.debug("Zai: Available via API key saved in settings")
+            return true
+        }
+
         // Check if z.ai is configured in Claude settings
         do {
             let (config, _) = try await readClaudeConfig()
@@ -73,15 +79,21 @@ public struct ZaiUsageProbe: UsageProbe {
             throw ProbeError.cliNotFound("Claude")
         }
 
+        let settingsKey = settingsApiKey()
+
         let (config, configPath): (String, String)
         do {
             (config, configPath) = try await readClaudeConfig()
         } catch {
+            if let settingsKey {
+                AppLog.probes.debug("Zai: Could not read Claude config, using settings API key: \(error.localizedDescription)")
+                return try await probe(platform: .zai, apiKey: settingsKey)
+            }
             AppLog.probes.error("Zai probe failed: Could not read Claude config: \(error.localizedDescription)")
             throw ProbeError.executionFailed("Could not read Claude config")
         }
 
-        guard let platform = Self.detectPlatform(from: config) else {
+        guard let platform = Self.detectPlatform(from: config) ?? (settingsKey != nil ? .zai : nil) else {
             AppLog.probes.error("Zai probe failed: No z.ai endpoint found in Claude config (path: \(configPath))")
             throw ProbeError.authenticationRequired
         }
@@ -89,6 +101,11 @@ public struct ZaiUsageProbe: UsageProbe {
         let apiKey = try await extractAPIKeyWithFallback(from: config, configPath: configPath)
         AppLog.probes.debug("Zai: Detected platform: \(platform.rawValue)")
 
+        return try await probe(platform: platform, apiKey: apiKey)
+    }
+
+    /// Performs the quota request against the given platform with the given key.
+    private func probe(platform: ZaiPlatform, apiKey: String) async throws -> UsageSnapshot {
         let baseURL = platform.rawValue
         guard let url = URL(string: "\(baseURL)/api/monitor/usage/quota/limit") else {
             AppLog.probes.error("Zai probe failed: Invalid API URL")
@@ -160,7 +177,20 @@ public struct ZaiUsageProbe: UsageProbe {
         return (result.output, configPath.path)
     }
 
+    private func settingsApiKey() -> String? {
+        guard let key = settingsRepository.getZaiApiKey(),
+              !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return key
+    }
+
     private func extractAPIKeyWithFallback(from config: String, configPath: String) async throws -> String {
+        if let settingsKey = settingsApiKey() {
+            AppLog.probes.debug("Zai: Using API key saved in ClaudeBar settings")
+            return settingsKey
+        }
+
         if let configApiKey = Self.extractAPIKey(from: config) {
             AppLog.probes.debug("Zai: Using API key from config file")
             return configApiKey

@@ -16,14 +16,14 @@ Research notes for the Z.ai (GLM Coding Plan) probe, from the code, [#22](https:
 
 Z.ai has no CLI of its own. Users point Claude Code at Z.ai's Anthropic-compatible endpoint, so the probe reads Claude Code's settings file (or the custom path) with `cat` and looks for:
 
-1. **Platform**: `env.ANTHROPIC_BASE_URL`, then `providers[].base_url`, then any occurrence of one of the three hosts anywhere in the file. The last step lets unusual config shapes work.
-2. **Key**: `env.ANTHROPIC_AUTH_TOKEN`, then `providers[].api_key`, then top-level `api_key`, then the configured env var name.
+1. **Platform**: `env.ANTHROPIC_BASE_URL`, then `providers[].base_url`, then any occurrence of one of the three hosts anywhere in the file. The last step lets unusual config shapes work. With no host found but an API key saved in ClaudeBar settings, the platform defaults to `https://api.z.ai`.
+2. **Key**: the API key saved in ClaudeBar settings (Settings → Providers → Z.ai → API KEY), then `env.ANTHROPIC_AUTH_TOKEN`, then `providers[].api_key`, then top-level `api_key`, then the configured env var name.
 
-`isAvailable` also requires `claude` on PATH, a leftover from treating Z.ai as "Claude Code pointed elsewhere".
+`isAvailable` also requires `claude` on PATH, a leftover from treating Z.ai as "Claude Code pointed elsewhere". A settings-saved API key satisfies availability on its own.
 
 Known limits:
 
-- The env var is read from `ProcessInfo.processInfo.environment`, the app's own environment. Launched from Finder or Login Items, that doesn't include shell rc exports ([#170](https://github.com/tddworks/ClaudeBar/issues/170)). Loading the login shell's environment, the way `BinaryLocator` does for PATH, would fix it.
+- The env var is read from `ProcessInfo.processInfo.environment`, the app's own environment. Launched from Finder or Login Items, that doesn't include shell rc exports ([#170](https://github.com/tddworks/ClaudeBar/issues/170)). When it misses, `LoginShellEnvironment` re-reads the variable through the user's login shell (`$SHELL -l -c 'printf %s "$VAR"'` via the probe's `CLIExecutor`), validating the name against shell-identifier syntax before interpolating it. The lookup never logs the value.
 - The custom path goes through `URL(fileURLWithPath:)` and `cat` without a shell, so `~` isn't expanded.
 
 ## Response
