@@ -38,7 +38,7 @@ The key is looked up in this order: the **API KEY** saved in ClaudeBar settings,
 - **The env var fallback now reads your login shell too.** ClaudeBar first looks in its own environment; if the variable isn't there it asks `$SHELL -l -c 'printf %s "$VAR"'`, so keys exported in `~/.zshrc` or `~/.bash_profile` are found even when the app starts from Finder, the Dock or Login Items ([#170](https://github.com/tddworks/ClaudeBar/issues/170)). `launchctl setenv` is no longer needed.
 - **Only `ANTHROPIC_AUTH_TOKEN` is read from `env`.** A key stored as `ANTHROPIC_API_KEY` isn't found.
 - **"Authentication required" also means no Z.ai URL was found** in the settings file. The file must contain `api.z.ai`, `open.bigmodel.cn` or `dev.bigmodel.cn` somewhere, and must be valid JSON.
-- **No `claude` on PATH means no Z.ai**, even with a custom settings path.
+- **No `claude` on PATH means no Z.ai from your settings file**, even with a custom settings path. An **API KEY** saved in ClaudeBar settings is the exception: it works with or without Claude Code installed.
 - **Old versions:** before 0.4.61 the weekly window was merged into the 5-hour one, and before 0.4.75 credit-based plans failed with "No recognized quota types found". Update if you see either.
 
 ## See also

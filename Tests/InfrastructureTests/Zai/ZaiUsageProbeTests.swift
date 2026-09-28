@@ -586,6 +586,66 @@ struct ZaiUsageProbeTests {
     }
 
     @Test
+    func `isAvailable returns true with settings key even when claude CLI is missing`() async {
+        // Given
+        let mockExecutor = MockCLIExecutor()
+        given(mockExecutor).locate(.any).willReturn(nil)
+
+        given(mockExecutor).execute(
+            binary: .any,
+            args: .any,
+            input: .any,
+            timeout: .any,
+            workingDirectory: .any,
+            autoResponses: .any
+        ).willReturn(CLIResult(output: Self.sampleClaudeConfigWithoutZai, exitCode: 0))
+
+        let probe = ZaiUsageProbe(
+            cliExecutor: mockExecutor,
+            networkClient: MockNetworkClient(),
+            settingsRepository: makeSettingsRepository(apiKey: "settings-api-key")
+        )
+
+        // When & Then
+        #expect(await probe.isAvailable() == true)
+    }
+
+    @Test
+    func `probe succeeds with settings key even when claude CLI is missing`() async throws {
+        // Given
+        let mockExecutor = MockCLIExecutor()
+        let mockNetwork = MockNetworkClient()
+
+        given(mockExecutor).locate(.any).willReturn(nil)
+
+        given(mockExecutor).execute(
+            binary: .any,
+            args: .any,
+            input: .any,
+            timeout: .any,
+            workingDirectory: .any,
+            autoResponses: .any
+        ).willReturn(CLIResult(output: Self.sampleClaudeConfigWithoutZai, exitCode: 0))
+
+        given(mockNetwork).request(.matching { request in
+            request.value(forHTTPHeaderField: "Authorization") == "Bearer settings-api-key"
+        }).willReturn((Data(Self.sampleQuotaLimitResponse.utf8), Self.makeOKResponse()))
+
+        let probe = ZaiUsageProbe(
+            cliExecutor: mockExecutor,
+            networkClient: mockNetwork,
+            settingsRepository: makeSettingsRepository(apiKey: "settings-api-key")
+        )
+
+        // When
+        let snapshot = try await probe.probe()
+
+        // Then
+        #expect(snapshot.providerId == "zai")
+        #expect(!snapshot.quotas.isEmpty)
+    }
+
+    @Test
     func `probe throws authenticationRequired when settings API key is blank and no other source`() async throws {
         // Given
         let mockExecutor = MockCLIExecutor()

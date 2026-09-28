@@ -87,4 +87,20 @@ struct LoginShellEnvironmentTests {
         let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: "  shell-token\n"))
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == "shell-token")
     }
+
+    @Test
+    func `extracts the value between markers when rc files print noise first`() async {
+        let output = "Welcome to zsh\n"
+            + "\(LoginShellEnvironment.beginMarker)shell-token\(LoginShellEnvironment.endMarker)\n"
+        let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: output))
+        #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == "shell-token")
+    }
+
+    @Test
+    func `returns nil when the variable is unset but rc noise was printed`() async {
+        let output = "Welcome to zsh\n"
+            + "\(LoginShellEnvironment.beginMarker)\(LoginShellEnvironment.endMarker)\n"
+        let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: output))
+        #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == nil)
+    }
 }

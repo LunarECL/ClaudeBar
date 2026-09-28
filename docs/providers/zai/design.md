@@ -19,7 +19,7 @@ Z.ai has no CLI of its own. Users point Claude Code at Z.ai's Anthropic-compatib
 1. **Platform**: `env.ANTHROPIC_BASE_URL`, then `providers[].base_url`, then any occurrence of one of the three hosts anywhere in the file. The last step lets unusual config shapes work. With no host found but an API key saved in ClaudeBar settings, the platform defaults to `https://api.z.ai`.
 2. **Key**: the API key saved in ClaudeBar settings (Settings → Providers → Z.ai → API KEY), then `env.ANTHROPIC_AUTH_TOKEN`, then `providers[].api_key`, then top-level `api_key`, then the configured env var name.
 
-`isAvailable` also requires `claude` on PATH, a leftover from treating Z.ai as "Claude Code pointed elsewhere". A settings-saved API key satisfies availability on its own.
+`isAvailable` also requires `claude` on PATH, a leftover from treating Z.ai as "Claude Code pointed elsewhere". An API key saved in ClaudeBar settings skips that check entirely (and the config read) — the quota API never needs the CLI.
 
 Known limits:
 

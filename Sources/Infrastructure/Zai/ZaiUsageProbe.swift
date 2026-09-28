@@ -47,6 +47,13 @@ public struct ZaiUsageProbe: UsageProbe {
 
     /// Checks if Z.ai is available by looking for Claude CLI and z.ai configuration
     public func isAvailable() async -> Bool {
+        // An API key saved in ClaudeBar settings works without Claude Code or
+        // any endpoint in the config
+        if settingsApiKey() != nil {
+            AppLog.probes.debug("Zai: Available via API key saved in settings")
+            return true
+        }
+
         // Check if Claude CLI is installed
         guard cliExecutor.locate("claude") != nil else {
             let env = ProcessInfo.processInfo.environment
@@ -54,12 +61,6 @@ public struct ZaiUsageProbe: UsageProbe {
             AppLog.probes.info("Current directory: \(FileManager.default.currentDirectoryPath)")
             AppLog.probes.info("PATH: \(env["PATH"] ?? "<not set>")")
             return false
-        }
-
-        // An API key saved in ClaudeBar settings works without any endpoint in the config
-        if settingsApiKey() != nil {
-            AppLog.probes.debug("Zai: Available via API key saved in settings")
-            return true
         }
 
         // Check if z.ai is configured in Claude settings
@@ -74,12 +75,15 @@ public struct ZaiUsageProbe: UsageProbe {
 
     /// Fetches the current usage quota from Z.ai API
     public func probe() async throws -> UsageSnapshot {
-        guard cliExecutor.locate("claude") != nil else {
-            AppLog.probes.error("Zai probe failed: Claude CLI not found")
-            throw ProbeError.cliNotFound("Claude")
-        }
-
         let settingsKey = settingsApiKey()
+
+        // The quota API never needs the claude CLI; only the config-file path does
+        if settingsKey == nil {
+            guard cliExecutor.locate("claude") != nil else {
+                AppLog.probes.error("Zai probe failed: Claude CLI not found")
+                throw ProbeError.cliNotFound("Claude")
+            }
+        }
 
         let (config, configPath): (String, String)
         do {
