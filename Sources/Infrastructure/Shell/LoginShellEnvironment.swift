@@ -15,10 +15,10 @@ struct LoginShellEnvironment: Sendable {
     }
 
     /// The name comes from user settings and is interpolated into the command
-    /// string, so only valid shell identifiers are allowed through.
+    /// string, so only valid POSIX shell identifiers (ASCII) are allowed through.
     static func isValidName(_ name: String) -> Bool {
-        guard let first = name.first, first.isLetter || first == "_" else { return false }
-        return name.dropFirst().allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
+        guard let first = name.first, (first.isASCII && first.isLetter) || first == "_" else { return false }
+        return name.dropFirst().allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
     }
 
     /// Wraps the requested value in delimiters so rc-file noise (a stray `echo`
@@ -37,12 +37,14 @@ struct LoginShellEnvironment: Sendable {
 
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? ""
         let binary = shell.isEmpty ? "/bin/zsh" : shell
-        let command = "printf '\(Self.beginMarker)%s\(Self.endMarker)\\n' \"\(name)\""
+        // Interactive login shell so rc files that commonly hold the key
+        // (~/.zshrc as well as ~/.zprofile) are sourced before reading it.
+        let command = "printf '\(Self.beginMarker)%s\(Self.endMarker)\\n' \"$\(name)\""
 
         do {
             let result = try await cliExecutor.execute(
                 binary: binary,
-                args: ["-l", "-c", command],
+                args: ["-l", "-i", "-c", command],
                 input: nil,
                 timeout: timeout,
                 workingDirectory: nil,
@@ -61,18 +63,14 @@ struct LoginShellEnvironment: Sendable {
             return nil
         }
 
-        if let begin = output.range(of: beginMarker),
-           let end = output.range(of: endMarker, range: begin.upperBound..<output.endIndex) {
-            let value = String(output[begin.upperBound..<end.lowerBound])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !value.isEmpty else {
-                AppLog.probes.debug("LoginShellEnvironment: \(name) is not set in login shell")
-                return nil
-            }
-            return value
+        guard let begin = output.range(of: beginMarker),
+              let end = output.range(of: endMarker, range: begin.upperBound..<output.endIndex) else {
+            AppLog.probes.debug("LoginShellEnvironment: markers missing from shell output for \(name)")
+            return nil
         }
 
-        let value = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = String(output[begin.upperBound..<end.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else {
             AppLog.probes.debug("LoginShellEnvironment: \(name) is not set in login shell")
             return nil

@@ -21,6 +21,15 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         )
     }
 
+    private var zaiCredentials: SecureCredentialMigration {
+        SecureCredentialMigration(
+            secureStore: secureCredentials,
+            legacyStore: userDefaults,
+            secureKey: CredentialKey.zaiApiKey,
+            legacyKey: Keys.zaiApiKey
+        )
+    }
+
     /// Creates a repository with settings in UserDefaults and secrets in Keychain.
     /// - Parameters:
     ///   - userDefaults: The UserDefaults instance used for non-sensitive settings.
@@ -79,19 +88,19 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
     }
 
     public func saveZaiApiKey(_ key: String) {
-        userDefaults.set(key, forKey: Keys.zaiApiKey)
+        zaiCredentials.save(key)
     }
 
     public func getZaiApiKey() -> String? {
-        userDefaults.string(forKey: Keys.zaiApiKey)
+        zaiCredentials.get()
     }
 
     public func deleteZaiApiKey() {
-        userDefaults.removeObject(forKey: Keys.zaiApiKey)
+        zaiCredentials.delete()
     }
 
     public func hasZaiApiKey() -> Bool {
-        userDefaults.object(forKey: Keys.zaiApiKey) != nil
+        zaiCredentials.exists()
     }
 
     // MARK: - CopilotSettingsRepository (Probe Mode)

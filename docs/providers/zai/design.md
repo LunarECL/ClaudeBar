@@ -23,7 +23,7 @@ Z.ai has no CLI of its own. Users point Claude Code at Z.ai's Anthropic-compatib
 
 Known limits:
 
-- The env var is read from `ProcessInfo.processInfo.environment`, the app's own environment. Launched from Finder or Login Items, that doesn't include shell rc exports ([#170](https://github.com/tddworks/ClaudeBar/issues/170)). When it misses, `LoginShellEnvironment` re-reads the variable through the user's login shell (`$SHELL -l -c 'printf %s "$VAR"'` via the probe's `CLIExecutor`), validating the name against shell-identifier syntax before interpolating it. The lookup never logs the value.
+- The env var is read from `ProcessInfo.processInfo.environment`, the app's own environment. Launched from Finder or Login Items, that doesn't include shell rc exports ([#170](https://github.com/tddworks/ClaudeBar/issues/170)). When it misses, `LoginShellEnvironment` re-reads the variable through the user's interactive login shell (`$SHELL -l -i -c` via the probe's `CLIExecutor`), so both `~/.zshrc` and `~/.zprofile` get sourced. The name is validated against POSIX identifier syntax (ASCII) before interpolation, and the value is read between `@@CLAUDEBAR_BEGIN@@`/`@@CLAUDEBAR_END@@` markers printed by `printf` so rc-file noise can't concatenate onto it; marker-less output is discarded. The lookup never logs the value.
 - The custom path goes through `URL(fileURLWithPath:)` and `cat` without a shell, so `~` isn't expanded.
 
 ## Response

@@ -59,6 +59,7 @@ struct ZaiUsageProbeEnvVarFallbackTests {
     }
 
     private func stubLoginShell(_ mockExecutor: MockCLIExecutor, output: String, exitCode: Int32 = 0) {
+        let wrapped = "\(LoginShellEnvironment.beginMarker)\(output)\(LoginShellEnvironment.endMarker)\n"
         given(mockExecutor).execute(
             binary: .matching { $0 != "cat" },
             args: .any,
@@ -66,7 +67,7 @@ struct ZaiUsageProbeEnvVarFallbackTests {
             timeout: .any,
             workingDirectory: .any,
             autoResponses: .any
-        ).willReturn(CLIResult(output: output, exitCode: exitCode))
+        ).willReturn(CLIResult(output: wrapped, exitCode: exitCode))
     }
 
     private func makeSettingsRepository(

@@ -15,7 +15,11 @@ struct ZaiUsageProbeTests {
     ) -> UserDefaultsProviderSettingsRepository {
         let suiteName = "com.claudebar.test.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
-        let repo = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        let secureDefaults = UserDefaults(suiteName: suiteName + ".secure")!
+        let repo = UserDefaultsProviderSettingsRepository(
+            userDefaults: defaults,
+            secureCredentials: UserDefaultsCredentialRepository(defaults: secureDefaults)
+        )
         repo.setEnabled(true, forProvider: "zai")
         if let apiKey {
             repo.saveZaiApiKey(apiKey)
