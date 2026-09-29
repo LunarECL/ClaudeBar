@@ -281,7 +281,7 @@ struct ClaudeProviderTests {
         let claude = ClaudeProvider(cliProbe: cliProbe, apiProbe: apiProbe, settingsRepository: settings)
 
         let snapshot = try await claude.refresh()
-        #expect(snapshot.accountTier == .max)
+        #expect(snapshot.accountTier == .claudeMax)
     }
 
     @Test
@@ -303,6 +303,32 @@ struct ClaudeProviderTests {
         await #expect(throws: ProbeError.parseFailed("Could not find session usage")) {
             try await claude.refresh()
         }
+    }
+
+    @Test
+    func `refresh does not fall back to the CLI when cliFallbackEnabled is false`() async throws {
+        // #317 removed the `isAvailable()` pre-check from *both* directions, so
+        // the one gate left has to carry its own weight: `claude.cliFallbackEnabled`
+        // is the user's switch for running the CLI in the background, and with it
+        // off the API probe's failure must stand alone — no CLI subprocess, and the
+        // API's own error is what the user sees.
+        let settings = FakeClaudeSettings(probeMode: .api, cliFallbackEnabled: false)
+
+        let apiProbe = MockUsageProbe()
+        given(apiProbe).isAvailable().willReturn(true)
+        given(apiProbe).probe().willThrow(ProbeError.parseFailed("Could not read usage"))
+
+        let cliProbe = MockUsageProbe()
+        given(cliProbe).isAvailable().willReturn(true)
+
+        let claude = ClaudeProvider(cliProbe: cliProbe, apiProbe: apiProbe, settingsRepository: settings)
+
+        await #expect(throws: ProbeError.parseFailed("Could not read usage")) {
+            try await claude.refresh()
+        }
+        #expect(claude.lastError as? ProbeError == .parseFailed("Could not read usage"))
+        // The switch is the whole point: the CLI must never be launched.
+        verify(cliProbe).probe().called(0)
     }
 
     // MARK: - Background Refresh Floor (issue #204)
