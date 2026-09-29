@@ -15,7 +15,12 @@ public final class ProcessRPCTransport: RPCTransport, @unchecked Sendable {
     private let stdinPipe: Pipe
     private let stdoutPipe: Pipe
 
-    public init(executable: String, arguments: [String], environment: [String: String]? = nil) throws {
+    public init(
+        executable: String,
+        arguments: [String],
+        environment: [String: String]? = nil,
+        workingDirectory: URL? = nil
+    ) throws {
         self.process = Process()
         self.stdinPipe = Pipe()
         self.stdoutPipe = Pipe()
@@ -25,7 +30,7 @@ public final class ProcessRPCTransport: RPCTransport, @unchecked Sendable {
             AppLog.probes.debug("Shell PATH: \(BinaryLocator.shellPath())")
             throw ProbeError.cliNotFound(executable)
         }
-        
+
         AppLog.probes.debug("RPC transport: Found '\(executable)' at: \(executablePath)")
 
         var env = environment ?? ProcessInfo.processInfo.environment
@@ -34,6 +39,9 @@ public final class ProcessRPCTransport: RPCTransport, @unchecked Sendable {
         process.environment = env
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
+        // Some CLIs (Codex 0.150+, #267) trust-check the directory they start
+        // in before answering anything, so the caller picks the cwd.
+        process.currentDirectoryURL = workingDirectory
         process.standardInput = stdinPipe
         process.standardOutput = stdoutPipe
         process.standardError = FileHandle.nullDevice

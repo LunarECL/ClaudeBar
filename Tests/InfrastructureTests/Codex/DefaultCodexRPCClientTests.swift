@@ -377,7 +377,7 @@ struct DefaultCodexRPCClientTests {
         """)
 
         let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
-        client.transportFactory = { _, _ in mockTransport }
+        client.transportFactory = { _, _, _ in mockTransport }
 
         // When - fetch succeeds, shutdown is NOT called (simulates if caller forgets)
         _ = try await client.fetchRateLimits()
@@ -398,7 +398,7 @@ struct DefaultCodexRPCClientTests {
             .willThrow(ProbeError.executionFailed("TTY not available"))
 
         let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
-        client.transportFactory = { _, _ in mockTransport }
+        client.transportFactory = { _, _, _ in mockTransport }
 
         // When - fetch throws
         await #expect(throws: ProbeError.self) {
@@ -424,7 +424,7 @@ struct DefaultCodexRPCClientTests {
 
         var spawnedArgs: [String] = []
         let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
-        client.transportFactory = { _, args in
+        client.transportFactory = { _, args, _ in
             spawnedArgs = args
             return mockTransport
         }
@@ -453,7 +453,7 @@ struct DefaultCodexRPCClientTests {
             }
 
         let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
-        client.transportFactory = { _, _ in mockTransport }
+        client.transportFactory = { _, _, _ in mockTransport }
 
         _ = try await client.fetchRateLimits()
 
@@ -483,7 +483,7 @@ struct DefaultCodexRPCClientTests {
             }
 
         let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
-        client.transportFactory = { _, _ in mockTransport }
+        client.transportFactory = { _, _, _ in mockTransport }
 
         _ = try await client.fetchRateLimits()
 
@@ -508,7 +508,7 @@ struct DefaultCodexRPCClientTests {
             }
 
         let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
-        client.transportFactory = { _, _ in mockTransport }
+        client.transportFactory = { _, _, _ in mockTransport }
 
         _ = try await client.fetchRateLimits()
 
@@ -517,6 +517,28 @@ struct DefaultCodexRPCClientTests {
             "expected an auto-response for the directory-trust prompt"
         )
         #expect(trust.value.contains("1"))
+    }
+
+    @Test
+    func `spawns app-server in the dedicated probe working directory`() async throws {
+        let mockTransport = MockRPCTransport()
+        let mockExecutor = MockCLIExecutor()
+        setupMockTransport(mockTransport, rateLimitsResponse: """
+        {"id":2,"result":{"rateLimits":{"planType":"pro","primary":{"usedPercent":30,"resetsAt":1735000000}}}}
+        """)
+
+        var spawnedWorkingDirectory: URL?
+        let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
+        client.transportFactory = { _, _, workingDirectory in
+            spawnedWorkingDirectory = workingDirectory
+            return mockTransport
+        }
+
+        _ = try await client.fetchRateLimits()
+
+        let workingDirectory = try #require(spawnedWorkingDirectory, "expected app-server to start in the dedicated probe working directory, not the inherited one")
+        #expect(workingDirectory.path.contains("ClaudeBar/Probe"))
+        #expect(FileManager.default.fileExists(atPath: workingDirectory.path))
     }
 
     /// Value passed to `-a` / `--ask-for-approval`, if any.

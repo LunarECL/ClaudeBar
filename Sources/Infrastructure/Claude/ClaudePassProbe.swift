@@ -56,7 +56,7 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
     /// Probes the CLI for guest pass information.
     /// The /passes command copies the referral URL to clipboard.
     public func probe() async throws -> ClaudePass {
-        let workingDir = probeWorkingDirectory()
+        let workingDir = ProbeWorkingDirectory.resolve()
         AppLog.probes.info("Starting Claude probe with /passes command...")
 
         let result: CLIResult
@@ -181,14 +181,4 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
     }
 
     // MARK: - Helpers
-
-    private func probeWorkingDirectory() -> URL {
-        let fm = FileManager.default
-        let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fm.temporaryDirectory
-        let dir = base
-            .appendingPathComponent("ClaudeBar", isDirectory: true)
-            .appendingPathComponent("Probe", isDirectory: true)
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }
 }
