@@ -326,7 +326,10 @@ struct ClaudeProviderTests {
         await #expect(throws: ProbeError.parseFailed("Could not read usage")) {
             try await claude.refresh()
         }
-        #expect(claude.lastError as? ProbeError == .parseFailed("Could not find session usage"))
+        // The API probe is primary here, so its error is the one the user is
+        // shown and the one `lastError` holds — the CLI's error never happens,
+        // because the CLI is never launched.
+        #expect(claude.lastError as? ProbeError == .parseFailed("Could not read usage"))
         // The switch is the whole point: the CLI must never be launched.
         verify(cliProbe).probe().called(0)
     }
@@ -359,11 +362,12 @@ struct ClaudeProviderTests {
         _ = try? await claude.refresh()
 
         // One line, naming the fallback probe and its error, and never any
-        // credential value.
+        // credential value. `ProbeError`'s own wording is capitalised
+        // ("Authentication required…"), so the kind is matched case-insensitively.
         #expect(recorder.messages.count == 1)
         let message = recorder.messages.first ?? ""
         #expect(message.contains("API"))
-        #expect(message.contains("authentication"))
+        #expect(message.lowercased().contains("authentication"))
     }
 
     // MARK: - Background Refresh Floor (issue #204)
