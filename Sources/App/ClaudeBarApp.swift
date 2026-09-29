@@ -112,7 +112,7 @@ struct ClaudeBarApp: App {
             AmpCodeProvider(probe: AmpCodeUsageProbe(), settingsRepository: settingsRepository),
             KimiProvider(
                 cliProbe: KimiCLIUsageProbe(),
-                apiProbe: KimiUsageProbe(),
+                apiProbe: KimiUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
             KiroProvider(probe: KiroUsageProbe(), settingsRepository: settingsRepository),

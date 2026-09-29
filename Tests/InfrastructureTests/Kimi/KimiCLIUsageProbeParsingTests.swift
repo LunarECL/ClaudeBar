@@ -52,6 +52,24 @@ struct KimiCLIUsageProbeParsingTests {
     │   5h limit      ██░░░░░░░░░░░░░░░░░░  12% used  resets in 3h 35m │
     """
 
+    /// kimi CLI 2.x restructured the panel: Session usage / Context window sections,
+    /// and the plan quota is "Monthly limit" (new plans dropped the weekly window).
+    /// Captured from kimi CLI 2.1.1.
+    private static let cli2xOutput = """
+      ╭ Usage ────────────────────────────────────────────────────────────────╮
+      │ Session usage                                                         │
+      │   No token usage recorded yet.                                        │
+      │                                                                       │
+      │ Context window                                                        │
+      │   ░░░░░░░░░░░░░░░░░░░░      0%  (0 / 1M)                              │
+      │                                                                       │
+      │ Plan usage                                                            │
+      │   5h limit       ░░░░░░░░░░░░░░░░░░░░  0% used  resets in 2h 41m      │
+      │   Monthly limit  ░░░░░░░░░░░░░░░░░░░░  2% used  resets in 24d 16h 42m │
+      │                  kimi 2% · code 0%                                    │
+      ╰───────────────────────────────────────────────────────────────────────╯
+    """
+
     // MARK: - Full Output Parsing
 
     @Test
@@ -175,6 +193,42 @@ struct KimiCLIUsageProbeParsingTests {
         #expect(snapshot.quotas.count == 2)
         #expect(snapshot.quota(for: .weekly)?.percentRemaining == 10.0)
         #expect(snapshot.quota(for: .session)?.percentRemaining == 88.0)
+    }
+
+    // MARK: - CLI 2.x Layout (Monthly plan quota)
+
+    @Test
+    func `parse cli 2x layout extracts session and monthly quotas`() throws {
+        let snapshot = try KimiCLIUsageProbe.parse(Self.cli2xOutput)
+
+        #expect(snapshot.quotas.count == 2)
+        #expect(snapshot.quota(for: .session)?.percentRemaining == 100.0)
+        #expect(snapshot.quota(for: .timeLimit("Monthly"))?.percentRemaining == 98.0)
+    }
+
+    @Test
+    func `parse cli 2x layout ignores context window and split usage lines`() throws {
+        let snapshot = try KimiCLIUsageProbe.parse(Self.cli2xOutput)
+
+        // "Context window … 0%  (0 / 1M)" and "kimi 2% · code 0%" must not become quotas
+        #expect(snapshot.quotas.count == 2)
+        #expect(snapshot.quotas.contains { $0.quotaType == .weekly } == false)
+    }
+
+    @Test
+    func `parse cli 2x layout extracts reset texts`() throws {
+        let snapshot = try KimiCLIUsageProbe.parse(Self.cli2xOutput)
+
+        #expect(snapshot.quota(for: .session)?.resetText == "Resets in 2h 41m")
+        #expect(snapshot.quota(for: .timeLimit("Monthly"))?.resetText == "Resets in 24d 16h 42m")
+    }
+
+    @Test
+    func `parse cli 2x layout monthly quota uses 30 day duration`() throws {
+        let snapshot = try KimiCLIUsageProbe.parse(Self.cli2xOutput)
+        let monthly = snapshot.quota(for: .timeLimit("Monthly"))
+
+        #expect(monthly?.quotaType.duration == .days(30))
     }
 
     // MARK: - Reset Time Parsing

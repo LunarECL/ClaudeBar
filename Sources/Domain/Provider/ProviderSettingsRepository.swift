@@ -213,6 +213,12 @@ public protocol KimiSettingsRepository: ProviderSettingsRepository {
 
     /// Sets the probe mode for Kimi
     func setKimiProbeMode(_ mode: KimiProbeMode)
+
+    /// Gets the API region (china or international, default: china for legacy compatibility)
+    func kimiRegion() -> KimiRegion
+
+    /// Sets the API region
+    func setKimiRegion(_ region: KimiRegion)
 }
 
 /// MiniMax-specific settings repository, extending base ProviderSettingsRepository.
