@@ -185,6 +185,42 @@ struct ClaudeDailyUsageAnalyzerTests {
         #expect(report.today.totalTokens == 1500)
     }
 
+    @Test func `costs nothing for an unpriced model on a locally routed session`() async throws {
+        // The same name on a remote endpoint may still be billed, so it keeps its
+        // Sonnet-rate estimate there.
+        let jsonl = """
+        {"type":"assistant","message":{"model":"some-unknown-model","usage":{"input_tokens":1000,"output_tokens":500}},"timestamp":"\(Self.todayTimestamp())"}
+        """
+        let claudeDir = try setupTempClaudeDir(with: jsonl)
+        defer { try? FileManager.default.removeItem(at: claudeDir) }
+
+        let local = ClaudeDailyUsageAnalyzer(claudeDir: claudeDir, isLocallyServed: { true })
+        let remote = ClaudeDailyUsageAnalyzer(claudeDir: claudeDir, isLocallyServed: { false })
+
+        let localReport = try await local.analyzeToday()
+        let remoteReport = try await remote.analyzeToday()
+
+        #expect(localReport.today.totalCost == 0)
+        // Sonnet estimate for 1K input + 500 output tokens.
+        #expect(remoteReport.today.totalCost == Decimal(string: "0.0105"))
+        #expect(localReport.today.totalTokens == remoteReport.today.totalTokens)
+    }
+
+    @Test func `prices a known anthropic model at list price`() async throws {
+        // Regression guard: real spend must keep being counted — even with a loopback
+        // endpoint configured, which must not retroactively zero the 2-day window.
+        let jsonl = """
+        {"type":"assistant","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":1000,"output_tokens":500}},"timestamp":"\(Self.todayTimestamp())"}
+        """
+        let claudeDir = try setupTempClaudeDir(with: jsonl)
+        defer { try? FileManager.default.removeItem(at: claudeDir) }
+
+        let analyzer = ClaudeDailyUsageAnalyzer(claudeDir: claudeDir, isLocallyServed: { true })
+        let report = try await analyzer.analyzeToday()
+
+        #expect(report.today.totalCost == Decimal(string: "0.0105"))
+    }
+
     @Test func `separates today and yesterday records`() async throws {
         let now = Date()
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: now))!.addingTimeInterval(3600 * 12)

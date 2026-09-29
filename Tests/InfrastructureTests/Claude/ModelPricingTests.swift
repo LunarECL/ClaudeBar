@@ -137,4 +137,35 @@ struct ModelPricingTests {
         // nobody bills per token.
         #expect(ModelPricing.savings(for: record(model: "llama-3.3-70b-instruct")) == 0)
     }
+
+    @Test func `unpriced model costs nothing when the session is served locally`() {
+        // Provenance beats the name list: a local server may serve a model whose name
+        // we have never seen, and no per-token price can exist for it.
+        #expect(ModelPricing.cost(for: record(model: "some-unknown-model"), servedLocally: true) == 0)
+    }
+
+    @Test func `known anthropic model still costs list price`() {
+        // Regression guard: real spend keeps being counted.
+        #expect(ModelPricing.cost(for: record(model: "claude-sonnet-4-6")) == Decimal(string: "8.55"))
+    }
+
+    @Test func `known anthropic model keeps list price when served locally`() {
+        // The price table stays authoritative for names it knows: a loopback endpoint
+        // says nothing about which Anthropic model was billed, and scanning two days
+        // would otherwise retroactively zero real spend from before the switch.
+        #expect(ModelPricing.cost(for: record(model: "claude-sonnet-4-6"), servedLocally: true)
+            == Decimal(string: "8.55"))
+    }
+
+    @Test func `known anthropic model keeps cache savings when served locally`() {
+        #expect(ModelPricing.savings(for: record(model: "claude-sonnet-4-6"), servedLocally: true)
+            == Decimal(string: "2.7"))
+    }
+
+    @Test func `paid gateway model keeps the sonnet estimate`() {
+        // A remote gateway may bill per token, so an unpriced name there is still
+        // estimated — the local fix must not zero out Zai / DeepSeek / proxy users.
+        #expect(ModelPricing.price(for: "glm-4.6").inputPer1M == 3)
+        #expect(ModelPricing.price(for: "deepseek-r1").inputPer1M == 3)
+    }
 }
