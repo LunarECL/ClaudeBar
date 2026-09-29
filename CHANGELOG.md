@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Z.ai: paste your GLM API key in Settings → Providers → Z.ai → API KEY. It wins over the settings.json token and env vars, and works even when no Z.ai URL is in settings.json (quota then comes from api.z.ai).
 
 ### Fixed
+- MiniMax no longer shows 0% available usage on every model. The probe now reads the Token Plan remains endpoint and shows both the 5-hour and weekly windows per model (Token Plan keys report 0 of 0 requests on the old endpoint), falling back to request counts for older responses.
 - ClaudeBar no longer grows in memory the longer it runs. It could reach several GB after a day or two and then peg the CPU and freeze the menu bar panel. [#313](https://github.com/tddworks/ClaudeBar/issues/313)
 - Z.ai: the auth env var is now also read through your login shell, so a key exported in `~/.zshrc` or `~/.bash_profile` is found even when ClaudeBar starts from Finder or Login Items. [#170](https://github.com/tddworks/ClaudeBar/issues/170)
 - `claudebar://open` now opens the popover and `claudebar://refresh` refreshes, instead of both opening the Settings window. Also fixes tapping the Touch Bar widget. https://github.com/tddworks/ClaudeBar/pull/310

@@ -15,7 +15,7 @@ public enum MiniMaxRegion: String, Sendable, Equatable, CaseIterable {
         }
     }
 
-    /// API base URL for coding plan remains endpoint (Coding Plan API 基础 URL)
+    /// API base URL for token plan remains endpoint (Token Plan API 基础 URL)
     public var apiBaseURL: String {
         switch self {
         case .international: return "https://api.minimax.io"
@@ -51,8 +51,8 @@ public enum MiniMaxRegion: String, Sendable, Equatable, CaseIterable {
         }
     }
 
-    /// Full API URL for the coding plan remains endpoint (Coding Plan 剩余额度 API URL)
-    public var codingPlanRemainsURL: String {
-        "\(apiBaseURL)/v1/api/openplatform/coding_plan/remains"
+    /// Full API URL for the token plan remains endpoint (Token Plan 剩余额度 API URL)
+    public var tokenPlanRemainsURL: String {
+        "\(apiBaseURL)/v1/token_plan/remains"
     }
 }

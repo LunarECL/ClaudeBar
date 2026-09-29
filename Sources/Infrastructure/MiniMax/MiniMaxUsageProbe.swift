@@ -1,7 +1,7 @@
 import Foundation
 import Domain
 
-/// Probes MiniMax Coding Plan API for usage quota information.
+/// Probes MiniMax Token Plan API for usage quota information.
 /// Supports both international (minimax.io) and China (minimaxi.com) regions.
 /// (支持国际版和中国版两个区域)
 /// Authentication: Bearer token from env var or stored API key.
@@ -12,7 +12,7 @@ public struct MiniMaxUsageProbe: UsageProbe {
 
     /// Resolves the API URL based on the configured region (根据区域配置动态选择 API URL)
     var apiURL: String {
-        settingsRepository.minimaxRegion().codingPlanRemainsURL
+        settingsRepository.minimaxRegion().tokenPlanRemainsURL
     }
 
     public init(
@@ -134,30 +134,43 @@ public struct MiniMaxUsageProbe: UsageProbe {
             throw ProbeError.noData
         }
 
-        let quotas = modelRemains.map { model -> UsageQuota in
+        let quotas = modelRemains.flatMap { model -> [UsageQuota] in
+            // Interval (5h) window — percent when present, legacy counts otherwise.
+            // ⚠️ Legacy count naming is misleading: current_interval_usage_count
+            // is what's LEFT, not what's used (confirmed against the dashboard).
             let total = model.currentIntervalTotalCount
-            // ⚠️ MiniMax API naming is misleading:
-            // Despite being called "current_interval_usage_count", this field
-            // actually represents the REMAINING count, not the used count.
-            // Confirmed via MiniMax dashboard: when dashboard shows "3% used",
-            // API returns usage_count=1459 out of total=1500 (i.e. 1459 remaining).
-            // (MiniMax API 命名有误导性：usage_count 实际是剩余次数，非已用次数)
-            let clampedRemaining = min(max(model.currentIntervalUsageCount, 0), total)
-            let usedCount = total - clampedRemaining
-            let remaining = total > 0 ? Double(clampedRemaining) / Double(total) * 100.0 : 0.0
+            let clampedRemaining = min(max(model.currentIntervalUsageCount, 0), max(total, 0))
+            let usedCount = max(total - clampedRemaining, 0)
 
-            // Parse end_time as millisecond timestamp (毫秒时间戳)
-            let resetsAt: Date? = model.endTime.map { Date(timeIntervalSince1970: Double($0) / 1000.0) }
+            let intervalPercent = model.currentIntervalRemainingPercent.map(Self.clampPercentage)
+            let intervalRemaining = intervalPercent
+                ?? (total > 0 ? Double(clampedRemaining) / Double(total) * 100.0 : 0.0)
+            let intervalText = intervalPercent != nil
+                ? "\(Int((100 - intervalRemaining).rounded()))% used"
+                : "\(usedCount)/\(total) requests"
 
-            let resetText = "\(usedCount)/\(total) requests"
-
-            return UsageQuota(
-                percentRemaining: remaining,
+            var quotas = [UsageQuota(
+                percentRemaining: intervalRemaining,
                 quotaType: .modelSpecific(model.modelName),
                 providerId: providerId,
-                resetsAt: resetsAt,
-                resetText: resetText
-            )
+                resetsAt: model.endTime.map { Date(timeIntervalSince1970: Double($0) / 1000.0) },
+                resetText: intervalText,
+                windowDuration: Self.windowDuration(start: model.startTime, end: model.endTime)
+            )]
+
+            // Weekly window — only when the API reports a weekly percentage.
+            if let weeklyPercent = model.currentWeeklyRemainingPercent.map(Self.clampPercentage) {
+                quotas.append(UsageQuota(
+                    percentRemaining: weeklyPercent,
+                    quotaType: .timeLimit("\(model.modelName) Weekly"),
+                    providerId: providerId,
+                    resetsAt: model.weeklyEndTime.map { Date(timeIntervalSince1970: Double($0) / 1000.0) },
+                    resetText: "\(Int((100 - weeklyPercent).rounded()))% used",
+                    windowDuration: Self.windowDuration(start: model.weeklyStartTime, end: model.weeklyEndTime)
+                ))
+            }
+
+            return quotas
         }
 
         return UsageSnapshot(
@@ -165,6 +178,15 @@ public struct MiniMaxUsageProbe: UsageProbe {
             quotas: quotas,
             capturedAt: Date()
         )
+    }
+
+    private static func windowDuration(start: Int64?, end: Int64?) -> TimeInterval? {
+        guard let start, let end, end > start else { return nil }
+        return Double(end - start) / 1000.0
+    }
+
+    private static func clampPercentage(_ value: Double) -> Double {
+        min(max(value, 0), 100)
     }
 }
 
@@ -184,6 +206,11 @@ struct ModelRemain: Decodable {
     let modelName: String
     let currentIntervalTotalCount: Int
     let currentIntervalUsageCount: Int
+    let currentIntervalRemainingPercent: Double?
+    let currentWeeklyRemainingPercent: Double?
     let remainsTime: Int?
+    let startTime: Int64?
     let endTime: Int64?
+    let weeklyStartTime: Int64?
+    let weeklyEndTime: Int64?
 }
