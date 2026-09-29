@@ -21,6 +21,15 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         )
     }
 
+    private var zaiCredentials: SecureCredentialMigration {
+        SecureCredentialMigration(
+            secureStore: secureCredentials,
+            legacyStore: userDefaults,
+            secureKey: CredentialKey.zaiApiKey,
+            legacyKey: Keys.zaiApiKey
+        )
+    }
+
     /// Creates a repository with settings in UserDefaults and secrets in Keychain.
     /// - Parameters:
     ///   - userDefaults: The UserDefaults instance used for non-sensitive settings.
@@ -76,6 +85,22 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
 
     public func setGlmAuthEnvVar(_ envVar: String) {
         userDefaults.set(envVar, forKey: Keys.glmAuthEnvVar)
+    }
+
+    public func saveZaiApiKey(_ key: String) {
+        zaiCredentials.save(key)
+    }
+
+    public func getZaiApiKey() -> String? {
+        zaiCredentials.get()
+    }
+
+    public func deleteZaiApiKey() {
+        zaiCredentials.delete()
+    }
+
+    public func hasZaiApiKey() -> Bool {
+        zaiCredentials.exists()
     }
 
     // MARK: - CopilotSettingsRepository (Probe Mode)
@@ -463,6 +488,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let kimiProbeMode = "providerConfig.kimiProbeMode"
         static let zaiConfigPath = "providerConfig.zaiConfigPath"
         static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
+        static let zaiApiKey = "com.claudebar.credentials.zai-api-key"
         static let copilotProbeMode = "providerConfig.copilotProbeMode"
         static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"
         static let copilotMonthlyLimit = "providerConfig.copilotMonthlyLimit"

@@ -39,6 +39,15 @@ public final class JSONSettingsRepository:
         )
     }
 
+    private var zaiCredentials: SecureCredentialMigration {
+        SecureCredentialMigration(
+            secureStore: secureCredentials,
+            legacyStore: credentials,
+            secureKey: CredentialKey.zaiApiKey,
+            legacyKey: Self.legacyZaiApiKeyKey
+        )
+    }
+
     public init(
         store: JSONSettingsStore,
         credentials: UserDefaults = .standard,
@@ -368,6 +377,24 @@ public final class JSONSettingsRepository:
 
     public func setGlmAuthEnvVar(_ envVar: String) {
         store.write(value: envVar, key: "zai.glmAuthEnvVar")
+    }
+
+    // Z.ai Credentials (Keychain with legacy UserDefaults migration)
+
+    public func saveZaiApiKey(_ key: String) {
+        zaiCredentials.save(key)
+    }
+
+    public func getZaiApiKey() -> String? {
+        zaiCredentials.get()
+    }
+
+    public func deleteZaiApiKey() {
+        zaiCredentials.delete()
+    }
+
+    public func hasZaiApiKey() -> Bool {
+        zaiCredentials.exists()
     }
 
     // MARK: - CopilotSettingsRepository
@@ -798,6 +825,7 @@ public final class JSONSettingsRepository:
     }
 
     private static let legacyVercelApiKeyKey = "com.claudebar.credentials.vercel-api-key"
+    private static let legacyZaiApiKeyKey = "com.claudebar.credentials.zai-api-key"
 }
 
 // MARK: - DeepSeekSettingsRepository
