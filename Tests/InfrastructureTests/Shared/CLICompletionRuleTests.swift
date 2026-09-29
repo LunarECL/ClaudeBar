@@ -106,13 +106,42 @@ struct CLICompletionRuleTests {
         #expect(!CLICompletionRule.claudeUsage.isPending(split))
     }
 
-    /// The same placeholder, cursor-split the way the CLI really writes it. This
-    /// is why the "Loading usage data" marker #271 added never once matched a
-    /// real screen in the 430 captures attached to #317.
+    /// The same placeholder, cursor-split the way the CLI really writes it: the
+    /// "Loading usage data" marker #271 added is a raw substring of 0 of the
+    /// 430 captures attached to #317 and a normalised match in 12, so a raw
+    /// search could never have fired on a real screen.
     @Test
     func `a cursor-split placeholder is still pending`() {
         let split = "\u{1B}[3C\u{1B}[2BLoading\u{1B}[12Gusage\u{1B}[18Gdata…"
         #expect(CLICompletionRule.claudeUsage.isPending(split))
+    }
+
+    /// A marker has to be a whole token, not a fragment of one. Collapsing the
+    /// terminal's padding is what lets a phrase match across a word seam, so the
+    /// boundary has to be checked rather than assumed (#317).
+    @Test
+    func `a marker does not match inside a longer word`() {
+        let label = CLICompletionRule(readyMarkers: ["Current session"])
+        #expect(!label.isReady("myCurrent session here"))
+        #expect(!label.isReady("XCurrent sessionY"))
+        #expect(!label.isReady("Current sessions"))
+        #expect(label.isReady("Current session"))
+    }
+
+    /// #317: the user's own SessionStart hook prints "The current session will
+    /// seed it…", and on its own that satisfies the `Current session` marker —
+    /// a false ready on a screen that never reached the Usage tab. The CLI
+    /// paints a section label as a whole row, so the marker has to end at the end
+    /// of its row; the hook's words sit mid-sentence.
+    @Test
+    func `hook prose that happens to contain the label is not a ready screen`() {
+        let hookProse = """
+        \u{1B}[1B  \u{1B}[5C\u{1B}[6G\u{1B}[25GSessionStart:startup says: # claude-mem status
+        \u{1B}[1B    \u{1B}[5CThis project has no memory yet. The current session will seed it; subsequent sessions will receive auto-injected context for relevant past work.
+        """
+        let label = CLICompletionRule(readyMarkers: ["Current session"])
+        #expect(!label.isReady(hookProse))
+        #expect(CLICompletionRule.claudeUsage.isPending(hookProse))
     }
 
     @Test
