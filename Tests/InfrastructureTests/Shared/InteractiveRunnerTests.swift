@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Domain
 @testable import Infrastructure
 
 @Suite
@@ -74,6 +75,26 @@ struct InteractiveRunnerTests {
         )
 
         #expect(result.output.contains("CLAUDEBAR_TEST_PRESERVE_VAR=should_be_present"))
+    }
+
+    // MARK: - Environment additions (issue #222)
+
+    @Test
+    func `Options defaults environmentAdditions to empty`() {
+        #expect(InteractiveRunner.Options().environmentAdditions.isEmpty)
+    }
+
+    @Test
+    func `run with environmentAdditions passes env vars to subprocess`() throws {
+        let runner = InteractiveRunner()
+
+        let result = try runner.run(
+            binary: "/usr/bin/env",
+            input: "",
+            options: .init(environmentAdditions: [HookConstants.probeEnvironmentKey: "1"])
+        )
+
+        #expect(result.output.contains("\(HookConstants.probeEnvironmentKey)=1"))
     }
 
     // MARK: - Completion Rule (issue #271)

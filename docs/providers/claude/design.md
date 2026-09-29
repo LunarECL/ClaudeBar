@@ -23,6 +23,12 @@ Contributor notes for the Claude provider. For setup, see the [README](README.md
 - **Never after `ProbeError.rateLimited`.** The CLI uses the same backend, so falling back only makes the throttling worse.
 - **Both fail**: report the *primary* error. The fallback's error is incidental and would send users after the wrong problem.
 
+## Hooks and the probe
+
+- Every probe run is a full Claude Code session, so the user's SessionStart/SessionEnd hooks fire for it too — a "Claude Code Started"/"Finished" pair on every quota poll (#222). Hooks live in the user-global `~/.claude/settings.json`, so running in the dedicated probe directory does not exempt a session from them. ClaudeBar owns both ends: the sessions it spawns itself (`/usage`, `/cost`, `/passes`) carry `CLAUDEBAR_PROBE=1` (`ClaudeUsageProbe.probeEnvironment`, carried by `DefaultCLIExecutor.environmentAdditions` → `InteractiveRunner.Options`), and the `__claudebar_hook` wrapper installed by `HookInstaller` returns before the curl POST when that variable is set.
+- The guarded wrapper reaches existing users because `install()` re-runs at launch when hooks are already installed (`ClaudeBarApp.init`), replacing only ClaudeBar's own matcher entries.
+- A second net in `SessionEvent.isClaudeBarProbe` drops events from the probe working directory (`…/ClaudeBar/Probe` suffix) — that filter predates the env marker and misses payloads whose `cwd` is missing or reshaped.
+
 ## CLI screen parsing
 
 - **Render the whole buffer, not just the visible screen.** In recent CLI versions `/usage` grew taller than the probe's 160×50 terminal (a usage-contribution report was added), which pushed the quota sections into scrollback. The renderer now reads visible rows plus scrollback.

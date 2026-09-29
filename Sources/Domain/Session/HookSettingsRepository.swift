@@ -4,6 +4,12 @@ import Foundation
 public enum HookConstants {
     /// Default port for the hook HTTP server
     public static let defaultPort: UInt16 = 19847
+
+    /// Environment variable ClaudeBar sets on the claude sessions it spawns
+    /// itself (quota probes). The hook command ClaudeBar installs checks it
+    /// and exits without POSTing, so a background quota poll can't loop back
+    /// through the user's hooks as a Claude session (#222).
+    public static let probeEnvironmentKey = "CLAUDEBAR_PROBE"
 }
 
 /// Settings repository for hook configuration.
