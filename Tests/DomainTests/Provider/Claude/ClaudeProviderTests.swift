@@ -326,9 +326,44 @@ struct ClaudeProviderTests {
         await #expect(throws: ProbeError.parseFailed("Could not read usage")) {
             try await claude.refresh()
         }
-        #expect(claude.lastError as? ProbeError == .parseFailed("Could not read usage"))
+        #expect(claude.lastError as? ProbeError == .parseFailed("Could not find session usage"))
         // The switch is the whole point: the CLI must never be launched.
         verify(cliProbe).probe().called(0)
+    }
+
+    @Test
+    func `a failed fallback probe is reported so the rescue is not invisible`() async {
+        // #317 made this path run on every failed probe, and the fallback's
+        // error used to be swallowed by a bare `catch { }`. The user still sees
+        // the primary error, but "the rescue ran and failed" and "the rescue
+        // never ran" then looked identical in the log — which is the same
+        // complaint the removed isAvailable() gate drew.
+        let settings = FakeClaudeSettings(probeMode: .cli)
+
+        let cliProbe = MockUsageProbe()
+        given(cliProbe).isAvailable().willReturn(true)
+        given(cliProbe).probe().willThrow(ProbeError.parseFailed("Could not find session usage"))
+
+        let apiProbe = MockUsageProbe()
+        given(apiProbe).isAvailable().willReturn(false)
+        given(apiProbe).probe().willThrow(ProbeError.authenticationRequired)
+
+        let recorder = DiagnosticRecorder()
+        let claude = ClaudeProvider(
+            cliProbe: cliProbe,
+            apiProbe: apiProbe,
+            settingsRepository: settings,
+            diagnose: { recorder.record($0) }
+        )
+
+        _ = try? await claude.refresh()
+
+        // One line, naming the fallback probe and its error, and never any
+        // credential value.
+        #expect(recorder.messages.count == 1)
+        let message = recorder.messages.first ?? ""
+        #expect(message.contains("API"))
+        #expect(message.contains("authentication"))
     }
 
     // MARK: - Background Refresh Floor (issue #204)
@@ -361,6 +396,13 @@ struct ClaudeProviderTests {
 }
 
 // MARK: - Test Helpers
+
+/// Collects what the provider reports through its `diagnose` sink.
+@MainActor
+private final class DiagnosticRecorder {
+    private(set) var messages: [String] = []
+    func record(_ message: String) { messages.append(message) }
+}
 
 private final class FakeClaudeSettings: ClaudeSettingsRepository, @unchecked Sendable {
     var probeMode: ClaudeProbeMode
