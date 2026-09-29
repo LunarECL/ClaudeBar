@@ -893,7 +893,8 @@ struct QuotaMonitorTests {
         let claudeProbe = CountingUsageProbe(providerId: "claude")
         let codexProbe = CountingUsageProbe(providerId: "codex")
         let claudeProvider = ClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-        let codexProvider = CodexProvider(probe: codexProbe, settingsRepository: settings)
+        // Verified: this test covers the monitoring loop, not the passivity gate
+        let codexProvider = CodexProvider(probe: codexProbe, settingsRepository: VerifiedCodexSettings())
         let monitor = makeSuspendingMonitor(providers: AIProviders(providers: [claudeProvider, codexProvider]))
 
         // When - App layer passes selected + configured menu bar provider ids in percentage mode.
@@ -938,7 +939,8 @@ struct QuotaMonitorTests {
         let claudeProbe = CountingUsageProbe(providerId: "claude")
         let codexProbe = CountingUsageProbe(providerId: "codex")
         let claudeProvider = ClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-        let codexProvider = CodexProvider(probe: codexProbe, settingsRepository: settings)
+        // Verified: this test covers the monitoring loop, not the passivity gate
+        let codexProvider = CodexProvider(probe: codexProbe, settingsRepository: VerifiedCodexSettings())
         let monitor = makeSuspendingMonitor(providers: AIProviders(providers: [claudeProvider, codexProvider]))
         monitor.selectProvider(id: "codex")
 
@@ -1601,4 +1603,19 @@ struct QuotaMonitorTests {
         #expect(codex.isEnabled == true)
         #expect(monitor.selectedProviderId == "claude")
     }
+}
+
+/// Codex settings with the verified-at-least-once flag already set, so the
+/// monitoring-loop tests exercise the loop itself instead of the issue-216
+/// passivity gate (an unverified Codex stays passive in the background).
+private final class VerifiedCodexSettings: CodexSettingsRepository, @unchecked Sendable {
+    func isEnabled(forProvider id: String) -> Bool { true }
+    func isEnabled(forProvider id: String, defaultValue: Bool) -> Bool { true }
+    func setEnabled(_ enabled: Bool, forProvider id: String) {}
+    func customCardURL(forProvider id: String) -> String? { nil }
+    func setCustomCardURL(_ url: String?, forProvider id: String) {}
+    func codexProbeMode() -> CodexProbeMode { .rpc }
+    func setCodexProbeMode(_ mode: CodexProbeMode) {}
+    func codexVerifiedAtLeastOnce() -> Bool { true }
+    func setCodexVerifiedAtLeastOnce(_ verified: Bool) {}
 }

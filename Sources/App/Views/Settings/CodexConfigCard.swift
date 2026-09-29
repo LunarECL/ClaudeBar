@@ -117,7 +117,7 @@ struct CodexConfigCard: View {
                             .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
                             .foregroundStyle(codexProbeMode == .rpc ? theme.textPrimary : theme.textSecondary)
 
-                        Text("Uses codex app-server via JSON-RPC. Default, works with any auth.")
+                        Text("Uses codex app-server via JSON-RPC. Default, works with any auth. ClaudeBar never starts the Codex login itself.")
                             .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
                             .foregroundStyle(theme.textTertiary)
                     }
