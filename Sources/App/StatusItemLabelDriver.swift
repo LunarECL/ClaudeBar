@@ -533,9 +533,8 @@ final class StatusItemLabelDriver {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.blinkPhase.toggle()
-                // refreshNow, not renderNow: the tick must not arm a new
-                // observation registration twice a second, and must keep the
-                // equality check so a colon-less label ("2d") never repaints.
+                // refreshNow, not renderNow: the tick must keep the equality
+                // check so a colon-less label ("2d") never repaints.
                 self.labelSync?.refreshNow()
             }
         }
