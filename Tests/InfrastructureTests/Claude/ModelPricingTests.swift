@@ -4,6 +4,20 @@ import Testing
 
 @Suite
 struct ModelPricingTests {
+    /// A record with 1M in / 100K out / 1M cache-write / 1M cache-read tokens.
+    private func record(model: String) -> TokenUsageRecord {
+        TokenUsageRecord(
+            messageId: nil,
+            requestId: nil,
+            model: model,
+            inputTokens: 1_000_000,
+            outputTokens: 100_000,
+            cacheCreationTokens: 1_000_000,
+            cacheReadTokens: 1_000_000,
+            timestamp: Date()
+        )
+    }
+
     @Test func `sonnet pricing matches published rates`() {
         let price = ModelPricing.price(for: "claude-sonnet-4-6")
         #expect(price.inputPer1M == 3)
@@ -105,5 +119,22 @@ struct ModelPricingTests {
         )
         // 2M × $4.50/M = $9.00
         #expect(ModelPricing.savings(for: record) == 9)
+    }
+
+    // MARK: - Locally served models (issue #190)
+
+    @Test func `local model produces zero cost`() {
+        #expect(ModelPricing.cost(for: record(model: "qwen3-coder")) == 0)
+    }
+
+    @Test func `local model with runtime tag produces zero cost`() {
+        // ollama / LM Studio echo the tag back: "qwen3-coder:30b", "qwen2.5-coder:7b".
+        #expect(ModelPricing.cost(for: record(model: "qwen3-coder:30b")) == 0)
+    }
+
+    @Test func `local model produces zero cache savings`() {
+        // Cache savings at Anthropic rates would be a fabricated number for a model
+        // nobody bills per token.
+        #expect(ModelPricing.savings(for: record(model: "llama-3.3-70b-instruct")) == 0)
     }
 }

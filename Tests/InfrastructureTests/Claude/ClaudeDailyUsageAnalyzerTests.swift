@@ -168,6 +168,23 @@ struct ClaudeDailyUsageAnalyzerTests {
         #expect(report.today.totalTokens == 3000)
     }
 
+    @Test func `costs nothing for a locally served model`() async throws {
+        // issue #190: Claude Code routed to a local server (ollama / LM Studio) still
+        // writes a full usage block, so the tokens are real but nothing was billed.
+        let jsonl = """
+        {"type":"assistant","message":{"model":"qwen3-coder:30b","usage":{"input_tokens":1000,"output_tokens":500}},"timestamp":"\(Self.todayTimestamp())"}
+        """
+        let claudeDir = try setupTempClaudeDir(with: jsonl)
+        defer { try? FileManager.default.removeItem(at: claudeDir) }
+
+        let report = try await ClaudeDailyUsageAnalyzer(claudeDir: claudeDir).analyzeToday()
+
+        #expect(report.today.totalCost == 0)
+        #expect(report.today.cachedSavings == 0)
+        // Tokens were still consumed locally — the token card keeps counting them.
+        #expect(report.today.totalTokens == 1500)
+    }
+
     @Test func `separates today and yesterday records`() async throws {
         let now = Date()
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: now))!.addingTimeInterval(3600 * 12)
