@@ -233,4 +233,57 @@ struct CodexCredentialLoaderTests {
         #expect(reloaded?.refreshToken == "new-refresh")
         #expect(reloaded?.lastRefresh != nil)
     }
+
+    // MARK: - CODEX_HOME Tests
+
+    @Test
+    func `authFilePath honors CODEX_HOME`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = CodexCredentialLoader(
+            homeDirectory: tempDir.path,
+            environment: ["CODEX_HOME": tempDir.appendingPathComponent("custom-codex").path]
+        )
+
+        #expect(loader.authFilePath == tempDir.appendingPathComponent("custom-codex/auth.json").path)
+    }
+
+    @Test
+    func `authFilePath falls back to home dot codex when CODEX_HOME is unset`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = CodexCredentialLoader(homeDirectory: tempDir.path, environment: [:])
+
+        #expect(loader.authFilePath == tempDir.appendingPathComponent(".codex/auth.json").path)
+    }
+
+    @Test
+    func `authFilePath falls back to home dot codex when CODEX_HOME is empty`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = CodexCredentialLoader(homeDirectory: tempDir.path, environment: ["CODEX_HOME": ""])
+
+        #expect(loader.authFilePath == tempDir.appendingPathComponent(".codex/auth.json").path)
+    }
+
+    @Test
+    func `loadCredentials reads auth json from CODEX_HOME`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let codexHome = tempDir.appendingPathComponent("custom-codex", isDirectory: true)
+        try FileManager.default.createDirectory(at: codexHome, withIntermediateDirectories: true)
+        let auth = codexHome.appendingPathComponent("auth.json")
+        try Data("{\"tokens\":{\"access_token\":\"codex-home-token\"}}".utf8).write(to: auth)
+
+        let loader = CodexCredentialLoader(
+            homeDirectory: tempDir.path,
+            environment: ["CODEX_HOME": codexHome.path]
+        )
+
+        #expect(loader.loadCredentials()?.accessToken == "codex-home-token")
+    }
 }
