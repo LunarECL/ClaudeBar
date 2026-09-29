@@ -69,14 +69,20 @@ struct CLICompletionRuleTests {
         #expect(!CLICompletionRule.claudeUsage.isPending(Self.loadedScreen))
     }
 
+    /// #317 changed this invariant, and the old name said what it claimed:
+    /// "no placeholder" was treated as "settled". The placeholder is only one way
+    /// a `/usage` capture can be unfinished — a CLI that has not opened the Usage
+    /// tab yet is equally unfinished, and accepting that screen handed the parser
+    /// captures with nothing in them. Readiness is now positive evidence: a ready
+    /// marker on screen, and without one the capture is still filling in.
     @Test
-    func `output without a placeholder is never pending`() {
+    func `output that never reached the Usage tab is pending even without a placeholder`() {
         let costPanelOnly = """
         Opus 5 (1M context) · API Usage Billing
           Session
             Total cost:            $0.0000
         """
-        #expect(!CLICompletionRule.claudeUsage.isPending(costPanelOnly))
+        #expect(CLICompletionRule.claudeUsage.isPending(costPanelOnly))
     }
 
     /// #317: the screen the CLI shows while still booting carries no ready marker
@@ -84,6 +90,29 @@ struct CLICompletionRuleTests {
     @Test
     func `the boot screen from issue 317 is still pending`() {
         #expect(CLICompletionRule.claudeUsage.isPending(Self.bootScreen))
+    }
+
+    /// A TUI redraw writes every word run at its own absolute column, so
+    /// `Current session` reaches the PTY as `Curre␛[10Gt␛[12Gsession` and
+    /// `38% used` as `38%␛[59Gused`. Searching the raw bytes for a ready marker
+    /// never finds them, which would hold the capture open on a screen that is
+    /// already finished.
+    @Test
+    func `a ready marker split across cursor positions still ends the wait`() {
+        let split = """
+        \u{1B}[3C\u{1B}[2BCurre\u{1B}[10Gt\u{1B}[12Gsession
+        \u{1B}[1B█████\u{1B}[55G38%\u{1B}[59Gused
+        """
+        #expect(!CLICompletionRule.claudeUsage.isPending(split))
+    }
+
+    /// The same placeholder, cursor-split the way the CLI really writes it. This
+    /// is why the "Loading usage data" marker #271 added never once matched a
+    /// real screen in the 430 captures attached to #317.
+    @Test
+    func `a cursor-split placeholder is still pending`() {
+        let split = "\u{1B}[3C\u{1B}[2BLoading\u{1B}[12Gusage\u{1B}[18Gdata…"
+        #expect(CLICompletionRule.claudeUsage.isPending(split))
     }
 
     @Test
@@ -94,7 +123,7 @@ struct CLICompletionRuleTests {
 
     @Test
     func `markers match regardless of case`() {
-        let rule = CLICompletionRule(pendingMarkers: ["loading"], readyMarkers: ["done"])
+        let rule = CLICompletionRule(readyMarkers: ["done"])
         #expect(rule.isPending("LOADING…"))
         #expect(!rule.isPending("LOADING… DONE"))
     }
