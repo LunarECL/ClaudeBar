@@ -330,16 +330,22 @@ the case that would otherwise have been guessed wrong in both directions.
 
 ### Provenance plumbing
 
-`ClaudeLocalInferenceDetector` reads `~/.claude.json` — `env.ANTHROPIC_BASE_URL` and
-the `providers` array, the same file and shapes `ZaiUsageProbe` already parses — and
-reports whether any configured base URL resolves to a loopback host (`localhost`,
-`127.0.0.1`, `::1`, `0.0.0.0`, `*.localhost`). `ClaudeBarApp` passes
+`ClaudeLocalInferenceDetector` reads `~/.claude.json` — `env.ANTHROPIC_BASE_URL`, or the
+`providers` array when that key is absent, the same file and shapes `ZaiUsageProbe`
+already parses — and reports whether the active base URL resolves to a loopback host
+(`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `*.localhost`). `ClaudeBarApp` passes
 `isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }` into
 `ClaudeDailyUsageAnalyzer`; the analyzer's default is `{ false }` so tests never read
 the developer's own config, matching `ClaudeUsageProbe`'s no-op resolver.
 
 - **Resolved per scan, not at init**, so pointing the CLI at a local server takes
   effect on the next popover open without an app restart.
+- **`env` outranks `providers`.** `providers` is the menu of gateways a user *may*
+  switch between; `env.ANTHROPIC_BASE_URL` is the one Claude Code is routed at. A
+  config listing `api.z.ai` alongside a leftover `localhost:11434` is the ordinary
+  shape of a machine that tries both, and OR-ing the two would mark the window local
+  and zero a real GLM/DeepSeek estimate for a machine running no local inference at
+  all. `providers` is consulted only when `env` names no route.
 - **Loopback only.** A remote `ANTHROPIC_BASE_URL` (z.ai, a corporate proxy) is
   still billed by somebody, so it proves nothing. An unparseable URL counts as
   remote: zeroing a cost because parsing failed would silently under-report spend.
@@ -365,6 +371,7 @@ the developer's own config, matching `ClaudeUsageProbe`'s no-op resolver.
 | `glm-4.6`, `deepseek-r1` | still priced (paid-gateway names stay estimated) |
 | analyzer over a local-model JSONL | `totalCost == 0` while `totalTokens == 1500` |
 | detector | loopback hosts true, gateway/LAN/unparseable false, `providers[]` shapes |
+| detector | a `localhost` entry in `providers[]` does not override a remote `env` route, and vice versa |
 
 ---
 

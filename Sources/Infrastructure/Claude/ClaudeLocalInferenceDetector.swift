@@ -9,8 +9,9 @@ import Foundation
 /// a local server may serve a model we have never heard of, under any name.
 ///
 /// Read from `~/.claude.json`, the same file `ZaiUsageProbe` inspects:
-/// `env.ANTHROPIC_BASE_URL` (Claude Code's own setting) and the `providers`
-/// array form. A missing, unreadable or remote URL simply means "not local".
+/// `env.ANTHROPIC_BASE_URL` — Claude Code's own setting, and the route it will
+/// actually take — and, only when that key is absent, the `providers` array. A
+/// missing, unreadable or remote URL simply means "not local".
 public enum ClaudeLocalInferenceDetector {
     /// Hosts that address this machine.
     private static let loopbackHosts: Set<String> = [
@@ -27,7 +28,7 @@ public enum ClaudeLocalInferenceDetector {
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return false }
 
-        return baseURLs(in: root).contains(where: isLoopback)
+        return activeBaseURLs(in: root).contains(where: isLoopback)
     }
 
     /// Whether a base URL string points at this machine.
@@ -40,15 +41,33 @@ public enum ClaudeLocalInferenceDetector {
         return loopbackHosts.contains(bare) || bare.hasSuffix(".localhost")
     }
 
-    /// Every `ANTHROPIC_BASE_URL` Claude Code could be using.
-    static func baseURLs(in root: [String: Any]) -> [String] {
-        var urls: [String] = []
+    /// The base URLs that could be in use right now, most authoritative first.
+    ///
+    /// `env.ANTHROPIC_BASE_URL` wins outright and the `providers` array is not
+    /// consulted at all: `providers` is the menu of gateways a user *may* switch
+    /// between, while `env` is the one Claude Code is routed at. A config that
+    /// lists a local entry next to a paid gateway is the ordinary shape of a
+    /// machine that tries both, and OR-ing them would mark the whole two-day
+    /// window local — zeroing a real z.ai/DeepSeek estimate for a machine that is
+    /// not running local inference at all.
+    static func activeBaseURLs(in root: [String: Any]) -> [String] {
         if let env = root["env"] as? [String: Any],
            let baseURL = env["ANTHROPIC_BASE_URL"] as? String {
-            urls.append(baseURL)
+            return [baseURL]
         }
+        return providersBaseURLs(in: root)
+    }
+
+    /// The base URLs declared by the `providers` array, consulted only when
+    /// `env.ANTHROPIC_BASE_URL` is absent.
+    static func providersBaseURLs(in root: [String: Any]) -> [String] {
+        var urls: [String] = []
         for provider in root["providers"] as? [[String: Any]] ?? [] {
             if let baseURL = provider["base_url"] as? String { urls.append(baseURL) }
+            // Speculative: unlike `providers[].base_url`, this nested shape is one
+            // `ZaiUsageProbe` does not parse and no observed config exhibits. Kept
+            // only so it cannot cost us a true positive; it is never consulted when
+            // `env` names a route.
             if let env = provider["env"] as? [String: Any],
                let baseURL = env["ANTHROPIC_BASE_URL"] as? String {
                 urls.append(baseURL)
