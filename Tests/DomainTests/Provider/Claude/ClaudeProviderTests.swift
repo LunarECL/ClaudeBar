@@ -251,6 +251,60 @@ struct ClaudeProviderTests {
         }
     }
 
+    // MARK: - Fallback Gate (issue #317)
+
+    @Test
+    func `refresh falls back to the API probe even when its isAvailable says no`() async throws {
+        // `isAvailable()` is a second, independently implemented answer to "can
+        // this probe work?", asked before every fallback. When it said no the
+        // rescue was skipped and nothing said so — 115 refreshes in the log
+        // attached to #317 where only the broken CLI probe ever ran, and the user
+        // saw "Claude Unavailable" throughout. The API probe decides for itself
+        // inside `probe()`, and its error is discarded in favour of the primary
+        // one, so the pre-check bought nothing but silent skips.
+        let settings = FakeClaudeSettings(probeMode: .cli)
+
+        let cliProbe = MockUsageProbe()
+        given(cliProbe).isAvailable().willReturn(true)
+        given(cliProbe).probe().willThrow(ProbeError.parseFailed("Could not find session usage"))
+
+        let apiSnapshot = UsageSnapshot(
+            providerId: "claude",
+            quotas: [],
+            capturedAt: Date(),
+            accountTier: .claudeMax
+        )
+        let apiProbe = MockUsageProbe()
+        given(apiProbe).isAvailable().willReturn(false)
+        given(apiProbe).probe().willReturn(apiSnapshot)
+
+        let claude = ClaudeProvider(cliProbe: cliProbe, apiProbe: apiProbe, settingsRepository: settings)
+
+        let snapshot = try await claude.refresh()
+        #expect(snapshot.accountTier == .max)
+    }
+
+    @Test
+    func `refresh surfaces the CLI error when the API fallback also fails`() async throws {
+        // Dropping the availability pre-check must not change which error wins:
+        // the primary failure is still the one the user is shown.
+        let settings = FakeClaudeSettings(probeMode: .cli)
+
+        let cliProbe = MockUsageProbe()
+        given(cliProbe).isAvailable().willReturn(true)
+        given(cliProbe).probe().willThrow(ProbeError.parseFailed("Could not find session usage"))
+
+        let apiProbe = MockUsageProbe()
+        given(apiProbe).isAvailable().willReturn(false)
+        given(apiProbe).probe().willThrow(ProbeError.authenticationRequired)
+
+        let claude = ClaudeProvider(cliProbe: cliProbe, apiProbe: apiProbe, settingsRepository: settings)
+
+        await #expect(throws: ProbeError.parseFailed("Could not find session usage")) {
+            try await claude.refresh()
+        }
+    }
+
     // MARK: - Background Refresh Floor (issue #204)
 
     @Test

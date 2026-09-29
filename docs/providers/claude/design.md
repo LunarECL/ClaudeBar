@@ -18,8 +18,8 @@ Contributor notes for the Claude provider. For setup, see the [README](README.md
 
 `ClaudeProvider` runs the chosen mode first and, if it fails, the other one:
 
-- **CLI → API**: when the API probe has credentials. This recovers from `/usage` parse failures and from subscriptions the CLI can't see.
-- **API → CLI**: only while `claude.cliFallbackEnabled` is on (the default). Users asked for an off switch because running the CLI in the background can cause prompts (e.g. SSH keys).
+- **CLI → API**: unconditional. This recovers from `/usage` parse failures and from subscriptions the CLI can't see. It is deliberately *not* gated on `ClaudeAPIUsageProbe.isAvailable()`: that call is a second, independently implemented answer to "can you work?", and when it said no the rescue was skipped without a word in the log — 115 refreshes in the #317 log where only the broken CLI probe ever ran. The gate saved nothing either, because `isAvailable()` reads the same credentials `probe()` reads before any network call, and the probe's own error is discarded in favour of the primary one.
+- **API → CLI**: unconditional, except while `claude.cliFallbackEnabled` is off (on by default). Users asked for that off switch because running the CLI in the background can cause prompts (e.g. SSH keys) — it is the one policy gate, and it stays.
 - **Never after `ProbeError.rateLimited`.** The CLI uses the same backend, so falling back only makes the throttling worse.
 - **Both fail**: report the *primary* error. The fallback's error is incidental and would send users after the wrong problem.
 

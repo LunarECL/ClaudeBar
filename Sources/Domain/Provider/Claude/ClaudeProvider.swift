@@ -235,6 +235,30 @@ public final class ClaudeProvider: AIProvider {
         return true
     }
 
+    /// The alternate probe to try when the active one fails, or `nil` when there
+    /// is nothing to try.
+    ///
+    /// Deliberately not gated on the fallback probe's `isAvailable()`. That call
+    /// is a second, independently implemented answer to "can you work?", and when
+    /// it said no the rescue was skipped without a word in the log: 115 refreshes
+    /// in the log attached to #317 where only the broken CLI probe ever ran, and
+    /// the user saw "Claude Unavailable" throughout. The cost it saved was
+    /// nothing — `ClaudeAPIUsageProbe.isAvailable()` reads the same credentials
+    /// `probe()` reads before it makes any network call, and the probe's own
+    /// error is discarded in favour of the primary one, so a wrong answer here
+    /// could only ever cost a rescue (#317).
+    ///
+    /// The one policy gate stays: `claude.cliFallbackEnabled`, the user's switch
+    /// for running the CLI in the background.
+    private func fallbackProbe() async -> (any UsageProbe)? {
+        switch probeMode {
+        case .cli:
+            return apiProbe
+        case .api:
+            return cliFallbackEnabled ? cliProbe : nil
+        }
+    }
+
     /// Attaches the daily-usage report for interactive refreshes only.
     /// Background refreshes (the menu-bar poll) skip the JSONL scan to stay cheap
     /// — the menu-bar label never renders the daily report, and the dropdown that
@@ -281,19 +305,6 @@ public final class ClaudeProvider: AIProvider {
     private var cliFallbackEnabled: Bool {
         (settingsRepository as? ClaudeSettingsRepository)?
             .claudeCliFallbackEnabled() ?? true
-    }
-
-    private func fallbackProbe() async -> (any UsageProbe)? {
-        switch probeMode {
-        case .cli:
-            guard let apiProbe, await apiProbe.isAvailable() else {
-                return nil
-            }
-            return apiProbe
-        case .api:
-            guard cliFallbackEnabled else { return nil }
-            return await cliProbe.isAvailable() ? cliProbe : nil
-        }
     }
 
     // MARK: - Guest Pass
