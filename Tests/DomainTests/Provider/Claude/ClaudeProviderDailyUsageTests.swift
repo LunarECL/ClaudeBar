@@ -96,7 +96,9 @@ struct ClaudeProviderDailyUsageTests {
         #expect(snapshot.dailyUsageReport == nil)
     }
 
-    // MARK: - Background refresh skips the daily scan (issue #204)    /// A daily-usage analyzer that records how many times it ran, so a test can
+    // MARK: - Background refresh skips the daily scan (issue #204)
+
+    /// A daily-usage analyzer that records how many times it ran, so a test can
     /// assert the expensive JSONL scan was *skipped* (state), not just that its
     /// result wasn't attached.
     private final class CountingDailyUsageAnalyzer: DailyUsageAnalyzing, @unchecked Sendable {
