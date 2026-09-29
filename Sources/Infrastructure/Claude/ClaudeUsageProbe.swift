@@ -15,6 +15,9 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     /// Runs `/usage`, under the rule that waits for the Usage screen.
     let cliExecutor: CLIExecutor
     /// Runs `/cost`, deliberately under no rule at all — see `probeCost`.
+    ///
+    /// Kept apart from `cliExecutor` so the two commands can be paired with the
+    /// rule each one's own screen needs, and so a test can read the pairing back.
     let costExecutor: CLIExecutor
     private let terminalRenderer: TerminalRenderer
 
@@ -23,11 +26,12 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     /// `user:inference` scope and cannot access quota data via `/usage`.
     static let envExclusions = ["CLAUDE_CODE_OAUTH_TOKEN"]
 
-    /// Reported when `claude /usage` shows the API-billing cost panel for an
-    /// account the config file says is a subscription. Surfaced only if the
-    /// usage API cannot answer either, so it names both ways out (#271).
+    /// Reported when `claude /usage` shows the API-billing cost panel — or says
+    /// `/usage` is "only available for subscription plans" — for an account the
+    /// config file says is a subscription. Surfaced only if the usage API cannot
+    /// answer either, so it names both ways out (#271, #317).
     public static let subscriptionMisreadAsApiBilling =
-        "The Claude CLI did not see this account's subscription — its usage screen showed API billing only. "
+        "The Claude CLI did not see this account's subscription — its usage screen reported API billing instead of a plan. "
         + "Run `claude login` again, or switch Claude to API mode in Settings."
 
     /// Resolves account info from `~/.claude.json`
@@ -45,11 +49,12 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
             environmentExclusions: Self.envExclusions,
             completionRule: .claudeUsage
         )
-        // `/cost` needs no rule: it paints one static panel in a single pass, so
-        // the idle cutoff is the honest end of the wait (#317). Reusing the
-        // `/usage` rule here made every `/cost` run wait out the full timeout,
-        // because a settled `/cost` screen carries none of that rule's ready
-        // markers. See `probeCost` for why a `/cost` marker cannot be used.
+        // `/cost` needs no rule: the CLI paints its cost panel in full during
+        // boot, so the idle cutoff is the honest end of the wait and a rule could
+        // only add a way to get it wrong (#317). Reusing the `/usage` rule here
+        // made every `/cost` run wait out the full timeout, because an
+        // API-billed account never paints a quota bar and that rule's markers are
+        // quota-bar markers. See `probeCost` for the measurements.
         self.costExecutor = cliExecutor ?? DefaultCLIExecutor(
             environmentExclusions: Self.envExclusions
         )
@@ -117,7 +122,11 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
             }
             throw ProbeError.folderTrustRequired
         } catch ProbeError.subscriptionRequired {
-            // API Usage Billing accounts don't support /usage, try /cost instead
+            // The account really does pay per token — `parseClaudeOutput` has
+            // already vetoed this route for anything `~/.claude.json` says is a
+            // subscription, because `/cost` would answer $0.00 for the probe's
+            // own session and, by succeeding, stop the usage API from running
+            // (#271, #317).
             AppLog.probes.info("Account requires /cost command, falling back...")
             return try await probeCost(workingDir: workingDir)
         } catch {
@@ -143,18 +152,30 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     ///
     /// Runs under its own executor with **no** completion rule, so the capture
     /// ends on the ordinary idle cutoff the way every pre-#317 `/cost` run did.
-    /// `/cost` is a single static panel written in one pass — there is no second
-    /// request and nothing to wait for — so "the screen stopped changing" is the
-    /// whole end condition, and a rule could only add a way to get it wrong.
     ///
-    /// In particular, borrowing `.claudeUsage` here cost every run the full 20s
-    /// timeout: a settled `/cost` screen has no quota bars, so none of that
-    /// rule's ready markers (`% used`, `Current session`, …) ever appear and
-    /// `isPending` stayed true forever. And a dedicated `.claudeCost` rule keyed
-    /// on `Total cost` is not the fix either — the CLI paints `Total cost:
-    /// $0.0000` in the boot screen *before* `/cost` is submitted, so that marker
-    /// fires on a screen where nothing has been read yet and the probe would
-    /// answer a cost of $0.00 (#317).
+    /// There is nothing to wait for, and that is measured rather than assumed.
+    /// `claude` registers `/cost` as an *alias* of `/usage`, so this is the same
+    /// screen the other executor waits for — but for an API-billed account it
+    /// has no quota bars, and the cost panel it does show is painted in full
+    /// during boot, before the command resolves. Across the 430 `/usage`
+    /// captures attached to #317, all five panel rows (`Total cost`,
+    /// `Total duration (API)`, `Total duration (wall)`, `Total code changes`,
+    /// `Usage:`) are present in 114 of the 114 captures that never reached the
+    /// Usage tab, exactly as in the 316 that did. There is no partial panel to
+    /// wait for, and therefore no marker that says "finished" — which is why
+    /// this takes no rule rather than a rule of its own. Reusing `.claudeUsage`
+    /// cost every run the full 20s timeout: `Current session` and `% used` are
+    /// quota-bar markers, and an API-billed account never paints a quota bar, so
+    /// that rule can never say "done" (#317).
+    ///
+    /// A capture that ended before the panel was painted at all has no
+    /// `Total cost` row and fails in `parseCostOutput` with a parse error, so it
+    /// never reaches a `$0.00`. What a capture of a fully painted panel reports
+    /// is the *probe's own* session spend, which for a session that has made no
+    /// request is `$0.0000` — the same figure a capture that waits out the
+    /// timeout would read, because the panel is the same either way. Reporting
+    /// that is not what makes the number wrong; routing a subscription account
+    /// here is, and `probe()` now vetoes that before it gets this far (#317).
     private func probeCost(workingDir: URL) async throws -> UsageSnapshot {
         AppLog.probes.info("Starting Claude probe with /cost command...")
 
@@ -213,6 +234,15 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     /// ```
     internal func parseCostOutput(_ text: String) throws -> UsageSnapshot {
         let clean = renderTerminalOutput(text)
+
+        // A screen that reports a failure is never a cost reading. `/cost` used
+        // to skip this check and answer `$0.00` from it — a rate-limited or
+        // logged-out screen still paints the cost panel, and `$0.00` succeeds,
+        // which stops ClaudeProvider from trying anything else (#317).
+        if let error = extractUsageError(clean) {
+            AppLog.probes.error("Claude /cost screen reported an error: \(error.localizedDescription)")
+            throw error
+        }
 
         // Extract total cost: "$0.55" or "0.55"
         guard let cost = extractCostValue(clean) else {
@@ -308,16 +338,30 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         AppLog.probes.debug("Claude /usage raw output (\(text.count) chars):\n\(text)")
         AppLog.probes.debug("Claude /usage normalized output (\(clean.count) chars):\n\(clean)")
 
+        // Account info (email, org, billing type) comes from ~/.claude.json via
+        // resolver. CLI /usage tab no longer includes account details since
+        // v2.1.79+, so this is the only place that knows how the account pays —
+        // which is what decides whether a `/cost` fallback is honest (#271, #317).
+        let accountInfo = accountInfoResolver.resolve()
+
         // Check for errors first
         if let error = extractUsageError(clean) {
+            // "/usage is only available for subscription plans" routes the probe
+            // to `/cost`, and `/cost` would report the *probe session's* cost —
+            // $0.00 for a session that made no request. Because that parse
+            // succeeds, it would stop ClaudeProvider from running the usage API,
+            // the one route that can still read a subscription's real quota. Only
+            // `~/.claude.json` can contradict the CLI here, so let it (#317).
+            if error == .subscriptionRequired {
+                if let veto = subscriptionVeto(accountInfo) {
+                    throw veto
+                }
+            }
             throw error
         }
 
         // Detect account type from header (e.g., "Opus 4.5 · Claude Max" or "Opus 4.5 · Claude Pro")
         let accountTier = detectAccountType(clean)
-        // Account info (email, org) comes from ~/.claude.json via resolver
-        // CLI /usage tab no longer includes account details since v2.1.79+
-        let accountInfo = accountInfoResolver.resolve()
 
         // Note: pay-as-you-go API accounts are caught earlier by extractUsageError()
         // via the "/usage is only available for subscription plans" message and routed
@@ -359,11 +403,8 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
                 // quota bars — and because that path *succeeds*, it would stop
                 // ClaudeProvider from falling back to the usage API, which can
                 // still read the real numbers. Fail instead so that runs (#271).
-                if let accountInfo, accountInfo.isSubscriptionBilled {
-                    AppLog.probes.error(
-                        "Claude /usage rendered the API billing cost panel for a \(accountInfo.billingType ?? "subscription") account — not falling back to /cost"
-                    )
-                    throw ProbeError.executionFailed(Self.subscriptionMisreadAsApiBilling)
+                if let veto = subscriptionVeto(accountInfo) {
+                    throw veto
                 }
 
                 AppLog.probes.info("Claude /usage rendered the API billing cost panel, falling back to /cost")
@@ -916,6 +957,25 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     internal func isApiUsageBillingPanel(_ text: String) -> Bool {
         let lower = text.lowercased()
         return lower.contains("api usage billing") && lower.contains("total cost:")
+    }
+
+    /// The error to raise instead of routing an account to `/cost`, or nil when
+    /// the account really does pay per token.
+    ///
+    /// Every route into `/cost` shares one hazard, and it is the reason this
+    /// lives next to the parser rather than in the fallback: `/cost` reports the
+    /// *probe's own* session, which has made no request, so it answers $0.00 —
+    /// and a successful probe ends the refresh, so the usage API that can read a
+    /// subscription's real quota never runs (#271, #317). `~/.claude.json` is the
+    /// only source that knows better, and it is checked on both routes: the
+    /// "only available for subscription plans" message and the API-billing cost
+    /// panel.
+    private func subscriptionVeto(_ accountInfo: AccountInfo?) -> ProbeError? {
+        guard let accountInfo, accountInfo.isSubscriptionBilled else { return nil }
+        AppLog.probes.error(
+            "Claude /usage reported API billing for a \(accountInfo.billingType ?? "subscription") account — not falling back to /cost"
+        )
+        return .executionFailed(Self.subscriptionMisreadAsApiBilling)
     }
 
     internal func extractUsageError(_ text: String) -> ProbeError? {

@@ -1158,6 +1158,116 @@ struct ClaudeUsageProbeParsingTests {
         }
     }
 
+    // MARK: - /cost Screens That Are Not Cost Readings (issue #317)
+
+    /// The other route into `/cost`, and the one #317's veto did not cover.
+    /// `extractUsageError` returns `.subscriptionRequired` for this message, and
+    /// `probe()` turns that into a `/cost` run. A subscription that reaches it
+    /// gets the probe session's own $0.00 — and because that parse *succeeds*,
+    /// the usage API that can read its real quota never runs.
+    static let subscriptionOnlyMessageOutput = """
+    Claude Code v2.1.274
+    Opus 5 (1M context) · API Usage Billing
+
+      Session
+        Total cost:            $0.0000
+        Total duration (API):  0s
+        Total duration (wall): 1s
+        Total code changes:    0 lines added, 0 lines removed
+        Usage: 0 input, 0 output, 0 cache read, 0 cache write
+
+    /usage is only available for subscription plans. /cost shows session cost.
+    """
+
+    @Test
+    func `subscription-only message on a subscription account refuses the cost fallback`() {
+        let resolver = MockAccountInfoResolving()
+        given(resolver).resolve().willReturn(
+            AccountInfo(email: "user@example.com", billingType: "apple_subscription")
+        )
+
+        #expect(throws: ProbeError.executionFailed(ClaudeUsageProbe.subscriptionMisreadAsApiBilling)) {
+            try ClaudeUsageProbe.parse(Self.subscriptionOnlyMessageOutput, accountInfoResolver: resolver)
+        }
+    }
+
+    @Test
+    func `subscription-only message on a pay-as-you-go account still routes to cost`() {
+        let resolver = MockAccountInfoResolving()
+        given(resolver).resolve().willReturn(AccountInfo(email: "user@example.com", billingType: "api"))
+
+        #expect(throws: ProbeError.subscriptionRequired) {
+            try ClaudeUsageProbe.parse(Self.subscriptionOnlyMessageOutput, accountInfoResolver: resolver)
+        }
+    }
+
+    /// A `/cost` screen that reports a failure is not a cost of zero. The rate
+    /// limit case is the one that matters: a throttled CLI still paints the
+    /// panel, `extractCostValue` reads `$0.0000` off it, and the probe *succeeds*
+    /// with a cost of nothing — which is both wrong and final, since a successful
+    /// probe ends the refresh (#317).
+    @Test
+    func `a rate-limited cost screen is an error rather than a cost of zero`() {
+        let rateLimited = Self.costCommandOutput + "\nError: Usage endpoint is rate limited. Please try again in a moment."
+
+        #expect(throws: ProbeError.executionFailed("Rate limited - too many requests")) {
+            try ClaudeUsageProbe.parseCost(rateLimited)
+        }
+    }
+
+    @Test
+    func `a logged-out cost screen is an error rather than a cost of zero`() {
+        let loggedOut = Self.costCommandOutput + "\nInvalid API key · Please log in with /login"
+
+        #expect(throws: ProbeError.authenticationRequired) {
+            try ClaudeUsageProbe.parseCost(loggedOut)
+        }
+    }
+
+    /// A capture that ended before the cost panel was painted at all has no
+    /// `Total cost` row, and says so instead of answering `$0.00`. This is the
+    /// shape an early `/cost` capture takes when the CLI is still booting: the
+    /// panel is the last thing it draws, and a screen without it is not a
+    /// reading of anything.
+    @Test
+    func `a capture with no cost panel is a parse failure rather than a cost of zero`() {
+        let beforeThePanel = """
+        Claude Code v2.1.274
+        Opus 5 (1M context) with high effort · API Usage Billing
+        ~/Library/Application Support/ClaudeBar/Probe
+         Esc to cancel
+        """
+
+        #expect(throws: ProbeError.parseFailed("Could not find total cost")) {
+            try ClaudeUsageProbe.parseCost(beforeThePanel)
+        }
+    }
+
+    /// The panel itself is not evidence that the command ran. It is painted in
+    /// full during boot, before `/cost` is submitted — all five rows are present
+    /// in 114 of the 114 boot captures in the log attached to #317, exactly as
+    /// in the 316 that reached the Usage tab. So `$0.0000` off this screen is the
+    /// probe session's own spend, not a misread, and the fix is upstream: a
+    /// subscription must not be routed here at all.
+    @Test
+    func `a fully painted cost panel of an empty session reads as zero`() {
+        let panelOnly = """
+        Claude Code v2.1.274
+        Opus 5 (1M context) with high effort · API Usage Billing
+          Session
+            Total cost:            $0.0000
+            Total duration (API):  0s
+            Total duration (wall): 1s
+            Total code changes:  0 lines added, 0 lines removed
+            Usage: 0 input, 0 output, 0 cache read, 0 cache write
+          Esc to cancel
+        """
+
+        let snapshot = try ClaudeUsageProbe.parseCost(panelOnly)
+        #expect(snapshot.costUsage?.totalCost == Decimal(string: "0.0000"))
+        #expect(snapshot.accountTier == .claudeApi)
+    }
+
     @Test
     func `subscription output that mentions API usage billing alongside quotas still parses`() throws {
         // Extra Usage credits put "API Usage Billing" in a subscription header —

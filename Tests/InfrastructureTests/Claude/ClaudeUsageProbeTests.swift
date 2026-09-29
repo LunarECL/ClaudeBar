@@ -457,10 +457,14 @@ struct ClaudeUsageProbeTests {
     @Test
     func `the cost fallback runs with no completion rule so it ends on idle`() {
         // The regression #317 introduced: both commands shared one executor
-        // carrying `.claudeUsage`, and a settled `/cost` screen matches none of
-        // that rule's ready markers. `isPending` stayed true for the whole run,
-        // so the idle break could never fire and every `/cost` capture burned
-        // the full 20s timeout instead of the ~3.5s it always took.
+        // carrying `.claudeUsage`. Its markers are quota-bar markers, and an
+        // API-billed account never paints a quota bar, so `isPending` stayed true
+        // for the whole run, the idle break could never fire, and every `/cost`
+        // capture burned the full 20s timeout instead of the ~3.7s it takes with
+        // no rule (measured against the real InteractiveRunner).
+        //
+        // The pairing is the point, not just the values: a rule is not "the
+        // right markers", it is "markers this screen can actually reach".
         let probe = ClaudeUsageProbe()
 
         let usageRule = (probe.cliExecutor as? DefaultCLIExecutor)?.completionRule
