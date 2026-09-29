@@ -27,7 +27,7 @@ Contributor notes for the Claude provider. For setup, see the [README](README.md
 
 - Every probe run is a full Claude Code session, so the user's SessionStart/SessionEnd hooks fire for it too — a "Claude Code Started"/"Finished" pair on every quota poll (#222). Hooks live in the user-global `~/.claude/settings.json`, so running in the dedicated probe directory does not exempt a session from them. ClaudeBar owns both ends: the sessions it spawns itself (`/usage`, `/cost`, `/passes`) carry `CLAUDEBAR_PROBE=1` (`ClaudeUsageProbe.probeEnvironment`, carried by `DefaultCLIExecutor.environmentAdditions` → `InteractiveRunner.Options`), and the `__claudebar_hook` wrapper installed by `HookInstaller` returns before the curl POST when that variable is set.
 - The guarded wrapper reaches existing users because `install()` re-runs at launch when hooks are already installed (`ClaudeBarApp.init`), replacing only ClaudeBar's own matcher entries.
-- A second net in `SessionEvent.isClaudeBarProbe` drops events from the probe working directory (`…/ClaudeBar/Probe` suffix) — that filter predates the env marker and misses payloads whose `cwd` is missing or reshaped.
+- A second net in `SessionEvent.isClaudeBarProbe` drops events from the probe working directory (`…/ClaudeBar/Probe` suffix) and events with no attributable working directory at all. The empty-cwd case is deliberate: a payload without `cwd` is indistinguishable from probe noise (that was the leak in #222) and couldn't name a project anyway, so dropping it costs nothing real; a genuine session always carries its directory. The env marker above stays the primary defense — this filter covers senders ClaudeBar doesn't control.
 
 ## CLI screen parsing
 
