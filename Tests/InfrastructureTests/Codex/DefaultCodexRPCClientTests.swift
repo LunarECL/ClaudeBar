@@ -461,6 +461,64 @@ struct DefaultCodexRPCClientTests {
         #expect(!ttyArgs.contains("untrusted"))
     }
 
+    // MARK: - Directory Trust Prompt (#267)
+
+    /// Codex 0.150+ asks "Do you trust the contents of this directory?" before
+    /// it does anything interactive. A probe that inherits the app's cwd
+    /// (`/`, untrusted) stalls on that prompt, so `/status` never runs and no
+    /// usage text is produced (#267).
+    @Test
+    func `TTY fallback runs in the dedicated probe working directory`() async throws {
+        let mockTransport = MockRPCTransport()
+        let mockExecutor = MockCLIExecutor()
+        given(mockTransport).send(.any).willReturn(())
+        given(mockTransport).receive().willThrow(ProbeError.executionFailed("RPC failed"))
+        given(mockTransport).close().willReturn(())
+
+        var ttyWorkingDirectory: URL?
+        given(mockExecutor).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
+            .willProduce { _, _, _, _, workingDirectory, _ in
+                ttyWorkingDirectory = workingDirectory
+                return CLIResult(output: "5h limit\n[####------] 40% left", exitCode: 0)
+            }
+
+        let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
+        client.transportFactory = { _, _ in mockTransport }
+
+        _ = try await client.fetchRateLimits()
+
+        let workingDirectory = try #require(ttyWorkingDirectory, "expected the TTY fallback to run in a dedicated working directory, not the inherited one")
+        #expect(workingDirectory.path.contains("ClaudeBar/Probe"))
+        #expect(FileManager.default.fileExists(atPath: workingDirectory.path))
+    }
+
+    @Test
+    func `TTY fallback auto-responds to the directory-trust prompt`() async throws {
+        let mockTransport = MockRPCTransport()
+        let mockExecutor = MockCLIExecutor()
+        given(mockTransport).send(.any).willReturn(())
+        given(mockTransport).receive().willThrow(ProbeError.executionFailed("RPC failed"))
+        given(mockTransport).close().willReturn(())
+
+        var ttyAutoResponses: [String: String] = [:]
+        given(mockExecutor).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
+            .willProduce { _, _, _, _, _, autoResponses in
+                ttyAutoResponses = autoResponses
+                return CLIResult(output: "5h limit\n[####------] 40% left", exitCode: 0)
+            }
+
+        let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
+        client.transportFactory = { _, _ in mockTransport }
+
+        _ = try await client.fetchRateLimits()
+
+        let trust = try #require(
+            ttyAutoResponses.first { $0.key.localizedCaseInsensitiveContains("trust") },
+            "expected an auto-response for the directory-trust prompt"
+        )
+        #expect(trust.value.contains("1"))
+    }
+
     /// Value passed to `-a` / `--ask-for-approval`, if any.
     private func approvalPolicy(in args: [String]) -> String? {
         guard let flagIndex = args.firstIndex(where: { $0 == "-a" || $0 == "--ask-for-approval" }),
