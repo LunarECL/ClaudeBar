@@ -9,6 +9,22 @@ public struct CodexCredentialResult: @unchecked Sendable {
     public var lastRefresh: String?
     public var fullData: [String: Any]
 
+    /// Display metadata from the locally saved ID token. This is not token verification.
+    public var email: String? {
+        guard let tokens = fullData["tokens"] as? [String: Any],
+              let token = tokens["id_token"] as? String else { return nil }
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return nil }
+        var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard let data = Data(base64Encoded: payload),
+              let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let email = claims["email"] as? String,
+              !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return email
+    }
+
     public init(
         accessToken: String,
         refreshToken: String? = nil,
@@ -38,18 +54,24 @@ public struct CodexCredentialResult: @unchecked Sendable {
 /// }
 /// ```
 public struct CodexCredentialLoader: Sendable {
-    private let homeDirectory: String
+    private let codexHome: String
 
     /// Refresh age threshold: 8 days (matching Codex JS reference)
     private static let refreshAgeMs: Double = 8 * 24 * 60 * 60 * 1000
 
-    public init(homeDirectory: String = NSHomeDirectory()) {
-        self.homeDirectory = homeDirectory
+    public init(homeDirectory: String) {
+        self.codexHome = (homeDirectory as NSString).appendingPathComponent(".codex")
+    }
+
+    /// Explicit homes never fall back to the desktop/CLI login.
+    public init(codexHome: String = ProcessInfo.processInfo.environment["CODEX_HOME"]
+                ?? (NSHomeDirectory() as NSString).appendingPathComponent(".codex")) {
+        self.codexHome = codexHome
     }
 
     /// The path to the auth file.
     public var authFilePath: String {
-        (homeDirectory as NSString).appendingPathComponent(".codex/auth.json")
+        (codexHome as NSString).appendingPathComponent("auth.json")
     }
 
     /// Loads credentials from `~/.codex/auth.json`.

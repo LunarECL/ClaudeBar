@@ -225,11 +225,12 @@ private struct ProviderDetailView: View {
     /// The provider-specific config card, when one exists.
     @ViewBuilder
     private var configCard: some View {
-        switch provider.id {
+        switch provider is CodexProvider ? "codex" : provider.id {
         case "claude":
             ClaudeConfigCard(monitor: monitor)
         case "codex":
             CodexConfigCard(monitor: monitor)
+            CodexAccountsCard(monitor: monitor)
         case "kimi":
             KimiConfigCard(monitor: monitor)
         case "minimax":

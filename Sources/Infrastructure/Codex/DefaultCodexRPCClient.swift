@@ -5,6 +5,8 @@ import Domain
 /// Uses RPCTransport for communication, enabling testability.
 public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     private let executable: String
+    private let codexHome: String?
+    private let includeAccountIdentity: Bool
     private let cliExecutor: CLIExecutor
     private let transport: RPCTransport?
     private var nextID = 1
@@ -13,8 +15,10 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     var transportFactory: ((String, [String]) throws -> RPCTransport)?
 
     /// Default initializer - uses real CLI executor and creates transport lazily.
-    public init(executable: String = "codex", cliExecutor: CLIExecutor? = nil) {
+    public init(executable: String = "codex", cliExecutor: CLIExecutor? = nil, codexHome: String? = nil, includeAccountIdentity: Bool = false) {
         self.executable = executable
+        self.codexHome = codexHome
+        self.includeAccountIdentity = includeAccountIdentity
         self.cliExecutor = cliExecutor ?? DefaultCLIExecutor()
         self.transport = nil
     }
@@ -22,6 +26,8 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     /// Internal initializer for testing with mock transport.
     init(transport: RPCTransport, cliExecutor: CLIExecutor? = nil) {
         self.executable = "codex"
+        self.codexHome = nil
+        self.includeAccountIdentity = false
         self.cliExecutor = cliExecutor ?? DefaultCLIExecutor()
         self.transport = transport
     }
@@ -56,9 +62,30 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
         do {
             return try await fetchViaRPC()
         } catch {
+            // The TTY runner inherits the global login. Never fall back to it
+            // for a separately authenticated account.
+            if codexHome != nil { throw error }
             AppLog.probes.warning("Codex RPC failed: \(error.localizedDescription), trying TTY fallback...")
             return try await fetchViaTTY()
         }
+    }
+
+    /// Each process gets its own environment; never mutate the app's CODEX_HOME.
+    var processEnvironment: [String: String] {
+        var environment = ProcessInfo.processInfo.environment
+        if let codexHome {
+            environment["CODEX_HOME"] = codexHome
+            // Explicit file accounts must not inherit another auth mechanism.
+            for key in ["OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_ACCESS_TOKEN",
+                        "OPENAI_IDENTITY_TOKEN_FILE", "OPENAI_IDENTITY_PROVIDER_ID"] {
+                environment.removeValue(forKey: key)
+            }
+        }
+        return environment
+    }
+
+    var accountArguments: [String] {
+        codexHome == nil ? [] : ["-c", "cli_auth_credentials_store=\"file\""]
     }
 
     // MARK: - RPC Approach
@@ -71,9 +98,9 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
             ownsTransport = false
         } else {
             let factory = transportFactory ?? { exec, args in
-                try ProcessRPCTransport(executable: exec, arguments: args)
+                try ProcessRPCTransport(executable: exec, arguments: args, environment: self.processEnvironment)
             }
-            activeTransport = try factory(executable, Self.baseArguments + ["app-server"])
+            activeTransport = try factory(executable, Self.baseArguments + accountArguments + ["app-server"])
             ownsTransport = true
         }
         defer {
@@ -87,6 +114,16 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
             "clientInfo": ["name": "claudebar", "version": "1.0.0"]
         ])
         try sendNotification(transport: activeTransport, method: "initialized")
+
+        // Ask the CLI for display identity as well, including keychain-backed
+        // default logins. Reading identity must not itself rotate credentials.
+        var accountEmail: String?
+        if includeAccountIdentity {
+            let accountMessage = try await request(transport: activeTransport, method: "account/read", params: ["refreshToken": false])
+            let accountResult = accountMessage["result"] as? [String: Any]
+            let account = accountResult?["account"] as? [String: Any]
+            accountEmail = account?["email"] as? String
+        }
 
         // Fetch rate limits
         let message = try await request(transport: activeTransport, method: "account/rateLimits/read")
@@ -120,14 +157,14 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
                 return CodexRateLimitsResponse(
                     primary: CodexRateLimitWindow(usedPercent: 0, resetDescription: "Free plan"),
                     secondary: nil,
-                    planType: planType
+                    planType: planType, accountEmail: accountEmail
                 )
             }
             // No rate limit data available yet
             throw ProbeError.parseFailed("No rate limits available yet - make some API calls first")
         }
 
-        return CodexRateLimitsResponse(primary: primary, secondary: secondary, planType: planType)
+        return CodexRateLimitsResponse(primary: primary, secondary: secondary, planType: planType, accountEmail: accountEmail)
     }
 
     // MARK: - TTY Fallback

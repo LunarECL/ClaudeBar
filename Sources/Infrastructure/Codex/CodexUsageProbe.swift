@@ -20,11 +20,13 @@ public struct CodexRateLimitsResponse: Sendable, Equatable {
     public let primary: CodexRateLimitWindow?
     public let secondary: CodexRateLimitWindow?
     public let planType: String?
+    public let accountEmail: String?
 
-    public init(primary: CodexRateLimitWindow?, secondary: CodexRateLimitWindow?, planType: String? = nil) {
+    public init(primary: CodexRateLimitWindow?, secondary: CodexRateLimitWindow?, planType: String? = nil, accountEmail: String? = nil) {
         self.primary = primary
         self.secondary = secondary
         self.planType = planType
+        self.accountEmail = accountEmail
     }
 }
 
@@ -105,7 +107,8 @@ public struct CodexUsageProbe: UsageProbe {
         return UsageSnapshot(
             providerId: "codex",
             quotas: quotas,
-            capturedAt: Date()
+            capturedAt: Date(),
+            accountEmail: limits.accountEmail
         )
     }
 

@@ -12,6 +12,10 @@ Shows your OpenAI Codex rate-limit windows (usually the 5-hour session and weekl
 2. Settings → Providers → Codex: turn it on (it is on by default).
 3. Optional: in the same pane, **Codex Configuration → Probe Mode** picks RPC or API.
 
+## Multiple accounts
+
+Use **Codex Accounts → Add Codex Account** in the provider settings to link another independent ChatGPT login. Accounts are identified by email and can be pinned separately in the menu bar. See [multiple accounts](../../features/multi-account/README.md) for setup and reconnect instructions.
+
 ## Probe modes
 
 | Mode | Needs | Pick it when |

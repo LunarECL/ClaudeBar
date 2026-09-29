@@ -56,7 +56,7 @@ struct ClaudeBarApp: App {
     @State private var hookServerTask: Task<Void, Never>?
 
     /// Alerts users when quota status degrades
-    private let quotaAlerter = NotificationAlerter()
+    private let quotaAlerter = NotificationAlerter(accountSettings: JSONSettingsRepository.shared)
 
     /// Sends session start/end notifications
     private let sessionAlertSender = SystemAlertSender()
@@ -90,8 +90,8 @@ struct ClaudeBarApp: App {
                 dailyUsageAnalyzer: ClaudeDailyUsageAnalyzer()
             ),
             CodexProvider(
-                rpcProbe: CodexUsageProbe(),
-                apiProbe: CodexAPIUsageProbe(),
+                rpcProbe: CodexAccountUsageProbe(probe: CodexUsageProbe(client: DefaultCodexRPCClient(includeAccountIdentity: true))),
+                apiProbe: CodexAccountUsageProbe(probe: CodexAPIUsageProbe()),
                 settingsRepository: settingsRepository
             ),
             GeminiProvider(probe: GeminiUsageProbe(), settingsRepository: settingsRepository),
@@ -154,6 +154,11 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
         ])
+        for config in settingsRepository.accounts(forProvider: "codex") {
+            if let provider = CodexAccountSetup.provider(configuration: config, settingsRepository: settingsRepository) {
+                repository.add(provider)
+            }
+        }
         AppLog.providers.info("Created \(repository.all.count) providers")
 
         // Initialize the domain service with quota alerter

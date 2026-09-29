@@ -175,3 +175,31 @@ This plan covered the API probe. What was learned afterwards, mostly about the R
 - **Process leak (#113)**: each refresh starts its own `app-server`. The transport the probe creates **must** be closed in a `defer`. Before this was fixed, thousands of orphaned `codex app-server` processes built up.
 - **API mode credits**: `x-codex-credits-balance` (header) or `credits.balance` (body) is shown against a hard-coded limit of 1000. The API doesn't return a limit. Headers `x-codex-primary-used-percent` / `x-codex-secondary-used-percent` take precedence. Reset times always come from `rate_limit.*_window`.
 - **No fallback between modes.** `CodexProvider` runs only the selected probe. Unlike Claude, a failing mode doesn't try the other.
+
+
+## Independent Codex accounts
+
+Additional accounts reuse `ProviderAccountConfig` and `MultiAccountSettingsRepository`.
+Each becomes a separate `CodexProvider` in `QuotaMonitor`, with compound ID
+`codex.<local UUID>`. The default retains `codex`. Registering instances lets the
+existing enable toggles, refreshes, overview and three menu-bar selections operate
+independently, without introducing another provider-state owner. The optional
+`MultiAccountProvider` picker protocol is not used: users can pin two accounts at
+once instead of selecting only one active account within Codex.
+
+Settings contain the email, canonical Codex directory and expected ChatGPT account
+ID, never tokens. Setup rejects duplicate directories (including symlinks), the
+default directory and duplicate ChatGPT account IDs. Email is a display identifier,
+not an authentication key; separate workspaces can share an email.
+
+`CodexAccountUsageProbe` validates the expected account ID before and after a
+probe. Both modes get the same explicit home; file API refresh writes only there.
+RPC sets CODEX_HOME on the child process and forces file credential storage for
+added accounts. It disables the inherited-environment TTY fallback for those
+accounts. Missing/replaced credentials fail closed. A provider coalesces simultaneous
+refreshes so overlapping UI/background polls cannot rotate its refresh token twice.
+
+RPC identity comes from `account/read` with `refreshToken: false`, which also
+supports the default Keychain login. File credentials provide the email from the
+ID token as display metadata only; decoding that claim does not verify a token.
+Full email remains in menu-bar tooltips when a visible label is shortened.
