@@ -17,10 +17,38 @@ import Foundation
 /// The PTY buffer is cumulative — a redraw appends, it does not erase — so a
 /// placeholder appearing or disappearing proves nothing either way.
 public struct CLICompletionRule: Sendable, Equatable {
-    /// Markers whose presence means the screen has settled, data or error.
-    public let readyMarkers: [String]
+    /// One piece of evidence that the screen has settled.
+    public struct Marker: Sendable, Equatable {
+        /// The text to look for, matched the way `screenText` normalises.
+        public let text: String
 
-    public init(readyMarkers: [String]) {
+        /// True when the marker has to be the whole row, not just a run of
+        /// words inside one.
+        ///
+        /// Only for a *section label* — something the CLI paints as a row of
+        /// its own. `Current session` is one: the same words in the middle of a
+        /// SessionStart hook's sentence are prose, and treating them as the
+        /// label ends the wait on a screen that never opened the Usage tab
+        /// (#317). A marker that is not a label must not carry this: the CLI
+        /// shares rows, and a real Usage screen puts `27% used` and
+        /// `Resets 4:59pm (America/New_York)` on the same line, and redraw
+        /// artifacts repeat the reset text on that line. Requiring the whole
+        /// row for those would stop real screens being recognised.
+        public let endsRow: Bool
+
+        public init(_ text: String, endsRow: Bool = false) {
+            self.text = text
+            self.endsRow = endsRow
+        }
+
+        /// A marker the CLI paints as a whole row: a section label.
+        public static func row(_ text: String) -> Marker { Marker(text, endsRow: true) }
+    }
+
+    /// Markers whose presence means the screen has settled, data or error.
+    public let readyMarkers: [Marker]
+
+    public init(readyMarkers: [Marker]) {
         self.readyMarkers = readyMarkers
     }
 
@@ -33,6 +61,16 @@ public struct CLICompletionRule: Sendable, Equatable {
     public func isReady(_ text: String) -> Bool {
         let screen = Self.screenText(text)
         return readyMarkers.contains { Self.contains(marker: $0, in: screen) }
+    }
+
+    /// The ready markers this text carries, in the order they are declared.
+    ///
+    /// Read by `scripts/replay-claude-usage-captures.swift` to report which
+    /// piece of evidence ended a real capture, so the corpus replay says why a
+    /// screen was accepted rather than only that it was.
+    public func matchedMarkers(in text: String) -> [String] {
+        let screen = Self.screenText(text)
+        return readyMarkers.filter { Self.contains(marker: $0, in: screen) }.map(\.text)
     }
 
     /// The text a marker is actually findable in, as a character array.
@@ -85,26 +123,30 @@ public struct CLICompletionRule: Sendable, Equatable {
     ///
     /// Collapsing the padding costs the text its word boundaries, so both are
     /// restored here. A marker has to *begin* one — otherwise a phrase could
-    /// match the tail of one word plus the head of the next — and, when it is a
-    /// phrase, it has to *end* at the end of its row: the CLI paints a section
-    /// label as the whole row (`Current session` then a line break), whereas a
-    /// SessionStart hook printing "The current session will seed it…" carries
-    /// the same words mid-sentence. Without that second test the hook alone
-    /// satisfies the `Current session` marker on a screen that has never reached
-    /// the Usage tab, which is the false ready #317 is about (#317).
+    /// match the tail of one word plus the head of the next — and a marker
+    /// declared with `endsRow` has to end at the end of its row too. That
+    /// second test is per-marker because only a section label earns it: the CLI
+    /// paints `Current session` as a row of its own, while a SessionStart hook
+    /// printing "The current session will seed it…" carries the same words
+    /// mid-sentence, and treating that as the label ends the wait on a screen
+    /// that never reached the Usage tab (#317). The other markers are values the
+    /// CLI shares a row with other content — `27% used` sits beside
+    /// `Resets 4:59pm (America/New_York)`, and a redraw artifact repeats the
+    /// reset text on that same line — so requiring a whole row from them would
+    /// stop real Usage screens being recognised.
     ///
     /// A marker that starts with punctuation (`% used`) supplies its own left
-    /// boundary, and a marker that is not a phrase (`Error:`) does not need its
-    /// own row — the colon is boundary enough.
-    private static func contains(marker: String, in screen: [Character]) -> Bool {
-        let needle = screenText(marker)
+    /// boundary, and a marker that is not a label (`Error:`) only has to end on
+    /// a non-word character — the colon is boundary enough, and a settled error
+    /// continues into "Error: Usage endpoint is rate limited…".
+    private static func contains(marker: Marker, in screen: [Character]) -> Bool {
+        let needle = screenText(marker.text)
         guard !needle.isEmpty, screen.count >= needle.count else { return false }
         // Decided from the marker as written, not from its normalised form: a
         // marker that opens with punctuation (`% used`) supplies its own left
         // boundary, and normalising would turn that `%` into a separator and
         // then demand a boundary that a `38% used` row never has.
-        let startsAWord = marker.first.map { $0.isLetter || $0.isNumber } ?? false
-        let isPhrase = marker.contains(where: \.isWhitespace)
+        let startsAWord = marker.text.first.map { $0.isLetter || $0.isNumber } ?? false
 
         var start = screen.startIndex
         while start <= screen.index(screen.endIndex, offsetBy: -needle.count) {
@@ -119,23 +161,22 @@ public struct CLICompletionRule: Sendable, Equatable {
                 }
             }
             if let end = match(needle, in: screen, from: start) {
-                // A phrase has to end at the end of its row. The CLI writes
+                // A row marker has to end at the end of its row. The CLI writes
                 // `Current session` and then a cursor move, not a line break, so
                 // the padding between the phrase and that break is stepped over
                 // before looking.
                 var next = end
-                if isPhrase {
+                if marker.endsRow {
                     while next < screen.endIndex, screen[next] == separator {
                         next += 1
                     }
                 }
                 let atRowEnd = next == screen.endIndex || screen[next] == lineBreak
-                if isPhrase {
+                if marker.endsRow {
                     if atRowEnd { return true }
                 } else {
-                    // A single word only has to end on a non-word character;
-                    // `Error:` relies on this, since a settled error continues
-                    // into "Error: Usage endpoint is rate limited…".
+                    // Everything else only has to end on a non-word character,
+                    // so trailing content on the same row is allowed.
                     if atRowEnd || !(screen[next].isLetter || screen[next].isNumber) {
                         return true
                     }
@@ -205,14 +246,21 @@ public struct CLICompletionRule: Sendable, Equatable {
     /// Ready markers cover both outcomes so a stalled or rate-limited endpoint
     /// ends the wait as soon as the CLI says so, instead of holding the run open
     /// until the probe timeout.
+    ///
+    /// Only `Current session` is a row marker. It is the Usage screen's section
+    /// label, and the words also turn up mid-sentence in a SessionStart hook's
+    /// output. The rest are values the CLI shares a row with other content —
+    /// `27% used` beside `Resets 4:59pm (America/New_York)`, an error message
+    /// that continues after its colon — so a whole-row requirement would reject
+    /// real screens (#317).
     public static let claudeUsage = CLICompletionRule(
         readyMarkers: [
-            "Current session",
-            "% used",
-            "% left",
-            "rate limited",
-            "Error:",
-            "/usage is only available",
+            .row("Current session"),
+            Marker("% used"),
+            Marker("% left"),
+            Marker("rate limited"),
+            Marker("Error:"),
+            Marker("/usage is only available"),
         ]
     )
 }

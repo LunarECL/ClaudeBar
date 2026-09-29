@@ -121,7 +121,7 @@ struct CLICompletionRuleTests {
     /// boundary has to be checked rather than assumed (#317).
     @Test
     func `a marker does not match inside a longer word`() {
-        let label = CLICompletionRule(readyMarkers: ["Current session"])
+        let label = CLICompletionRule(readyMarkers: [.row("Current session")])
         #expect(!label.isReady("myCurrent session here"))
         #expect(!label.isReady("XCurrent sessionY"))
         #expect(!label.isReady("Current sessions"))
@@ -139,9 +139,58 @@ struct CLICompletionRuleTests {
         \u{1B}[1B  \u{1B}[5C\u{1B}[6G\u{1B}[25GSessionStart:startup says: # claude-mem status
         \u{1B}[1B    \u{1B}[5CThis project has no memory yet. The current session will seed it; subsequent sessions will receive auto-injected context for relevant past work.
         """
-        let label = CLICompletionRule(readyMarkers: ["Current session"])
+        let label = CLICompletionRule(readyMarkers: [.row("Current session")])
         #expect(!label.isReady(hookProse))
         #expect(CLICompletionRule.claudeUsage.isPending(hookProse))
+    }
+
+    /// #317: the row-end requirement used to be decided by "does this marker
+    /// contain a space", which bound `% used`, `% left`, `rate limited` and
+    /// `/usage is only available` as well. It is now a per-marker flag, because
+    /// only a section label is painted as a whole row. These are the rows the
+    /// old rule turned down that a real Usage screen still paints.
+    @Test
+    func `a value marker on a row that carries trailing content still ends the wait`() {
+        // The CLI shares rows: the percentage sits beside the reset time, and a
+        // redraw artifact repeats the reset text on that same line (see
+        // `deduplicateResetText`). Requiring `% used` to end its row meant
+        // holding the capture open on a finished screen. There is no
+        // `Current session` label here, so this stands or falls on the value
+        // marker alone.
+        let shared = """
+              Session
+                Total cost:            $0.0000
+                Total duration (API):  0s
+                Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+                27% used  Resets 4:59pm (America/New_York)Resets 4:59pm (America/New_York)
+        """
+        #expect(CLICompletionRule.claudeUsage.isReady(shared))
+
+        let rateLimited = "Error: Output rate limited, retrying in 20s"
+        #expect(CLICompletionRule.claudeUsage.isReady(rateLimited))
+    }
+
+    @Test
+    func `a value marker on the same row as its number still ends the wait`() {
+        // The percentage and the word are written in separate runs, and the
+        // label's own row is not the row the value is on.
+        let value = CLICompletionRule(readyMarkers: [CLICompletionRule.Marker("% used")])
+        #expect(value.isReady("38% used"))
+        #expect(value.isReady("  38% used\n"))
+        #expect(value.isReady("38% used  Resets 4:59pm (America/New_York)"))
+        #expect(value.isReady("Resets 4:59pm (America/New_York)Resets 4:59pm (America/New_York)  27% used"))
+    }
+
+    /// The flag cuts the other way too: a section label with trailing content on
+    /// its row is not the label the CLI paints, so it must not end the wait.
+    /// Nothing else on this screen is ready evidence, so `.claudeUsage` is
+    /// pending for the same reason.
+    @Test
+    func `the section label must still be the whole row`() {
+        let label = CLICompletionRule(readyMarkers: [.row("Current session")])
+        #expect(label.isReady("Current session\n  expires in 5m"))
+        #expect(!label.isReady("Current session  expires in 5m"))
+        #expect(CLICompletionRule.claudeUsage.isPending("Current session  expires in 5m"))
     }
 
     @Test
@@ -190,7 +239,7 @@ struct CLICompletionRuleTests {
 
     @Test
     func `a marker matches an uppercase screen and not an uppercase non-match`() {
-        let rule = CLICompletionRule(readyMarkers: ["done"])
+        let rule = CLICompletionRule(readyMarkers: [CLICompletionRule.Marker("done")])
         #expect(rule.isPending("LOADING…"))
         #expect(!rule.isPending("LOADING… DONE"))
     }
