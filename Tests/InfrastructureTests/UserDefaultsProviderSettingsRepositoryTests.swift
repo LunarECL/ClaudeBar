@@ -192,4 +192,26 @@ struct UserDefaultsProviderSettingsRepositoryTests {
         repository.setClaudeCliFallbackEnabled(false)
         #expect(repository.claudeCliFallbackEnabled() == false)
     }
+
+    // MARK: - Codex Verified Flag
+
+    @Test
+    func `codexVerifiedAtLeastOnce defaults to false`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        #expect(repository.codexVerifiedAtLeastOnce() == false)
+    }
+
+    @Test
+    func `setCodexVerifiedAtLeastOnce persists value`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setCodexVerifiedAtLeastOnce(true)
+        #expect(repository.codexVerifiedAtLeastOnce() == true)
+
+        repository.setCodexVerifiedAtLeastOnce(false)
+        #expect(repository.codexVerifiedAtLeastOnce() == false)
+    }
 }
