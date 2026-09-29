@@ -48,6 +48,75 @@ struct CodexUsageProbeTests {
 @Suite
 struct CodexUsageProbeRPCTests {
 
+    /// Temp home directory with (or without) a fake `~/.codex/auth.json`.
+    private func makeTempHome(withAuth: Bool) -> (CodexCredentialLoader, URL) {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("claudebar-codex-probe-\(UUID().uuidString)")
+        let codexDir = dir.appendingPathComponent(".codex")
+        try? FileManager.default.createDirectory(at: codexDir, withIntermediateDirectories: true)
+        if withAuth {
+            let auth = codexDir.appendingPathComponent("auth.json")
+            try? Data("{\"tokens\":{\"access_token\":\"test-token\"}}".utf8).write(to: auth)
+        }
+        return (CodexCredentialLoader(homeDirectory: dir.path), dir)
+    }
+
+    /// Hand-written client double: records fetches as state so tests can
+    /// assert the CLI was never spawned without Mockable failure diagnostics.
+    private final class CountingRPCClient: CodexRPCClient, @unchecked Sendable {
+        private let lock = NSLock()
+        private var _fetchCalls = 0
+        private var _shutdownCalls = 0
+
+        var fetchCalls: Int { lock.withLock { _fetchCalls } }
+        var shutdownCalls: Int { lock.withLock { _shutdownCalls } }
+
+        func isAvailable() -> Bool { true }
+
+        func fetchRateLimits() async throws -> CodexRateLimitsResponse {
+            lock.withLock { _fetchCalls += 1 }
+            return CodexRateLimitsResponse(
+                primary: CodexRateLimitWindow(usedPercent: 30, resetDescription: nil),
+                secondary: nil
+            )
+        }
+
+        func shutdown() {
+            lock.withLock { _shutdownCalls += 1 }
+        }
+    }
+
+    @Test
+    func `probe refuses to spawn the CLI when auth json is missing`() async {
+        let (loader, dir) = makeTempHome(withAuth: false)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let client = CountingRPCClient()
+        let probe = CodexUsageProbe(client: client, credentialLoader: loader)
+
+        await #expect(throws: ProbeError.authenticationRequired) {
+            try await probe.probe()
+        }
+
+        // No auth file means the CLI could open the browser login when
+        // spawned — the probe must not launch it at all (issue #216)
+        #expect(client.fetchCalls == 0)
+    }
+
+    @Test
+    func `probe fetches rate limits when auth json exists`() async throws {
+        let (loader, dir) = makeTempHome(withAuth: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let client = CountingRPCClient()
+        let probe = CodexUsageProbe(client: client, credentialLoader: loader)
+
+        let snapshot = try await probe.probe()
+
+        #expect(snapshot.providerId == "codex")
+        #expect(snapshot.sessionQuota?.percentRemaining == 70)
+        #expect(client.fetchCalls == 1)
+        #expect(client.shutdownCalls == 1)
+    }
+
     @Test
     func `probe returns snapshot from client`() async throws {
         // Given
@@ -61,7 +130,9 @@ struct CodexUsageProbeRPCTests {
         )
         given(mockClient).shutdown().willReturn(())
 
-        let probe = CodexUsageProbe(client: mockClient)
+        let (loader, dir) = makeTempHome(withAuth: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let probe = CodexUsageProbe(client: mockClient, credentialLoader: loader)
 
         // When
         let snapshot = try await probe.probe()
@@ -85,7 +156,9 @@ struct CodexUsageProbeRPCTests {
         )
         given(mockClient).shutdown().willReturn(())
 
-        let probe = CodexUsageProbe(client: mockClient)
+        let (loader, dir) = makeTempHome(withAuth: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let probe = CodexUsageProbe(client: mockClient, credentialLoader: loader)
 
         // When
         let snapshot = try await probe.probe()
@@ -109,7 +182,9 @@ struct CodexUsageProbeRPCTests {
         )
         given(mockClient).shutdown().willReturn(())
 
-        let probe = CodexUsageProbe(client: mockClient)
+        let (loader, dir) = makeTempHome(withAuth: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let probe = CodexUsageProbe(client: mockClient, credentialLoader: loader)
 
         // When
         let snapshot = try await probe.probe()
@@ -131,7 +206,9 @@ struct CodexUsageProbeRPCTests {
         )
         given(mockClient).shutdown().willReturn(())
 
-        let probe = CodexUsageProbe(client: mockClient)
+        let (loader, dir) = makeTempHome(withAuth: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let probe = CodexUsageProbe(client: mockClient, credentialLoader: loader)
 
         // When
         let snapshot = try await probe.probe()
@@ -152,7 +229,9 @@ struct CodexUsageProbeRPCTests {
         )
         given(mockClient).shutdown().willReturn(())
 
-        let probe = CodexUsageProbe(client: mockClient)
+        let (loader, dir) = makeTempHome(withAuth: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let probe = CodexUsageProbe(client: mockClient, credentialLoader: loader)
 
         // When
         _ = try await probe.probe()

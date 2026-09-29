@@ -73,9 +73,14 @@ public struct CodexRateLimitWindow: Sendable, Equatable {
 /// Infrastructure adapter that probes the Codex CLI to fetch usage quotas.
 public struct CodexUsageProbe: UsageProbe {
     private let client: CodexRPCClient
+    private let credentialLoader: CodexCredentialLoader
 
-    public init(client: CodexRPCClient? = nil) {
+    public init(
+        client: CodexRPCClient? = nil,
+        credentialLoader: CodexCredentialLoader = CodexCredentialLoader()
+    ) {
         self.client = client ?? DefaultCodexRPCClient()
+        self.credentialLoader = credentialLoader
     }
 
     public func isAvailable() async -> Bool {
@@ -85,6 +90,17 @@ public struct CodexUsageProbe: UsageProbe {
     public func probe() async throws -> UsageSnapshot {
         AppLog.probes.info("Starting Codex probe...")
         defer { client.shutdown() }
+
+        // Defense in depth for issue #216: spawning the CLI while the user
+        // has never authenticated can make it open the ChatGPT browser login
+        // all by itself. ClaudeBar never starts the Codex login, so refuse to
+        // launch anything when the auth file is absent. (Only the file's
+        // existence is checked here — API-key users keep working, and the
+        // API probe has its own OAuth gate on loadCredentials().)
+        guard FileManager.default.fileExists(atPath: credentialLoader.authFilePath) else {
+            AppLog.probes.error("Codex probe aborted: no \(credentialLoader.authFilePath) — refusing to spawn the CLI")
+            throw ProbeError.authenticationRequired
+        }
 
         let limits = try await client.fetchRateLimits()
         let snapshot = try Self.mapRateLimitsToSnapshot(limits)
