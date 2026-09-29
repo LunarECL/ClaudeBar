@@ -296,7 +296,7 @@ number.
 | # | Case | Price | Why |
 |---|---|---|---|
 | 1 | Known Anthropic model — exact, prefix, `opus`/`haiku` inference | table | Authoritative, and never overridden |
-| 2 | Open-weight family name (`qwen`, `llama`, `gemma`, `mistral`, …) | **free** | A local runner is not billed per token |
+| 2 | Open-weight family name (`qwen`, `llama`, `gemma`, `mistral`, …) | **free** | In the shapes that occur — ollama, LM Studio, llama.cpp — nothing bills per token |
 | 3 | Anything else, when the session was **served locally** | **free** | A loopback endpoint proves nobody can bill for the tokens |
 | 4 | Anything else, no local provenance | `defaultPrice` | The hedge for a new Anthropic model, kept intact |
 
@@ -366,9 +366,19 @@ the developer's own config, matching `ClaudeUsageProbe`'s no-op resolver.
 - A local server asked to serve `sonnet` (so the log says `claude-sonnet-4-6`) is
   still priced at list rates: the name is in the table, and a loopback URL says
   nothing about which Anthropic model would have been billed.
-- A model whose name suggests open weights but which is actually metered by a remote
-  gateway (`qwen3-max` on Alibaba Cloud, `mistral-large` on La Plateforme) is reported
-  free. The loopback signal is the escape hatch for it.
+- **A hosted open-weight endpoint reads as $0, and nothing can re-price it.** A model
+  whose name says open weights but which is metered by somebody else's cloud —
+  `qwen3-max` on Alibaba, `mistral-large-2411` on La Plateforme, `gemma-3-27b-it`, or any
+  `*/llama-*` id from OpenRouter, Together, Fireworks, DeepInfra or Groq — is reported
+  free. The loopback signal is **not** an escape hatch here: rules 2 and 3 are OR'd on
+  one line, so the name alone is enough to make the price free and no configuration can
+  put it back. The name is the only signal available, and it is wrong for this case.
+- **A local proxy in front of a paid upstream reads as $0.** LiteLLM on
+  `localhost:4000` forwarding to z.ai, OpenRouter or a corporate model gateway satisfies
+  rule 3 for every unpriced name, because loopback proves the *client* is on this
+  machine, not that the *tokens* were. Same failure as the case above, and the more
+  common shape in a team that fronts its providers through one router. The detector
+  cannot tell a runner from a router: both answer on loopback.
 - Cost remains a client-side estimate either way; §2's non-goals still stand.
 
 ### Tests
