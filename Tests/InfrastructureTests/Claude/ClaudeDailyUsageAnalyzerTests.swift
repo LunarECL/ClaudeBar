@@ -168,11 +168,12 @@ struct ClaudeDailyUsageAnalyzerTests {
         #expect(report.today.totalTokens == 3000)
     }
 
-    @Test func `costs nothing for a locally served model`() async throws {
-        // issue #190: Claude Code routed to a local server (ollama / LM Studio) still
-        // writes a full usage block, so the tokens are real but nothing was billed.
+    @Test func `costs nothing for a recognised open weight family name`() async throws {
+        // issue #190 rule 2: the name alone says "open weight", so the cost is $0 with
+        // no provenance involved. Cache tokens are in the fixture on purpose — savings
+        // is 0 only because the free price is applied, not because nothing was cached.
         let jsonl = """
-        {"type":"assistant","message":{"model":"qwen3-coder:30b","usage":{"input_tokens":1000,"output_tokens":500}},"timestamp":"\(Self.todayTimestamp())"}
+        {"type":"assistant","message":{"model":"qwen3-coder:30b","usage":{"input_tokens":1000,"output_tokens":500,"cache_read_input_tokens":1000000}},"timestamp":"\(Self.todayTimestamp())"}
         """
         let claudeDir = try setupTempClaudeDir(with: jsonl)
         defer { try? FileManager.default.removeItem(at: claudeDir) }
@@ -181,8 +182,32 @@ struct ClaudeDailyUsageAnalyzerTests {
 
         #expect(report.today.totalCost == 0)
         #expect(report.today.cachedSavings == 0)
-        // Tokens were still consumed locally — the token card keeps counting them.
+        // The cache read really happened, it was just not billed.
+        #expect(report.today.cacheReadTokens == 1_000_000)
+        // Tokens were still consumed — the token card keeps counting them.
         #expect(report.today.totalTokens == 1500)
+    }
+
+    @Test func `costs nothing for a private fine tune served locally`() async throws {
+        // issue #190 rule 3: a name the family list has never heard of. Provenance is
+        // the only thing that can price this, and cache savings must follow it.
+        let jsonl = """
+        {"type":"assistant","message":{"model":"acme-internal-7b","usage":{"input_tokens":1000,"output_tokens":500,"cache_read_input_tokens":1000000}},"timestamp":"\(Self.todayTimestamp())"}
+        """
+        let claudeDir = try setupTempClaudeDir(with: jsonl)
+        defer { try? FileManager.default.removeItem(at: claudeDir) }
+
+        let local = ClaudeDailyUsageAnalyzer(claudeDir: claudeDir, isLocallyServed: { true })
+        let remote = ClaudeDailyUsageAnalyzer(claudeDir: claudeDir, isLocallyServed: { false })
+
+        let localReport = try await local.analyzeToday()
+        let remoteReport = try await remote.analyzeToday()
+
+        #expect(localReport.today.totalCost == 0)
+        #expect(localReport.today.cachedSavings == 0)
+        // Same session, remote endpoint: nothing proves it was free.
+        #expect(remoteReport.today.totalCost > 0)
+        #expect(remoteReport.today.cachedSavings > 0)
     }
 
     @Test func `costs nothing for an unpriced model on a locally routed session`() async throws {
@@ -219,6 +244,31 @@ struct ClaudeDailyUsageAnalyzerTests {
         let report = try await analyzer.analyzeToday()
 
         #expect(report.today.totalCost == Decimal(string: "0.0105"))
+    }
+
+    @Test func `yesterday keeps its estimate when a loopback route is configured`() async throws {
+        // `servedLocally` describes the route as it is *now*, so it must not reach back
+        // a day and zero an unpriced name recorded before the switch — the same
+        // retroactive erasure rule 1 guards against for priced models.
+        let yesterday = Calendar.current.date(
+            byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: Date())
+        )!.addingTimeInterval(3600 * 12)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let jsonl = """
+        {"type":"assistant","message":{"model":"some-unknown-model","usage":{"input_tokens":1000,"output_tokens":500}},"timestamp":"\(formatter.string(from: yesterday))"}
+        """
+        let claudeDir = try setupTempClaudeDir(with: jsonl)
+        defer { try? FileManager.default.removeItem(at: claudeDir) }
+
+        let report = try await ClaudeDailyUsageAnalyzer(claudeDir: claudeDir, isLocallyServed: { true })
+            .analyzeToday()
+
+        #expect(report.today.isEmpty)
+        // Sonnet estimate preserved rather than zeroed.
+        #expect(report.previous.totalCost == Decimal(string: "0.0105"))
+        #expect(report.previous.totalTokens == 1500)
     }
 
     @Test func `separates today and yesterday records`() async throws {

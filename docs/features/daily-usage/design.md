@@ -315,6 +315,15 @@ Zeroing `claude-sonnet-4-6` whenever a loopback URL happens to be configured wou
 retroactively erase real spend from before the switch. The loopback fact is evidence
 about *unpriced* names only; for names the table knows, the table wins.
 
+**Why provenance stops at midnight.** The same reasoning bounds *when* the signal
+applies, not only to which names. Today is priced with it; yesterday's unpriced names
+keep the Sonnet estimate. Applying it across the whole window would erase yesterday's
+gateway estimate by precisely the mechanism rule 1 refuses — a current setting
+reaching back over records written before it was true. The asymmetry is deliberate and
+it is one-directional: the bound can *over*-report (a user who ran locally all of
+yesterday sees Sonnet-rate dollars for a day nobody billed), never under-report. A
+real z.ai bill quietly becoming $0 is the error this design will not make.
+
 **A brand-new Anthropic model released tomorrow** lands in rule 4 and is estimated at
 Sonnet rates, exactly as today. Anthropic model IDs contain `claude`, so none of the
 local-family substrings can swallow one; and no Anthropic release is served from a
@@ -340,6 +349,8 @@ the developer's own config, matching `ClaudeUsageProbe`'s no-op resolver.
 
 - **Resolved per scan, not at init**, so pointing the CLI at a local server takes
   effect on the next popover open without an app restart.
+- **Applied to today only.** The signal describes the route as it is now, so yesterday's
+  records stay on the estimate — see *Why provenance stops at midnight* above.
 - **`env` outranks `providers`.** `providers` is the menu of gateways a user *may*
   switch between; `env.ANTHROPIC_BASE_URL` is the one Claude Code is routed at. A
   config listing `api.z.ai` alongside a leftover `localhost:11434` is the ordinary
@@ -364,12 +375,14 @@ the developer's own config, matching `ClaudeUsageProbe`'s no-op resolver.
 
 | Scenario | Assert |
 |---|---|
-| `qwen3-coder`, `qwen3-coder:30b` | cost and cache savings are 0 |
-| unpriced name, `servedLocally: true` | cost 0 |
+| `qwen3-coder`, `qwen3-coder:30b` | cost and cache savings are 0, with cache tokens in the fixture |
+| unpriced name, `servedLocally: true` | cost and cache savings 0 |
 | unpriced name, no provenance | unchanged Sonnet estimate |
+| unpriced name yesterday, `servedLocally: true` | yesterday keeps the Sonnet estimate |
 | `claude-sonnet-4-6`, `servedLocally: true` | list price **and** cache savings kept |
 | `glm-4.6`, `deepseek-r1` | still priced (paid-gateway names stay estimated) |
 | analyzer over a local-model JSONL | `totalCost == 0` while `totalTokens == 1500` |
+| analyzer over a private-fine-tune JSONL, loopback | cost and savings 0; same JSONL remote, both > 0 |
 | detector | loopback hosts true, gateway/LAN/unparseable false, `providers[]` shapes |
 | detector | a `localhost` entry in `providers[]` does not override a remote `env` route, and vice versa |
 

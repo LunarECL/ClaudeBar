@@ -9,7 +9,8 @@ public struct ClaudeDailyUsageAnalyzer: DailyUsageAnalyzing, Sendable {
     private let now: @Sendable () -> Date
     /// Whether Claude Code is pointed at a loopback endpoint, i.e. inference
     /// nobody bills per token (#190). Resolved per scan, not at init, so routing
-    /// the CLI at a local server takes effect on the next scan.
+    /// the CLI at a local server takes effect on the next scan. Applies to today's
+    /// records only — it describes the current route, and the window reaches back a day.
     private let isLocallyServed: @Sendable () -> Bool
 
     /// - Parameter isLocallyServed: defaults to `false` so tests never read the
@@ -67,9 +68,16 @@ public struct ClaudeDailyUsageAnalyzer: DailyUsageAnalyzing, Sendable {
             record.timestamp >= yesterdayStart && record.timestamp < todayStart
         }
 
-        // Aggregate stats
+        // Aggregate stats.
+        //
+        // `servedLocally` is a *current* setting, so it prices today only. Applying it
+        // to the whole two-day window would retroactively zero yesterday's estimate for
+        // unpriced names — the same erasure rule 1 exists to prevent, just one day
+        // earlier. Yesterday therefore keeps its Sonnet-rate estimate, which over-reports
+        // local spend if the CLI was routed locally all day; over-reporting is the safe
+        // direction, since the alternative is a cost that silently disappears.
         let todayStat = aggregate(records: todayRecords, date: todayStart, servedLocally: servedLocally)
-        let yesterdayStat = aggregate(records: yesterdayRecords, date: yesterdayStart, servedLocally: servedLocally)
+        let yesterdayStat = aggregate(records: yesterdayRecords, date: yesterdayStart, servedLocally: false)
 
         AppLog.probes.info("DailyUsage: today=\(todayStat.formattedCost)/\(todayStat.formattedTokens), yesterday=\(yesterdayStat.formattedCost)/\(yesterdayStat.formattedTokens)")
 
