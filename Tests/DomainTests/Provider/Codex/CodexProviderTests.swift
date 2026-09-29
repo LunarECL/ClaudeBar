@@ -203,6 +203,33 @@ struct CodexProviderVerifiedSessionTests {
         #expect(codex.lastError == nil)
     }
 
+    // MARK: - Popover-open (.passive) refreshes (issue #216)
+
+    @Test
+    func `passive popover-open refresh does not probe an unverified RPC session`() async {
+        // Merely opening the popover must not spawn codex app-server either
+        let settings = makeCodexSettings(verified: false)
+        let rpcProbe = CountingProbe()
+        let codex = CodexProvider(rpcProbe: rpcProbe, apiProbe: CountingProbe(), settingsRepository: settings)
+
+        await #expect(throws: ProbeError.self) {
+            try await codex.refresh(.passive)
+        }
+        #expect(rpcProbe.calls == 0)
+        #expect(codex.lastError != nil)
+    }
+
+    @Test
+    func `passive popover-open refresh probes once the session is verified`() async throws {
+        let settings = makeCodexSettings(verified: true)
+        let rpcProbe = CountingProbe(percent: 60)
+        let codex = CodexProvider(rpcProbe: rpcProbe, apiProbe: CountingProbe(), settingsRepository: settings)
+
+        let result = try await codex.refresh(.passive)
+        #expect(result.sessionQuota?.percentRemaining == 60)
+        #expect(rpcProbe.calls == 1)
+    }
+
     @Test
     func `provider without a Codex settings repository stays passive in the background`() async {
         let settings = makeBaseSettingsRepository()

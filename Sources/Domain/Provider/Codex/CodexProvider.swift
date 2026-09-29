@@ -143,9 +143,10 @@ public final class CodexProvider: AIProvider {
     ///
     /// The RPC probe spawns `codex app-server`, and an unauthenticated Codex
     /// CLI can open the ChatGPT browser login all by itself. Probing is an
-    /// active operation, so it only runs when the user asked for it: while no
-    /// explicit refresh (Refresh / Connect) has succeeded at least once,
-    /// `.background` refreshes stay passive — they return the last snapshot
+    /// active operation, so it only runs on `.interactive` refreshes — a
+    /// genuine click (Refresh / Connect). Automatic refreshes stay passive
+    /// until such a click has succeeded at least once: `.background` (the
+    /// menu-bar poll) and `.passive` (popover open) return the last snapshot
     /// without spawning anything, or surface `notCheckedMessage` when there is
     /// nothing to show yet. A successful interactive refresh that ran the RPC
     /// probe persists the verified flag (issue #216).
@@ -154,7 +155,7 @@ public final class CodexProvider: AIProvider {
         isSyncing = true
         defer { isSyncing = false }
 
-        if kind == .background, backgroundProbeIsRPC, !hasVerifiedSession {
+        if kind != .interactive, backgroundProbeIsRPC, !hasVerifiedSession {
             if let snapshot {
                 return snapshot
             }

@@ -96,9 +96,7 @@ struct ClaudeProviderDailyUsageTests {
         #expect(snapshot.dailyUsageReport == nil)
     }
 
-    // MARK: - Background refresh skips the daily scan (issue #204)
-
-    /// A daily-usage analyzer that records how many times it ran, so a test can
+    // MARK: - Background refresh skips the daily scan (issue #204)    /// A daily-usage analyzer that records how many times it ran, so a test can
     /// assert the expensive JSONL scan was *skipped* (state), not just that its
     /// result wasn't attached.
     private final class CountingDailyUsageAnalyzer: DailyUsageAnalyzing, @unchecked Sendable {
@@ -148,6 +146,25 @@ struct ClaudeProviderDailyUsageTests {
 
         let claude = ClaudeProvider(probe: mockProbe, settingsRepository: settings, dailyUsageAnalyzer: analyzer)
         let snapshot = try await claude.refresh(.interactive)
+
+        #expect(analyzer.calls == 1)
+        #expect(snapshot.dailyUsageReport != nil)
+    }
+
+    // MARK: - Popover-open (.passive) refreshes (issue #216)
+
+    @Test
+    func `passive popover-open refresh attaches the daily usage report`() async throws {
+        // The popover renders the daily cards (MenuContentView), so opening it
+        // must keep feeding them — .passive is only passive for Codex's spawn
+        // gate, not an energy shortcut like the .background poll (#204).
+        let settings = makeSettingsRepository()
+        let mockProbe = MockUsageProbe()
+        given(mockProbe).probe().willReturn(makeSnapshot())
+        let analyzer = CountingDailyUsageAnalyzer(report: makeTodayReport())
+
+        let claude = ClaudeProvider(probe: mockProbe, settingsRepository: settings, dailyUsageAnalyzer: analyzer)
+        let snapshot = try await claude.refresh(.passive)
 
         #expect(analyzer.calls == 1)
         #expect(snapshot.dailyUsageReport != nil)
