@@ -12,7 +12,10 @@ import SwiftTerm
 public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     private let claudeBinary: String
     private let timeout: TimeInterval
-    private let cliExecutor: CLIExecutor
+    /// Runs `/usage`, under the rule that waits for the Usage screen.
+    let cliExecutor: CLIExecutor
+    /// Runs `/cost`, deliberately under no rule at all — see `probeCost`.
+    let costExecutor: CLIExecutor
     private let terminalRenderer: TerminalRenderer
 
     /// Environment variables to strip from the CLI subprocess.
@@ -41,6 +44,14 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         self.cliExecutor = cliExecutor ?? DefaultCLIExecutor(
             environmentExclusions: Self.envExclusions,
             completionRule: .claudeUsage
+        )
+        // `/cost` needs no rule: it paints one static panel in a single pass, so
+        // the idle cutoff is the honest end of the wait (#317). Reusing the
+        // `/usage` rule here made every `/cost` run wait out the full timeout,
+        // because a settled `/cost` screen carries none of that rule's ready
+        // markers. See `probeCost` for why a `/cost` marker cannot be used.
+        self.costExecutor = cliExecutor ?? DefaultCLIExecutor(
+            environmentExclusions: Self.envExclusions
         )
         self.terminalRenderer = TerminalRenderer(cols: 160, rows: 50)
         self.accountInfoResolver = accountInfoResolver
@@ -128,13 +139,28 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         return snapshot
     }
 
-    /// Probes using /cost command for API Usage Billing accounts
+    /// Probes using /cost command for API Usage Billing accounts.
+    ///
+    /// Runs under its own executor with **no** completion rule, so the capture
+    /// ends on the ordinary idle cutoff the way every pre-#317 `/cost` run did.
+    /// `/cost` is a single static panel written in one pass — there is no second
+    /// request and nothing to wait for — so "the screen stopped changing" is the
+    /// whole end condition, and a rule could only add a way to get it wrong.
+    ///
+    /// In particular, borrowing `.claudeUsage` here cost every run the full 20s
+    /// timeout: a settled `/cost` screen has no quota bars, so none of that
+    /// rule's ready markers (`% used`, `Current session`, …) ever appear and
+    /// `isPending` stayed true forever. And a dedicated `.claudeCost` rule keyed
+    /// on `Total cost` is not the fix either — the CLI paints `Total cost:
+    /// $0.0000` in the boot screen *before* `/cost` is submitted, so that marker
+    /// fires on a screen where nothing has been read yet and the probe would
+    /// answer a cost of $0.00 (#317).
     private func probeCost(workingDir: URL) async throws -> UsageSnapshot {
         AppLog.probes.info("Starting Claude probe with /cost command...")
 
         let costResult: CLIResult
         do {
-            costResult = try await cliExecutor.execute(
+            costResult = try await costExecutor.execute(
                 binary: claudeBinary,
                 args: ["/cost", "--allowed-tools", ""],
                 input: "",

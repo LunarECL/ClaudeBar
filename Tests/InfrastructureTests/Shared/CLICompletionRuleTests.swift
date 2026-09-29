@@ -121,8 +121,46 @@ struct CLICompletionRuleTests {
         #expect(!CLICompletionRule.claudeUsage.isPending(rateLimited))
     }
 
+    /// The screen `claude /cost` settles on, and why it carries no `/usage` rule.
+    ///
+    /// `/cost` is one static panel written in a single pass, so it has no
+    /// "still filling in" phase and needs no rule: the probe runs it with
+    /// `completionRule: nil` and the ordinary idle cutoff ends the capture. What
+    /// this pins down is that the `/usage` rule must not be borrowed for it —
+    /// a settled `/cost` screen has no quota bars, so it matches none of that
+    /// rule's markers and `isPending` would never fall, costing every run the
+    /// full 20s timeout (#317).
+    static let settledCostScreen = """
+    Claude Code v2.1.273
+      Session
+        Total cost:            $3.5500
+        Total duration (API):  6m 19.7s
+        Total duration (wall): 6h 33m 10.2s
+        Total code changes:    12 lines added, 3 lines removed
+      Esc to cancel
+    """
+
     @Test
-    func `markers match regardless of case`() {
+    func `a settled cost screen matches none of the usage ready markers`() {
+        // This is the reason `/cost` runs under no rule at all rather than this
+        // one: borrowed as-is, the rule can never say "done" here, and the run
+        // waits out the full timeout before the parser sees a finished screen.
+        #expect(CLICompletionRule.claudeUsage.isPending(Self.settledCostScreen))
+    }
+
+    /// The CLI paints the cost panel during boot, before `/cost` is submitted —
+    /// it is in the boot screen fixture above. So a ready marker keyed on
+    /// `Total cost` would fire on a screen where no cost has been read yet and
+    /// the probe would answer $0.00. Recorded here so the reason `/cost` takes
+    /// no rule is not "revisit this and add a marker" (#317).
+    @Test
+    func `a total-cost marker would fire on the boot screen before cost is submitted`() {
+        #expect(CLICompletionRule.claudeUsage.isPending(Self.bootScreen))
+        #expect(Self.bootScreen.contains("Total cost"))
+    }
+
+    @Test
+    func `a marker matches an uppercase screen and not an uppercase non-match`() {
         let rule = CLICompletionRule(readyMarkers: ["done"])
         #expect(rule.isPending("LOADING…"))
         #expect(!rule.isPending("LOADING… DONE"))

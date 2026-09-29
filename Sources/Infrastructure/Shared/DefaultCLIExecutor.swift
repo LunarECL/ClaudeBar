@@ -10,8 +10,9 @@ public struct DefaultCLIExecutor: CLIExecutor {
 
     /// Rule that tells the PTY run when the screen has settled. Without one, any
     /// idle gap ends the capture, truncating TUIs that fill in asynchronously
-    /// (issue #271).
-    private let completionRule: CLICompletionRule?
+    /// (issue #271). Readable from tests so a probe can be checked for pairing
+    /// each command with the rule its own screen needs (#317).
+    let completionRule: CLICompletionRule?
 
     public init(
         environmentExclusions: [String] = [],
