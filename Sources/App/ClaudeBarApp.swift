@@ -333,13 +333,13 @@ struct ClaudeBarApp: App {
         MenuBarExtra {
             Group {
                 #if ENABLE_SPARKLE
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)
                     .environment(\.sparkleUpdater, sparkleUpdater)
                 #else
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)

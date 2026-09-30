@@ -1383,6 +1383,40 @@ struct QuotaMonitorTests {
     }
 
     @Test
+    func `selectProvider at position selects the enabled provider shown in that slot`() {
+        // Given - gemini sits between two enabled providers but is disabled,
+        // so the pills read: 1 Claude, 2 Codex
+        let settings = makeSettingsRepository()
+        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let gemini = GeminiProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        gemini.isEnabled = false
+        let monitor = makeMonitor(providers: AIProviders(providers: [claude, gemini, codex]))
+
+        // When
+        monitor.selectProvider(atPosition: 2)
+
+        // Then
+        #expect(monitor.selectedProviderId == "codex")
+    }
+
+    @Test
+    func `selectProvider at position ignores a slot with no provider`() {
+        // Given
+        let settings = makeSettingsRepository()
+        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let monitor = makeMonitor(providers: AIProviders(providers: [claude, codex]))
+
+        // When
+        monitor.selectProvider(atPosition: 3)
+        monitor.selectProvider(atPosition: 0)
+
+        // Then
+        #expect(monitor.selectedProviderId == "claude")
+    }
+
+    @Test
     func `init selects first enabled when default claude is disabled`() {
         // Given - claude (default) is disabled before init
         let settings = makeSettingsRepository()
