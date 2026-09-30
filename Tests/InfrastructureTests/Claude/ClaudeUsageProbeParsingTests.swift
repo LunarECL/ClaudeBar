@@ -1250,7 +1250,7 @@ struct ClaudeUsageProbeParsingTests {
     /// probe session's own spend, not a misread, and the fix is upstream: a
     /// subscription must not be routed here at all.
     @Test
-    func `a fully painted cost panel of an empty session reads as zero`() {
+    func `a fully painted cost panel of an empty session reads as zero`() throws {
         let panelOnly = """
         Claude Code v2.1.274
         Opus 5 (1M context) with high effort · API Usage Billing
