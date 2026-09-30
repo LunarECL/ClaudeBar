@@ -87,7 +87,10 @@ struct ClaudeBarApp: App {
                 apiProbe: ClaudeAPIUsageProbe(),
                 passProbe: ClaudePassProbe(),
                 settingsRepository: settingsRepository,
-                dailyUsageAnalyzer: ClaudeDailyUsageAnalyzer()
+                dailyUsageAnalyzer: ClaudeDailyUsageAnalyzer(
+                    // Inference routed at a loopback endpoint costs nothing (#190).
+                    isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
+                )
             ),
             CodexProvider(
                 rpcProbe: CodexUsageProbe(),

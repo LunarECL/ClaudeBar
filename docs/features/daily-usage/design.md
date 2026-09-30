@@ -3,7 +3,8 @@
 **Status:** Implemented
 **Date:** 2026-06-09
 **Issue:** [#207](https://github.com/tddworks/ClaudeBar/issues/207) — Daily Usage cost & token cards overcount ~4×
-**Affected code:** `Sources/Infrastructure/Claude/SessionJSONLParser.swift`, `Sources/Infrastructure/Claude/ClaudeDailyUsageAnalyzer.swift`
+**Follow-up:** [#190](https://github.com/tddworks/ClaudeBar/issues/190) — locally served models billed at Anthropic rates (§11)
+**Affected code:** `Sources/Infrastructure/Claude/SessionJSONLParser.swift`, `Sources/Infrastructure/Claude/ClaudeDailyUsageAnalyzer.swift`, `Sources/Infrastructure/Claude/ModelPricing.swift`, `Sources/Infrastructure/Claude/ClaudeLocalInferenceDetector.swift`
 
 ---
 
@@ -266,6 +267,134 @@ Run: `xcodebuild test -scheme ClaudeBar-Workspace -workspace ClaudeBar.xcworkspa
 | Field-wise max across group | Equivalent to last-wins here but more code; only needed if stable fields ever varied (they don't). |
 | Dedup inside each file only | Misses resume/branch copies that span files. Must dedup on the combined set. |
 | Switch to an authoritative usage source (à la tokemon's OAuth path) | Larger, orthogonal change; doesn't block fixing the inflation. Possible future work. |
+
+---
+
+## 11. Locally Served Models Cost Nothing (#190)
+
+### Problem
+
+`ModelPricing.price(for:)` ends in `return defaultPrice` — Sonnet-level $3/$15 per 1M —
+for **any** name the table does not know. `SessionJSONLParser` accepts every
+`type:"assistant"` line's `message.model`, including the model names a local server
+reports when `ANTHROPIC_BASE_URL` points at ollama or LM Studio. So a user who
+switched Claude Code to a local model watched the Cost Usage card keep climbing in
+dollars, while the session/weekly quotas — which come from the Anthropic account and
+were correctly flat — told them nothing was being spent.
+
+`cachedSavings` had the same defect: cache savings priced at Anthropic rates for a
+model nobody bills per token are a fabricated number, not an estimate.
+
+The default exists for a narrow reason: it hedges **Anthropic** models released after
+the table was written. Applied to `qwen3-coder` it is not a hedge, it is a wrong
+number.
+
+### Design: two free signals, one table, one order of precedence
+
+`price(for:servedLocally:)` resolves in this order:
+
+| # | Case | Price | Why |
+|---|---|---|---|
+| 1 | Known Anthropic model — exact, prefix, `opus`/`haiku` inference | table | Authoritative, and never overridden |
+| 2 | Open-weight family name (`qwen`, `llama`, `gemma`, `mistral`, …) | **free** | In the shapes that occur — ollama, LM Studio, llama.cpp — nothing bills per token |
+| 3 | Anything else, when the session was **served locally** | **free** | A loopback endpoint proves nobody can bill for the tokens |
+| 4 | Anything else, no local provenance | `defaultPrice` | The hedge for a new Anthropic model, kept intact |
+
+**Why both signals, and why this order.** Name alone needs a list that is always
+behind: `phi4`, `granite` or a private fine-tune served over ollama still billed at
+Sonnet rates. Provenance alone needs a config file to be present and correct, and
+`ANTHROPIC_BASE_URL` is unset for most people — including everyone who reaches a
+local runner some other way. Provenance settles what the name cannot: a local server
+may serve a model we have never heard of, under any name. The name list settles what
+the config cannot: it keeps a local model's cost at $0 even after the user has
+switched back to the API, when the loopback signal is gone.
+
+**Why rule 1 is not overridden by provenance.** `ANTHROPIC_BASE_URL` is a global,
+current setting, but records are per-moment and the scan window is two days wide.
+Zeroing `claude-sonnet-4-6` whenever a loopback URL happens to be configured would
+retroactively erase real spend from before the switch. The loopback fact is evidence
+about *unpriced* names only; for names the table knows, the table wins.
+
+**Why provenance stops at midnight.** The same reasoning bounds *when* the signal
+applies, not only to which names. Today is priced with it; yesterday's unpriced names
+keep the Sonnet estimate. Applying it across the whole window would erase yesterday's
+gateway estimate by precisely the mechanism rule 1 refuses — a current setting
+reaching back over records written before it was true. The asymmetry is deliberate and
+it is one-directional: the bound can *over*-report (a user who ran locally all of
+yesterday sees Sonnet-rate dollars for a day nobody billed), never under-report. A
+real z.ai bill quietly becoming $0 is the error this design will not make.
+
+**A brand-new Anthropic model released tomorrow** lands in rule 4 and is estimated at
+Sonnet rates, exactly as today. Anthropic model IDs contain `claude`, so none of the
+local-family substrings can swallow one; and no Anthropic release is served from a
+loopback endpoint, so provenance cannot quietly zero it. The failure mode of this fix
+is the *opposite* of the old one: we never invent a price for an unrecognised
+Anthropic model.
+
+**Deliberately absent from the name list:** `glm-4`, `deepseek`, and friends. Those
+names are also served by paid gateways (z.ai, DeepSeek, OpenRouter) through the same
+`ANTHROPIC_BASE_URL` mechanism, so a name alone cannot say whether they cost anything.
+They stay on the Sonnet estimate unless rule 3 proves the run was local — which is
+the case that would otherwise have been guessed wrong in both directions.
+
+### Provenance plumbing
+
+`ClaudeLocalInferenceDetector` reads `~/.claude.json` — `env.ANTHROPIC_BASE_URL`, or the
+`providers` array when that key is absent, the same file and shapes `ZaiUsageProbe`
+already parses — and reports whether the active base URL resolves to a loopback host
+(`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `*.localhost`). `ClaudeBarApp` passes
+`isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }` into
+`ClaudeDailyUsageAnalyzer`; the analyzer's default is `{ false }` so tests never read
+the developer's own config, matching `ClaudeUsageProbe`'s no-op resolver.
+
+- **Resolved per scan, not at init**, so pointing the CLI at a local server takes
+  effect on the next popover open without an app restart.
+- **Applied to today only.** The signal describes the route as it is now, so yesterday's
+  records stay on the estimate — see *Why provenance stops at midnight* above.
+- **`env` outranks `providers`.** `providers` is the menu of gateways a user *may*
+  switch between; `env.ANTHROPIC_BASE_URL` is the one Claude Code is routed at. A
+  config listing `api.z.ai` alongside a leftover `localhost:11434` is the ordinary
+  shape of a machine that tries both, and OR-ing the two would mark the window local
+  and zero a real GLM/DeepSeek estimate for a machine running no local inference at
+  all. `providers` is consulted only when `env` names no route.
+- **Loopback only.** A remote `ANTHROPIC_BASE_URL` (z.ai, a corporate proxy) is
+  still billed by somebody, so it proves nothing. An unparseable URL counts as
+  remote: zeroing a cost because parsing failed would silently under-report spend.
+
+### Known limitations
+
+- A local server asked to serve `sonnet` (so the log says `claude-sonnet-4-6`) is
+  still priced at list rates: the name is in the table, and a loopback URL says
+  nothing about which Anthropic model would have been billed.
+- **A hosted open-weight endpoint reads as $0, and nothing can re-price it.** A model
+  whose name says open weights but which is metered by somebody else's cloud —
+  `qwen3-max` on Alibaba, `mistral-large-2411` on La Plateforme, `gemma-3-27b-it`, or any
+  `*/llama-*` id from OpenRouter, Together, Fireworks, DeepInfra or Groq — is reported
+  free. The loopback signal is **not** an escape hatch here: rules 2 and 3 are OR'd on
+  one line, so the name alone is enough to make the price free and no configuration can
+  put it back. The name is the only signal available, and it is wrong for this case.
+- **A local proxy in front of a paid upstream reads as $0.** LiteLLM on
+  `localhost:4000` forwarding to z.ai, OpenRouter or a corporate model gateway satisfies
+  rule 3 for every unpriced name, because loopback proves the *client* is on this
+  machine, not that the *tokens* were. Same failure as the case above, and the more
+  common shape in a team that fronts its providers through one router. The detector
+  cannot tell a runner from a router: both answer on loopback.
+- Cost remains a client-side estimate either way; §2's non-goals still stand.
+
+### Tests
+
+| Scenario | Assert |
+|---|---|
+| `qwen3-coder`, `qwen3-coder:30b` | cost and cache savings are 0, with cache tokens in the fixture |
+| unpriced name, `servedLocally: true` | cost and cache savings 0 |
+| unpriced name, no provenance | unchanged Sonnet estimate |
+| unpriced name yesterday, `servedLocally: true` | yesterday keeps the Sonnet estimate |
+| `claude-sonnet-4-6`, `servedLocally: true` | list price **and** cache savings kept |
+| `glm-4.6`, `deepseek-r1` | still priced (paid-gateway names stay estimated) |
+| analyzer over a local-model JSONL | `totalCost == 0` while `totalTokens == 1500` |
+| analyzer over a private-fine-tune JSONL, loopback | cost and savings 0; same JSONL remote, both > 0 |
+| detector | loopback hosts true, gateway/LAN/unparseable false, `providers[]` shapes |
+| detector | a `localhost` entry in `providers[]` does not override a remote `env` route, and vice versa |
 
 ---
 
