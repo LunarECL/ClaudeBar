@@ -4,7 +4,7 @@ description: Track Codex 5-hour and weekly limits through the codex app-server R
 
 # Codex
 
-Shows your OpenAI Codex rate-limit windows (usually the 5-hour session and weekly limits) with reset countdowns. API mode also shows your Codex credits balance when ChatGPT reports one.
+Shows your OpenAI Codex rate-limit windows (usually the 5-hour session and weekly limits) with reset countdowns. API mode also shows your Codex credits balance when ChatGPT reports one. Separate preview buckets such as GPT-5.3-Codex-Spark appear as extra rows after your main windows.
 
 ## Setup
 

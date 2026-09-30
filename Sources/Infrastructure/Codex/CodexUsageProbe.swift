@@ -15,16 +15,41 @@ public protocol CodexRPCClient: Sendable {
     func shutdown()
 }
 
+/// A separate Codex rate-limit bucket alongside the main limits, e.g.
+/// GPT-5.3-Codex-Spark's own 5h + weekly windows.
+public struct CodexAdditionalLimit: Sendable, Equatable {
+    /// Display name of the bucket (e.g. "Codex Spark"), taken from `limitName`
+    /// and falling back to `limitId`.
+    public let name: String
+    public let primary: CodexRateLimitWindow?
+    public let secondary: CodexRateLimitWindow?
+
+    public init(name: String, primary: CodexRateLimitWindow? = nil, secondary: CodexRateLimitWindow? = nil) {
+        self.name = name
+        self.primary = primary
+        self.secondary = secondary
+    }
+}
+
 /// Response from Codex rate limits API.
 public struct CodexRateLimitsResponse: Sendable, Equatable {
     public let primary: CodexRateLimitWindow?
     public let secondary: CodexRateLimitWindow?
     public let planType: String?
+    /// Extra buckets beyond the main limits (e.g. Codex Spark), empty by
+    /// default so existing callers keep their behavior.
+    public let additional: [CodexAdditionalLimit]
 
-    public init(primary: CodexRateLimitWindow?, secondary: CodexRateLimitWindow?, planType: String? = nil) {
+    public init(
+        primary: CodexRateLimitWindow?,
+        secondary: CodexRateLimitWindow?,
+        planType: String? = nil,
+        additional: [CodexAdditionalLimit] = []
+    ) {
         self.primary = primary
         self.secondary = secondary
         self.planType = planType
+        self.additional = additional
     }
 }
 
@@ -97,6 +122,31 @@ public struct CodexUsageProbe: UsageProbe {
             ))
         }
 
+        for limit in limits.additional {
+            let label = menuLabel(for: limit.name)
+            guard !label.isEmpty else { continue }
+            if let primary = limit.primary {
+                quotas.append(UsageQuota(
+                    percentRemaining: max(0, 100 - primary.usedPercent),
+                    quotaType: .timeLimit(label),
+                    providerId: "codex",
+                    resetsAt: primary.resetsAt,
+                    resetText: primary.resetDescription,
+                    windowDuration: primary.windowDuration
+                ))
+            }
+            if let secondary = limit.secondary {
+                quotas.append(UsageQuota(
+                    percentRemaining: max(0, 100 - secondary.usedPercent),
+                    quotaType: .timeLimit(label + " 7d"),
+                    providerId: "codex",
+                    resetsAt: secondary.resetsAt,
+                    resetText: secondary.resetDescription,
+                    windowDuration: secondary.windowDuration
+                ))
+            }
+        }
+
         guard !quotas.isEmpty else {
             AppLog.probes.error("Codex probe failed: no rate limits in RPC response")
             throw ProbeError.parseFailed("No rate limits found")
@@ -107,6 +157,24 @@ public struct CodexUsageProbe: UsageProbe {
             quotas: quotas,
             capturedAt: Date()
         )
+    }
+
+    /// Trims a limit id or name to the menu-friendly distinguishing part:
+    /// "Codex Spark" and "codex_spark" both become "Spark"; anything without
+    /// the redundant prefix is kept as-is.
+    static func menuLabel(for name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        let lower = trimmed.lowercased()
+        if lower.hasPrefix("codex_") {
+            let rest = String(trimmed.dropFirst("codex_".count))
+            guard !rest.isEmpty else { return trimmed }
+            return rest.prefix(1).uppercased() + rest.dropFirst()
+        }
+        if lower.hasPrefix("codex ") {
+            let rest = String(trimmed.dropFirst("codex ".count))
+            return rest.isEmpty ? trimmed : rest
+        }
+        return trimmed
     }
 
     // MARK: - Parsing (for TTY fallback)
