@@ -74,8 +74,8 @@ public final class Account: AIProvider {
 
     public var cliCommand: String { provider.definition.cli ?? "" }
     /// The dashboard for the plan the last usage reported (#328).
-    public var dashboardURL: URL? { provider.definition.links.dashboard(for: snapshot?.accountTier) }
-    public var statusPageURL: URL? { provider.definition.links.status }
+    public var dashboardURL: URL? { provider.definition.profile.links.dashboard(for: snapshot?.accountTier) }
+    public var statusPageURL: URL? { provider.definition.profile.links.status }
     public var backgroundRefreshFloor: Duration? { provider.backgroundRefreshFloor }
     public var guestPasses: GuestPasses? { provider.guestPasses }
 

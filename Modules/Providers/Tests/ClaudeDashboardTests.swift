@@ -58,7 +58,7 @@ struct ClaudeDashboardTests {
         let definition = try Providers.builtIn("claude")
 
         #expect(try claude.provider().dashboardURL == Self.subscriptionUsageURL)
-        #expect(definition.links.dashboard(for: .custom("Enterprise")) == Self.subscriptionUsageURL)
-        #expect(definition.links.dashboard(for: nil) == Self.subscriptionUsageURL)
+        #expect(definition.profile.links.dashboard(for: .custom("Enterprise")) == Self.subscriptionUsageURL)
+        #expect(definition.profile.links.dashboard(for: nil) == Self.subscriptionUsageURL)
     }
 }

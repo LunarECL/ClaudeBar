@@ -1,11 +1,25 @@
 {
-  "id": "codex",
-  "name": "Codex",
-  "cli": "codex",
-  "links": {
-    "dashboard": "https://platform.openai.com/usage",
-    "status": "https://status.openai.com"
+  "profile": {
+    "id": "codex",
+    "name": "Codex",
+    "links": {
+      "dashboard": "https://platform.openai.com/usage",
+      "status": "https://status.openai.com"
+    },
+    "look": {
+      "symbol": "chevron.left.forwardslash.chevron.right",
+      "icon": "CodexIcon",
+      "color": {
+        "light": [0.18, 0.72, 0.68],
+        "dark": [0.35, 0.85, 0.78]
+      },
+      "gradientEnd": {
+        "light": [0.12, 0.52, 0.72],
+        "dark": [0.25, 0.65, 0.85]
+      }
+    }
   },
+  "cli": "codex",
   "enabledByDefault": true,
   "defaultDataSource": "rpc",
   "dataSources": [
@@ -16,13 +30,7 @@
       "fetch": {
         "jsonRpc": {
           "cli": "codex",
-          "args": [
-            "-s",
-            "read-only",
-            "-a",
-            "never",
-            "app-server"
-          ],
+          "args": ["-s", "read-only", "-a", "never", "app-server"],
           "workingDirectory": "dedicated",
           "handshake": [
             {
@@ -78,15 +86,9 @@
             {
               "kind": "time",
               "each": "$.result.rateLimitsByLimitId",
-              "skipKeys": [
-                "codex"
-              ],
+              "skipKeys": ["codex"],
               "name": {
-                "firstOf": [
-                  "limitName",
-                  "limitId",
-                  "$key"
-                ],
+                "firstOf": ["limitName", "limitId", "$key"],
                 "dropPrefixes": [
                   {
                     "prefix": "codex_",
@@ -129,15 +131,11 @@
             ],
             "otherwise": "No rate limits available yet - make some API calls first"
           },
-          "email": [
-            "$.account.result.account.email"
-          ]
+          "email": ["$.account.result.account.email"]
         }
       },
       "fallback": "tty",
-      "requiresFiles": [
-        "${CODEX_HOME:-~/.codex}/auth.json"
-      ],
+      "requiresFiles": ["${CODEX_HOME:-~/.codex}/auth.json"],
       "verifyBeforeBackground": true,
       "unverifiedMessage": "Codex CLI session not checked. Click Refresh or Connect to check Codex status."
     },
@@ -160,15 +158,8 @@
             "tokenURL": "https://auth.openai.com/oauth/token",
             "clientId": "app_EMoamEEZ73f0CkXaXp7hrann",
             "every": 691200,
-            "onStatus": [
-              401,
-              403
-            ],
-            "expiredCodes": [
-              "refresh_token_expired",
-              "refresh_token_reused",
-              "refresh_token_invalidated"
-            ],
+            "onStatus": [401, 403],
+            "expiredCodes": ["refresh_token_expired", "refresh_token_reused", "refresh_token_invalidated"],
             "hint": "Run `codex` in terminal to log in again."
           }
         }
@@ -192,10 +183,7 @@
             {
               "kind": "session",
               "at": "$.rate_limit.primary_window",
-              "usedPercent": [
-                "$header.x-codex-primary-used-percent",
-                "used_percent"
-              ],
+              "usedPercent": ["$header.x-codex-primary-used-percent", "used_percent"],
               "resetsAt": [
                 {
                   "epochSeconds": "reset_at"
@@ -208,10 +196,7 @@
             {
               "kind": "weekly",
               "at": "$.rate_limit.secondary_window",
-              "usedPercent": [
-                "$header.x-codex-secondary-used-percent",
-                "used_percent"
-              ],
+              "usedPercent": ["$header.x-codex-secondary-used-percent", "used_percent"],
               "resetsAt": [
                 {
                   "epochSeconds": "reset_at"
@@ -225,10 +210,7 @@
               "kind": "time",
               "each": "$.additional_rate_limits",
               "name": {
-                "firstOf": [
-                  "limit_name",
-                  "metered_feature"
-                ],
+                "firstOf": ["limit_name", "metered_feature"],
                 "dropPrefixes": [
                   {
                     "prefix": "codex_",
@@ -263,15 +245,10 @@
             }
           ],
           "cost": {
-            "remaining": [
-              "$header.x-codex-credits-balance",
-              "$.credits.balance"
-            ],
+            "remaining": ["$header.x-codex-credits-balance", "$.credits.balance"],
             "limit": 1000
           },
-          "email": [
-            "$credential.email"
-          ]
+          "email": ["$credential.email"]
         }
       }
     },
@@ -282,12 +259,7 @@
       "fetch": {
         "cli": {
           "cli": "codex",
-          "args": [
-            "-s",
-            "read-only",
-            "-a",
-            "never"
-          ],
+          "args": ["-s", "read-only", "-a", "never"],
           "input": "/status\n",
           "timeout": 20,
           "workingDirectory": "dedicated",
@@ -300,27 +272,18 @@
         "text": {
           "errors": [
             {
-              "contains": [
-                "data not available yet"
-              ],
+              "contains": ["data not available yet"],
               "error": {
                 "parseFailed": "Data not available yet"
               }
             },
             {
-              "contains": [
-                "update available"
-              ],
-              "alsoContains": [
-                "codex"
-              ],
+              "contains": ["update available"],
+              "alsoContains": ["codex"],
               "error": "updateRequired"
             },
             {
-              "contains": [
-                "not logged in",
-                "please log in"
-              ],
+              "contains": ["not logged in", "please log in"],
               "error": "authenticationRequired"
             }
           ],
@@ -341,9 +304,7 @@
           "whenEmpty": "Could not find usage limits in Codex output"
         }
       },
-      "requiresFiles": [
-        "${CODEX_HOME:-~/.codex}/auth.json"
-      ]
+      "requiresFiles": ["${CODEX_HOME:-~/.codex}/auth.json"]
     }
   ],
   "accounts": {
@@ -394,15 +355,10 @@
         },
         "mapping": {
           "json": {
-            "email": [
-              "$.account.result.account.email",
-              "$credential.email"
-            ]
+            "email": ["$.account.result.account.email", "$credential.email"]
           }
         },
-        "requiresFiles": [
-          "{{account.codexHome}}/auth.json"
-        ],
+        "requiresFiles": ["{{account.codexHome}}/auth.json"],
         "identity": {
           "field": "account",
           "equals": "{{account.chatgptAccountId}}",

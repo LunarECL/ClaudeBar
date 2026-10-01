@@ -32,7 +32,7 @@ no Swift for a vendor**: no `XxxProvider`, no `XxxUsageProbe`, no
 | golden tests | `Modules/Providers/Tests/<Name>DefinitionTests.swift` | always |
 | a generic rule or worker | `Modules/DataSources/` (+ `DataSourcesTests`) | when the definition language can't say what the provider needs |
 | registration | `Sources/App/ClaudeBarApp.swift` → `Self.builtIn("<id>", settings:)` | always |
-| look (color, icon, name) | `Sources/App/Views/ProviderVisualIdentity.swift` lookup tables, `Theme.swift`, the asset catalog | always, until the look moves into the definition |
+| look (name, symbol, colour, icon) | `profile.look` in `<id>.json`; the icon image in the asset catalog | always |
 | research | `docs/providers/<id>/README.md` (users), `design.md` (contributors) | always |
 
 **The rules** ([MODULAR_DESIGN §3–4](../../../docs/architecture/MODULAR_DESIGN.md#3--the-dependency-rules)):
@@ -44,10 +44,15 @@ no Swift for a vendor**: no `XxxProvider`, no `XxxUsageProbe`, no
 
 ```jsonc
 {
-  "id": "acme",                         // stable forever: settings and the menu bar key on it
-  "name": "Acme",
+  "profile": {                          // WHO IT IS
+    "id": "acme",                       // stable forever: settings and the menu bar key on it
+    "name": "Acme",
+    "links": { "dashboard": "https://…", "status": "https://…" },
+    "look": { "symbol": "bolt.fill", "icon": "AcmeIcon",          // SF Symbol, asset name
+              "color": { "light": [0.2, 0.5, 0.9], "dark": [0.3, 0.6, 1.0] },
+              "gradientEnd": { "light": [0.1, 0.3, 0.7], "dark": [0.2, 0.4, 0.8] } }
+  },
   "cli": "acme",                        // optional
-  "links": { "dashboard": "https://…", "status": "https://…" },
   "enabledByDefault": true,
   "defaultDataSource": "api",
   "dataSources": [
@@ -174,9 +179,9 @@ script, `<id>-<what>.js`. Test it through Swift with real captured screens
 // Sources/App/ClaudeBarApp.swift, in the AIProviders list
 Self.builtIn("acme", settings: settingsRepository),
 ```
-Add the provider's color, SF Symbol, name and icon asset to the lookup tables
-in `ProviderVisualIdentity.swift` / `Theme.swift`, and the icon to the asset
-catalog ([references/provider-icon-guide.md](references/provider-icon-guide.md)).
+Its name, symbol and colours are `profile.look` in the JSON — no `switch id`
+table to edit. Add the icon image to the asset catalog under `look.icon`
+([references/provider-icon-guide.md](references/provider-icon-guide.md)).
 Settings need no new protocol: the data source choice is
 `dataSourceKind(forProvider:)`, and an on/off setting a definition names (for
 example `fallback.enabledBySetting`) is `isOn(_:forProvider:)`.
@@ -202,6 +207,6 @@ setting `foo` is read from `<id>.foo`.
 - [ ] `<id>.json` makes them pass; no vendor-named Swift anywhere
 - [ ] Any new mapping/fetch/lookup ability added generically to `DataSources`, test-first, and listed in TARGET_ARCHITECTURE §8.1
 - [ ] Registered in `ClaudeBarApp` with `Self.builtIn`
-- [ ] Visual identity and icon added
+- [ ] `profile.look` filled in and the icon added to the asset catalog
 - [ ] Provider docs and CHANGELOG line written; docs check passes
 - [ ] `tuist test` green

@@ -55,7 +55,7 @@ public final class Provider {
     }
 
     public var id: String { definition.id }
-    public var name: String { definition.name }
+    public var name: String { definition.profile.name }
 
     // MARK: - Accounts
 

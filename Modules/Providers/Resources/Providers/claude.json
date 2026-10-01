@@ -1,12 +1,28 @@
 {
-  "id": "claude",
-  "name": "Claude",
-  "cli": "claude",
-  "links": {
-    "dashboard": "https://claude.ai/new#settings/usage",
-    "dashboardByPlan": { "claudeApi": "https://console.anthropic.com/settings/billing" },
-    "status": "https://status.anthropic.com"
+  "profile": {
+    "id": "claude",
+    "name": "Claude",
+    "links": {
+      "dashboard": "https://claude.ai/new#settings/usage",
+      "dashboardByPlan": {
+        "claudeApi": "https://console.anthropic.com/settings/billing"
+      },
+      "status": "https://status.anthropic.com"
+    },
+    "look": {
+      "symbol": "brain.fill",
+      "icon": "ClaudeIcon",
+      "color": {
+        "light": [0.95, 0.48, 0.38],
+        "dark": [0.98, 0.55, 0.45]
+      },
+      "gradientEnd": {
+        "light": [0.92, 0.45, 0.72],
+        "dark": [0.85, 0.35, 0.65]
+      }
+    }
   },
+  "cli": "claude",
   "enabledByDefault": true,
   "defaultDataSource": "cli",
   "dataSources": [
@@ -21,8 +37,22 @@
           "input": "",
           "timeout": 20,
           "workingDirectory": "dedicated",
-          "environment": { "unset": ["CLAUDE_CODE_OAUTH_TOKEN"], "set": { "CLAUDEBAR_PROBE": "1" } },
-          "readyWhen": [{ "row": "Current session" }, "% used", "% left", "rate limited", "Error:", "/usage is only available"],
+          "environment": {
+            "unset": ["CLAUDE_CODE_OAUTH_TOKEN"],
+            "set": {
+              "CLAUDEBAR_PROBE": "1"
+            }
+          },
+          "readyWhen": [
+            {
+              "row": "Current session"
+            },
+            "% used",
+            "% left",
+            "rate limited",
+            "Error:",
+            "/usage is only available"
+          ],
           "screen": "rendered",
           "autoResponses": {
             "Esc to cancel": "\r",
@@ -41,7 +71,11 @@
           "billingType": "$.oauthAccount.billingType"
         }
       },
-      "mapping": { "script": { "file": "claude-usage-screen.js" } },
+      "mapping": {
+        "script": {
+          "file": "claude-usage-screen.js"
+        }
+      },
       "recover": {
         "folderTrustRequired": {
           "patchJSONFile": {
@@ -51,7 +85,9 @@
           }
         }
       },
-      "fallbackOn": { "subscriptionRequired": "cliCost" },
+      "fallbackOn": {
+        "subscriptionRequired": "cliCost"
+      },
       "fallback": "api"
     },
     {
@@ -65,7 +101,12 @@
           "input": "",
           "timeout": 20,
           "workingDirectory": "dedicated",
-          "environment": { "unset": ["CLAUDE_CODE_OAUTH_TOKEN"], "set": { "CLAUDEBAR_PROBE": "1" } },
+          "environment": {
+            "unset": ["CLAUDE_CODE_OAUTH_TOKEN"],
+            "set": {
+              "CLAUDEBAR_PROBE": "1"
+            }
+          },
           "screen": "rendered",
           "autoResponses": {
             "Esc to cancel": "\r",
@@ -76,7 +117,11 @@
           }
         }
       },
-      "mapping": { "script": { "file": "claude-cost-screen.js" } },
+      "mapping": {
+        "script": {
+          "file": "claude-cost-screen.js"
+        }
+      },
       "fallback": "api"
     },
     {
@@ -103,7 +148,9 @@
               "subscriptionType": "$.claudeAiOauth.subscriptionType"
             }
           },
-          { "environment": "CLAUDE_CODE_OAUTH_TOKEN" }
+          {
+            "environment": "CLAUDE_CODE_OAUTH_TOKEN"
+          }
         ],
         "refresh": {
           "oauth2": {
@@ -111,7 +158,11 @@
             "clientId": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
             "scope": "user:profile user:inference user:sessions:claude_code",
             "bodyFormat": "json",
-            "dueWhen": { "expiresAt": "expiresAt", "unit": "milliseconds", "skew": 300 },
+            "dueWhen": {
+              "expiresAt": "expiresAt",
+              "unit": "milliseconds",
+              "skew": 300
+            },
             "onStatus": [401, 403],
             "hint": "Run `claude` in terminal to log in again."
           }
@@ -130,30 +181,82 @@
           "timeout": 15
         }
       },
-      "cache": { "ttl": 900 },
+      "cache": {
+        "ttl": 900
+      },
       "mapping": {
         "json": {
           "notAnObject": "Failed to parse usage response",
           "plan": {
             "path": "$credential.subscriptionType",
             "plans": {
-              "claude_max": "claudeMax", "max": "claudeMax",
-              "claude_pro": "claudePro", "pro": "claudePro",
-              "claude_api": "claudeApi", "api": "claudeApi"
+              "claude_max": "claudeMax",
+              "max": "claudeMax",
+              "claude_pro": "claudePro",
+              "pro": "claudePro",
+              "claude_api": "claudeApi",
+              "api": "claudeApi"
             }
           },
           "quotas": [
-            { "kind": "session", "at": "$.five_hour", "usedPercent": "utilization", "resetsAt": { "iso8601": "resets_at" }, "overLimit": true, "countdown": "hours" },
-            { "kind": "weekly", "at": "$.seven_day", "usedPercent": "utilization", "resetsAt": { "iso8601": "resets_at" }, "overLimit": true, "countdown": "hours" },
-            { "kind": "model", "name": "sonnet", "at": "$.seven_day_sonnet", "usedPercent": "utilization", "resetsAt": { "iso8601": "resets_at" }, "overLimit": true, "countdown": "hours" },
-            { "kind": "model", "name": "opus", "at": "$.seven_day_opus", "usedPercent": "utilization", "resetsAt": { "iso8601": "resets_at" }, "overLimit": true, "countdown": "hours" },
+            {
+              "kind": "session",
+              "at": "$.five_hour",
+              "usedPercent": "utilization",
+              "resetsAt": {
+                "iso8601": "resets_at"
+              },
+              "overLimit": true,
+              "countdown": "hours"
+            },
+            {
+              "kind": "weekly",
+              "at": "$.seven_day",
+              "usedPercent": "utilization",
+              "resetsAt": {
+                "iso8601": "resets_at"
+              },
+              "overLimit": true,
+              "countdown": "hours"
+            },
+            {
+              "kind": "model",
+              "name": "sonnet",
+              "at": "$.seven_day_sonnet",
+              "usedPercent": "utilization",
+              "resetsAt": {
+                "iso8601": "resets_at"
+              },
+              "overLimit": true,
+              "countdown": "hours"
+            },
+            {
+              "kind": "model",
+              "name": "opus",
+              "at": "$.seven_day_opus",
+              "usedPercent": "utilization",
+              "resetsAt": {
+                "iso8601": "resets_at"
+              },
+              "overLimit": true,
+              "countdown": "hours"
+            },
             {
               "kind": "model",
               "each": "$.limits",
-              "where": { "path": "kind", "equals": "weekly_scoped" },
-              "name": { "firstOf": ["scope.model.display_name"], "firstWord": true, "lowercase": true },
+              "where": {
+                "path": "kind",
+                "equals": "weekly_scoped"
+              },
+              "name": {
+                "firstOf": ["scope.model.display_name"],
+                "firstWord": true,
+                "lowercase": true
+              },
               "usedPercent": "percent",
-              "resetsAt": { "iso8601": "resets_at" },
+              "resetsAt": {
+                "iso8601": "resets_at"
+              },
               "overLimit": true,
               "countdown": "hours",
               "unique": true
@@ -162,20 +265,41 @@
           "cost": [
             {
               "kind": "extraUsage",
-              "when": { "path": "$.spend.enabled", "equals": true },
-              "used": { "amount": "$.spend.used.amount_minor", "decimals": "$.spend.used.exponent" },
-              "limit": { "amount": "$.spend.limit.amount_minor", "decimals": "$.spend.limit.exponent" }
+              "when": {
+                "path": "$.spend.enabled",
+                "equals": true
+              },
+              "used": {
+                "amount": "$.spend.used.amount_minor",
+                "decimals": "$.spend.used.exponent"
+              },
+              "limit": {
+                "amount": "$.spend.limit.amount_minor",
+                "decimals": "$.spend.limit.exponent"
+              }
             },
             {
               "kind": "extraUsage",
-              "when": { "path": "$.extra_usage.is_enabled", "equals": true },
-              "used": { "amount": "$.extra_usage.used_credits", "decimals": ["$.extra_usage.decimal_places", 2] },
-              "limit": { "amount": "$.extra_usage.monthly_limit", "decimals": ["$.extra_usage.decimal_places", 2] }
+              "when": {
+                "path": "$.extra_usage.is_enabled",
+                "equals": true
+              },
+              "used": {
+                "amount": "$.extra_usage.used_credits",
+                "decimals": ["$.extra_usage.decimal_places", 2]
+              },
+              "limit": {
+                "amount": "$.extra_usage.monthly_limit",
+                "decimals": ["$.extra_usage.decimal_places", 2]
+              }
             }
           ]
         }
       },
-      "fallback": { "to": "cli", "enabledBySetting": "cliFallbackEnabled" }
+      "fallback": {
+        "to": "cli",
+        "enabledBySetting": "cliFallbackEnabled"
+      }
     }
   ]
 }

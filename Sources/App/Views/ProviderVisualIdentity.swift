@@ -30,20 +30,39 @@ public protocol ProviderVisualIdentity {
 
 // MARK: - Provider Visual Identity
 
-/// A provider built from a definition takes its look from the id tables
-/// below — the same values its hand-written class used — until the look moves
-/// into the definition itself (docs/architecture/TARGET_ARCHITECTURE.md §8, slice 3).
+/// A provider that is data takes its face from its definition's profile.
 extension Account: ProviderVisualIdentity {
-    public var symbolIcon: String { ProviderVisualIdentityLookup.symbolIcon(for: id) }
+    private var look: ProviderLook { provider.definition.profile.look }
 
-    public var iconAssetName: String { ProviderVisualIdentityLookup.iconAssetName(for: id) }
+    public var symbolIcon: String { look.symbol ?? ProviderVisualIdentityLookup.symbolIcon(for: id) }
+
+    public var iconAssetName: String { look.icon ?? ProviderVisualIdentityLookup.iconAssetName(for: id) }
 
     public func themeColor(for scheme: ColorScheme) -> Color {
-        ProviderVisualIdentityLookup.color(for: id, scheme: scheme)
+        look.color.map { $0.color(for: scheme) } ?? ProviderVisualIdentityLookup.color(for: id, scheme: scheme)
     }
 
     public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        ProviderVisualIdentityLookup.gradient(for: id, scheme: scheme)
+        look.gradient(for: scheme) ?? ProviderVisualIdentityLookup.gradient(for: id, scheme: scheme)
+    }
+}
+
+extension ProviderLook.Shades {
+    func color(for scheme: ColorScheme) -> Color {
+        let rgb = scheme == .dark ? dark : light
+        return Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
+    }
+}
+
+extension ProviderLook {
+    /// The provider's colour running into `gradientEnd`, top-leading to bottom-trailing.
+    func gradient(for scheme: ColorScheme) -> LinearGradient? {
+        guard let color, let gradientEnd else { return nil }
+        return LinearGradient(
+            colors: [color.color(for: scheme), gradientEnd.color(for: scheme)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 
@@ -549,16 +568,14 @@ enum ProviderVisualIdentityLookup {
     }
 
     /// Get provider theme color by ID
+    /// The look a definition gives, for screens that only hold an id.
+    private static func look(for providerId: String) -> ProviderLook? {
+        Providers.builtInDefinition(forLineupId: providerId)?.profile.look
+    }
+
     static func color(for providerId: String, scheme: ColorScheme) -> Color {
-        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
-        case "claude":
-            return scheme == .dark
-                ? BaseTheme.coralAccent
-                : Color(red: 0.95, green: 0.48, blue: 0.38)
-        case "codex":
-            return scheme == .dark
-                ? BaseTheme.tealBright
-                : Color(red: 0.18, green: 0.72, blue: 0.68)
+        if let color = look(for: providerId)?.color { return color.color(for: scheme) }
+        switch providerId {
         case "gemini":
             return scheme == .dark
                 ? BaseTheme.goldenGlow
@@ -637,18 +654,11 @@ enum ProviderVisualIdentityLookup {
 
     /// Get provider gradient by ID
     static func gradient(for providerId: String, scheme: ColorScheme) -> LinearGradient {
+        if let gradient = look(for: providerId)?.gradient(for: scheme) { return gradient }
         let primaryColor = color(for: providerId, scheme: scheme)
         let secondaryColor: Color
 
-        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
-        case "claude":
-            secondaryColor = scheme == .dark
-                ? BaseTheme.pinkHot
-                : Color(red: 0.92, green: 0.45, blue: 0.72)
-        case "codex":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.25, green: 0.65, blue: 0.85)
-                : Color(red: 0.12, green: 0.52, blue: 0.72)
+        switch providerId {
         case "gemini":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.95, green: 0.55, blue: 0.35)
@@ -735,9 +745,8 @@ enum ProviderVisualIdentityLookup {
 
     /// Get provider icon asset name by ID
     static func iconAssetName(for providerId: String) -> String {
-        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
-        case "claude": return "ClaudeIcon"
-        case "codex": return "CodexIcon"
+        if let icon = look(for: providerId)?.icon { return icon }
+        switch providerId {
         case "gemini": return "GeminiIcon"
         case "copilot": return "CopilotIcon"
         case "antigravity": return "AntigravityIcon"
@@ -761,9 +770,8 @@ enum ProviderVisualIdentityLookup {
 
     /// Get provider display name by ID
     static func name(for providerId: String) -> String {
-        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
-        case "claude": return "Claude"
-        case "codex": return "Codex"
+        if let definition = Providers.builtInDefinition(forLineupId: providerId) { return definition.profile.name }
+        switch providerId {
         case "gemini": return "Gemini"
         case "copilot": return "GitHub Copilot"
         case "antigravity": return "Antigravity"
@@ -787,9 +795,8 @@ enum ProviderVisualIdentityLookup {
 
     /// Get provider SF symbol icon by ID
     static func symbolIcon(for providerId: String) -> String {
-        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
-        case "claude": return "brain.fill"
-        case "codex": return "chevron.left.forwardslash.chevron.right"
+        if let symbol = look(for: providerId)?.symbol { return symbol }
+        switch providerId {
         case "gemini": return "sparkles"
         case "copilot": return "chevron.left.forwardslash.chevron.right"
         case "antigravity": return "wand.and.stars"

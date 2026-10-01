@@ -47,11 +47,12 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     }
 
     /// Stable forever: settings, the menu-bar choice and the lineup are keyed by it.
-    public let id: String
-    public let name: String
+    /// WHO IT IS — the only place an id becomes a face.
+    public var profile: ProviderProfile
+    /// Stable forever: settings, the menu-bar choice and the lineup are keyed by it.
+    public var id: String { profile.id }
     /// The CLI a person would run (`codex`), when there is one.
     public let cli: String?
-    public let links: Links
     public let enabledByDefault: Bool
     public let dataSources: [DataSourceDefinition]
     public let defaultDataSource: String
@@ -118,19 +119,15 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     }
 
     public init(
-        id: String,
-        name: String,
+        profile: ProviderProfile,
         cli: String? = nil,
-        links: Links = Links(),
         enabledByDefault: Bool = true,
         dataSources: [DataSourceDefinition],
         defaultDataSource: String,
         accounts: Accounts? = nil
     ) {
-        self.id = id
-        self.name = name
+        self.profile = profile
         self.cli = cli
-        self.links = links
         self.enabledByDefault = enabledByDefault
         self.dataSources = dataSources
         self.defaultDataSource = defaultDataSource
@@ -139,20 +136,23 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
-        name = try container.decode(String.self, forKey: .name)
+        profile = try container.decode(ProviderProfile.self, forKey: .profile)
         cli = try container.decodeIfPresent(String.self, forKey: .cli)
-        links = try container.decodeIfPresent(Links.self, forKey: .links) ?? Links()
         enabledByDefault = try container.decodeIfPresent(Bool.self, forKey: .enabledByDefault) ?? true
         dataSources = try container.decode([DataSourceDefinition].self, forKey: .dataSources)
         defaultDataSource = try container.decode(String.self, forKey: .defaultDataSource)
         accounts = try container.decodeIfPresent(Accounts.self, forKey: .accounts)
     }
 
+    enum CodingKeys: String, CodingKey {
+        case profile, cli, enabledByDefault, dataSources, defaultDataSource, accounts
+    }
+
     /// Decodes and checks the laws: at least one data source, kinds unique,
     /// the default and every fallback naming one of them.
-    public static func parse(_ data: Data) throws -> ProviderDefinition {
-        let definition = try JSONDecoder().decode(ProviderDefinition.self, from: data)
+    public static func parse(_ data: Data, origin: ProviderProfile.Origin = .builtIn) throws -> ProviderDefinition {
+        var definition = try JSONDecoder().decode(ProviderDefinition.self, from: data)
+        definition.profile.origin = origin
         try definition.validate()
         return definition
     }
@@ -213,5 +213,102 @@ public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {
         case .missingFile(let name): "No provider definition named '\(name)'"
         case .missingAccountValue(let id, let name): "A '\(id)' account has no saved '\(name)'"
         }
+    }
+}
+
+/// WHO IT IS — name, face and links; data, never a `switch` on id.
+public struct ProviderProfile: Sendable, Equatable, Codable {
+    /// Where the definition came from — the badge Settings prints.
+    public enum Origin: String, Sendable, Equatable, Codable {
+        /// "Built in" — shipped in the app.
+        case builtIn
+        /// "Custom" — made in *Add Provider*, copied or imported.
+        case custom
+        /// "Extension" — a manifest in `~/.claudebar/extensions/`.
+        case `extension`
+    }
+
+    /// Stable forever: settings, the menu-bar choice and the lineup are keyed by it.
+    public let id: String
+    public let name: String
+    public let links: ProviderDefinition.Links
+    public let look: ProviderLook
+    /// Not written in the file: whoever loads it knows where it came from.
+    public var origin: Origin
+
+    public init(id: String, name: String, links: ProviderDefinition.Links = .init(), look: ProviderLook = .init(), origin: Origin = .builtIn) {
+        self.id = id
+        self.name = name
+        self.links = links
+        self.look = look
+        self.origin = origin
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(String.self, forKey: .id),
+            name: try container.decode(String.self, forKey: .name),
+            links: try container.decodeIfPresent(ProviderDefinition.Links.self, forKey: .links) ?? .init(),
+            look: try container.decodeIfPresent(ProviderLook.self, forKey: .look) ?? .init()
+        )
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, links, look
+    }
+}
+
+/// The face — an SF Symbol, an icon in the asset catalog, and a colour with
+/// the gradient it runs into, for light and dark. Plain data: the app turns it
+/// into colours.
+public struct ProviderLook: Sendable, Equatable, Codable {
+    /// `[red, green, blue]`, each 0…1, as written in the definition.
+    public struct RGB: Sendable, Equatable, Codable {
+        public let red: Double
+        public let green: Double
+        public let blue: Double
+
+        public init(_ red: Double, _ green: Double, _ blue: Double) {
+            self.red = red
+            self.green = green
+            self.blue = blue
+        }
+
+        public init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            self.init(try container.decode(Double.self), try container.decode(Double.self), try container.decode(Double.self))
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.unkeyedContainer()
+            try container.encode(red)
+            try container.encode(green)
+            try container.encode(blue)
+        }
+    }
+
+    /// One colour per appearance.
+    public struct Shades: Sendable, Equatable, Codable {
+        public let light: RGB
+        public let dark: RGB
+
+        public init(light: RGB, dark: RGB) {
+            self.light = light
+            self.dark = dark
+        }
+    }
+
+    public let symbol: String?
+    public let icon: String?
+    public let color: Shades?
+    /// Where the provider's gradient ends; it starts at `color`.
+    public let gradientEnd: Shades?
+
+    public init(symbol: String? = nil, icon: String? = nil, color: Shades? = nil, gradientEnd: Shades? = nil) {
+        self.symbol = symbol
+        self.icon = icon
+        self.color = color
+        self.gradientEnd = gradientEnd
     }
 }

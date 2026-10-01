@@ -18,6 +18,23 @@ public enum Providers {
         return try Data(contentsOf: url)
     }
 
+    /// Every built-in definition, by id — read once from `Resources/Providers/`.
+    public static let builtInDefinitions: [String: ProviderDefinition] = {
+        let urls = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: nil) ?? []
+        var definitions: [String: ProviderDefinition] = [:]
+        for url in urls {
+            guard let data = try? Data(contentsOf: url), let definition = try? ProviderDefinition.parse(data) else { continue }
+            definitions[definition.id] = definition
+        }
+        return definitions
+    }()
+
+    /// The built-in definition a lineup id belongs to — `codex.<account>`
+    /// belongs to `codex`. What screens that only hold an id use for a face.
+    public static func builtInDefinition(forLineupId id: String) -> ProviderDefinition? {
+        builtInDefinitions[id] ?? id.split(separator: ".", maxSplits: 1).first.flatMap { builtInDefinitions[String($0)] }
+    }
+
     /// A mapping script shipped beside the built-in definitions.
     public static let builtInScripts: DataSources.ScriptSource = { file in
         let name = (file as NSString).deletingPathExtension

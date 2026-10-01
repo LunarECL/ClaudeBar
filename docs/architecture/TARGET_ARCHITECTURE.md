@@ -85,11 +85,16 @@ against the current probes' fixtures before those probes are deleted.
 
 ```json
 {
-  "id": "codex",
-  "name": "Codex",
+  "profile": {
+    "id": "codex",
+    "name": "Codex",
+    "links": { "dashboard": "https://platform.openai.com/usage",
+               "status": "https://status.openai.com" },
+    "look": { "symbol": "chevron.left.forwardslash.chevron.right", "icon": "CodexIcon",
+              "color": { "light": [0.18, 0.72, 0.68], "dark": [0.35, 0.85, 0.78] },
+              "gradientEnd": { "light": [0.12, 0.52, 0.72], "dark": [0.25, 0.65, 0.85] } }
+  },
   "cli": "codex",
-  "links": { "dashboard": "https://platform.openai.com/usage",
-             "status": "https://status.openai.com" },
   "enabledByDefault": true,
   "defaultDataSource": "rpc",
   "dataSources": [
@@ -364,7 +369,7 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | **1** | **Codex** — the definition types, `CredentialLookup` · `Fetch` · `Mapping`, `DataSource`, `Provider`; workers `JSONFileReader`, `OAuth2Refresher`, `HTTPFetcher`, `JSONRPCFetcher`, `TerminalFetcher`, `JSONMapper`, `TextMapper`; `codex.json`; golden tests | `CodexProvider`, `CodexUsageProbe`, `CodexAPIUsageProbe`, `DefaultCodexRPCClient`, `CodexCredentialLoader` are deleted; both modes and the fallback work; `codex.probeMode` is read as before |
 | 1a ✅ | **Accounts under one Provider** — `Provider` owns `[Account]`; `{{account.x}}` filled at fetch time; `codex.json`'s `accounts.dataSources` deleted; `AddedAccounts` → `provider.add(account:)` | same ids, pills, pins and settings keys; no visible change |
 | 2 | the HTTP + API-key providers (DeepSeek, MiniMax, Z.ai, Kimi API, Vercel, …): `EnvironmentReader`, `SettingReader` | their probes and provider classes are deleted |
-| 3 | the look and the settings form move into the JSON; the `switch id` tables and the simple config cards go | adding a provider edits no Swift |
+| 3 | the look (✅ #353) and the settings form move into the JSON; the `switch id` tables and the simple config cards go | adding a provider edits no Swift |
 | 4 | the kernel laws: `Left` (no fake 100%), `Window` (no guessed length) | balance definitions map money only |
 | 5 | the CLI and cookie providers (Gemini, Kiro, Cursor, AmpCode, Antigravity, Alibaba, …): `CLIFetcher`, `BrowserCookieReader`, …; Bedrock via `Fetch.cloudWatch` and the `AWSClients` module; extensions read as definitions; *PROBE MODE* → *DATA SOURCE* | no `XxxUsageProbe` is left |
 | 6 | *Add Provider*, *Export*, *Import* — the screens of [USER_JOURNEYS.md](USER_JOURNEYS.md) moments 5–11, outer loop from its §5 scenarios | a person adds, shares and imports a provider without a restart, and no exported file contains a key |
