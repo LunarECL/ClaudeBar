@@ -451,4 +451,25 @@ struct ClaudeUsageProbeTests {
         let exclusions = ClaudeUsageProbe.envExclusions
         #expect(exclusions == ["CLAUDE_CODE_OAUTH_TOKEN"])
     }
+
+    // MARK: - Completion Rule Pairing (issue #317)
+
+    @Test
+    func `the cost fallback runs with no completion rule so it ends on idle`() {
+        // The regression #317 introduced: both commands shared one executor
+        // carrying `.claudeUsage`. Its markers are quota-bar markers, and an
+        // API-billed account never paints a quota bar, so `isPending` stayed true
+        // for the whole run, the idle break could never fire, and every `/cost`
+        // capture burned the full 20s timeout instead of the ~3.7s it takes with
+        // no rule (measured against the real InteractiveRunner).
+        //
+        // The pairing is the point, not just the values: a rule is not "the
+        // right markers", it is "markers this screen can actually reach".
+        let probe = ClaudeUsageProbe()
+
+        let usageRule = (probe.cliExecutor as? DefaultCLIExecutor)?.completionRule
+        let costRule = (probe.costExecutor as? DefaultCLIExecutor)?.completionRule
+        #expect(usageRule == CLICompletionRule.claudeUsage)
+        #expect(costRule == nil)
+    }
 }

@@ -11,6 +11,8 @@ struct MenuContentView: View {
     let monitor: QuotaMonitor
     let sessionMonitor: SessionMonitor
     let quotaAlerter: QuotaAlerter
+    /// Closes the popover (Escape). The presentation binding lives on the App.
+    var onClose: (() -> Void)?
     var onHookSettingsChanged: ((Bool) -> Void)?
 
     @Environment(\.appTheme) private var theme
@@ -126,6 +128,8 @@ struct MenuContentView: View {
         .fixedSize(horizontal: false, vertical: true)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .background(TouchBarWindowAccessor())
+        .background(keyboardShortcuts)
+        .background(PopoverKeyWindowAccessor())
         .touchBar {
             ClaudeBarNativeTouchBar(monitor: monitor)
         }
@@ -180,6 +184,45 @@ struct MenuContentView: View {
             visibleScreenHeight: NSScreen.main?.visibleFrame.height ?? 800,
             overviewMode: settings.overviewModeEnabled
         )
+    }
+
+    // MARK: - Keyboard Shortcuts
+
+    /// Shortcuts with no button of their own: Escape, and ⌘1–⌘9 for the
+    /// provider pills. The action bar's buttons carry theirs directly.
+    private var keyboardShortcuts: some View {
+        ZStack {
+            Button("Close", action: handleEscape)
+                .keyboardShortcut(.cancelAction)
+
+            if !settings.overviewModeEnabled {
+                ForEach(1...9, id: \.self) { position in
+                    Button("Select provider \(position)") {
+                        monitor.selectProvider(atPosition: position)
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character(String(position))))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
+    }
+
+    /// Escape backs out one level: an open overlay first, then the popover.
+    private func handleEscape() {
+        if showSharePass {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showSharePass = false
+            }
+        } else if let claudeProvider = selectedProvider as? ClaudeProvider, claudeProvider.passError != nil {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                claudeProvider.clearPassError()
+            }
+        } else {
+            onClose?()
+        }
     }
 
     // MARK: - Background Orbs
@@ -353,7 +396,7 @@ struct MenuContentView: View {
             return "Update available: v\(version)"
         }
         #endif
-        return "Settings"
+        return "Settings (⌘,)"
     }
 
     // MARK: - Provider Pills
@@ -366,7 +409,7 @@ struct MenuContentView: View {
     private var providerPills: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(enabledProviders, id: \.id) { provider in
+                ForEach(Array(enabledProviders.enumerated()), id: \.element.id) { index, provider in
                     ProviderPill(
                         providerId: provider.id,
                         providerName: provider.name,
@@ -376,6 +419,7 @@ struct MenuContentView: View {
                         // Avoid withAnimation to prevent constraint update loops in MenuBarExtra
                         selectedProviderId = provider.id
                     }
+                    .help(index < 9 ? "\(provider.name) (⌘\(index + 1))" : provider.name)
                 }
             }
             .background(HorizontalScrollBooster())
@@ -804,6 +848,7 @@ struct MenuContentView: View {
                 }
             }
             .keyboardShortcut("d")
+            .help("Open dashboard (⌘D)")
 
             // Refresh Button
             let isCurrentlyRefreshing = settings.overviewModeEnabled
@@ -826,6 +871,7 @@ struct MenuContentView: View {
                 }
             }
             .keyboardShortcut("r")
+            .help("Refresh (⌘R)")
 
             Spacer()
 
@@ -853,7 +899,7 @@ struct MenuContentView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .help("Share Claude Code")
+                .help("Share Claude Code (⌘S)")
                 .keyboardShortcut("s")
             }
 
@@ -901,7 +947,7 @@ struct MenuContentView: View {
                 }
             }
             .buttonStyle(.plain)
-            .help("Quit ClaudeBar")
+            .help("Quit ClaudeBar (⌘Q)")
             .keyboardShortcut("q")
         }
         .opacity(animateIn ? 1 : 0)
