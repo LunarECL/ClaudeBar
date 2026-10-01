@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Claude and Codex now run from built-in provider definitions instead of their own code — a first step toward adding providers from Settings. Your usage, settings, accounts and menu bar stay the same; if anything reads differently, please report it. ([#329](https://github.com/tddworks/ClaudeBar/pull/329))
+- Claude and Codex now run from built-in provider definitions instead of their own code: a first step toward adding providers from Settings. Usage, settings, accounts and the menu bar stay the same; please report anything that reads differently. ([#329](https://github.com/tddworks/ClaudeBar/pull/329))
 
 ---
 
