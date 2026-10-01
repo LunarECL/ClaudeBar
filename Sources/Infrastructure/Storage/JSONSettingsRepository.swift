@@ -347,6 +347,14 @@ public final class JSONSettingsRepository:
         store.write(value: mode.rawValue, key: "codex.probeMode")
     }
 
+    public func codexVerifiedAtLeastOnce() -> Bool {
+        store.read(key: "codex.verifiedAtLeastOnce") ?? false
+    }
+
+    public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
+        store.write(value: verified, key: "codex.verifiedAtLeastOnce")
+    }
+
     // MARK: - KimiSettingsRepository
 
     public func kimiProbeMode() -> KimiProbeMode {

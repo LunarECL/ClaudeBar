@@ -265,6 +265,14 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(mode.rawValue, forKey: Keys.codexProbeMode)
     }
 
+    public func codexVerifiedAtLeastOnce() -> Bool {
+        userDefaults.object(forKey: Keys.codexVerifiedAtLeastOnce) as? Bool ?? false
+    }
+
+    public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
+        userDefaults.set(verified, forKey: Keys.codexVerifiedAtLeastOnce)
+    }
+
     // MARK: - KimiSettingsRepository
 
     public func kimiProbeMode() -> KimiProbeMode {
@@ -497,6 +505,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let claudeCliFallbackEnabled = "providerConfig.claudeCliFallbackEnabled"
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
+        static let codexVerifiedAtLeastOnce = "providerConfig.codexVerifiedAtLeastOnce"
         // Kimi settings
         static let kimiProbeMode = "providerConfig.kimiProbeMode"
         static let kimiRegion = "providerConfig.kimiRegion"

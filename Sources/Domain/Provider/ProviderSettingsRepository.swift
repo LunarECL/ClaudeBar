@@ -201,6 +201,16 @@ public protocol CodexSettingsRepository: ProviderSettingsRepository {
 
     /// Sets the probe mode for Codex
     func setCodexProbeMode(_ mode: CodexProbeMode)
+
+    /// Whether the Codex CLI session was successfully checked at least once by
+    /// an explicit user action (Refresh / Connect). Until this is set, automatic
+    /// background refreshes must not run the RPC probe: spawning `codex
+    /// app-server` while the CLI is unauthenticated can open the ChatGPT browser
+    /// login on its own (issue #216).
+    func codexVerifiedAtLeastOnce() -> Bool
+
+    /// Marks (or clears) the verified-at-least-once flag
+    func setCodexVerifiedAtLeastOnce(_ verified: Bool)
 }
 
 /// Kimi-specific settings repository, extending base ProviderSettingsRepository.
