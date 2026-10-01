@@ -103,7 +103,7 @@ struct GeminiUsageProbeParsingTests {
         let output = Self.notLoggedInOutput
 
         // When & Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try GeminiUsageProbe.parse(output)
         }
     }
@@ -119,7 +119,7 @@ struct GeminiUsageProbeParsingTests {
         let output = Self.emptyOutput
 
         // When & Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try GeminiUsageProbe.parse(output)
         }
     }

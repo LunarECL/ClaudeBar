@@ -58,7 +58,7 @@ public struct CopilotInternalAPIProbe: UsageProbe {
     public func probe() async throws -> UsageSnapshot {
         guard let token = getToken(), !token.isEmpty else {
             AppLog.probes.error("Copilot Internal API: No GitHub token configured (check token field or env var)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         AppLog.probes.debug("Copilot Internal API: Fetching user quota data")
@@ -73,7 +73,7 @@ public struct CopilotInternalAPIProbe: UsageProbe {
         let urlString = "\(Self.apiBaseURL)/copilot_internal/user"
 
         guard let url = URL(string: urlString) else {
-            throw ProbeError.executionFailed("Invalid URL")
+            throw UsageError.executionFailed("Invalid URL")
         }
 
         var request = URLRequest(url: url)
@@ -85,7 +85,7 @@ public struct CopilotInternalAPIProbe: UsageProbe {
         let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         AppLog.probes.debug("Copilot Internal API response status: \(httpResponse.statusCode)")
@@ -95,16 +95,16 @@ public struct CopilotInternalAPIProbe: UsageProbe {
             break
         case 401:
             AppLog.probes.error("Copilot Internal API: Authentication failed (401)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         case 403:
             AppLog.probes.error("Copilot Internal API: Forbidden - check token permissions (403)")
-            throw ProbeError.executionFailed("Forbidden - ensure Classic PAT has 'copilot' scope")
+            throw UsageError.executionFailed("Forbidden - ensure Classic PAT has 'copilot' scope")
         case 404:
             AppLog.probes.error("Copilot Internal API: Endpoint not found or no Copilot subscription (404)")
-            throw ProbeError.executionFailed("No Copilot subscription found")
+            throw UsageError.executionFailed("No Copilot subscription found")
         default:
             AppLog.probes.error("Copilot Internal API: HTTP error \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("HTTP error: \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("HTTP error: \(httpResponse.statusCode)")
         }
 
         // Log response metadata for debugging (avoid logging full response body)
@@ -116,7 +116,7 @@ public struct CopilotInternalAPIProbe: UsageProbe {
             return try decoder.decode(CopilotInternalUserResponse.self, from: data)
         } catch {
             AppLog.probes.error("Copilot Internal API: Failed to parse response - \(error.localizedDescription)")
-            throw ProbeError.parseFailed("Failed to parse Copilot Internal API response: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Failed to parse Copilot Internal API response: \(error.localizedDescription)")
         }
     }
 
@@ -135,7 +135,8 @@ public struct CopilotInternalAPIProbe: UsageProbe {
                 quotaType: .timeLimit("Monthly"),
                 providerId: "copilot",
                 resetsAt: MonthlyResetDate.nextMonthlyResetDate(),
-                resetText: "No AI credits quota"
+                resetText: "No AI credits quota",
+                windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
             )
             return UsageSnapshot(
                 providerId: "copilot",
@@ -153,7 +154,8 @@ public struct CopilotInternalAPIProbe: UsageProbe {
                 quotaType: .timeLimit("Monthly"),
                 providerId: "copilot",
                 resetsAt: MonthlyResetDate.nextMonthlyResetDate(),
-                resetText: "Unlimited AI credits"
+                resetText: "Unlimited AI credits",
+                windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
             )
             return UsageSnapshot(
                 providerId: "copilot",
@@ -179,7 +181,8 @@ public struct CopilotInternalAPIProbe: UsageProbe {
             quotaType: .timeLimit("Monthly"),
             providerId: "copilot",
             resetsAt: MonthlyResetDate.nextMonthlyResetDate(),
-            resetText: resetText
+            resetText: resetText,
+            windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
         )
 
         return UsageSnapshot(

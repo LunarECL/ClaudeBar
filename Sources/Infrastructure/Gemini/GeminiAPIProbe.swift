@@ -32,21 +32,21 @@ internal struct GeminiAPIProbe {
     func probe() async throws -> UsageSnapshot {
         do {
             return try await probeAPI()
-        } catch ProbeError.authenticationRequired {
+        } catch UsageError.authenticationRequired {
             AppLog.probes.info("Gemini: Token expired, attempting CLI refresh...")
             do {
                 try await refreshTokenViaCLI()
-            } catch ProbeError.cliNotFound {
+            } catch UsageError.cliNotFound {
                 // If CLI is not available, we can't refresh - propagate original auth error
                 AppLog.probes.warning("Gemini: CLI not available for token refresh, authentication required")
-                throw ProbeError.authenticationRequired
+                throw UsageError.authenticationRequired
             }
             AppLog.probes.info("Gemini: Retrying API probe after token refresh...")
             do {
                 return try await probeAPI()
-            } catch ProbeError.authenticationRequired {
+            } catch UsageError.authenticationRequired {
                 AppLog.probes.error("Gemini: API probe failed with authentication error even after token refresh")
-                throw ProbeError.authenticationRequired
+                throw UsageError.authenticationRequired
             } catch {
                 AppLog.probes.error("Gemini: API probe failed after token refresh: \(error)")
                 throw error
@@ -60,7 +60,7 @@ internal struct GeminiAPIProbe {
 
         guard let accessToken = creds.accessToken, !accessToken.isEmpty else {
             AppLog.probes.error("Gemini probe failed: no access token in credentials file")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         // Discover the Gemini project ID for accurate quota data
@@ -75,7 +75,7 @@ internal struct GeminiAPIProbe {
         }
 
         guard let url = URL(string: Self.quotaEndpoint) else {
-            throw ProbeError.executionFailed("Invalid endpoint URL")
+            throw UsageError.executionFailed("Invalid endpoint URL")
         }
 
         var request = URLRequest(url: url)
@@ -94,19 +94,19 @@ internal struct GeminiAPIProbe {
         let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         AppLog.probes.debug("Gemini API response status: \(httpResponse.statusCode)")
 
         if httpResponse.statusCode == 401 {
             AppLog.probes.error("Gemini probe failed: authentication required (401)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         guard httpResponse.statusCode == 200 else {
             AppLog.probes.error("Gemini probe failed: HTTP error \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("HTTP \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("HTTP \(httpResponse.statusCode)")
         }
 
         // Log raw response at debug level
@@ -128,7 +128,7 @@ internal struct GeminiAPIProbe {
     private func refreshTokenViaCLI() async throws {
         guard cliExecutor.locate("gemini") != nil else {
             AppLog.probes.error("Gemini CLI not found, cannot refresh token")
-            throw ProbeError.cliNotFound("gemini")
+            throw UsageError.cliNotFound("gemini")
         }
 
         AppLog.probes.debug("Gemini: Running CLI to refresh OAuth token...")
@@ -153,7 +153,7 @@ internal struct GeminiAPIProbe {
 
         guard let buckets = response.buckets, !buckets.isEmpty else {
             AppLog.probes.error("Gemini parse failed: no quota buckets in API response")
-            throw ProbeError.parseFailed("No quota buckets in response")
+            throw UsageError.parseFailed("No quota buckets in response")
         }
 
         // Group quotas by model, keeping lowest per model
@@ -197,13 +197,14 @@ internal struct GeminiAPIProbe {
                     quotaType: .modelSpecific(entry.displayLabel),
                     providerId: "gemini",
                     resetsAt: resetsAt,
-                    resetText: formatResetText(resetsAt)
+                    resetText: formatResetText(resetsAt),
+                    windowDuration: QuotaType.modelSpecific(entry.displayLabel).conventionalWindow.seconds
                 )
             }
 
         guard !quotas.isEmpty else {
             AppLog.probes.error("Gemini parse failed: no valid quotas after processing buckets")
-            throw ProbeError.parseFailed("No valid quotas found")
+            throw UsageError.parseFailed("No valid quotas found")
         }
 
         return UsageSnapshot(
@@ -226,13 +227,13 @@ internal struct GeminiAPIProbe {
 
         guard FileManager.default.fileExists(atPath: credsURL.path) else {
             AppLog.probes.error("Gemini probe failed: credentials file not found")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         let data = try Data(contentsOf: credsURL)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             AppLog.probes.error("Gemini probe failed: invalid JSON in credentials file")
-            throw ProbeError.parseFailed("Invalid credentials file")
+            throw UsageError.parseFailed("Invalid credentials file")
         }
 
         let accessToken = json["access_token"] as? String

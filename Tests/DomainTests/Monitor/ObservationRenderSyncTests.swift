@@ -341,7 +341,7 @@ struct ObservationRenderSyncTests {
             quotas: [UsageQuota(percentRemaining: 64, quotaType: .session, providerId: "claude")],
             capturedAt: Date()
         ))
-        let provider = ClaudeProvider(probe: probe, settingsRepository: settings)
+        let provider = StubClaudeProvider(probe: probe, settingsRepository: settings)
         let monitor = QuotaMonitor(
             providers: AIProviders(providers: [provider]),
             clock: NoOpClock()

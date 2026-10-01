@@ -296,7 +296,7 @@ struct DeepSeekConfigCard: View {
             _ = try await provider.refresh()
             AppLog.credentials.info("DeepSeek connection test succeeded")
             deepSeekTestResult = "Success: Connection verified"
-        } catch ProbeError.authenticationRequired {
+        } catch UsageError.authenticationRequired {
             let message = "DeepSeek rejected the API key. New keys may take a moment to activate."
             AppLog.credentials.error("DeepSeek connection test failed: \(message)")
             deepSeekTestResult = "Failed: \(message)"

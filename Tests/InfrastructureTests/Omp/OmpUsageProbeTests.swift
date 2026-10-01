@@ -62,7 +62,7 @@ struct OmpUsageProbeTests {
 
         let probe = OmpUsageProbe(cliExecutor: mockExecutor)
 
-        await #expect(throws: ProbeError.cliNotFound("omp")) {
+        await #expect(throws: UsageError.cliNotFound("omp")) {
             try await probe.probe()
         }
     }
@@ -83,7 +83,7 @@ struct OmpUsageProbeTests {
 
         let probe = OmpUsageProbe(cliExecutor: mockExecutor)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -109,9 +109,9 @@ struct OmpUsageProbeTests {
 
         let probe = OmpUsageProbe(cliExecutor: mockExecutor)
 
-        // Exact match pins the complete surfaced message (ProbeError's
+        // Exact match pins the complete surfaced message (UsageError's
         // Equatable compares payloads) — no fragment of CLI output survives.
-        await #expect(throws: ProbeError.executionFailed("omp usage exited with code 3")) {
+        await #expect(throws: UsageError.executionFailed("omp usage exited with code 3")) {
             try await probe.probe()
         }
     }
@@ -132,7 +132,7 @@ struct OmpUsageProbeTests {
 
         let probe = OmpUsageProbe(cliExecutor: mockExecutor)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -153,7 +153,7 @@ struct OmpUsageProbeTests {
 
         let probe = OmpUsageProbe(cliExecutor: mockExecutor)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

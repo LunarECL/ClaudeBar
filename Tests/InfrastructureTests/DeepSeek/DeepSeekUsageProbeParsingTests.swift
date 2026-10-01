@@ -208,7 +208,7 @@ struct DeepSeekUsageProbeParsingTests {
         let data = Data(Self.sampleEmptyBalanceInfosResponse.utf8)
 
         // When & Then
-        #expect(throws: ProbeError.noData) {
+        #expect(throws: UsageError.noData) {
             try DeepSeekUsageProbe.parseResponse(data, providerId: "deepseek")
         }
     }
@@ -218,13 +218,13 @@ struct DeepSeekUsageProbeParsingTests {
         // Given
         let data = Data("not json".utf8)
 
-        // When & Then: must be parseFailed specifically, not any ProbeError
+        // When & Then: must be parseFailed specifically, not any UsageError
         do {
             _ = try DeepSeekUsageProbe.parseResponse(data, providerId: "deepseek")
-            Issue.record("Expected ProbeError.parseFailed")
+            Issue.record("Expected UsageError.parseFailed")
         } catch {
-            guard case ProbeError.parseFailed = error else {
-                Issue.record("Expected ProbeError.parseFailed, got \(error)")
+            guard case UsageError.parseFailed = error else {
+                Issue.record("Expected UsageError.parseFailed, got \(error)")
                 return
             }
         }

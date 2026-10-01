@@ -15,7 +15,7 @@ struct KimiUsageProbeTests {
 
         func resolveToken() throws -> String {
             guard let token else {
-                throw ProbeError.authenticationRequired
+                throw UsageError.authenticationRequired
             }
             return token
         }
@@ -131,7 +131,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: nil)
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -149,7 +149,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -167,7 +167,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -185,7 +185,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -203,7 +203,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -234,7 +234,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

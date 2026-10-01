@@ -155,7 +155,7 @@ struct ZaiUsageProbeTests {
             timeout: .any,
             workingDirectory: .any,
             autoResponses: .any
-        ).willThrow(ProbeError.executionFailed("File not found"))
+        ).willThrow(UsageError.executionFailed("File not found"))
 
         let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
@@ -265,7 +265,7 @@ struct ZaiUsageProbeTests {
         let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
         // When & Then
-        await #expect(throws: ProbeError.cliNotFound("Claude")) {
+        await #expect(throws: UsageError.cliNotFound("Claude")) {
             try await probe.probe()
         }
     }
@@ -289,7 +289,7 @@ struct ZaiUsageProbeTests {
         let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
         // When & Then
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -375,7 +375,7 @@ struct ZaiUsageProbeTests {
         )
 
         // When & Then
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -413,7 +413,7 @@ struct ZaiUsageProbeTests {
         )
 
         // When & Then
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -452,7 +452,7 @@ struct ZaiUsageProbeTests {
         )
 
         // When & Then
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -671,7 +671,7 @@ struct ZaiUsageProbeTests {
         )
 
         // When & Then
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }

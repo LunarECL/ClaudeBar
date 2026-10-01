@@ -79,11 +79,11 @@ struct MistralUsageProbeTests {
         let mockAnalyzer = MockDailyUsageAnalyzing()
         given(mockAnalyzer)
             .analyzeToday()
-            .willThrow(ProbeError.noData)
+            .willThrow(UsageError.noData)
 
         let probe = MistralUsageProbe(vibeLogAnalyzer: mockAnalyzer)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

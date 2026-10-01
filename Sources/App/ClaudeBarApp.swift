@@ -1,6 +1,7 @@
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 import MenuBarExtraAccess
 #if ENABLE_SPARKLE
 import Sparkle
@@ -17,6 +18,23 @@ extension Notification.Name {
 
 @main
 struct ClaudeBarApp: App {
+    /// A built-in provider from its bundled definition. A definition that fails
+    /// to load is a packaging bug the catalog tests catch before release.
+    @MainActor
+    private static func builtIn(
+        _ id: String,
+        settings: any ProviderSettingsRepository,
+        accounts: [ProviderAccountConfig] = [],
+        dailyUsage: (any DailyUsageAnalyzing)? = nil,
+        guestPasses: GuestPasses? = nil
+    ) -> Provider {
+        do {
+            return try Providers.make(id, settings: settings, accounts: accounts, dailyUsage: dailyUsage, guestPasses: guestPasses)
+        } catch {
+            preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
+        }
+    }
+
     /// The main domain service - monitors all AI providers
     /// This is the single source of truth for providers and their state
     @State private var monitor: QuotaMonitor
@@ -78,29 +96,28 @@ struct ClaudeBarApp: App {
         // - HookSettingsRepository
         let settingsRepository = JSONSettingsRepository.shared
 
-        // Create all providers with their probes (rich domain models)
+        // Claude is data: Modules/Providers/Resources/Providers/claude.json
+        // and the mapping scripts beside it. What isn't usage rides along:
+        // today's usage from local session logs (#190 keeps loopback
+        // inference free) and guest passes.
+        let claude = Self.builtIn(
+            "claude",
+            settings: settingsRepository,
+            dailyUsage: ClaudeDailyUsageAnalyzer(
+                isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
+            ),
+            guestPasses: GuestPasses(source: ClaudeGuestPassSource())
+        )
+        // Codex is data: Modules/Providers/Resources/Providers/codex.json — the
+        // product once, with the logins added beside the default one (#326).
+        let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
+
+        // The lineup: each login is its own pill. Legacy providers are their
+        // own single login until they become definitions.
         // Each provider manages its own isEnabled state (persisted via ProviderSettingsRepository)
-        // Each probe checks isAvailable() for credentials/prerequisites
         let repository = AIProviders(providers: [
-            ClaudeProvider(
-                cliProbe: ClaudeUsageProbe(),
-                apiProbe: ClaudeAPIUsageProbe(),
-                passProbe: ClaudePassProbe(),
-                settingsRepository: settingsRepository,
-                dailyUsageAnalyzer: ClaudeDailyUsageAnalyzer(
-                    // Inference routed at a loopback endpoint costs nothing (#190).
-                    isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
-                ),
-                // The Domain layer holds no logger, so the provider reports
-                // what the UI cannot show — a fallback probe that ran and then
-                // failed — through here (#317). Never any credential value.
-                diagnose: { AppLog.probes.info($0) }
-            ),
-            CodexProvider(
-                rpcProbe: CodexAccountUsageProbe(probe: CodexUsageProbe(client: DefaultCodexRPCClient(includeAccountIdentity: true))),
-                apiProbe: CodexAccountUsageProbe(probe: CodexAPIUsageProbe()),
-                settingsRepository: settingsRepository
-            ),
+            claude.defaultAccount,
+            codex.defaultAccount,
             GeminiProvider(probe: GeminiUsageProbe(), settingsRepository: settingsRepository),
             AntigravityProvider(probe: AntigravityUsageProbe(), settingsRepository: settingsRepository),
             ZaiProvider(
@@ -161,10 +178,16 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
         ])
-        for config in settingsRepository.accounts(forProvider: "codex") {
-            if let provider = CodexAccountSetup.provider(configuration: config, settingsRepository: settingsRepository) {
-                repository.add(provider)
-            }
+        // Added Codex logins follow the built-in lineup, as they always have.
+        for account in codex.accounts.dropFirst() {
+            repository.add(account)
+        }
+        // Providers people made in Add Provider (~/.claudebar/providers), after
+        // the built-ins; their keys come from ClaudeBar's vault.
+        let vault = ProviderVault()
+        for definition in ProviderCatalog().custom() {
+            Providers.register(custom: definition)
+            repository.add(Providers.make(definition, settings: settingsRepository, secrets: vault).defaultAccount)
         }
         AppLog.providers.info("Created \(repository.all.count) providers")
 
@@ -172,10 +195,12 @@ struct ClaudeBarApp: App {
         // QuotaMonitor automatically validates selected provider on init
         // The settings repository carries the user's provider order (issue #141),
         // so the popover, overview and ⌘1–⌘9 follow it.
+        // Alerts and every status follow the person's burn-rate setting (#357).
         let monitor = QuotaMonitor(
             providers: repository,
             alerter: quotaAlerter,
-            settingsRepository: settingsRepository
+            settingsRepository: settingsRepository,
+            statusPolicy: { AppSettings.shared.statusPolicy }
         )
         self.monitor = monitor
         AppLog.monitor.info("QuotaMonitor initialized")

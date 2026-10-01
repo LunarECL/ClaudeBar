@@ -116,13 +116,13 @@ struct GrokProviderTests {
     func `refresh records error on failure`() async {
         let settings = MockRepositoryFactory.makeSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.authenticationRequired)
+        given(mockProbe).probe().willThrow(UsageError.authenticationRequired)
         let grok = GrokProvider(probe: mockProbe, settingsRepository: settings)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await grok.refresh()
         }
         #expect(grok.snapshot == nil)
-        #expect(grok.lastError as? ProbeError == .authenticationRequired)
+        #expect(grok.lastError as? UsageError == .authenticationRequired)
     }
 }

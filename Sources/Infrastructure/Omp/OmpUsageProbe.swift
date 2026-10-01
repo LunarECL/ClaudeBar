@@ -57,7 +57,7 @@ public struct OmpUsageProbe: UsageProbe {
 
     public func probe() async throws -> UsageSnapshot {
         guard cliExecutor.locate(ompBinary) != nil else {
-            throw ProbeError.cliNotFound(ompBinary)
+            throw UsageError.cliNotFound(ompBinary)
         }
 
         AppLog.probes.info("Starting Oh My Pi probe with `omp usage --json`...")
@@ -72,17 +72,17 @@ public struct OmpUsageProbe: UsageProbe {
                 workingDirectory: nil,
                 autoResponses: [:]
             )
-        } catch let error as ProbeError {
+        } catch let error as UsageError {
             throw error
         } catch {
             AppLog.probes.error("Oh My Pi probe failed: \(error.localizedDescription)")
-            throw ProbeError.executionFailed(error.localizedDescription)
+            throw UsageError.executionFailed(error.localizedDescription)
         }
 
         guard result.exitCode == 0 else {
             // Never surface raw CLI output: usage output carries account
             // emails/ids, and this message reaches the UI via `lastError`.
-            throw ProbeError.executionFailed("omp usage exited with code \(result.exitCode)")
+            throw UsageError.executionFailed("omp usage exited with code \(result.exitCode)")
         }
 
         let snapshot = try Self.parse(result.output)
@@ -104,7 +104,7 @@ public struct OmpUsageProbe: UsageProbe {
               let end = text.lastIndex(of: "}"),
               start < end
         else {
-            throw ProbeError.parseFailed("No JSON object in omp usage output")
+            throw UsageError.parseFailed("No JSON object in omp usage output")
         }
         return try parseResponse(Data(text[start...end].utf8))
     }
@@ -115,7 +115,7 @@ public struct OmpUsageProbe: UsageProbe {
         do {
             payload = try JSONDecoder().decode(UsagePayload.self, from: data)
         } catch {
-            throw ProbeError.parseFailed("Malformed omp usage JSON: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Malformed omp usage JSON: \(error.localizedDescription)")
         }
 
         // Multiple accounts on the same upstream provider need a discriminator
@@ -270,7 +270,7 @@ public struct OmpUsageProbe: UsageProbe {
             ))
         }
         guard !quotas.isEmpty || !accountRows.isEmpty else {
-            throw ProbeError.noData
+            throw UsageError.noData
         }
 
         return UsageSnapshot(
