@@ -287,7 +287,7 @@ struct KimiUsageProbeParsingTests {
     func `parseResponse throws parseFailed for invalid JSON`() throws {
         let json = "not json".data(using: .utf8)!
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try KimiUsageProbe.parseResponse(json, providerId: "kimi")
         }
     }
@@ -308,7 +308,7 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try KimiUsageProbe.parseResponse(json, providerId: "kimi")
         }
     }
@@ -321,7 +321,7 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try KimiUsageProbe.parseResponse(json, providerId: "kimi")
         }
     }

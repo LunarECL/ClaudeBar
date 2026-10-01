@@ -223,7 +223,7 @@ struct AmpCodeUsageProbeParsingTests {
         let text = ""
 
         // When/Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try AmpCodeUsageProbe.parse(text)
         }
     }
@@ -234,7 +234,7 @@ struct AmpCodeUsageProbeParsingTests {
         let text = "some random text that is not amp usage output"
 
         // When/Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try AmpCodeUsageProbe.parse(text)
         }
     }

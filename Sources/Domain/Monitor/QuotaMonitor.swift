@@ -1,3 +1,6 @@
+import Quotas
+import DataSources
+import Providers
 import Foundation
 import Observation
 
@@ -40,6 +43,10 @@ public final class QuotaMonitor {
     /// tests; the app injects a real provider via the convenience init.
     private let powerStateProvider: (any PowerStateProvider)?
 
+    /// The person's status policy, read live — every status the monitor
+    /// reports, and every alert it sends, is under it.
+    private let readStatusPolicy: @MainActor () -> StatusPolicy
+
     /// Previous status for change detection
     private var previousStatuses: [String: QuotaStatus] = [:]
 
@@ -61,13 +68,15 @@ public final class QuotaMonitor {
         alerter: (any QuotaAlerter)? = nil,
         clock: any Clock,
         settingsRepository: (any ProviderSettingsRepository)? = nil,
-        powerStateProvider: (any PowerStateProvider)? = nil
+        powerStateProvider: (any PowerStateProvider)? = nil,
+        statusPolicy: @escaping @MainActor () -> StatusPolicy = { .absolute }
     ) {
         self.providers = providers
         self.alerter = alerter
         self.settingsRepository = settingsRepository
         self.clock = clock
         self.powerStateProvider = powerStateProvider
+        self.readStatusPolicy = statusPolicy
         selectFirstEnabledIfNeeded()
     }
 
@@ -112,7 +121,10 @@ public final class QuotaMonitor {
     private func handleSnapshotUpdate(provider: any AIProvider, snapshot: UsageSnapshot) async {
         let previousStatus = previousStatuses[provider.id] ?? .healthy
         // Hidden quotas don't count: a quota the user hid must not page them.
-        let newStatus = snapshot.visibleOverallStatus(hiding: hiddenQuotaKeys(forProvider: provider.id))
+        let newStatus = snapshot.visibleOverallStatus(
+            hiding: hiddenQuotaKeys(forProvider: provider.id),
+            under: statusPolicy
+        )
 
         previousStatuses[provider.id] = newStatus
 
@@ -382,13 +394,19 @@ public final class QuotaMonitor {
         }
     }
 
+    /// HOW STRICT TO BE — the person's policy (Settings → General).
+    public var statusPolicy: StatusPolicy { readStatusPolicy() }
+
     /// Returns the overall status across enabled providers (worst status wins),
     /// counting only quotas visible for each provider (issue #140)
     public var overallStatus: QuotaStatus {
         providers.enabled
             .compactMap { provider in
                 provider.snapshot.map {
-                    $0.visibleOverallStatus(hiding: hiddenQuotaKeys(forProvider: provider.id))
+                    $0.visibleOverallStatus(
+                        hiding: hiddenQuotaKeys(forProvider: provider.id),
+                        under: statusPolicy
+                    )
                 }
             }
             .max() ?? .healthy
@@ -407,7 +425,10 @@ public final class QuotaMonitor {
         guard let provider = selectedProvider, let snapshot = provider.snapshot else {
             return .healthy
         }
-        return snapshot.visibleOverallStatus(hiding: hiddenQuotaKeys(forProvider: provider.id))
+        return snapshot.visibleOverallStatus(
+            hiding: hiddenQuotaKeys(forProvider: provider.id),
+            under: statusPolicy
+        )
     }
 
     /// Whether any provider is currently refreshing
@@ -540,7 +561,7 @@ public final class QuotaMonitor {
                     // bind a low (`.utility`) QoS so any CLI subprocess spawned
                     // during the refresh runs on efficiency cores / throttled —
                     // both keep idle energy use low (issue #204).
-                    await ProbeExecutionContext.$qualityOfService.withValue(.utility) {
+                    await FetchContext.$qualityOfService.withValue(.utility) {
                         if let providerIds {
                             await self.refresh(providerIds: providerIds, kind: .background)
                         } else {

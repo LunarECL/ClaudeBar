@@ -51,7 +51,7 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = ClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude]),
                 clock: TestClock()
@@ -82,10 +82,10 @@ struct RefreshSpec {
 
             let codexProbe = MockUsageProbe()
             given(codexProbe).isAvailable().willReturn(true)
-            given(codexProbe).probe().willThrow(ProbeError.timeout)
+            given(codexProbe).probe().willThrow(UsageError.timeout)
 
-            let claude = ClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = CodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
+            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude, codex]),
                 clock: TestClock()
@@ -123,7 +123,7 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = ClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude]),
                 clock: TestClock()
@@ -156,7 +156,7 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = ClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude]),
                 clock: TestClock()
@@ -238,7 +238,7 @@ struct RefreshSpec {
                 quotas: [UsageQuota(percentRemaining: 42, quotaType: .session, providerId: "claude")],
                 capturedAt: Date()
             ))
-            let claude = ClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude]),
                 clock: TestClock()
@@ -268,7 +268,8 @@ struct RefreshSpec {
             let apiProbe = MockUsageProbe()
             given(apiProbe).isAvailable().willReturn(true)
             given(apiProbe).probe().willReturn(snapshot)
-            let claude = ClaudeProvider(cliProbe: cliProbe, apiProbe: apiProbe, settingsRepository: settings)
+            _ = cliProbe
+            let claude = StubClaudeProvider(probe: apiProbe, settingsRepository: settings, backgroundRefreshFloor: .seconds(900))
             let clock = RecordingClock()
             let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: clock)
 
@@ -297,7 +298,7 @@ struct RefreshSpec {
                     capturedAt: Date()
                 ),
             ])
-            let claude = ClaudeProvider(cliProbe: MockUsageProbe(), apiProbe: probe, settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings, backgroundRefreshFloor: .seconds(900))
             let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: TestClock())
 
             // When/Then — two back-to-back user-initiated refreshes both update the

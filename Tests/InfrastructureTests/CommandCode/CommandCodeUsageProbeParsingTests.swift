@@ -89,7 +89,7 @@ struct CommandCodeUsageProbeParsingTests {
 
     @Test
     func `throws parseFailed on invalid JSON`() {
-        #expect(throws: ProbeError.parseFailed("Failed to parse Command Code response as JSON")) {
+        #expect(throws: UsageError.parseFailed("Failed to parse Command Code response as JSON")) {
             try CommandCodeUsageProbe.parseResponse(Data("not json".utf8), providerId: "commandcode")
         }
     }

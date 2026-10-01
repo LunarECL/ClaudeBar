@@ -130,7 +130,7 @@ struct DeepSeekUsageProbeTests {
         let probe = makeProbe()
 
         // When & Then
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -147,7 +147,7 @@ struct DeepSeekUsageProbeTests {
         let probe = makeProbe(apiKey: "bad-key", networkClient: mockNetwork)
 
         // When & Then
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -164,7 +164,7 @@ struct DeepSeekUsageProbeTests {
         let probe = makeProbe(apiKey: "bad-key", networkClient: mockNetwork)
 
         // When & Then
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -180,13 +180,13 @@ struct DeepSeekUsageProbeTests {
 
         let probe = makeProbe(apiKey: "test-key", networkClient: mockNetwork)
 
-        // When & Then: must be executionFailed specifically, not any ProbeError
+        // When & Then: must be executionFailed specifically, not any UsageError
         do {
             _ = try await probe.probe()
-            Issue.record("Expected ProbeError.executionFailed")
+            Issue.record("Expected UsageError.executionFailed")
         } catch {
-            guard case ProbeError.executionFailed = error else {
-                Issue.record("Expected ProbeError.executionFailed, got \(error)")
+            guard case UsageError.executionFailed = error else {
+                Issue.record("Expected UsageError.executionFailed, got \(error)")
                 return
             }
         }

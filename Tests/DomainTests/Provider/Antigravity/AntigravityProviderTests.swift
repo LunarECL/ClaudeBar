@@ -175,7 +175,7 @@ struct AntigravityProviderTests {
         let settings = makeSettingsRepository()
         // Use two separate probes to simulate the behavior
         let failingProbe = MockUsageProbe()
-        given(failingProbe).probe().willThrow(ProbeError.timeout)
+        given(failingProbe).probe().willThrow(UsageError.timeout)
         let antigravityWithFailingProbe = AntigravityProvider(probe: failingProbe, settingsRepository: settings)
 
         do {
@@ -202,7 +202,7 @@ struct AntigravityProviderTests {
     func `antigravity provider stores error on refresh failure`() async {
         let settings = makeSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.executionFailed("Server not found"))
+        given(mockProbe).probe().willThrow(UsageError.executionFailed("Server not found"))
         let antigravity = AntigravityProvider(probe: mockProbe, settingsRepository: settings)
 
         #expect(antigravity.lastError == nil)
@@ -220,10 +220,10 @@ struct AntigravityProviderTests {
     func `antigravity provider rethrows probe errors`() async {
         let settings = makeSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.executionFailed("Server not found"))
+        given(mockProbe).probe().willThrow(UsageError.executionFailed("Server not found"))
         let antigravity = AntigravityProvider(probe: mockProbe, settingsRepository: settings)
 
-        await #expect(throws: ProbeError.executionFailed("Server not found")) {
+        await #expect(throws: UsageError.executionFailed("Server not found")) {
             try await antigravity.refresh()
         }
     }
@@ -252,7 +252,7 @@ struct AntigravityProviderTests {
     func `antigravity provider resets isSyncing after refresh fails`() async {
         let settings = makeSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.timeout)
+        given(mockProbe).probe().willThrow(UsageError.timeout)
         let antigravity = AntigravityProvider(probe: mockProbe, settingsRepository: settings)
 
         do {
@@ -272,8 +272,8 @@ struct AntigravityProviderTests {
         let copilotSettings = MockRepositoryFactory.makeCopilotSettingsRepository()
         let mockProbe = MockUsageProbe()
         let antigravity = AntigravityProvider(probe: mockProbe, settingsRepository: settings)
-        let claude = ClaudeProvider(probe: mockProbe, settingsRepository: settings)
-        let codex = CodexProvider(probe: mockProbe, settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: mockProbe, settingsRepository: settings)
+        let codex = StubCodexProvider(probe: mockProbe, settingsRepository: settings)
         let gemini = GeminiProvider(probe: mockProbe, settingsRepository: settings)
         let copilot = CopilotProvider(probe: mockProbe, settingsRepository: copilotSettings)
 

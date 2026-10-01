@@ -103,7 +103,7 @@ struct GrokUsageProbeTests {
         let loader = GrokCredentialLoader(homeDirectory: tempDir.path)
         let probe = GrokUsageProbe(credentialLoader: loader)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -210,7 +210,7 @@ struct GrokUsageProbeTests {
         let loader = GrokCredentialLoader(homeDirectory: tempDir.path)
         let probe = GrokUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.sessionExpired()) {
+        await #expect(throws: UsageError.sessionExpired()) {
             try await probe.probe()
         }
     }
@@ -238,7 +238,7 @@ struct GrokUsageProbeTests {
         let loader = GrokCredentialLoader(homeDirectory: tempDir.path)
         let probe = GrokUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.sessionExpired()) {
+        await #expect(throws: UsageError.sessionExpired()) {
             try await probe.probe()
         }
     }
@@ -256,7 +256,7 @@ struct GrokUsageProbeTests {
         let loader = GrokCredentialLoader(homeDirectory: tempDir.path)
         let probe = GrokUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -274,7 +274,7 @@ struct GrokUsageProbeTests {
         let loader = GrokCredentialLoader(homeDirectory: tempDir.path)
         let probe = GrokUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.executionFailed("HTTP error: 500")) {
+        await #expect(throws: UsageError.executionFailed("HTTP error: 500")) {
             try await probe.probe()
         }
     }

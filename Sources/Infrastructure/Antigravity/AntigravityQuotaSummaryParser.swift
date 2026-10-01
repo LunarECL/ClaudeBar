@@ -50,6 +50,7 @@ enum AntigravityQuotaSummaryParser {
                 quotaType: spec.quotaType,
                 providerId: providerId,
                 resetsAt: bucket.resetTime.flatMap(parseDate),
+                windowDuration: spec.quotaType.conventionalWindow.seconds,
                 group: spec.group,
                 compactTitle: spec.compactTitle,
                 menuBarTitle: spec.menuBarTitle

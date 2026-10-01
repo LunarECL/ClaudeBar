@@ -274,7 +274,7 @@ struct AntigravityUsageProbeParsingTests {
         let invalidData = Data("not json".utf8)
 
         // When/Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try AntigravityUsageProbe.parseUserStatusResponse(invalidData, providerId: "antigravity")
         }
     }
@@ -294,7 +294,7 @@ struct AntigravityUsageProbeParsingTests {
         let data = Data(emptyResponse.utf8)
 
         // When/Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try AntigravityUsageProbe.parseUserStatusResponse(data, providerId: "antigravity")
         }
     }

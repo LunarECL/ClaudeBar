@@ -52,6 +52,25 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         return userDefaults.bool(forKey: key)
     }
 
+    /// Same key the Claude and Codex modes use (`providerConfig.<id>ProbeMode`).
+    public func dataSourceKind(forProvider id: String) -> String? {
+        userDefaults.string(forKey: "providerConfig.\(id)ProbeMode")
+    }
+
+    public func setDataSourceKind(_ kind: String, forProvider id: String) {
+        userDefaults.set(kind, forKey: "providerConfig.\(id)ProbeMode")
+    }
+
+    /// `providerConfig.<id><Setting>` — e.g. `providerConfig.claudeCliFallbackEnabled`.
+    public func isOn(_ setting: String, forProvider id: String) -> Bool? {
+        let key = "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())"
+        return userDefaults.object(forKey: key) as? Bool
+    }
+
+    public func setOn(_ on: Bool, _ setting: String, forProvider id: String) {
+        userDefaults.set(on, forKey: "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())")
+    }
+
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         let key = Self.enabledKey(forProvider: id)
         userDefaults.set(enabled, forKey: key)

@@ -76,7 +76,7 @@ public enum ClaudeLocalInferenceDetector {
         return urls
     }
 
-    /// Mirrors `CLAUDE_CONFIG_DIR` handling in `ClaudeAccountInfoResolver`.
+    /// Honours `CLAUDE_CONFIG_DIR` the way `claude.json`'s context file does.
     private static func defaultConfigURL() -> URL {
         let configDir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"]
             .map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true) }

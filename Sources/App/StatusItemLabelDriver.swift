@@ -3,6 +3,7 @@ import CoreText
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 
 /// Drives the menu-bar status item imperatively (AppKit), bypassing SwiftUI's
 /// `MenuBarExtra` label hosting entirely.
@@ -212,7 +213,7 @@ final class StatusItemLabelDriver {
             .contains { !CountdownColon.ranges(in: $0.text).isEmpty }
         let primaryProvider = monitor.enabledProviders.first { $0.id == settings.menuBarPercentageProviderId }
         let showsQuota = settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled
-        let primaryProviderName = !showsQuota || (additionalLabels.isEmpty && !(primaryProvider is CodexProvider))
+        let primaryProviderName = !showsQuota || (additionalLabels.isEmpty && (primaryProvider as? Account)?.isNamedByAccount != true)
             ? nil : primaryProvider?.name
 
         return LabelContent(
@@ -258,14 +259,10 @@ final class StatusItemLabelDriver {
     /// Quota windows the user hid for this provider (issue #140) don't color it.
     private var effectiveSelectedProviderStatus: QuotaStatus {
         guard let snapshot = monitor.selectedProvider?.snapshot else { return .healthy }
-        let hiddenQuotaKeys = settings.hiddenQuotaKeys(forProvider: snapshot.providerId)
-        if settings.burnRateWarningEnabled {
-            return snapshot.visiblePaceAwareOverallStatus(
-                hiding: hiddenQuotaKeys,
-                burnRateThreshold: settings.burnRateThreshold
-            )
-        }
-        return snapshot.visibleOverallStatus(hiding: hiddenQuotaKeys)
+        return snapshot.visibleOverallStatus(
+            hiding: settings.hiddenQuotaKeys(forProvider: snapshot.providerId),
+            under: settings.statusPolicy
+        )
     }
 
     private func render(_ content: LabelContent) {

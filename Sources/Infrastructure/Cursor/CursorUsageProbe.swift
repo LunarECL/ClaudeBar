@@ -73,7 +73,7 @@ public struct CursorUsageProbe: UsageProbe {
 
         guard FileManager.default.fileExists(atPath: dbPath) else {
             AppLog.probes.error("Cursor: Database not found at \(dbPath)")
-            throw ProbeError.cliNotFound("Cursor (database not found)")
+            throw UsageError.cliNotFound("Cursor (database not found)")
         }
 
         AppLog.probes.info("Cursor: Reading auth token from database...")
@@ -104,19 +104,19 @@ public struct CursorUsageProbe: UsageProbe {
             )
         } catch {
             AppLog.probes.error("Cursor: Failed to run sqlite3 - \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Failed to read Cursor database: \(error.localizedDescription)")
+            throw UsageError.executionFailed("Failed to read Cursor database: \(error.localizedDescription)")
         }
 
         guard result.isSuccess else {
             AppLog.probes.error("Cursor: sqlite3 exited with status \(result.exitCode)")
-            throw ProbeError.executionFailed("sqlite3 exited with status \(result.exitCode)")
+            throw UsageError.executionFailed("sqlite3 exited with status \(result.exitCode)")
         }
 
         let token = result.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !token.isEmpty else {
             AppLog.probes.error("Cursor: No access token found in database (not logged in?)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         return token
@@ -126,7 +126,7 @@ public struct CursorUsageProbe: UsageProbe {
     static func extractUserIdFromJWT(_ token: String) throws -> String {
         let parts = token.split(separator: ".")
         guard parts.count >= 2 else {
-            throw ProbeError.parseFailed("Invalid JWT format")
+            throw UsageError.parseFailed("Invalid JWT format")
         }
 
         // JWT payload is base64url-encoded
@@ -141,12 +141,12 @@ public struct CursorUsageProbe: UsageProbe {
         }
 
         guard let payloadData = Data(base64Encoded: base64) else {
-            throw ProbeError.parseFailed("Failed to decode JWT payload")
+            throw UsageError.parseFailed("Failed to decode JWT payload")
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any],
               let sub = json["sub"] as? String, !sub.isEmpty else {
-            throw ProbeError.parseFailed("JWT payload missing 'sub' claim")
+            throw UsageError.parseFailed("JWT payload missing 'sub' claim")
         }
 
         return sub
@@ -156,7 +156,7 @@ public struct CursorUsageProbe: UsageProbe {
 
     private func fetchUsageSummary(cookie: String) async throws -> Data {
         guard let url = URL(string: Self.usageSummaryURL) else {
-            throw ProbeError.executionFailed("Invalid URL")
+            throw UsageError.executionFailed("Invalid URL")
         }
 
         var request = URLRequest(url: url)
@@ -168,7 +168,7 @@ public struct CursorUsageProbe: UsageProbe {
         let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         AppLog.probes.debug("Cursor: API response status \(httpResponse.statusCode)")
@@ -178,13 +178,13 @@ public struct CursorUsageProbe: UsageProbe {
             return data
         case 401:
             AppLog.probes.error("Cursor: Authentication failed (401) - token may be expired")
-            throw ProbeError.sessionExpired(hint: "Re-authenticate in Cursor settings.")
+            throw UsageError.sessionExpired(hint: "Re-authenticate in Cursor settings.")
         case 403:
             AppLog.probes.error("Cursor: Forbidden (403)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         default:
             AppLog.probes.error("Cursor: HTTP error \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("HTTP error: \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("HTTP error: \(httpResponse.statusCode)")
         }
     }
 
@@ -197,13 +197,13 @@ public struct CursorUsageProbe: UsageProbe {
         let json: [String: Any]
         do {
             guard let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw ProbeError.parseFailed("Response is not a JSON object")
+                throw UsageError.parseFailed("Response is not a JSON object")
             }
             json = parsed
-        } catch let error as ProbeError {
+        } catch let error as UsageError {
             throw error
         } catch {
-            throw ProbeError.parseFailed("Invalid JSON: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Invalid JSON: \(error.localizedDescription)")
         }
 
         var quotas: [UsageQuota] = []
@@ -334,7 +334,7 @@ public struct CursorUsageProbe: UsageProbe {
 
         // If no quotas found, the user might be on a free plan with no data
         guard !quotas.isEmpty else {
-            throw ProbeError.parseFailed("No usage data found in Cursor response")
+            throw UsageError.parseFailed("No usage data found in Cursor response")
         }
 
         // Determine account tier from membership type

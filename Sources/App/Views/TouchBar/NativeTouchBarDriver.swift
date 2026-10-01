@@ -154,7 +154,7 @@ public struct TouchBarActiveProviderBadge: View {
     }
 
     private var statusColor: Color {
-        let status = monitor.selectedProvider?.snapshot?.overallStatus ?? .healthy
+        let status = monitor.selectedProviderStatus
         switch status {
         case .healthy: return .green
         case .warning: return .yellow

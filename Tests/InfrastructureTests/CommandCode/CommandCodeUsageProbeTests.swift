@@ -114,7 +114,7 @@ struct CommandCodeUsageProbeTests {
             networkClient: MockNetworkClient()
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -199,7 +199,7 @@ struct CommandCodeUsageProbeTests {
 
         let probe = CommandCodeUsageProbe(credentialLoader: loader(home: tempDir), networkClient: network)
 
-        await #expect(throws: ProbeError.sessionExpired(hint: "Run `cmd login` or set COMMAND_CODE_API_KEY.")) {
+        await #expect(throws: UsageError.sessionExpired(hint: "Run `cmd login` or set COMMAND_CODE_API_KEY.")) {
             try await probe.probe()
         }
         // A rejected whoami must not continue to the credits call
@@ -216,7 +216,7 @@ struct CommandCodeUsageProbeTests {
 
         let probe = CommandCodeUsageProbe(credentialLoader: loader(home: tempDir), networkClient: network)
 
-        await #expect(throws: ProbeError.sessionExpired(hint: "Run `cmd login` or set COMMAND_CODE_API_KEY.")) {
+        await #expect(throws: UsageError.sessionExpired(hint: "Run `cmd login` or set COMMAND_CODE_API_KEY.")) {
             try await probe.probe()
         }
     }
@@ -231,7 +231,7 @@ struct CommandCodeUsageProbeTests {
 
         let probe = CommandCodeUsageProbe(credentialLoader: loader(home: tempDir), networkClient: network)
 
-        await #expect(throws: ProbeError.executionFailed("HTTP error: 500")) {
+        await #expect(throws: UsageError.executionFailed("HTTP error: 500")) {
             try await probe.probe()
         }
     }
@@ -247,7 +247,7 @@ struct CommandCodeUsageProbeTests {
 
         let probe = CommandCodeUsageProbe(credentialLoader: loader(home: tempDir), networkClient: network)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -262,7 +262,7 @@ struct CommandCodeUsageProbeTests {
 
         let probe = CommandCodeUsageProbe(credentialLoader: loader(home: tempDir), networkClient: network)
 
-        await #expect(throws: ProbeError.parseFailed("Failed to parse Command Code response as JSON")) {
+        await #expect(throws: UsageError.parseFailed("Failed to parse Command Code response as JSON")) {
             try await probe.probe()
         }
     }

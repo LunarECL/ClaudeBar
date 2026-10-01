@@ -264,7 +264,7 @@ struct BedrockUsageProbeTests {
             settingsRepository: settings
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

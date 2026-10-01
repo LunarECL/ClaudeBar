@@ -417,7 +417,7 @@ struct CursorUsageProbeParsingTests {
     func `parse empty response throws error`() {
         let json = "{}".data(using: .utf8)!
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try CursorUsageProbe.parseUsageSummary(json)
         }
     }
@@ -426,7 +426,7 @@ struct CursorUsageProbeParsingTests {
     func `parse invalid json throws error`() {
         let json = "not json".data(using: .utf8)!
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try CursorUsageProbe.parseUsageSummary(json)
         }
     }
@@ -440,7 +440,7 @@ struct CursorUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try CursorUsageProbe.parseUsageSummary(json)
         }
     }
@@ -860,7 +860,7 @@ struct CursorUsageProbeParsingTests {
 
     @Test
     func `extract user ID from invalid JWT throws`() {
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try CursorUsageProbe.extractUserIdFromJWT("not-a-jwt")
         }
     }
@@ -870,7 +870,7 @@ struct CursorUsageProbeParsingTests {
         // Payload: {"iat": 123} (no sub)
         let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJpYXQiOjEyM30.sig"
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try CursorUsageProbe.extractUserIdFromJWT(jwt)
         }
     }

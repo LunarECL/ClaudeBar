@@ -88,9 +88,11 @@ public final class NotificationAlerter: QuotaAlerter, @unchecked Sendable {
             .first(where: { $0.toProviderAccount(providerId: "codex").id == providerId }) {
             return account.email.map { "Codex · \($0)" } ?? "Codex"
         }
+        // A provider that is data names itself in its profile.
+        if let definition = Providers.definition(forLineupId: providerId) {
+            return definition.profile.name
+        }
         switch providerId {
-        case "claude": return "Claude"
-        case "codex": return "Codex"
         case "gemini": return "Gemini"
         case "copilot": return "GitHub Copilot"
         case "antigravity": return "Antigravity"
