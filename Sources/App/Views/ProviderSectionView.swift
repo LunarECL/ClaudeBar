@@ -9,10 +9,7 @@ struct ProviderSectionView: View {
     @State private var settings = AppSettings.shared
 
     private var effectiveOverallStatus: QuotaStatus {
-        if settings.burnRateWarningEnabled {
-            return snapshot.paceAwareOverallStatus(burnRateThreshold: settings.burnRateThreshold)
-        }
-        return snapshot.overallStatus
+        snapshot.overallStatus(under: settings.statusPolicy)
     }
 
     var body: some View {

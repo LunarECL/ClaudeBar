@@ -86,7 +86,7 @@ private struct ProviderListRow: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("\(Int(quota.percentRemaining))%")
                             .font(.system(size: 12, weight: .bold, design: theme.fontDesign))
-                            .foregroundStyle(theme.statusColor(for: quota.status))
+                            .foregroundStyle(theme.statusColor(for: quota.status(under: AppSettings.shared.statusPolicy)))
                             .monospacedDigit()
 
                         GeometryReader { geo in
@@ -95,7 +95,7 @@ private struct ProviderListRow: View {
                                     .fill(theme.progressTrack)
 
                                 Capsule()
-                                    .fill(theme.statusColor(for: quota.status))
+                                    .fill(theme.statusColor(for: quota.status(under: AppSettings.shared.statusPolicy)))
                                     .frame(width: geo.size.width * quota.percentRemaining / 100)
                             }
                         }

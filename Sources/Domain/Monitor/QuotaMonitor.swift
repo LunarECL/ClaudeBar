@@ -38,6 +38,10 @@ public final class QuotaMonitor {
     /// tests; the app injects a real provider via the convenience init.
     private let powerStateProvider: (any PowerStateProvider)?
 
+    /// The person's status policy, read live — every status the monitor
+    /// reports, and every alert it sends, is under it.
+    private let readStatusPolicy: @MainActor () -> StatusPolicy
+
     /// Previous status for change detection
     private var previousStatuses: [String: QuotaStatus] = [:]
 
@@ -58,12 +62,14 @@ public final class QuotaMonitor {
         providers: any AIProviderRepository,
         alerter: (any QuotaAlerter)? = nil,
         clock: any Clock,
-        powerStateProvider: (any PowerStateProvider)? = nil
+        powerStateProvider: (any PowerStateProvider)? = nil,
+        statusPolicy: @escaping @MainActor () -> StatusPolicy = { .absolute }
     ) {
         self.providers = providers
         self.alerter = alerter
         self.clock = clock
         self.powerStateProvider = powerStateProvider
+        self.readStatusPolicy = statusPolicy
         selectFirstEnabledIfNeeded()
     }
 
@@ -101,7 +107,7 @@ public final class QuotaMonitor {
     /// Handles snapshot update and alerts user if status changed
     private func handleSnapshotUpdate(provider: any AIProvider, snapshot: UsageSnapshot) async {
         let previousStatus = previousStatuses[provider.id] ?? .healthy
-        let newStatus = snapshot.overallStatus
+        let newStatus = snapshot.overallStatus(under: statusPolicy)
 
         previousStatuses[provider.id] = newStatus
 
@@ -368,10 +374,13 @@ public final class QuotaMonitor {
         }
     }
 
+    /// HOW STRICT TO BE — the person's policy (Settings → General).
+    public var statusPolicy: StatusPolicy { readStatusPolicy() }
+
     /// Returns the overall status across enabled providers (worst status wins)
     public var overallStatus: QuotaStatus {
         providers.enabled
-            .compactMap(\.snapshot?.overallStatus)
+            .compactMap { $0.snapshot?.overallStatus(under: statusPolicy) }
             .max() ?? .healthy
     }
 
@@ -384,7 +393,7 @@ public final class QuotaMonitor {
 
     /// Status of the currently selected provider (for menu bar icon)
     public var selectedProviderStatus: QuotaStatus {
-        selectedProvider?.snapshot?.overallStatus ?? .healthy
+        selectedProvider?.snapshot?.overallStatus(under: statusPolicy) ?? .healthy
     }
 
     /// Whether any provider is currently refreshing

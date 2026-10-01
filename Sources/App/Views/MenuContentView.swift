@@ -335,11 +335,7 @@ struct MenuContentView: View {
 
     /// Status of the currently selected provider, nil when it has no snapshot.
     private var selectedProviderStatus: QuotaStatus? {
-        guard let snapshot = selectedProvider?.snapshot else { return nil }
-        if settings.burnRateWarningEnabled {
-            return snapshot.paceAwareOverallStatus(burnRateThreshold: settings.burnRateThreshold)
-        }
-        return snapshot.overallStatus
+        selectedProvider?.snapshot?.overallStatus(under: settings.statusPolicy)
     }
 
     /// What the header pill says. A provider that failed to probe reads as
@@ -542,7 +538,7 @@ struct MenuContentView: View {
 
             Spacer()
 
-            let status = provider.snapshot?.overallStatus ?? .healthy
+            let status = provider.snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy
             Text(provider.isSyncing ? "Syncing..." : status.badgeText)
                 .badge(theme.statusColor(for: status))
         }
@@ -1206,7 +1202,7 @@ struct WrappedStatCard: View {
     }
 
     private var statusColor: Color {
-        theme.statusColor(for: quota.status)
+        theme.statusColor(for: quota.status(under: settings.statusPolicy))
     }
 
     private var isCappedSpend: Bool {
@@ -1247,7 +1243,7 @@ struct WrappedStatCard: View {
                     Text(quota.pace.displayName.uppercased())
                         .badge(paceColor)
                 } else {
-                    Text(quota.status.badgeText)
+                    Text(quota.status(under: settings.statusPolicy).badgeText)
                         .badge(statusColor)
                 }
             }

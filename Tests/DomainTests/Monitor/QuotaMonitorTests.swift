@@ -1532,6 +1532,62 @@ struct QuotaMonitorTests {
         verify(mockAlerter).alert(providerId: .any, previousStatus: .any, currentStatus: .any).called(0)
     }
 
+    @Test
+    func `with pace-aware status an on-pace quota raises no warning`() async {
+        // Given — 40% left with 90% of the window gone: on pace, so healthy
+        let mockAlerter = MockQuotaAlerter()
+        given(mockAlerter).alert(providerId: .any, previousStatus: .any, currentStatus: .any).willReturn(())
+        let probe = MockUsageProbe()
+        given(probe).isAvailable().willReturn(true)
+        given(probe).probe().willReturn(UsageSnapshot(
+            providerId: "claude",
+            quotas: [UsageQuota(
+                percentRemaining: 40, quotaType: .session, providerId: "claude",
+                resetsAt: Date().addingTimeInterval(30 * 60), windowDuration: 5 * 3600
+            )],
+            capturedAt: Date()
+        ))
+        let claude = StubClaudeProvider(probe: probe, settingsRepository: makeSettingsRepository())
+        let monitor = QuotaMonitor(
+            providers: AIProviders(providers: [claude]), alerter: mockAlerter, clock: TestClock(),
+            statusPolicy: { .paceAware(burnRateThreshold: 1.5) }
+        )
+
+        // When
+        await monitor.refresh(providerId: "claude")
+
+        // Then — the notification agrees with the menu bar: no warning
+        verify(mockAlerter).alert(providerId: .any, previousStatus: .any, currentStatus: .any).called(0)
+        #expect(monitor.selectedProviderStatus == .healthy)
+    }
+
+    @Test
+    func `with absolute status the same quota warns`() async {
+        let mockAlerter = MockQuotaAlerter()
+        given(mockAlerter).alert(providerId: .any, previousStatus: .any, currentStatus: .any).willReturn(())
+        let probe = MockUsageProbe()
+        given(probe).isAvailable().willReturn(true)
+        given(probe).probe().willReturn(UsageSnapshot(
+            providerId: "claude",
+            quotas: [UsageQuota(
+                percentRemaining: 40, quotaType: .session, providerId: "claude",
+                resetsAt: Date().addingTimeInterval(30 * 60), windowDuration: 5 * 3600
+            )],
+            capturedAt: Date()
+        ))
+        let claude = StubClaudeProvider(probe: probe, settingsRepository: makeSettingsRepository())
+        let monitor = QuotaMonitor(
+            providers: AIProviders(providers: [claude]), alerter: mockAlerter, clock: TestClock(),
+            statusPolicy: { .absolute }
+        )
+
+        await monitor.refresh(providerId: "claude")
+
+        verify(mockAlerter).alert(
+            providerId: .value("claude"), previousStatus: .value(.healthy), currentStatus: .value(.warning)
+        ).called(1)
+    }
+
     // MARK: - Disabled Provider Skipping
 
     @Test

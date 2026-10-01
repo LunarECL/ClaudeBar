@@ -257,11 +257,7 @@ final class StatusItemLabelDriver {
     /// Status of the selected provider, considering the burn-rate setting.
     /// Mirrors the dropdown's status logic for the icon-only fallback.
     private var effectiveSelectedProviderStatus: QuotaStatus {
-        guard let snapshot = monitor.selectedProvider?.snapshot else { return .healthy }
-        if settings.burnRateWarningEnabled {
-            return snapshot.paceAwareOverallStatus(burnRateThreshold: settings.burnRateThreshold)
-        }
-        return snapshot.overallStatus
+        monitor.selectedProvider?.snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy
     }
 
     private func render(_ content: LabelContent) {
