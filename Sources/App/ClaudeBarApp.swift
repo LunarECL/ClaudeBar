@@ -90,7 +90,11 @@ struct ClaudeBarApp: App {
                 dailyUsageAnalyzer: ClaudeDailyUsageAnalyzer(
                     // Inference routed at a loopback endpoint costs nothing (#190).
                     isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
-                )
+                ),
+                // The Domain layer holds no logger, so the provider reports
+                // what the UI cannot show — a fallback probe that ran and then
+                // failed — through here (#317). Never any credential value.
+                diagnose: { AppLog.probes.info($0) }
             ),
             CodexProvider(
                 rpcProbe: CodexUsageProbe(),
@@ -329,13 +333,13 @@ struct ClaudeBarApp: App {
         MenuBarExtra {
             Group {
                 #if ENABLE_SPARKLE
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)
                     .environment(\.sparkleUpdater, sparkleUpdater)
                 #else
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)

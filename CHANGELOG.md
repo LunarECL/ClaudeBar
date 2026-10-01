@@ -10,11 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Z.ai: paste your GLM API key in Settings → Providers → Z.ai → API KEY. It wins over the settings.json token and env vars, and works even when no Z.ai URL is in settings.json (quota then comes from api.z.ai).
 - Codex: the GPT-5.3-Codex-Spark research preview has its own 5h and weekly windows, separate from your main limits. Those Spark windows now show as extra rows after your session and weekly gauges. ([#178](https://github.com/tddworks/ClaudeBar/issues/178))
+- Popover keyboard shortcuts: Escape closes the popover (or an open share overlay first), and ⌘1–⌘9 switch between the provider pills. Tooltips on the pills and action buttons now show each shortcut (⌘D, ⌘R, ⌘S, ⌘, and ⌘Q already worked).
 
 ### Fixed
 - ClaudeBar no longer grows in memory the longer it runs. It could reach several GB after a day or two and then peg the CPU and freeze the menu bar panel. [#313](https://github.com/tddworks/ClaudeBar/issues/313)
 - Z.ai: the auth env var is now also read through your login shell, so a key exported in `~/.zshrc` or `~/.bash_profile` is found even when ClaudeBar starts from Finder or Login Items. [#170](https://github.com/tddworks/ClaudeBar/issues/170)
 - Cost Usage no longer counts dollars for models you run locally. With Claude Code pointed at ollama or LM Studio the card kept adding Anthropic Sonnet prices; it now shows $0.00, while Token Usage keeps counting. ([#190](https://github.com/tddworks/ClaudeBar/issues/190))
+- Claude no longer shows as "Unavailable" while you're working in it. The `/usage` probe accepted the CLI's boot screen as finished, so slow SessionStart hooks produced a capture with nothing to read. It now waits for the Usage screen. ([#317](https://github.com/tddworks/ClaudeBar/issues/317))
+- Claude's cost fallback is fast again and no longer invents a $0.00. The `/cost` capture waited out the full 20s timeout, and a screen that reported a failure was read as a cost of nothing. ([#317](https://github.com/tddworks/ClaudeBar/issues/317))
+- Claude now always falls back between its two probe modes when one fails. A pre-check could report the other probe unusable and skip the rescue, silently, leaving "Claude Unavailable" on screen — in both directions. ([#317](https://github.com/tddworks/ClaudeBar/issues/317))
 - Codex: the probe no longer stalls on Codex 0.150's "Do you trust the contents of this directory?" prompt. Codex now runs in ClaudeBar's own probe folder and the prompt is answered for you, so the Codex tab shows your usage again. https://github.com/tddworks/ClaudeBar/issues/267
 - `claudebar://open` now opens the popover and `claudebar://refresh` refreshes, instead of both opening the Settings window. Also fixes tapping the Touch Bar widget. https://github.com/tddworks/ClaudeBar/pull/310
 - Cursor now shows Auto and API cards when those fields are in the usage response, next to Monthly. The menu bar still defaults to Monthly; set the secondary quota to API to see both. ([#303](https://github.com/tddworks/ClaudeBar/issues/303))
