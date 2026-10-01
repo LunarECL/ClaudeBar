@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Breaking: Claude's Dashboard button (⌘D) now opens your usage page on claude.ai on a subscription (Max, Pro, Team) instead of the Console billing page. Pay-as-you-go API accounts still get the Console; on a subscription, open console.anthropic.com yourself if you need it. ([#328](https://github.com/tddworks/ClaudeBar/pull/328))
+
 ### Added
 - Codex: add separate ChatGPT accounts, identify them by email, and pin both quotas in the menu bar. Each login keeps its own usage and refreshes. [#308](https://github.com/tddworks/ClaudeBar/issues/308)
 - Z.ai: paste your GLM API key in Settings → Providers → Z.ai → API KEY. It wins over the settings.json token and env vars, and works even when no Z.ai URL is in settings.json (quota then comes from api.z.ai).

@@ -13,8 +13,18 @@ public final class ClaudeProvider: AIProvider {
     public let name: String = "Claude"
     public let cliCommand: String = "claude"
 
+    /// Where the Dashboard button goes depends on how the account is billed.
+    /// Subscription plans (Max, Pro, Team, …) track their limits on claude.ai;
+    /// only pay-per-use API accounts have anything to see in the Console. An
+    /// unknown tier (before the first refresh, or a probe that reported none)
+    /// is treated as a subscription, the same default the CLI probe uses.
     public var dashboardURL: URL? {
-        URL(string: "https://console.anthropic.com/settings/billing")
+        switch snapshot?.accountTier {
+        case .claudeApi:
+            return URL(string: "https://console.anthropic.com/settings/billing")
+        case .claudeMax, .claudePro, .custom, nil:
+            return URL(string: "https://claude.ai/new#settings/usage")
+        }
     }
 
     public var statusPageURL: URL? {
