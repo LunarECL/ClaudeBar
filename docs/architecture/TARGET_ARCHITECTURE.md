@@ -41,10 +41,11 @@ paths, field names, client ids, CLI arguments — is data.
 └──────────────────────────────────┬───────────────────────────────────────┘
                                    ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ Provider ◆  THE lifecycle: isEnabled · active data source · fallback ·   │
-│             isSyncing · usage · lastError · refresh() · use(kind)        │
+│ Provider ◆  THE PRODUCT and THE lifecycle: isEnabled · the data source   │
+│             in use · fallback · refresh(account) · use(kind)             │
+│   └ accounts: [Account] — the logins: values · isEnabled · usage · sync  │
 └──────────────────────────────────┬───────────────────────────────────────┘
-                                   │ refresh → activeDataSource.fetchUsage()
+                                   │ refresh(account) → dataSource.fetchUsage(for: account)
                                    ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ DataSource ◆  ONE type for every provider: its definition + only the     │
@@ -361,6 +362,7 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | # | Slice | Done when |
 |---|---|---|
 | **1** | **Codex** — the definition types, `CredentialLookup` · `Fetch` · `Mapping`, `DataSource`, `Provider`; workers `JSONFileReader`, `OAuth2Refresher`, `HTTPFetcher`, `JSONRPCFetcher`, `TerminalFetcher`, `JSONMapper`, `TextMapper`; `codex.json`; golden tests | `CodexProvider`, `CodexUsageProbe`, `CodexAPIUsageProbe`, `DefaultCodexRPCClient`, `CodexCredentialLoader` are deleted; both modes and the fallback work; `codex.probeMode` is read as before |
+| 1a | **Accounts under one Provider** — `Provider` owns `[Account]`; `{{account.x}}` filled at fetch time; `codex.json`'s `accounts.dataSources` deleted; `AddedAccounts` → `provider.add(account:)` | same ids, pills, pins and settings keys; no visible change |
 | 2 | the HTTP + API-key providers (DeepSeek, MiniMax, Z.ai, Kimi API, Vercel, …): `EnvironmentReader`, `SettingReader` | their probes and provider classes are deleted |
 | 3 | the look and the settings form move into the JSON; the `switch id` tables and the simple config cards go | adding a provider edits no Swift |
 | 4 | the kernel laws: `Left` (no fake 100%), `Window` (no guessed length) | balance definitions map money only |
@@ -383,6 +385,7 @@ vendor type:
 | 15-minute cache, a remembered 429 | `cache.ttl` (also the background floor) and rate-limit memory on `DataSource` |
 | the account's email and billing type | `context` files handed to the mapping |
 | the folder-trust prompt | `recover.patchJSONFile`, tried once |
+| Codex logins in their own folders (#326) | `accounts` (`nameFromEmail`, `folder`), `{{account.x}}`, `identity` (fail closed when a folder signs in to someone else), `requiresFiles` (#216), `verifyBeforeBackground`, JSON-RPC `then` + `environment`, `#jwt.claim` and `$credential.` paths |
 | the usage API's model limits, plan and money | JSON mapping rules, not a script: `each` + `where`, names by `firstWord`/`lowercase`, `unique` (first wins), `overLimit` (negative left), `countdown: "hours"`, `plan.plans` from `$credential.`, and a list of `cost` shapes with `when` and exact `{amount, decimals}` minor units |
 | today's usage and guest passes | `Provider.dailyUsage` (interactive refreshes only) and the `GuestPasses` capability |
 
@@ -394,7 +397,11 @@ vendor type:
   already priced — not a scripting language inside the mapping.
 - **JSONPath dialect.** A small, documented subset (`$.a.b`, `[*]`, maps by
   key, `$header.`), implemented and tested here, rather than a dependency.
-- **Multi-account in a definition.** Claude has accounts today; slice 7
-  decides whether a definition declares them or a credential lookup discovers
-  them.
+- ~~**Multi-account in a definition.**~~ — **decided** ([CANONICAL_MODEL §1, §5](CANONICAL_MODEL.md#1--the-tree)):
+  a definition declares how an account is added (`accounts.folder` today, an
+  account-scope setting in the form later); the provider owns `[Account]`;
+  one definition serves every account, the account's values filled when the
+  fetch runs. Accounts are simultaneous — each is a pill. Claude (slice 7)
+  follows the same shape. **Not built yet**: today each Codex login is its own
+  `Provider` with a copy of the data sources (CANONICAL_MODEL §8, ticket in #350).
 - **A `command` fetch from the UI** — see [CANONICAL_MODEL §9](CANONICAL_MODEL.md#9--open).

@@ -78,19 +78,27 @@ connect · Couldn't find the numbers*, *via API*. Those are the words below.
 
 ```text
 Monitor  ◆                                  THE ROOT — what the menu bar is watching. One per app
-├── lineup: [Provider]                      the Providers pane's order. Enabled ones are shown
+├── providers: [Provider]                   the Providers pane's order
+├── lineup → [Account]                      DERIVED — the enabled accounts of the enabled providers,
+│                                           in that order: the pills, the menu bar, the notifications
+├── selection: Account.ID                   which pill the popover opens on — `codex` · `codex.<acct>`
 │   │
-│   └── Provider  ◆                         ONE THING YOU PAY FOR — built in, or made by the user
+│   └── Provider  ◆                         THE PRODUCT — HOW TO FIND OUT, once for all its logins.
+│       │                                   Built in, made by the user, or an extension
 │       ├── profile: ProviderProfile  ◇     WHO IT IS — the only place an id becomes a face
 │       │   ├── id: ProviderID              stable forever; settings are keyed by it
 │       │   ├── name                        "DeepSeek"
 │       │   ├── look: ProviderLook          symbol · colour · gradient — data, never a switch on id
-│       │   └── links                       dashboard · status page · "Open DeepSeek API Keys"
-│       ├── isEnabled                       the pane's toggle
+│       │   ├── links                       dashboard · status page · "Open DeepSeek API Keys"
+│       │   └── origin                      builtIn · custom · extension — "Built in · Custom · Extension"
+│       ├── isEnabled                       the pane's toggle — off hides every login
 │       ├── settingsForm: SettingsForm  ◇   WHAT IT NEEDS FROM YOU — [Setting]: API KEY, REGION, ENV
 │       │                                   VAR … each says its kind (text · secret · number ·
-│       │                                   toggle · choice · path) and its default. A SECRET
-│       │                                   is a reference into the vault, never a value
+│       │                                   toggle · choice · path), its default, and its SCOPE:
+│       │                                   provider (REGION, ENV VAR NAME) or account (the Codex
+│       │                                   folder, an API key) — "Add Account" fills the account
+│       │                                   scope. A SECRET is a reference into the vault, never a value
+│       ├── dataSource: kind                the one in use — one choice for every login ("DATA SOURCE")
 │       ├── dataSources: [DataSource]  ◆    HOW WE FIND OUT — one or more; "DATA SOURCE" picks one
 │       │   └── DataSource  ◆               ONE TYPE FOR EVERY PROVIDER — its definition, made live by
 │       │       │                           the factory with only the connection its fetch needs
@@ -110,24 +118,32 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │                       for a format no rule can say (a TUI screen)
 │       │       │   └── fallback: kind?     the data source to try when this one fails — Codex's
 │       │       │                           RPC falls back to its terminal
-│       │       ├── fetchResponse() → Response   "Test Connection" — looks up the key and fetches;
+│       │       ├── fetchResponse(for: Account) → Response   "Test Connection" — looks up the key and fetches;
 │       │       │                           stops BEFORE mapping, so a person with nothing mapped
 │       │       │                           yet can see what came back
-│       │       ├── fetchUsage() → Usage    "Fetching usage data…" — mapping.read(fetchResponse())
-│       │       ├── isReady                 DERIVED — the key answers and the CLI exists ("Configured")
-│       ├── accounts: [Account]  ◆          NEVER EMPTY. One account is the "default" account
-│       │   └── Account  ◆
-│       │       ├── id · label · email · organization
-│       │       ├── plan: Plan?  ◇          MAX · PRO · API · Coding Plan — what the vendor sold
-│       │       └── usage: Usage?  ◇        WHAT WE LAST SAW — survives a failed refresh
-│       ├── active: Account.ID              whose usage the popover shows
-│       └── sync: SyncState  ◇              isSyncing · lastError: DataSourceError — THE PROVIDER'S,
-│                                           not the usage's: a failure never erases what we saw.
-│                                           The error names its STEP — lookup · fetch · mapping —
-│                                           "Couldn't read your key · Couldn't connect · Couldn't
-│                                           find the numbers" — because each sends you somewhere else
+│       │       ├── fetchUsage(for: Account) → Usage   "Fetching usage data…" — mapping.read(fetchResponse())
+│       │       └── isReady(for: Account)   DERIVED — the key answers and the CLI exists ("Configured")
+│       │                                   The ACCOUNT's values fill `{{account.x}}` when the fetch
+│       │                                   runs, as the token fills `{{token}}` — one definition,
+│       │                                   never a copy per login
+│       ├── accounts: [Account]  ◆          NEVER EMPTY. One account is the "default" — the plain login
+│       │   └── Account  ◆                  A LOGIN YOU PAY FOR — who, and what we last saw. No behaviour
+│       │       ├── id: Account.ID          `<provider>` for the default, `<provider>.<acct>` for an added one
+│       │       ├── label · email           what you gave, or the login file holds — names the pill
+│       │       ├── values                  its account-scope settings — the Codex folder, the login's
+│       │       │                           account id; a secret as a reference
+│       │       ├── isEnabled               PAUSE without forgetting — no refresh, no pill. "Remove" forgets
+│       │       ├── usage: Usage?  ◇        WHAT WE LAST SAW — survives a failed refresh; carries the
+│       │       │                           plan and organization the data source learned
+│       │       ├── sync: SyncState  ◇      FETCH HEALTH — isSyncing · lastError: DataSourceError. Never
+│       │       │                           erases the usage. The error names its STEP — lookup · fetch ·
+│       │       │                           mapping — "Couldn't read your key · Couldn't connect ·
+│       │       │                           Couldn't find the numbers" — because each sends you somewhere else
+│       │       └── status                  DERIVED — QUOTA HEALTH: the worst quota in its usage.
+│       │                                   The pill's and the menu-bar entry's colour
+│       ├── status                          DERIVED — the worst across its enabled accounts
+│       └── bestAccount                     DERIVED — the enabled account with the most left: "switch to work"
 │
-├── selection: ProviderID                   which provider the popover opens on
 ├── statusPolicy: StatusPolicy  ◇           HOW STRICT TO BE — absolute thresholds, or pace-aware
 │                                           with the user's burn-rate threshold
 └── budgets: [Budget]  ◇                    THE USER'S OWN CEILINGS on a Cost — a Daily Budget,
@@ -152,7 +168,8 @@ Usage  ◇                                    "Fetching usage data…" — WHAT 
 │       └── pace                            DERIVED — needs a Window; otherwise unknown
 ├── cost: Cost?  ◇                          MONEY GONE — "API COST" or "EXTRA USAGE", over a period.
 │                                           Judged by a Budget, never by a Quota
-└── account facts                           email · organization · plan, when the data source learns them
+└── account facts                           email · organization · plan, when the data source learns them —
+                                            the screen prefers these to what the Account was given
 
 Response  ◇                                 "Response" — WHAT CAME BACK, before anyone read it:
                                             status · headers · body. The Map fields step shows it
@@ -224,15 +241,16 @@ someone made five minutes ago run on the same `DataSource` and the same lifecycl
 
 | The user does | The node is told | Notes |
 |---|---|---|
-| toggles a provider in Providers | `provider.enable()` · `disable()` | the lineup keeps its place |
-| drags the pane's order | `monitor.lineup.move(_:to:)` | |
+| toggles a provider in Providers | `provider.enable()` · `disable()` | every login of it; the pane keeps its place |
+| toggles one account | `account.enable()` · `disable()` | pauses that login — no refresh, no pill — and keeps its settings |
+| drags the pane's order | `monitor.providers.move(_:to:)` | the lineup follows |
 | picks DATA SOURCE | `provider.use(_ kind:)` | one data source active at a time |
 | fills API KEY, REGION … | `provider.settings.set(_:to:)` | a secret goes to the vault; the form keeps the reference |
-| *Add Account* · remove · switch | `provider.add(account:)` · `remove` · `activate` | never removes the last one |
-| clicks a provider pill | `monitor.select(_:)` | |
-| refreshes | `monitor.refresh(_:kind:)` → `provider.refresh(kind)` | interactive or background |
+| *Add Account* · *Remove* | `provider.add(account:)` — fills the form's account scope · `provider.remove(account:)` | never removes the default; removing forgets the account's settings, never its CLI's login files |
+| clicks a pill | `monitor.select(_ account:)` | |
+| refreshes | `monitor.refresh(_:kind:)` → `provider.refresh(account, kind)` | interactive or background; one account's fetch |
 | *Add Provider* → *Start from* | `ProviderDefinition.blank(fetch:)` · `definition.copy()` | the picker is `http` · `cli` · `file`; a copy gets a new id and the origin **custom** |
-| *Connect* → *Test Connection* | `dataSource.fetchResponse()` → a `Response` or a `DataSourceError` | nothing is mapped yet, nothing is saved |
+| *Connect* → *Test Connection* | `dataSource.fetchResponse(for: account)` → a `Response` or a `DataSourceError` | nothing is mapped yet, nothing is saved |
 | *Map fields* — clicks a value | `mapping.quotas.append(…)` / `mapping.cost = …` with *Used · Remaining · Limit · Resets* | the card previews live from the same `Response` |
 | *Save* | `catalog.add(definition)` → `monitor.lineup.append` | no restart |
 | *Edit* · *Delete* a custom provider | `catalog.replace(definition)` · `catalog.remove(id)` | built-ins can only be disabled |
@@ -244,10 +262,13 @@ someone made five minutes ago run on the same `DataSource` and the same lifecycl
 ## 4 · The reads — what the tree answers
 
 ```text
-monitor.overallStatus                → Status       the menu bar's colour: the worst enabled
-monitor.lowestQuota                  → Quota?       across the enabled lineup
-provider.usage                       → Usage?       the ACTIVE account's latest
-provider.status                      → Status       the worst quota in that usage
+monitor.overallStatus                → Status       the menu bar's colour: the worst
+monitor.lowestQuota                  → Quota?       across the lineup (enabled accounts of enabled providers)
+monitor.lineup                       → [Account]    the pills and the menu-bar entries
+account.usage                        → Usage?       that login's latest — what its pill shows
+account.status                       → Status       QUOTA HEALTH: the worst quota in that usage
+account.sync.lastError               → DataSourceError?  FETCH HEALTH: which step failed — never a Status
+provider.status                      → Status       the worst across its enabled accounts
 provider.bestAccount                 → Account?     the most left — "switch to work"
 usage.quota(named:)                  → Quota?
 usage.isStale                        → Bool         older than 5 minutes
@@ -255,7 +276,7 @@ quota.status(under: StatusPolicy)    → Status
 quota.pace                           → Pace         unknown without a window
 quota.window?.timeUntilReset         → Duration?    "Resets in 2h 5m"
 cost.judged(by: Budget)              → BudgetStatus ON TRACK · NEAR LIMIT · OVER BUDGET
-dataSource.fetchResponse()           → Response     Test Connection: what came back, unmapped
+dataSource.fetchResponse(for:)       → Response     Test Connection: what came back, unmapped
 mapping.read(response)               → Usage        Map fields: the live card
 definition.missingSettings           → [Setting]    Import: "Key needed"
 ```
@@ -266,10 +287,14 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 |---|---|
 | a provider's id is stable forever; settings, the menu-bar choice and the lineup are keyed by it. A custom provider's id is minted once and never derived from its name | `ProviderProfile` |
 | a provider's face is DATA — its symbol and colours ride on the profile, so adding one never edits a `switch id` | `ProviderLook` |
-| a provider has at least one account; a single-account provider's only account is `default`, and its compound id equals the provider id | `Provider.accounts` |
-| what the popover shows is the ACTIVE account's usage; aggregate status is the worst across accounts | `Provider` |
-| a failed refresh keeps the last usage and records the error beside it — what we saw is never erased by failing to look again | `Provider.sync` |
-| at most one refresh per provider is in flight | `Provider` |
+| a provider has at least one account; the `default` account's id equals the provider id, an added one's is `<provider>.<acct>` — the ids today's settings and menu-bar pins are keyed by | `Provider.accounts` |
+| a provider is the PRODUCT and an account a LOGIN: how to fetch, the data source choice, the look and the provider-scope settings are the provider's, once; who, its values, what we saw and whether the last fetch worked are the account's | `Provider` · `Account` |
+| accounts are SIMULTANEOUS — every enabled login is fetched and shown as its own pill; the popover shows the selected one. (A vendor that allows one live login at a time would add an `active` account; none does today) | `Monitor.selection` |
+| one definition serves every account: the account's values fill `{{account.x}}` when the fetch runs; a data source is never copied per login | `DataSource` |
+| status is QUOTA health, derived from usage; a failed fetch is FETCH health, in `sync` — a key that expired never turns the menu bar red | `Account.status` · `Account.sync` |
+| a disabled account is paused, not forgotten; a provider whose accounts are all disabled reads as disabled | `Account.isEnabled` |
+| a failed refresh keeps the last usage and records the error beside it — what we saw is never erased by failing to look again | `Account.sync` |
+| at most one refresh per account is in flight | `Provider` |
 | exactly one data source is active per provider; switching never loses settings the other one needs | `Provider.dataSources` |
 | a data source reads settings only through its form; it never writes settings and never reads another provider's | `DataSource` · `SettingsForm` |
 | a secret never appears in `settings.json`, a log line, an error message or a test fixture — the form holds a reference, the vault the value, and the vault falls back when the Keychain refuses an ad-hoc build | `Setting` · `SecretVault` |
@@ -358,6 +383,7 @@ context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
 | Node | Today | Moves to |
 |---|---|---|
 | `Provider` lifecycle | copied into 20 `XxxProvider` classes (`isSyncing`, `snapshot`, `lastError`, `isEnabled`, `refresh`) | one `Provider` in `Providers`; built-ins become JSON definitions |
+| `Provider.accounts` · `Account` | **one `Provider` per login** (#326, ported in #329): `codex` and `codex.<acct>` are separate providers, each with a COPY of the data sources — `ProviderDefinition.parse(_:account:)` substitutes `{{account.x}}` into the JSON text, and `codex.json` repeats `rpc` and `api` under `accounts.dataSources`. `active` does not exist; each login is a pill, as the model now says | one `Provider` (the product) owning `[Account]`; the account's values filled at fetch time; `accounts.dataSources` deleted; `AddedAccounts` → `provider.add(account:)`. The ids, the pills and every settings key stay |
 | `ExtensionProvider` | a generic provider over scripted sections | the same `Provider`, with `script` fetches — the proof that one lifecycle fits |
 | `ProviderProfile.look` | four `switch id` tables: `ProviderVisualIdentity`, `Theme`, `ProviderIcons`, `NotificationAlerter` | data on the profile |
 | `SettingsForm` | 11 settings sub-protocols in `ProviderSettingsRepository.swift`, mirrored in two repositories and 11 config cards; extensions already use `ConfigField` | `ConfigField` generalised; one form renderer; custom cards only where a form cannot say it (Claude's account management) |
@@ -402,8 +428,10 @@ Each step ships green and changes no behaviour a user can see, until the last.
   escape hatch. Which features, is found provider by provider.
 - **Cost lines.** Bedrock reports cost per model, and an extension can report
   metrics. Is that one `Cost` with lines, or a third kind of `Left`?
-- **A custom provider with accounts.** One definition plus N secrets — is
-  the account list the form's (one API key each), or the provider's?
+- ~~**A custom provider with accounts.**~~ — **answered**: the provider's.
+  The form has two scopes; an account fills the ACCOUNT scope (one API key
+  each, as a reference), and *Add Account* is that form. One definition
+  serves every account (§1, §5).
 - ~~**`command` fetches from the UI.**~~ — **answered by the journey**
   ([USER_JOURNEYS F10](USER_JOURNEYS.md#3--what-the-journeys-changed)): the
   picker offers *CLI*, because a person typing their own command runs it with

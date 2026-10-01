@@ -205,24 +205,31 @@ This plan covered the API probe. What was learned afterwards, mostly about the R
 ## Independent Codex accounts
 
 Additional accounts reuse `ProviderAccountConfig` and `MultiAccountSettingsRepository`.
-Each becomes a separate `CodexProvider` in `QuotaMonitor`, with compound ID
-`codex.<local UUID>`. The default retains `codex`. Registering instances lets the
-existing enable toggles, refreshes, overview and three menu-bar selections operate
-independently, without introducing another provider-state owner. The optional
-`MultiAccountProvider` picker protocol is not used: users can pin two accounts at
-once instead of selecting only one active account within Codex.
+`codex.json`'s `accounts` says how one is added (`folder`: saved as `codexHome`,
+its login's `account` claim saved as `chatgptAccountId`) and that each is named by
+its email. Today each becomes a separate generic `Provider` in `QuotaMonitor`
+(`AddedAccounts.provider`), with compound ID `codex.<local UUID>`; the default keeps
+`codex`. Each login is its own pill, enable toggle and menu-bar choice — users pin
+two accounts at once instead of selecting one active account within Codex.
+
+**Where this is going** ([CANONICAL_MODEL](../../architecture/CANONICAL_MODEL.md#1--the-tree)):
+one Codex `Provider` (the product) owning `[Account]` (the logins), one definition
+for all of them with the account's values filled when a fetch runs — so the
+duplicate `accounts.dataSources` block goes. Ids, pills and settings keys stay.
 
 Settings contain the email, canonical Codex directory and expected ChatGPT account
 ID, never tokens. Setup rejects duplicate directories (including symlinks), the
 default directory and duplicate ChatGPT account IDs. Email is a display identifier,
 not an authentication key; separate workspaces can share an email.
 
-`CodexAccountUsageProbe` validates the expected account ID before and after a
-probe. Both modes get the same explicit home; file API refresh writes only there.
-RPC sets CODEX_HOME on the child process and forces file credential storage for
-added accounts. It disables the inherited-environment TTY fallback for those
-accounts. Missing/replaced credentials fail closed. A provider coalesces simultaneous
-refreshes so overlapping UI/background polls cannot rotate its refresh token twice.
+The `identity` rule checks the expected account ID before and after a fetch.
+Both data sources read the account's own `{{account.codexHome}}/auth.json`; a
+refreshed API token is written back only there. RPC sets `CODEX_HOME` on the child
+process, unsets the other OpenAI auth variables, and forces file credential storage
+(`-c cli_auth_credentials_store="file"`) for added accounts, which have no TTY
+fallback — the terminal would read the global login. Missing or replaced credentials
+fail closed. A provider coalesces simultaneous refreshes so overlapping UI and
+background polls cannot rotate its refresh token twice.
 
 RPC identity comes from `account/read` with `refreshToken: false`, which also
 supports the default Keychain login. File credentials provide the email from the

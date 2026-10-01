@@ -1,5 +1,5 @@
 ---
-description: The provider redesign seen from outside in — four people, eleven moments from glancing at the menu bar to adding and sharing a custom provider, the words each screen prints, the command each lands on, and the ten findings that changed the canonical model; read before designing a provider screen or changing a provider-facing type.
+description: The provider redesign seen from outside in — four people, twelve moments from glancing at the menu bar to adding and sharing a custom provider, the words each screen prints, the command each lands on, and the twelve findings that changed the canonical model; read before designing a provider screen or changing a provider-facing type.
 ---
 
 # Provider journeys — outside in
@@ -43,8 +43,9 @@ the command that lands on the domain, and the node that answers.
 | # | Moment | Sees | Does | Command | Node |
 |---|---|---|---|---|---|
 | 1 | Mia glances at the menu bar | *38%*, amber | nothing | `monitor.lowestQuota` | `Monitor` → worst `Quota.status` |
-| 2 | Mia opens the popover | *Session · Weekly · Spark*, *% left*, *Resets in 1h 12m*, *Running hot*, *EXTRA USAGE*, *Updated 2m ago · via RPC*, *PLUS* | switches to a lighter model for an hour | `provider.usage` | `Usage` → `[Quota]` · `Cost` · `Plan` |
-| 3 | Raj sees Codex fail | *Couldn't read your key* · *Session expired. Run `codex` in terminal to log in again.* · last usage dimmed, *Last seen 3h ago* | logs in, or opens settings | `provider.lastError` | `DataSourceError(step: .lookup)`; `usage` kept |
+| 2 | Mia opens the popover | *Session · Weekly · Spark*, *% left*, *Resets in 1h 12m*, *Running hot*, *EXTRA USAGE*, *Updated 2m ago · via RPC*, *PLUS* | switches to a lighter model for an hour | `account.usage` | `Usage` → `[Quota]` · `Cost` · `Plan` |
+| 2a | Mia has two Codex logins | two pills, *Codex · me@…* and *Codex · work@…*, both pinned in the menu bar; Settings lists one **Codex** with *Add Account…* and a toggle per login | pauses *work* on the weekend; later clicks *work* when *me* runs low | `monitor.select(account)` · `account.disable()` · `provider.bestAccount` | `Provider` (the product) → `[Account]` (the logins) |
+| 3 | Raj sees Codex fail | *Couldn't read your key* · *Session expired. Run `codex` in terminal to log in again.* · last usage dimmed, *Last seen 3h ago* | logs in, or opens settings | `account.sync.lastError` | `DataSourceError(step: .lookup)`; `usage` kept |
 | 4 | Raj opens Codex settings | *DATA SOURCE: RPC · API*, *KEY LOOKUP ORDER*, *Test Connection*, *Built in* | switches to RPC, tests | `provider.use("rpc")` · `dataSource.fetchUsage()` | `Provider.dataSources` · `CredentialLookup` |
 | 5 | Ken: *Add Provider* | *Start from: API · CLI · File · Copy a provider*, *Import…* | chooses API | `ProviderDefinition.blank(.http)` · `definition.copy()` | `ProviderDefinition` (unsaved) |
 | 6 | Ken: *Connect* | *URL*, *Key lookup order: Environment variable · API key*, *Sent as*, *Test Connection*, *200 OK* | pastes his key, tests | `dataSource.fetchResponse()` | `Fetch.http` · `CredentialLookup` → `Response` |
@@ -56,7 +57,7 @@ the command that lands on the domain, and the node that answers.
 
 ## 3 · What the journeys changed
 
-Ten findings. Each is now in the canonical model; the column says where.
+Twelve findings. Each is now in the canonical model; the column says where.
 
 | # | Finding | From moment | Model change |
 |---|---|---|---|
@@ -70,6 +71,8 @@ Ten findings. Each is now in the canonical model; the column says where.
 | F8 | The screen calls a user-made provider **CUSTOM** | 9, 10 | the model's *declared* kind is renamed **custom**; origins are `builtIn` · `custom` · `extension` |
 | F9 | An exported provider **carries no key** | 10 | law on `ProviderDefinition`: a secret is a reference, never a value, and `exported()` keeps only the lookup order and the setting's name |
 | F10 | Import **says where the key will go** before asking for it; a *CLI* provider from someone else shows its command and asks before saving | 11 | law on `ProviderCatalog.import`; answers the model's open question about commands from the UI |
+| F11 | Two logins of one product are **two things Mia watches** but **one thing Raj fixes**: each login is a pill and a menu-bar entry; the data source, its settings and the look are set once for Codex | 2a, 4 | `Provider` is the product, `Account` a login; accounts are simultaneous (no `active`); one definition, the account's values filled at fetch time |
+| F12 | **Pause is not remove**: a login can be switched off without losing its folder; and an expired key is not a red quota — it reads *Couldn't read your key*, not CRITICAL | 2a, 3 | `Account.isEnabled`; `Account.status` (quota health) apart from `Account.sync` (fetch health) |
 
 ## 4 · The words the new screens print
 
