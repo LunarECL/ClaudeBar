@@ -1,11 +1,13 @@
+import AppKit
 import SwiftUI
 import Domain
 import Infrastructure
 import Providers
 
-/// *Delete* a provider someone made: its definition file and its saved key go,
-/// and it leaves the lineup. Built-ins can only be disabled.
-struct DeleteCustomProviderCard: View {
+/// A provider someone made: *Export…* it to share (the file names its key,
+/// never holds it), or *Delete* it — its definition file and saved key go, and
+/// it leaves the lineup. Built-ins can only be disabled.
+struct CustomProviderCard: View {
     let provider: Provider
     let monitor: QuotaMonitor
     let onDeleted: () -> Void
@@ -20,7 +22,7 @@ struct DeleteCustomProviderCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Custom provider")
                         .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
-                    Text("Deleting removes it from ClaudeBar and forgets its saved key.")
+                    Text("Export shares it without keys — they stay in your Keychain. Deleting removes it and forgets its key.")
                         .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
                         .foregroundStyle(theme.textTertiary)
                     if let error {
@@ -30,11 +32,26 @@ struct DeleteCustomProviderCard: View {
                     }
                 }
                 Spacer()
+                Button("Export…", action: export)
                 Button("Delete Provider…", role: .destructive) { confirming = true }
             }
         }
         .confirmationDialog("Delete \(provider.name)?", isPresented: $confirming) {
             Button("Delete", role: .destructive, action: delete)
+        }
+    }
+
+    private func export() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(provider.name).claudebar-provider.json"
+        panel.allowedContentTypes = [.json]
+        panel.begin { result in
+            guard result == .OK, let url = panel.url else { return }
+            do {
+                try provider.definition.exported().write(to: url, options: .atomic)
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
     }
 

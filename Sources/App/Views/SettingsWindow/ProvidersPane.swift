@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Domain
 import Infrastructure
@@ -11,6 +12,8 @@ struct ProvidersPane: View {
     @Environment(\.appTheme) private var theme
     @State private var selectedProviderId: String?
     @State private var addingProvider = false
+    @State private var importing: IdentifiedReview?
+    @State private var importError: String?
 
     var body: some View {
         if let providerId = selectedProviderId,
@@ -40,7 +43,13 @@ struct ProvidersPane: View {
                 }
 
                 HStack {
+                    if let importError {
+                        Text(importError)
+                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(theme.statusWarning)
+                    }
                     Spacer()
+                    Button("Import…", action: chooseImport)
                     Button("Add Provider…") { addingProvider = true }
                 }
                 .padding(.top, 4)
@@ -48,6 +57,25 @@ struct ProvidersPane: View {
         }
         .sheet(isPresented: $addingProvider) {
             AddProviderSheet(monitor: monitor) { addingProvider = false }
+        }
+        .sheet(item: $importing) { review in
+            ImportProviderSheet(monitor: monitor, review: review.value) { importing = nil }
+        }
+    }
+
+    /// *Import…*: a shared file is read and reviewed — nothing is saved or run yet.
+    private func chooseImport() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.json]
+        panel.begin { result in
+            guard result == .OK, let url = panel.url else { return }
+            do {
+                importError = nil
+                importing = IdentifiedReview(value: try ProviderCatalog().review(Data(contentsOf: url)))
+            } catch {
+                importError = "Not a ClaudeBar provider: \(error.localizedDescription)"
+            }
         }
     }
 }
@@ -266,7 +294,7 @@ private struct ProviderDetailView: View {
         default:
             if let custom = (provider as? Account)?.provider, custom.definition.profile.origin == .custom {
                 DataSourceSection(provider: custom, monitor: monitor)
-                DeleteCustomProviderCard(provider: custom, monitor: monitor, onDeleted: onBack)
+                CustomProviderCard(provider: custom, monitor: monitor, onDeleted: onBack)
             } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
                 ExtensionConfigCard(
                     provider: extProvider,
@@ -275,4 +303,10 @@ private struct ProviderDetailView: View {
             }
         }
     }
+}
+
+/// A review to present as a sheet.
+struct IdentifiedReview: Identifiable {
+    let id = UUID()
+    let value: ImportReview
 }
