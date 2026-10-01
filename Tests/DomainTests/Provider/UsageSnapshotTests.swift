@@ -596,6 +596,30 @@ struct UsageSnapshotTests {
     }
 
     @Test
+    func `visible overall status under the policy ignores hidden quotas`() {
+        // Given — 40% left halfway through a 10h window: a 1.2 burn rate is
+        // sustainable (pace-aware reads healthy) but under 50%, so the
+        // absolute policy still warns
+        let quotas = [
+            UsageQuota(
+                percentRemaining: 40,
+                quotaType: .session,
+                providerId: "gemini",
+                resetsAt: Date().addingTimeInterval(5 * 3600),
+                windowDuration: 10 * 3600
+            ),
+        ]
+        let snapshot = UsageSnapshot(providerId: "gemini", quotas: quotas, capturedAt: Date())
+
+        // When & Then — the policy decides warning vs healthy, and hiding the
+        // only quota reads healthy under either
+        let pace = StatusPolicy.paceAware(burnRateThreshold: 1.5)
+        #expect(snapshot.visibleOverallStatus(hiding: [], under: .absolute) == .warning)
+        #expect(snapshot.visibleOverallStatus(hiding: [], under: pace) == .healthy)
+        #expect(snapshot.visibleOverallStatus(hiding: ["session"], under: pace) == .healthy)
+    }
+
+    @Test
     func `visible lowest quota comes from visible quotas only`() {
         // Given — the weekly window is the lowest of all
         let quotas = [
