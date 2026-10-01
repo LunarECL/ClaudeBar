@@ -149,9 +149,10 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
 
         let primary = parseWindow(rateLimits["primary"])
         let secondary = parseWindow(rateLimits["secondary"])
+        let additional = parseAdditionalLimits(result["rateLimitsByLimitId"])
 
         // If plan is free and no limits, create default "unlimited" quotas
-        if primary == nil && secondary == nil {
+        if primary == nil && secondary == nil && additional.isEmpty {
             if planType == "free" {
                 AppLog.probes.info("Codex free plan - returning unlimited quotas")
                 return CodexRateLimitsResponse(
@@ -164,7 +165,7 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
             throw ProbeError.parseFailed("No rate limits available yet - make some API calls first")
         }
 
-        return CodexRateLimitsResponse(primary: primary, secondary: secondary, planType: planType, accountEmail: accountEmail)
+        return CodexRateLimitsResponse(primary: primary, secondary: secondary, planType: planType, additional: additional, accountEmail: accountEmail)
     }
 
     // MARK: - TTY Fallback
@@ -251,6 +252,32 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     }
 
     // MARK: - Parsing Helpers
+
+    /// The `rateLimitsByLimitId` key that mirrors the top-level `rateLimits`
+    /// payload; every other key is an extra bucket (e.g. Codex Spark).
+    static let mainLimitId = "codex"
+
+    /// Parses the multi-bucket `rateLimitsByLimitId` map, skipping the main
+    /// `codex` bucket (already surfaced via `rateLimits`) and any entry whose
+    /// windows cannot be parsed.
+    internal func parseAdditionalLimits(_ value: Any?) -> [CodexAdditionalLimit] {
+        guard let map = value as? [String: Any] else { return [] }
+
+        var limits: [CodexAdditionalLimit] = []
+        for key in map.keys.sorted() {
+            guard key != Self.mainLimitId, let entry = map[key] as? [String: Any] else { continue }
+
+            let name = (entry["limitName"] as? String)
+                ?? (entry["limitId"] as? String)
+                ?? key
+            let primary = parseWindow(entry["primary"])
+            let secondary = parseWindow(entry["secondary"])
+            guard primary != nil || secondary != nil else { continue }
+
+            limits.append(CodexAdditionalLimit(name: name, primary: primary, secondary: secondary))
+        }
+        return limits
+    }
 
     internal func parseWindow(_ value: Any?) -> CodexRateLimitWindow? {
         guard let dict = value as? [String: Any] else {
