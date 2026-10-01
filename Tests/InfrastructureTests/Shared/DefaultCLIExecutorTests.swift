@@ -85,6 +85,22 @@ struct DefaultCLIExecutorTests {
         #expect(result.output.contains("tmp"))
     }
 
+    @Test("Forwards environment additions to the spawned process")
+    func forwardsEnvironmentAdditions() async throws {
+        let result = try await DefaultCLIExecutor(
+            environmentAdditions: [HookConstants.probeEnvironmentKey: "1"]
+        ).execute(
+            binary: "/bin/sh",
+            args: ["-c", "test \"$\(HookConstants.probeEnvironmentKey)\" = 1 && echo marked"],
+            input: "",
+            timeout: 20,
+            workingDirectory: nil,
+            autoResponses: [:]
+        )
+
+        #expect(result.output.contains("marked"))
+    }
+
     @Test("Concurrent executions do not block one another")
     func concurrentExecutionsProceedInParallel() async throws {
         // The whole point of moving the blocking PTY run off the cooperative
