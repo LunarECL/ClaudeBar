@@ -4,6 +4,7 @@ import Foundation
 import Mockable
 import Providers
 import Testing
+@testable import DataSources
 
 /// How `claude.json` runs the Claude CLI — the `cli` (`/usage`) and `cliCost`
 /// (`/cost`) data sources — and what the old `ClaudeUsageProbeTests` pinned
@@ -102,6 +103,37 @@ struct ClaudeCLIDefinitionTests {
     func `both commands run in the probe directory`() throws {
         #expect(try call("cli").workingDirectory == .dedicated)
         #expect(try call("cliCost").workingDirectory == .dedicated)
+    }
+
+    // MARK: - One shared probe session (issue #132)
+
+    @Test
+    func `both commands run inside the same named probe session`() throws {
+        let usage = try call("cli").session
+        let cost = try call("cliCost").session
+
+        // The session contract is the same on both: the id lives in one file
+        // in the probe directory, so /usage creates the session and /cost
+        // joins it.
+        for session in [usage, cost] {
+            let session = try #require(session)
+            #expect(session.file == "probe-session.json")
+            #expect(session.create == ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"])
+            #expect(session.resume == ["--resume", "{{id}}"])
+            #expect(session.recreateOn == ["no conversation found", "no session found"])
+            #expect(session.unsupportedOn.contains("unknown option '--session-id'"))
+            #expect(session.unsupportedOn.contains("unknown option '--resume'"))
+            #expect(session.unsupportedOn.allSatisfy { $0.hasPrefix("unknown option") || $0.hasPrefix("unexpected argument") })
+        }
+        #expect(usage?.file == cost?.file)
+    }
+
+    @Test
+    func `the probe session file lives in the probe directory`() throws {
+        let session = try #require(try call("cli").session)
+
+        #expect(CLISessionRunner.fileURL(session.file, workingDirectory: .dedicated, homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
+            == CLIWorkingDirectory.resolve().appendingPathComponent("probe-session.json"))
     }
 
     @Test
