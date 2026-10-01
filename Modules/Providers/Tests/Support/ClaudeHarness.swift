@@ -93,7 +93,7 @@ struct ClaudeHarness {
         try unwrapped { try dataSource("cliCost").read(Response(text: screen)) }
     }
 
-    /// A usage API body through `claude-usage-api.js`, with the plan the
+    /// A usage API body through claude.json's JSON mapping, with the plan the
     /// credential would carry. Throws the `UsageError` the old probe threw.
     func readAPIResponse(_ json: String, subscriptionType: String? = nil) async throws -> UsageSnapshot {
         try writeCredentials(subscriptionType: subscriptionType)

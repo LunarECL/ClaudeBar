@@ -131,7 +131,50 @@
         }
       },
       "cache": { "ttl": 900 },
-      "mapping": { "script": { "file": "claude-usage-api.js", "credential": ["subscriptionType"] } },
+      "mapping": {
+        "json": {
+          "notAnObject": "Failed to parse usage response",
+          "plan": {
+            "path": "$credential.subscriptionType",
+            "plans": {
+              "claude_max": "claudeMax", "max": "claudeMax",
+              "claude_pro": "claudePro", "pro": "claudePro",
+              "claude_api": "claudeApi", "api": "claudeApi"
+            }
+          },
+          "quotas": [
+            { "kind": "session", "at": "$.five_hour", "usedPercent": "utilization", "resetsAt": { "iso8601": "resets_at" }, "overLimit": true, "countdown": "hours" },
+            { "kind": "weekly", "at": "$.seven_day", "usedPercent": "utilization", "resetsAt": { "iso8601": "resets_at" }, "overLimit": true, "countdown": "hours" },
+            { "kind": "model", "name": "sonnet", "at": "$.seven_day_sonnet", "usedPercent": "utilization", "resetsAt": { "iso8601": "resets_at" }, "overLimit": true, "countdown": "hours" },
+            { "kind": "model", "name": "opus", "at": "$.seven_day_opus", "usedPercent": "utilization", "resetsAt": { "iso8601": "resets_at" }, "overLimit": true, "countdown": "hours" },
+            {
+              "kind": "model",
+              "each": "$.limits",
+              "where": { "path": "kind", "equals": "weekly_scoped" },
+              "name": { "firstOf": ["scope.model.display_name"], "firstWord": true, "lowercase": true },
+              "usedPercent": "percent",
+              "resetsAt": { "iso8601": "resets_at" },
+              "overLimit": true,
+              "countdown": "hours",
+              "unique": true
+            }
+          ],
+          "cost": [
+            {
+              "kind": "extraUsage",
+              "when": { "path": "$.spend.enabled", "equals": true },
+              "used": { "amount": "$.spend.used.amount_minor", "decimals": "$.spend.used.exponent" },
+              "limit": { "amount": "$.spend.limit.amount_minor", "decimals": "$.spend.limit.exponent" }
+            },
+            {
+              "kind": "extraUsage",
+              "when": { "path": "$.extra_usage.is_enabled", "equals": true },
+              "used": { "amount": "$.extra_usage.used_credits", "decimals": ["$.extra_usage.decimal_places", 2] },
+              "limit": { "amount": "$.extra_usage.monthly_limit", "decimals": ["$.extra_usage.decimal_places", 2] }
+            }
+          ]
+        }
+      },
       "fallback": { "to": "cli", "enabledBySetting": "cliFallbackEnabled" }
     }
   ]

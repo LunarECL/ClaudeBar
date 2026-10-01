@@ -148,11 +148,16 @@ public struct NameRule: Sendable, Equatable, Codable {
     public let firstOf: [String]
     /// The first prefix that matches is the one dropped.
     public let dropPrefixes: [Prefix]
+    /// Only the first word — "Fable 5" → "Fable".
+    public let firstWord: Bool
+    public let lowercase: Bool
 
-    public init(text: String? = nil, firstOf: [String] = [], dropPrefixes: [Prefix] = []) {
+    public init(text: String? = nil, firstOf: [String] = [], dropPrefixes: [Prefix] = [], firstWord: Bool = false, lowercase: Bool = false) {
         self.text = text
         self.firstOf = firstOf
         self.dropPrefixes = dropPrefixes
+        self.firstWord = firstWord
+        self.lowercase = lowercase
     }
 
     public init(from decoder: Decoder) throws {
@@ -164,7 +169,9 @@ public struct NameRule: Sendable, Equatable, Codable {
         self.init(
             text: try container.decodeIfPresent(String.self, forKey: .text),
             firstOf: try container.decodeIfPresent([String].self, forKey: .firstOf) ?? [],
-            dropPrefixes: try container.decodeIfPresent([Prefix].self, forKey: .dropPrefixes) ?? []
+            dropPrefixes: try container.decodeIfPresent([Prefix].self, forKey: .dropPrefixes) ?? [],
+            firstWord: try container.decodeIfPresent(Bool.self, forKey: .firstWord) ?? false,
+            lowercase: try container.decodeIfPresent(Bool.self, forKey: .lowercase) ?? false
         )
     }
 }
@@ -249,26 +256,43 @@ public enum ErrorRef: Sendable, Equatable, Codable {
 public struct JSONMapping: Sendable, Equatable, Codable {
     public let plan: PlanRule?
     public let quotas: [QuotaRule]
-    public let cost: CostRule?
+    /// The first that answers — one rule, or a list of shapes a provider
+    /// has used over time.
+    public let cost: [CostRule]
     /// What to do when no quota answered.
     public let whenEmpty: EmptyRule?
     /// The account's email — the first path that answers, `$credential.` included.
     public let email: [String]
+    /// The `parseFailed` reason when the body is JSON but not an object.
+    public let notAnObject: String?
 
-    public init(plan: PlanRule? = nil, quotas: [QuotaRule], cost: CostRule? = nil, whenEmpty: EmptyRule? = nil, email: [String] = []) {
+    public init(
+        plan: PlanRule? = nil,
+        quotas: [QuotaRule],
+        cost: [CostRule] = [],
+        whenEmpty: EmptyRule? = nil,
+        email: [String] = [],
+        notAnObject: String? = nil
+    ) {
         self.plan = plan
         self.quotas = quotas
         self.cost = cost
         self.whenEmpty = whenEmpty
         self.email = email
+        self.notAnObject = notAnObject
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         plan = try container.decodeIfPresent(PlanRule.self, forKey: .plan)
         quotas = try container.decodeIfPresent([QuotaRule].self, forKey: .quotas) ?? []
-        cost = try container.decodeIfPresent(CostRule.self, forKey: .cost)
+        if let list = try? container.decodeIfPresent([CostRule].self, forKey: .cost) {
+            cost = list
+        } else {
+            cost = try container.decodeIfPresent(CostRule.self, forKey: .cost).map { [$0] } ?? []
+        }
         whenEmpty = try container.decodeIfPresent(EmptyRule.self, forKey: .whenEmpty)
+        notAnObject = try container.decodeIfPresent(String.self, forKey: .notAnObject)
         if let one = try? container.decodeIfPresent(String.self, forKey: .email) {
             email = [one]
         } else {
@@ -313,9 +337,26 @@ public struct QuotaRule: Sendable, Equatable, Codable {
     public let window: DurationRef?
     /// Fixed text in place of the reset countdown ("Free plan").
     public let resetText: String?
+    /// With `each`: only the elements where this holds.
+    public let `where`: Match?
+    /// Over the limit reads as negative left, as the provider reports it,
+    /// instead of 0.
+    public let overLimit: Bool
+    /// How the reset countdown is written.
+    public let countdown: Countdown
+    /// Skip a quota whose kind and name an earlier rule already produced —
+    /// the first one wins.
+    public let unique: Bool
+
+    /// `days` — "Resets in 2d 5h 30m"; `hours` — "Resets in 53h 30m".
+    public enum Countdown: String, Sendable, Equatable, Codable {
+        case days
+        case hours
+    }
 
     enum CodingKeys: String, CodingKey {
         case kind, name, at, each, skipKeys, windows, usedPercent, leftPercent, resetsAt, window, resetText
+        case `where`, overLimit, countdown, unique
     }
 
     public init(
@@ -329,7 +370,11 @@ public struct QuotaRule: Sendable, Equatable, Codable {
         leftPercent: [ValueRef] = [],
         resetsAt: [ResetRef] = [],
         window: DurationRef? = nil,
-        resetText: String? = nil
+        resetText: String? = nil,
+        where condition: Match? = nil,
+        overLimit: Bool = false,
+        countdown: Countdown = .days,
+        unique: Bool = false
     ) {
         self.kind = kind
         self.name = name
@@ -342,6 +387,10 @@ public struct QuotaRule: Sendable, Equatable, Codable {
         self.resetsAt = resetsAt
         self.window = window
         self.resetText = resetText
+        self.where = condition
+        self.overLimit = overLimit
+        self.countdown = countdown
+        self.unique = unique
     }
 
     public init(from decoder: Decoder) throws {
@@ -357,6 +406,10 @@ public struct QuotaRule: Sendable, Equatable, Codable {
         resetsAt = try Self.decodeList(ResetRef.self, container, .resetsAt)
         window = try container.decodeIfPresent(DurationRef.self, forKey: .window)
         resetText = try container.decodeIfPresent(String.self, forKey: .resetText)
+        self.where = try container.decodeIfPresent(Match.self, forKey: .where)
+        overLimit = try container.decodeIfPresent(Bool.self, forKey: .overLimit) ?? false
+        countdown = try container.decodeIfPresent(Countdown.self, forKey: .countdown) ?? .days
+        unique = try container.decodeIfPresent(Bool.self, forKey: .unique) ?? false
     }
 
     /// One value or a list of them — `"used_percent"` or `["$header.x", "used_percent"]`.
@@ -366,15 +419,19 @@ public struct QuotaRule: Sendable, Equatable, Codable {
     }
 }
 
-/// The plan badge — "PLUS", "PRO" — from a field, upper-cased unless `badges`
-/// names it.
+/// The plan badge — "PLUS", "PRO" — from a field (`$credential.` included),
+/// upper-cased unless `badges` names it. With `plans`, a value is one of the
+/// well-known plans by name (`claudeMax`, `claudePro`, `claudeApi`), and any
+/// other is kept as written.
 public struct PlanRule: Sendable, Equatable, Codable {
     public let path: String
     public let badges: [String: String]
+    public let plans: [String: String]
 
-    public init(path: String, badges: [String: String] = [:]) {
+    public init(path: String, badges: [String: String] = [:], plans: [String: String] = [:]) {
         self.path = path
         self.badges = badges
+        self.plans = plans
     }
 
     public init(from decoder: Decoder) throws {
@@ -385,13 +442,15 @@ public struct PlanRule: Sendable, Equatable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             path: try container.decode(String.self, forKey: .path),
-            badges: try container.decodeIfPresent([String: String].self, forKey: .badges) ?? [:]
+            badges: try container.decodeIfPresent([String: String].self, forKey: .badges) ?? [:],
+            plans: try container.decodeIfPresent([String: String].self, forKey: .plans) ?? [:]
         )
     }
 }
 
 /// Money gone — "EXTRA USAGE" or "API COST" — from what is left of a limit,
-/// or what was used.
+/// or what was used. The rule answers nothing when `when` does not hold, when
+/// nothing was used, or when a limit is present but not money.
 public struct CostRule: Sendable, Equatable, Codable {
     public enum Kind: String, Sendable, Equatable, Codable {
         case apiCost
@@ -399,16 +458,18 @@ public struct CostRule: Sendable, Equatable, Codable {
     }
 
     public let kind: Kind
+    public let when: Match?
     public let remaining: [ValueRef]
-    public let used: [ValueRef]
-    public let limit: [ValueRef]
+    public let used: Amount?
+    public let limit: Amount?
 
     enum CodingKeys: String, CodingKey {
-        case kind, remaining, used, limit
+        case kind, when, remaining, used, limit
     }
 
-    public init(kind: Kind = .apiCost, remaining: [ValueRef] = [], used: [ValueRef] = [], limit: [ValueRef] = []) {
+    public init(kind: Kind = .apiCost, when: Match? = nil, remaining: [ValueRef] = [], used: Amount? = nil, limit: Amount? = nil) {
         self.kind = kind
+        self.when = when
         self.remaining = remaining
         self.used = used
         self.limit = limit
@@ -417,14 +478,67 @@ public struct CostRule: Sendable, Equatable, Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         kind = try container.decodeIfPresent(Kind.self, forKey: .kind) ?? .apiCost
-        remaining = try Self.list(container, .remaining)
-        used = try Self.list(container, .used)
-        limit = try Self.list(container, .limit)
+        when = try container.decodeIfPresent(Match.self, forKey: .when)
+        if let list = try? container.decodeIfPresent([ValueRef].self, forKey: .remaining) {
+            remaining = list
+        } else {
+            remaining = try container.decodeIfPresent(ValueRef.self, forKey: .remaining).map { [$0] } ?? []
+        }
+        used = try container.decodeIfPresent(Amount.self, forKey: .used)
+        limit = try container.decodeIfPresent(Amount.self, forKey: .limit)
+    }
+}
+
+/// An amount of money: a number in the currency — `"used"` or a list, the
+/// first that answers — or minor units shifted by a number of decimal places,
+/// `{ "amount": "used.amount_minor", "decimals": "used.exponent" }`. Minor
+/// units are read exactly; a negative amount or a fractional or negative
+/// `decimals` is not money.
+public enum Amount: Sendable, Equatable, Codable {
+    case value([ValueRef])
+    case minorUnits(amount: String, decimals: [ValueRef])
+
+    private enum Keys: String, CodingKey { case amount, decimals }
+
+    public init(from decoder: Decoder) throws {
+        if let container = try? decoder.container(keyedBy: Keys.self),
+           let amount = try? container.decode(String.self, forKey: .amount) {
+            let decimals: [ValueRef]
+            if let list = try? container.decodeIfPresent([ValueRef].self, forKey: .decimals) {
+                decimals = list
+            } else {
+                decimals = try container.decodeIfPresent(ValueRef.self, forKey: .decimals).map { [$0] } ?? []
+            }
+            self = .minorUnits(amount: amount, decimals: decimals)
+        } else if let list = try? decoder.singleValueContainer().decode([ValueRef].self) {
+            self = .value(list)
+        } else {
+            self = .value([try decoder.singleValueContainer().decode(ValueRef.self)])
+        }
     }
 
-    private static func list(_ container: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) throws -> [ValueRef] {
-        if let list = try? container.decodeIfPresent([ValueRef].self, forKey: key) { return list }
-        return try container.decodeIfPresent(ValueRef.self, forKey: key).map { [$0] } ?? []
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .value(let refs):
+            var container = encoder.singleValueContainer()
+            try container.encode(refs)
+        case .minorUnits(let amount, let decimals):
+            var container = encoder.container(keyedBy: Keys.self)
+            try container.encode(amount, forKey: .amount)
+            try container.encode(decimals, forKey: .decimals)
+        }
+    }
+}
+
+/// `{ "path": "kind", "equals": "weekly_scoped" }` — a value in the response
+/// equals this JSON value.
+public struct Match: Sendable, Equatable, Codable {
+    public let path: String
+    public let equals: JSONValue
+
+    public init(path: String, equals: JSONValue) {
+        self.path = path
+        self.equals = equals
     }
 }
 

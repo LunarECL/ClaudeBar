@@ -11,9 +11,20 @@ struct JSONMapper: Reading {
         guard let document = try? JSONSerialization.jsonObject(with: response.body) else {
             throw UsageError.parseFailed("Response is not JSON")
         }
+        if let reason = mapping.notAnObject, !(document is [String: Any]) {
+            throw UsageError.parseFailed(reason)
+        }
         let scope = JSONScope(root: document, headers: response.headers, credential: facts.credential)
 
-        var quotas = mapping.quotas.flatMap { self.quotas(for: $0, in: scope, providerId: providerId) }
+        var quotas: [UsageQuota] = []
+        for rule in mapping.quotas {
+            var made = self.quotas(for: rule, in: scope, providerId: providerId)
+            if rule.unique {
+                var seen = Set(quotas.map(\.quotaType))
+                made = made.filter { seen.insert($0.quotaType).inserted }
+            }
+            quotas += made
+        }
         if quotas.isEmpty, let empty = mapping.whenEmpty {
             if let condition = empty.condition, scope.string(condition.path) == condition.equals {
                 quotas = empty.quotas.flatMap { self.quotas(for: $0, in: scope, providerId: providerId) }
@@ -24,7 +35,7 @@ struct JSONMapper: Reading {
 
         // Nothing answering is not a failure unless `whenEmpty` says so: a
         // provider that has no usage yet reports none (*No usage data*).
-        let cost = mapping.cost.flatMap { self.cost(for: $0, in: scope, providerId: providerId) }
+        let cost = mapping.cost.lazy.compactMap { self.cost(for: $0, in: scope, providerId: providerId) }.first
 
         return UsageSnapshot(
             providerId: providerId,
@@ -55,6 +66,9 @@ struct JSONMapper: Reading {
         default:
             return []
         }
+        if let condition = rule.where {
+            elements = elements.filter { Self.holds(condition, in: $0) }
+        }
 
         return elements.flatMap { element -> [UsageQuota] in
             guard let name = self.name(rule.name, in: element), !name.isEmpty else { return [] }
@@ -69,7 +83,7 @@ struct JSONMapper: Reading {
     private func quota(for rule: QuotaRule, named name: String?, in scope: JSONScope, providerId: String) -> UsageQuota? {
         let left: Double
         if let used = first(rule.usedPercent, in: scope) {
-            left = max(0, 100 - used)
+            left = rule.overLimit ? 100 - used : max(0, 100 - used)
         } else if let remaining = first(rule.leftPercent, in: scope) {
             left = remaining
         } else {
@@ -89,9 +103,16 @@ struct JSONMapper: Reading {
             quotaType: type,
             providerId: providerId,
             resetsAt: resetsAt,
-            resetText: rule.resetText ?? resetsAt.map { Countdown.text(until: $0, now: now()) },
+            resetText: rule.resetText ?? resetsAt.flatMap { countdown(rule.countdown, until: $0) },
             windowDuration: windowDuration
         )
+    }
+
+    private func countdown(_ style: QuotaRule.Countdown, until date: Date) -> String? {
+        switch style {
+        case .days: Countdown.text(until: date, now: now())
+        case .hours: Countdown.hoursText(until: date, now: now())
+        }
     }
 
     static func quotaType(_ kind: QuotaKind, name: String?) -> QuotaType? {
@@ -109,13 +130,35 @@ struct JSONMapper: Reading {
         guard let raw = rule.firstOf.lazy.compactMap({ scope.string($0) }).first(where: { !$0.isEmpty }) else {
             return nil
         }
-        let trimmed = raw.trimmingCharacters(in: .whitespaces)
-        for drop in rule.dropPrefixes where trimmed.lowercased().hasPrefix(drop.prefix.lowercased()) {
-            let rest = String(trimmed.dropFirst(drop.prefix.count))
-            guard !rest.isEmpty else { return trimmed }
+        var name = raw.trimmingCharacters(in: .whitespaces)
+        if rule.firstWord {
+            name = name.split(separator: " ").first.map(String.init) ?? ""
+        }
+        if rule.lowercase {
+            name = name.lowercased()
+        }
+        for drop in rule.dropPrefixes where name.lowercased().hasPrefix(drop.prefix.lowercased()) {
+            let rest = String(name.dropFirst(drop.prefix.count))
+            guard !rest.isEmpty else { return name }
             return drop.capitalize ? rest.prefix(1).uppercased() + rest.dropFirst() : rest
         }
-        return trimmed
+        return name
+    }
+
+    /// Whether the value at the condition's path equals its JSON value.
+    static func holds(_ condition: Match, in scope: JSONScope) -> Bool {
+        let value = scope.value(condition.path)
+        switch condition.equals {
+        case .string(let text): return value as? String == text
+        case .number(let number): return JSONPath.number(value) == number && !(value is String)
+        case .bool(let flag):
+            guard let value = value as? NSNumber, CFGetTypeID(value) == CFBooleanGetTypeID() else { return false }
+            return value.boolValue == flag
+        case .null: return value == nil || value is NSNull
+        case .object, .array:
+            guard let value = value as? NSObject, let expected = condition.equals.foundationObject as? NSObject else { return false }
+            return value.isEqual(expected)
+        }
     }
 
     // MARK: - Values
@@ -143,27 +186,62 @@ struct JSONMapper: Reading {
 
     private func plan(for rule: PlanRule, in scope: JSONScope) -> AccountTier? {
         guard let value = scope.string(rule.path), !value.isEmpty else { return nil }
+        if !rule.plans.isEmpty {
+            return ScriptOutput.tier(rule.plans[value.lowercased()] ?? value)
+        }
         return .custom(rule.badges[value.lowercased()] ?? value.uppercased())
     }
 
     private func cost(for rule: CostRule, in scope: JSONScope, providerId: String) -> CostUsage? {
-        let limit = first(rule.limit, in: scope)
-        let used: Double
-        if let spent = first(rule.used, in: scope) {
-            used = spent
+        if let condition = rule.when, !Self.holds(condition, in: scope) { return nil }
+        // A limit that is there but is not money drops the rule: an invalid
+        // cap must not read as "no cap".
+        var limit: Decimal?
+        if let amount = rule.limit, isPresent(amount, in: scope) {
+            guard let money = money(amount, in: scope) else { return nil }
+            limit = money
+        }
+        let used: Decimal
+        if let amount = rule.used {
+            guard let money = money(amount, in: scope) else { return nil }
+            used = money
         } else if let remaining = first(rule.remaining, in: scope), let limit {
-            used = max(0, min(limit, limit - remaining))
+            used = max(0, min(limit, limit - Decimal(remaining)))
         } else {
             return nil
         }
         return CostUsage(
-            totalCost: Decimal(used),
-            budget: limit.map { Decimal($0) },
+            totalCost: used,
+            budget: limit,
             apiDuration: 0,
             providerId: providerId,
             kind: rule.kind == .extraUsage ? .extraUsage : .apiCost,
             capturedAt: now()
         )
+    }
+
+    private func isPresent(_ amount: Amount, in scope: JSONScope) -> Bool {
+        switch amount {
+        case .value(let refs):
+            refs.contains { if case .path(let path) = $0 { scope.value(path) != nil } else { true } }
+        case .minorUnits(let path, _):
+            scope.value(path) != nil
+        }
+    }
+
+    private func money(_ amount: Amount, in scope: JSONScope) -> Decimal? {
+        switch amount {
+        case .value(let refs):
+            return first(refs, in: scope).map { Decimal($0) }
+        case .minorUnits(let path, let decimals):
+            guard let number = scope.value(path) as? NSNumber,
+                  CFGetTypeID(number) != CFBooleanGetTypeID(),
+                  let minor = Decimal(string: number.stringValue, locale: Locale(identifier: "en_US_POSIX")),
+                  minor >= 0,
+                  let places = first(decimals, in: scope),
+                  places >= 0, places.rounded() == places, places <= 38 else { return nil }
+            return minor / pow(Decimal(10), Int(places))
+        }
     }
 }
 
@@ -235,6 +313,17 @@ enum Countdown {
         let hours = Int(interval.truncatingRemainder(dividingBy: 86400) / 3600)
         let minutes = Int(interval.truncatingRemainder(dividingBy: 3600) / 60)
         if days > 0 { return "Resets in \(days)d \(hours)h \(minutes)m" }
+        if hours > 0 { return "Resets in \(hours)h \(minutes)m" }
+        if minutes > 0 { return "Resets in \(minutes)m" }
+        return "Resets soon"
+    }
+
+    /// The same in hours, never days — "Resets in 53h 30m". `nil` once past.
+    static func hoursText(until date: Date, now: Date) -> String? {
+        let interval = date.timeIntervalSince(now)
+        guard interval > 0 else { return nil }
+        let hours = Int(interval / 3600)
+        let minutes = Int(interval.truncatingRemainder(dividingBy: 3600) / 60)
         if hours > 0 { return "Resets in \(hours)h \(minutes)m" }
         if minutes > 0 { return "Resets in \(minutes)m" }
         return "Resets soon"

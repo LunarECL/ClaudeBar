@@ -5,7 +5,7 @@ import Mockable
 import Testing
 
 /// `claude.json`'s `api` data source — the key lookup, the OAuth refresh, the
-/// usage request and `claude-usage-api.js` — over stubbed connections.
+/// usage request and its JSON mapping — over stubbed connections.
 /// Ported from `ClaudeAPIUsageProbeTests`.
 @Suite
 struct ClaudeAPITests {
@@ -162,6 +162,25 @@ struct ClaudeAPITests {
         let session = snapshot.quotas.first { $0.quotaType == .session }
         #expect(session?.percentRemaining == 74.5)  // 100 - 25.5
         #expect(session?.resetsAt != nil)
+    }
+
+    @Test
+    func `the reset countdown is written in hours, never days`() async throws {
+        var claude = try ClaudeHarness()
+        defer { claude.cleanUp() }
+        claude.now = Date(timeIntervalSince1970: 1_750_000_000)
+        let resetsAt = ISO8601DateFormatter().string(from: claude.now.addingTimeInterval(50 * 3600 + 3 * 60))
+        let past = ISO8601DateFormatter().string(from: claude.now.addingTimeInterval(-60))
+
+        let snapshot = try await claude.readAPIResponse("""
+        {
+          "five_hour": { "utilization": 10, "resets_at": "\(past)" },
+          "seven_day": { "utilization": 10, "resets_at": "\(resetsAt)" }
+        }
+        """)
+
+        #expect(snapshot.quota(for: .weekly)?.resetText == "Resets in 50h 3m")
+        #expect(snapshot.quota(for: .session)?.resetText == nil)
     }
 
     @Test
