@@ -149,7 +149,10 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       └── bestAccount                     DERIVED — the enabled account with the most left: "switch to work"
 │
 └── statusPolicy: StatusPolicy  ◇           HOW STRICT TO BE — absolute thresholds, or pace-aware
-                                            with the user's burn-rate threshold
+                                            with the user's burn-rate threshold. ONE for the app
+                                            (General): every surface — menu bar, pill, card, Touch
+                                            Bar, notch, notifications, status export — reads the
+                                            same status. Colours are not policy: they are the page's
 
 Usage  ◇                                    "Fetching usage data…" — WHAT THE PROVIDER SAYS, AS OF A MOMENT
 ├── updatedAt                               "Updated 3m ago"; stale after 5 minutes
@@ -258,7 +261,8 @@ someone made five minutes ago run on the same `DataSource` and the same lifecycl
 | *Export…* | `definition.exported()` → a `.json` file | carries the lookup order and the setting names — never a key |
 | *Import provider* | `catalog.import(file)` → `definition.missingSettings` | says where a key will be sent, and shows a CLI command, BEFORE asking |
 | sets a Daily Budget · the Claude API Budget | `account.budget = …` (an account-scope setting) | judges that login's cost only |
-| chooses status colours / pace-aware | `monitor.statusPolicy = …` | colours are the page's; the thresholds are the policy's |
+| turns the burn-rate warning on, sets its threshold | `monitor.statusPolicy = …` | every status and every alert follows at once |
+| chooses status colours · high contrast | — the page's theme | how a status looks, never what it is |
 
 ## 4 · The reads — what the tree answers
 
@@ -304,7 +308,8 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | money keeps its currency; two currencies are never added or compared | `Money` |
 | **a window's length is the provider's word**, never guessed from a quota's name — the Codex RPC's primary window can be the weekly one | `Window` |
 | pace exists only inside a window with a reset; outside it is `unknown`, never `onPace` | `Quota.pace` |
-| depleted at 0, critical under 20 — ABSOLUTE, whatever the policy; pace-aware only softens WARNING | `StatusPolicy` |
+| depleted at 0, critical under 20 — ABSOLUTE, whatever the policy; pace-aware only decides WARNING vs HEALTHY between 20% and 50% left | `StatusPolicy` |
+| ONE status per quota: the menu bar, the cards, the Touch Bar, the notch, the status export and the notifications all read `quota.status(under: monitor.statusPolicy)` — never their own copy of the rule | `StatusPolicy` · `Monitor` |
 | a quota is the vendor's ceiling; a budget is the user's. A Cost is judged by a Budget, never shown as a Quota. A budget judges ONE account's cost — two logins' spend is never summed against it | `Cost` · `Account.budget` |
 | usage is stale 5 minutes after it was updated | `Usage` |
 | a background refresh is never faster than the slowest provider's floor, and slower on battery | `Monitor` |
@@ -394,6 +399,7 @@ context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
 | `Window` | `QuotaType.duration` guesses from the name; `windowDuration` and `resetsAt` sit beside it | a value the data source states |
 | `Usage` | `UsageSnapshot` with `bedrockUsage`, `extensionMetrics`, `dailyUsageReport` | kernel fields only; the rest moves to their contexts |
 | `Plan` | `AccountTier` with Claude cases | a name and a badge |
+| `StatusPolicy` | `burnRateWarningEnabled` + `burnRateThreshold` in App settings; five views and `menuBarLabel(…)` each re-apply `paceAwareStatus`; **notifications alert on the absolute status**, so pace-aware on can colour the menu bar amber with no alert; pace falls back to `quotaType.duration` when no window is known | one policy on the Monitor, applied in one place; alerts follow it; `StatusColorPolicy` (colours, high contrast) moves to the App |
 | `Account.budget` | two one-off settings: `app.claudeApiBudget` (+ `…Enabled`, edited in Claude's card) and `bedrock.dailyBudget`; Bedrock turns its budget into a fake `Daily Budget` quota | a `Budget` beside the account's `Cost`, judged as `BudgetStatus`, never a quota; the old keys read as the default account's budget |
 | page state | `MenuBarLabel`, `CountdownColon`, `PopoverContentHeight`, `MenuBarStackedSize` in `Domain/Provider`; `menuBarLabel(…)` on `QuotaMonitor` | the App |
 | `ProviderDefinition` · *Add Provider* | — (extensions are hand-written on disk) | Data Sources + Providers + a Settings sheet |
