@@ -1,3 +1,6 @@
+import Quotas
+import DataSources
+import Providers
 import Foundation
 import Observation
 
@@ -69,7 +72,7 @@ public final class VercelProvider: AIProvider {
     @discardableResult
     public func refresh() async throws -> UsageSnapshot {
         guard !isSyncing else {
-            throw ProbeError.executionFailed("Vercel refresh already in progress")
+            throw UsageError.executionFailed("Vercel refresh already in progress")
         }
 
         isSyncing = true

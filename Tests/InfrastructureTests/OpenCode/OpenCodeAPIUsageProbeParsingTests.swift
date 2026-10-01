@@ -100,7 +100,7 @@ struct OpenCodeAPIUsageProbeParsingTests {
     func `throws parseFailed when usage object is missing`() {
         let json = Data(#"{"type":"error","error":{"type":"AuthError","message":"Unauthorized"}}"#.utf8)
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try OpenCodeAPIUsageProbe.parseResponse(json)
         }
     }
@@ -109,14 +109,14 @@ struct OpenCodeAPIUsageProbeParsingTests {
     func `throws parseFailed when no windows could be parsed`() {
         let json = Data(#"{"usage":{}}"#.utf8)
 
-        #expect(throws: ProbeError.parseFailed("No usage windows in response")) {
+        #expect(throws: UsageError.parseFailed("No usage windows in response")) {
             try OpenCodeAPIUsageProbe.parseResponse(json)
         }
     }
 
     @Test
     func `throws parseFailed on invalid JSON`() {
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try OpenCodeAPIUsageProbe.parseResponse(Data("<html>".utf8))
         }
     }

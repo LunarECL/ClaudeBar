@@ -1,6 +1,8 @@
+import AppKit
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 
 /// Providers pane: master list of every registered provider with enable
 /// toggles; selecting a row drills into that provider's configuration.
@@ -9,6 +11,9 @@ struct ProvidersPane: View {
 
     @Environment(\.appTheme) private var theme
     @State private var selectedProviderId: String?
+    @State private var addingProvider = false
+    @State private var importing: IdentifiedReview?
+    @State private var importError: String?
 
     var body: some View {
         if let providerId = selectedProviderId,
@@ -36,6 +41,40 @@ struct ProvidersPane: View {
                         }
                     }
                 }
+
+                HStack {
+                    if let importError {
+                        Text(importError)
+                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(theme.statusWarning)
+                    }
+                    Spacer()
+                    Button("Import…", action: chooseImport)
+                    Button("Add Provider…") { addingProvider = true }
+                }
+                .padding(.top, 4)
+            }
+        }
+        .sheet(isPresented: $addingProvider) {
+            AddProviderSheet(monitor: monitor) { addingProvider = false }
+        }
+        .sheet(item: $importing) { review in
+            ImportProviderSheet(monitor: monitor, review: review.value) { importing = nil }
+        }
+    }
+
+    /// *Import…*: a shared file is read and reviewed — nothing is saved or run yet.
+    private func chooseImport() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.json]
+        panel.begin { result in
+            guard result == .OK, let url = panel.url else { return }
+            do {
+                importError = nil
+                importing = IdentifiedReview(value: try ProviderCatalog().review(Data(contentsOf: url)))
+            } catch {
+                importError = "Not a ClaudeBar provider: \(error.localizedDescription)"
             }
         }
     }
@@ -85,7 +124,7 @@ private struct ProviderListRow: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("\(Int(quota.percentRemaining))%")
                             .font(.system(size: 12, weight: .bold, design: theme.fontDesign))
-                            .foregroundStyle(theme.statusColor(for: quota.status))
+                            .foregroundStyle(theme.statusColor(for: quota.status(under: AppSettings.shared.statusPolicy)))
                             .monospacedDigit()
 
                         GeometryReader { geo in
@@ -94,7 +133,7 @@ private struct ProviderListRow: View {
                                     .fill(theme.progressTrack)
 
                                 Capsule()
-                                    .fill(theme.statusColor(for: quota.status))
+                                    .fill(theme.statusColor(for: quota.status(under: AppSettings.shared.statusPolicy)))
                                     .frame(width: geo.size.width * quota.percentRemaining / 100)
                             }
                         }
@@ -225,11 +264,16 @@ private struct ProviderDetailView: View {
     /// The provider-specific config card, when one exists.
     @ViewBuilder
     private var configCard: some View {
-        switch provider is CodexProvider ? "codex" : provider.id {
+        switch (provider as? Account)?.provider.id ?? provider.id {
         case "claude":
-            ClaudeConfigCard(monitor: monitor)
+            if let claude = (provider as? Account)?.provider {
+                DataSourceSection(provider: claude, monitor: monitor)
+            }
+            ClaudeBudgetCard()
         case "codex":
-            CodexConfigCard()
+            if let codex = (provider as? Account)?.provider {
+                DataSourceSection(provider: codex, monitor: monitor)
+            }
             CodexAccountsCard(monitor: monitor)
         case "kimi":
             KimiConfigCard(monitor: monitor)
@@ -248,7 +292,10 @@ private struct ProviderDetailView: View {
         case "bedrock":
             BedrockConfigCard(monitor: monitor)
         default:
-            if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
+            if let custom = (provider as? Account)?.provider, custom.definition.profile.origin == .custom {
+                DataSourceSection(provider: custom, monitor: monitor)
+                CustomProviderCard(provider: custom, monitor: monitor, onDeleted: onBack)
+            } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
                 ExtensionConfigCard(
                     provider: extProvider,
                     configRepository: AppSettings.shared.extensionConfig
@@ -256,4 +303,10 @@ private struct ProviderDetailView: View {
             }
         }
     }
+}
+
+/// A review to present as a sheet.
+struct IdentifiedReview: Identifiable {
+    let id = UUID()
+    let value: ImportReview
 }

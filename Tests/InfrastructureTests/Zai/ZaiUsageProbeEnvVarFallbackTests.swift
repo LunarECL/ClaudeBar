@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import Mockable
+@testable import DataSources
 @testable import Infrastructure
 @testable import Domain
 
@@ -165,7 +166,7 @@ struct ZaiUsageProbeEnvVarFallbackTests {
         do {
             _ = try await probe.probe()
             #expect(Bool(false), "Expected probe() to throw authenticationRequired")
-        } catch ProbeError.authenticationRequired {
+        } catch UsageError.authenticationRequired {
             // Expected - no API key available
         } catch {
             #expect(Bool(false), "Expected authenticationRequired, got: \(error)")
@@ -205,7 +206,7 @@ struct ZaiUsageProbeEnvVarFallbackTests {
         let settings = makeSettingsRepository(glmEnvVar: "CLAUDEBAR_TEST_GLM_EMPTY")
         let probe = ZaiUsageProbe(cliExecutor: mockExecutor, networkClient: mockNetwork, settingsRepository: settings)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -221,7 +222,7 @@ struct ZaiUsageProbeEnvVarFallbackTests {
         let settings = makeSettingsRepository(glmEnvVar: "GLM TOKEN;rm -rf /")
         let probe = ZaiUsageProbe(cliExecutor: mockExecutor, networkClient: mockNetwork, settingsRepository: settings)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }

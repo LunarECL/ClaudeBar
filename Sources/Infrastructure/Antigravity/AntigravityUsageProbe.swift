@@ -66,7 +66,7 @@ public struct AntigravityUsageProbe: UsageProbe {
         do {
             processInfo = try await detectProcess()
             AppLog.probes.debug("Antigravity process found: PID=\(processInfo.pid), port=\(processInfo.extensionPort ?? 0)")
-        } catch ProbeError.cliNotFound {
+        } catch UsageError.cliNotFound {
             AppLog.probes.info("Antigravity not running; trying Cloud Code with stored credentials")
             return try await probeCloudCode()
         } catch {
@@ -123,12 +123,12 @@ public struct AntigravityUsageProbe: UsageProbe {
     private func probeCloudCode() async throws -> UsageSnapshot {
         guard let credentials = await credentialLoader.load() else {
             AppLog.probes.error("Antigravity probe failed: not running and no stored credentials")
-            throw ProbeError.cliNotFound("Antigravity")
+            throw UsageError.cliNotFound("Antigravity")
         }
 
         guard credentials.hasUsableAccessToken(at: now()), let token = credentials.accessToken else {
             AppLog.probes.error("Antigravity: stored access token is expired; run Antigravity or agy to refresh it")
-            throw ProbeError.sessionExpired(hint: Self.sessionExpiredHint)
+            throw UsageError.sessionExpired(hint: Self.sessionExpiredHint)
         }
 
         switch await fetchCloudQuota(token: token) {
@@ -137,10 +137,10 @@ public struct AntigravityUsageProbe: UsageProbe {
             return snapshot
         case .authFailed:
             AppLog.probes.error("Antigravity: Cloud Code rejected the stored access token")
-            throw ProbeError.sessionExpired(hint: Self.sessionExpiredHint)
+            throw UsageError.sessionExpired(hint: Self.sessionExpiredHint)
         case .unavailable:
             AppLog.probes.error("Antigravity: Cloud Code quota endpoints unavailable")
-            throw ProbeError.executionFailed("Could not reach the Antigravity quota API")
+            throw UsageError.executionFailed("Could not reach the Antigravity quota API")
         }
     }
 
@@ -244,12 +244,12 @@ public struct AntigravityUsageProbe: UsageProbe {
             } else {
                 AppLog.probes.error("Antigravity process found (PID=\(pid)) but missing CSRF token")
                 AppLog.probes.debug("Antigravity: Full command line: \(lineStr)")
-                throw ProbeError.authenticationRequired
+                throw UsageError.authenticationRequired
             }
         }
 
         AppLog.probes.debug("Antigravity language server process not found")
-        throw ProbeError.cliNotFound("Antigravity")
+        throw UsageError.cliNotFound("Antigravity")
     }
 
     // MARK: - Port Discovery
@@ -273,7 +273,7 @@ public struct AntigravityUsageProbe: UsageProbe {
         if ports.isEmpty {
             AppLog.probes.error("Antigravity: No listening ports found for PID \(pid)")
             AppLog.probes.debug("lsof output: \(result.output.prefix(500))")
-            throw ProbeError.executionFailed("No listening ports found for Antigravity")
+            throw UsageError.executionFailed("No listening ports found for Antigravity")
         }
 
         AppLog.probes.debug("Antigravity: Found \(ports.count) listening ports: \(ports)")
@@ -312,12 +312,12 @@ public struct AntigravityUsageProbe: UsageProbe {
         }
 
         AppLog.probes.error("Antigravity: Could not connect to API on any port")
-        throw ProbeError.executionFailed("Could not connect to Antigravity API")
+        throw UsageError.executionFailed("Could not connect to Antigravity API")
     }
 
     private func makeRequest(scheme: String, port: Int, path: String, csrfToken: String) async throws -> Data {
         guard let url = URL(string: "\(scheme)://127.0.0.1:\(port)\(path)") else {
-            throw ProbeError.executionFailed("Invalid URL")
+            throw UsageError.executionFailed("Invalid URL")
         }
 
         var request = URLRequest(url: url)
@@ -341,7 +341,7 @@ public struct AntigravityUsageProbe: UsageProbe {
         let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw ProbeError.executionFailed("API request failed")
+            throw UsageError.executionFailed("API request failed")
         }
 
         return data
@@ -420,7 +420,7 @@ public struct AntigravityUsageProbe: UsageProbe {
             if let rawString = String(data: data, encoding: .utf8) {
                 AppLog.probes.debug("Antigravity raw response: \(rawString.prefix(500))")
             }
-            throw ProbeError.parseFailed("Invalid JSON: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Invalid JSON: \(error.localizedDescription)")
         }
 
         let modelConfigs = response.userStatus?.cascadeModelConfigData?.clientModelConfigs ?? []
@@ -440,13 +440,14 @@ public struct AntigravityUsageProbe: UsageProbe {
                 percentRemaining: remainingFraction * 100,
                 quotaType: .modelSpecific(config.label),
                 providerId: providerId,
-                resetsAt: resetsAt
+                resetsAt: resetsAt,
+                windowDuration: QuotaType.modelSpecific(config.label).conventionalWindow.seconds
             )
         }
 
         guard !quotas.isEmpty else {
             AppLog.probes.error("Antigravity parse failed: No valid model quotas found in \(modelConfigs.count) configs")
-            throw ProbeError.parseFailed("No valid model quotas found")
+            throw UsageError.parseFailed("No valid model quotas found")
         }
 
         // Extract account tier from planName (e.g., "Pro" → .custom("PRO"))
@@ -471,7 +472,7 @@ public struct AntigravityUsageProbe: UsageProbe {
         do {
             response = try decoder.decode(CommandModelResponse.self, from: data)
         } catch {
-            throw ProbeError.parseFailed("Invalid JSON: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Invalid JSON: \(error.localizedDescription)")
         }
 
         let modelConfigs = response.clientModelConfigs ?? []
@@ -488,12 +489,13 @@ public struct AntigravityUsageProbe: UsageProbe {
                 percentRemaining: remainingFraction * 100,
                 quotaType: .modelSpecific(config.label),
                 providerId: providerId,
-                resetsAt: resetsAt
+                resetsAt: resetsAt,
+                windowDuration: QuotaType.modelSpecific(config.label).conventionalWindow.seconds
             )
         }
 
         guard !quotas.isEmpty else {
-            throw ProbeError.parseFailed("No valid model quotas found")
+            throw UsageError.parseFailed("No valid model quotas found")
         }
 
         return UsageSnapshot(
@@ -524,7 +526,8 @@ public struct AntigravityUsageProbe: UsageProbe {
                     percentRemaining: (quotaInfo.remainingFraction ?? 0.0) * 100,
                     quotaType: .modelSpecific(label),
                     providerId: providerId,
-                    resetsAt: quotaInfo.resetTime.flatMap { parseResetTime($0) }
+                    resetsAt: quotaInfo.resetTime.flatMap { parseResetTime($0) },
+                    windowDuration: QuotaType.modelSpecific(label).conventionalWindow.seconds
                 )
             }
     }

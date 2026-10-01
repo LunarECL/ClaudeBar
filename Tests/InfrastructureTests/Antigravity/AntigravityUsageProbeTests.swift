@@ -220,7 +220,7 @@ struct AntigravityUsageProbeTests {
         let probe = AntigravityUsageProbe(cliExecutor: mockExecutor)
 
         // When & Then
-        await #expect(throws: ProbeError.cliNotFound("Antigravity")) {
+        await #expect(throws: UsageError.cliNotFound("Antigravity")) {
             try await probe.probe()
         }
     }
@@ -236,7 +236,7 @@ struct AntigravityUsageProbeTests {
         let probe = AntigravityUsageProbe(cliExecutor: mockExecutor)
 
         // When & Then
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -265,7 +265,7 @@ struct AntigravityUsageProbeTests {
         let probe = AntigravityUsageProbe(cliExecutor: mockExecutor)
 
         // When & Then
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -291,7 +291,7 @@ struct AntigravityUsageProbeTests {
         let probe = AntigravityUsageProbe(cliExecutor: mockExecutor)
 
         // When & Then
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -378,7 +378,7 @@ struct AntigravityUsageProbeTests {
         )
 
         // When & Then
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -418,7 +418,7 @@ struct AntigravityUsageProbeTests {
         )
 
         // When & Then
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

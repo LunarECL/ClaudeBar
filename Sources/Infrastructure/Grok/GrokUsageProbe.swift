@@ -35,7 +35,7 @@ public struct GrokUsageProbe: UsageProbe, @unchecked Sendable {
     public func probe() async throws -> UsageSnapshot {
         guard var credentials = credentialLoader.loadCredentials() else {
             AppLog.probes.error("Grok: No credentials found")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         // Refresh proactively when the stored token is expired or about to be
@@ -43,7 +43,7 @@ public struct GrokUsageProbe: UsageProbe, @unchecked Sendable {
             AppLog.probes.info("Grok: Token expired or expiring, refreshing...")
             do {
                 credentials = try await refreshToken(credentials)
-            } catch let error as ProbeError where error == .sessionExpired() {
+            } catch let error as UsageError where error == .sessionExpired() {
                 throw error
             } catch {
                 AppLog.probes.warning("Grok: Proactive refresh failed: \(error.localizedDescription), trying with existing token")
@@ -53,14 +53,14 @@ public struct GrokUsageProbe: UsageProbe, @unchecked Sendable {
         let data: Data
         do {
             data = try await fetchBilling(accessToken: credentials.accessToken)
-        } catch let error as ProbeError where error == .authenticationRequired {
+        } catch let error as UsageError where error == .authenticationRequired {
             // Token was rejected — refresh once and retry
             AppLog.probes.info("Grok: Got 401, attempting token refresh...")
             credentials = try await refreshToken(credentials)
             do {
                 data = try await fetchBilling(accessToken: credentials.accessToken)
-            } catch let error as ProbeError where error == .authenticationRequired {
-                throw ProbeError.sessionExpired(hint: Self.reloginHint)
+            } catch let error as UsageError where error == .authenticationRequired {
+                throw UsageError.sessionExpired(hint: Self.reloginHint)
             }
         }
 
@@ -72,12 +72,12 @@ public struct GrokUsageProbe: UsageProbe, @unchecked Sendable {
     private func refreshToken(_ credentials: GrokCredentialResult) async throws -> GrokCredentialResult {
         guard let refreshToken = credentials.refreshToken else {
             AppLog.probes.error("Grok: No refresh token available")
-            throw ProbeError.sessionExpired(hint: Self.reloginHint)
+            throw UsageError.sessionExpired(hint: Self.reloginHint)
         }
 
         let issuer = credentials.oidcIssuer ?? Self.defaultIssuer
         guard let refreshURL = URL(string: issuer.hasSuffix("/") ? issuer + "oauth2/token" : issuer + "/oauth2/token") else {
-            throw ProbeError.executionFailed("Invalid OIDC issuer: \(issuer)")
+            throw UsageError.executionFailed("Invalid OIDC issuer: \(issuer)")
         }
 
         var request = URLRequest(url: refreshURL)
@@ -97,7 +97,7 @@ public struct GrokUsageProbe: UsageProbe, @unchecked Sendable {
         let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response from token refresh")
+            throw UsageError.executionFailed("Invalid response from token refresh")
         }
 
         if httpResponse.statusCode == 400 || httpResponse.statusCode == 401 {
@@ -105,19 +105,19 @@ public struct GrokUsageProbe: UsageProbe, @unchecked Sendable {
             let errorObject = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             let errorCode = (errorObject?["error"] as? String) ?? "unknown"
             AppLog.probes.error("Grok: Token refresh rejected (HTTP \(httpResponse.statusCode), error: \(errorCode))")
-            throw ProbeError.sessionExpired(hint: Self.reloginHint)
+            throw UsageError.sessionExpired(hint: Self.reloginHint)
         }
 
         guard httpResponse.statusCode >= 200, httpResponse.statusCode < 300 else {
             AppLog.probes.error("Grok: Token refresh failed with HTTP \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("Token refresh failed: HTTP \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("Token refresh failed: HTTP \(httpResponse.statusCode)")
         }
 
         guard let responseDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let newAccessToken = responseDict["access_token"] as? String,
               !newAccessToken.isEmpty else {
             AppLog.probes.error("Grok: No access token in refresh response")
-            throw ProbeError.executionFailed("No access token in refresh response")
+            throw UsageError.executionFailed("No access token in refresh response")
         }
 
         var updatedCredentials = credentials
@@ -155,11 +155,11 @@ public struct GrokUsageProbe: UsageProbe, @unchecked Sendable {
             (data, response) = try await networkClient.request(request)
         } catch {
             AppLog.probes.error("Grok: Network error: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Network error: \(error.localizedDescription)")
+            throw UsageError.executionFailed("Network error: \(error.localizedDescription)")
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         AppLog.probes.debug("Grok: Response status \(httpResponse.statusCode)")
@@ -168,10 +168,10 @@ public struct GrokUsageProbe: UsageProbe, @unchecked Sendable {
         case 200:
             return data
         case 401, 403:
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         default:
             AppLog.probes.error("Grok: HTTP error \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("HTTP error: \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("HTTP error: \(httpResponse.statusCode)")
         }
     }
 
@@ -198,7 +198,7 @@ public struct GrokUsageProbe: UsageProbe, @unchecked Sendable {
         now: Date = Date()
     ) throws -> UsageSnapshot {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ProbeError.parseFailed("Failed to parse billing response as JSON")
+            throw UsageError.parseFailed("Failed to parse billing response as JSON")
         }
 
         let config = (root["config"] as? [String: Any]) ?? root

@@ -49,7 +49,7 @@ public struct CommandCodeUsageProbe: UsageProbe, @unchecked Sendable {
     public func probe() async throws -> UsageSnapshot {
         guard let apiKey = credentialLoader.loadAPIKey() else {
             AppLog.probes.error("Command Code: No API key found")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         let whoamiData = try await fetch(Self.whoamiURL, apiKey: apiKey)
@@ -85,11 +85,11 @@ public struct CommandCodeUsageProbe: UsageProbe, @unchecked Sendable {
             (data, response) = try await networkClient.request(request)
         } catch {
             AppLog.probes.error("Command Code: Network error: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Network error: \(error.localizedDescription)")
+            throw UsageError.executionFailed("Network error: \(error.localizedDescription)")
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         AppLog.probes.debug("Command Code: Response status \(httpResponse.statusCode)")
@@ -97,14 +97,14 @@ public struct CommandCodeUsageProbe: UsageProbe, @unchecked Sendable {
         switch httpResponse.statusCode {
         case 200..<300:
             guard (try? JSONSerialization.jsonObject(with: data)) is [String: Any] else {
-                throw ProbeError.parseFailed("Failed to parse Command Code response as JSON")
+                throw UsageError.parseFailed("Failed to parse Command Code response as JSON")
             }
             return data
         case 401, 403:
-            throw ProbeError.sessionExpired(hint: Self.reloginHint)
+            throw UsageError.sessionExpired(hint: Self.reloginHint)
         default:
             AppLog.probes.error("Command Code: HTTP error \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("HTTP error: \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("HTTP error: \(httpResponse.statusCode)")
         }
     }
 
@@ -117,7 +117,7 @@ public struct CommandCodeUsageProbe: UsageProbe, @unchecked Sendable {
         now: Date = Date()
     ) throws -> UsageSnapshot {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ProbeError.parseFailed("Failed to parse Command Code response as JSON")
+            throw UsageError.parseFailed("Failed to parse Command Code response as JSON")
         }
 
         return try parseCredits(root, providerId: providerId, accountEmail: accountEmail, now: now)

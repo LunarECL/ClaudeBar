@@ -1,3 +1,6 @@
+import Quotas
+import DataSources
+import Providers
 import Foundation
 
 /// Compact email labels for the limited menu-bar space. If truncation would

@@ -122,7 +122,7 @@ struct AccountManagementCard: View {
 
             // Status from snapshot
             if let snapshot = provider.accountSnapshots[account.accountId] {
-                let status = snapshot.overallStatus
+                let status = snapshot.overallStatus(under: AppSettings.shared.statusPolicy)
                 Circle()
                     .fill(theme.statusColor(for: status))
                     .frame(width: 8, height: 8)

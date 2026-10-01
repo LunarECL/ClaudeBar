@@ -45,7 +45,7 @@ public struct AmpCodeUsageProbe: UsageProbe {
         // Step 1: Locate the amp binary
         guard let ampPath = cliExecutor.locate("amp") else {
             AppLog.probes.error("AmpCode probe failed: amp binary not found")
-            throw ProbeError.cliNotFound("AmpCode")
+            throw UsageError.cliNotFound("AmpCode")
         }
 
         // Step 2: Execute `amp usage --no-color`
@@ -61,12 +61,12 @@ public struct AmpCodeUsageProbe: UsageProbe {
             )
         } catch {
             AppLog.probes.error("AmpCode probe failed: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("amp usage failed: \(error.localizedDescription)")
+            throw UsageError.executionFailed("amp usage failed: \(error.localizedDescription)")
         }
 
         guard result.exitCode == 0 else {
             AppLog.probes.error("AmpCode probe failed: exit code \(result.exitCode)")
-            throw ProbeError.executionFailed("amp usage exited with code \(result.exitCode)")
+            throw UsageError.executionFailed("amp usage exited with code \(result.exitCode)")
         }
 
         AppLog.probes.debug("AmpCode usage output:\n\(result.output)")
@@ -117,7 +117,7 @@ public struct AmpCodeUsageProbe: UsageProbe {
 
         guard !quotas.isEmpty else {
             AppLog.probes.error("AmpCode parse failed: no valid credit lines found")
-            throw ProbeError.parseFailed("No valid credit lines found in amp usage output")
+            throw UsageError.parseFailed("No valid credit lines found in amp usage output")
         }
 
         return UsageSnapshot(

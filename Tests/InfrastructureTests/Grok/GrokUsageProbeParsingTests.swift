@@ -180,7 +180,7 @@ struct GrokUsageProbeParsingTests {
 
     @Test
     func `throws parseFailed on invalid JSON`() {
-        #expect(throws: ProbeError.parseFailed("Failed to parse billing response as JSON")) {
+        #expect(throws: UsageError.parseFailed("Failed to parse billing response as JSON")) {
             try GrokUsageProbe.parseResponse(Data("not json".utf8), providerId: "grok")
         }
     }

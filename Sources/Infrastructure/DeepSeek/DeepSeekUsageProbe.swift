@@ -61,7 +61,7 @@ public struct DeepSeekUsageProbe: UsageProbe {
     public func probe() async throws -> UsageSnapshot {
         guard let apiKey = getApiKey(), !apiKey.isEmpty else {
             AppLog.probes.error("DeepSeek: No API key configured (check env var or settings)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         AppLog.probes.info("Starting DeepSeek probe...")
@@ -75,15 +75,15 @@ public struct DeepSeekUsageProbe: UsageProbe {
         let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         guard httpResponse.statusCode == 200 else {
             AppLog.probes.error("DeepSeek API returned HTTP \(httpResponse.statusCode)")
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                throw ProbeError.authenticationRequired
+                throw UsageError.authenticationRequired
             }
-            throw ProbeError.executionFailed("DeepSeek API returned HTTP \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("DeepSeek API returned HTTP \(httpResponse.statusCode)")
         }
 
         // Log raw response at debug level
@@ -118,14 +118,14 @@ public struct DeepSeekUsageProbe: UsageProbe {
             if let rawString = String(data: data, encoding: .utf8) {
                 AppLog.probes.debug("DeepSeek raw response: \(rawString.prefix(500))")
             }
-            throw ProbeError.parseFailed("Invalid JSON: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Invalid JSON: \(error.localizedDescription)")
         }
 
         let balanceInfos = response.balanceInfos ?? []
 
         guard !balanceInfos.isEmpty else {
             AppLog.probes.error("DeepSeek: Empty balance_infos in response")
-            throw ProbeError.noData
+            throw UsageError.noData
         }
 
         // Use the account's primary balance entry. DeepSeek returns the billing
@@ -135,7 +135,7 @@ public struct DeepSeekUsageProbe: UsageProbe {
 
         let posixLocale = Locale(identifier: "en_US_POSIX")
         guard let total = Decimal(string: selected.totalBalance, locale: posixLocale) else {
-            throw ProbeError.parseFailed("Invalid total_balance: \(selected.totalBalance)")
+            throw UsageError.parseFailed("Invalid total_balance: \(selected.totalBalance)")
         }
         let granted = selected.grantedBalance.flatMap { Decimal(string: $0, locale: posixLocale) }
         let toppedUp = selected.toppedUpBalance.flatMap { Decimal(string: $0, locale: posixLocale) }

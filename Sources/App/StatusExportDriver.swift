@@ -138,7 +138,7 @@ public final class StatusExportDriver {
         let statusString: String
         if let labelStatus = label?.status {
             statusString = statusName(labelStatus)
-        } else if let selectedStatus = selected?.snapshot?.overallStatus {
+        } else if let selectedStatus = selected?.snapshot?.overallStatus(under: settings.statusPolicy) {
             statusString = statusName(selectedStatus)
         } else {
             statusString = "unknown"
@@ -151,7 +151,7 @@ public final class StatusExportDriver {
             return ExportPayload.ProviderSummary(
                 id: provider.id,
                 name: provider.name,
-                status: statusName(snapshot?.overallStatus ?? .healthy),
+                status: statusName(snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy),
                 percentRemaining: primary?.percentRemaining,
                 percentUsed: primary?.percentUsed,
                 resetsAt: primary?.resetsAt.map { isoFormatter.string(from: $0) },
