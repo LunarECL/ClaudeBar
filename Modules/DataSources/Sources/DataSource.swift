@@ -18,6 +18,7 @@ public struct DataSource: Sendable {
     private let mapper: any Reading
     private let contextFiles: [String: JSONFileReader]
     private let recoveries: [String: any Recovering]
+    private let requiredFiles: [String]
     private let memory: UsageMemory
     private let now: @Sendable () -> Date
 
@@ -30,6 +31,7 @@ public struct DataSource: Sendable {
         mapper: any Reading,
         contextFiles: [String: JSONFileReader],
         recoveries: [String: any Recovering],
+        requiredFiles: [String] = [],
         now: @escaping @Sendable () -> Date
     ) {
         self.definition = definition
@@ -40,6 +42,7 @@ public struct DataSource: Sendable {
         self.mapper = mapper
         self.contextFiles = contextFiles
         self.recoveries = recoveries
+        self.requiredFiles = requiredFiles
         self.memory = UsageMemory()
         self.now = now
     }
@@ -57,12 +60,20 @@ public struct DataSource: Sendable {
         return (try? credentials.find()) != nil
     }
 
-    /// *Configured*: the key answers (when one is needed) and the CLI exists.
+    /// *Configured*: the key answers (when one is needed), belongs to the
+    /// expected account, and the CLI exists.
     public func isReady() async -> Bool {
-        if let credentials, (try? credentials.find()) == nil {
-            return false
+        if let credentials {
+            guard let found = try? credentials.find(), isExpectedAccount(found.credential) else { return false }
         }
         return fetcher.isReady()
+    }
+
+    /// The credential's values a page may show — the account id, the email —
+    /// never a token. Empty when nothing answers.
+    public func credentialFacts() -> [String: String] {
+        guard let found = try? credentials?.find() else { return [:] }
+        return Self.withoutSecrets(found.credential.values)
     }
 
     /// Looks up the key and fetches. Nothing is mapped and nothing is saved.
@@ -121,15 +132,51 @@ public struct DataSource: Sendable {
         }
     }
 
-    /// Only the values a script mapping asks for — never a token.
+    /// What a mapping may read of the credential — never a token. A script
+    /// sees only the values it names.
     private func visibleCredential(_ credential: Credential?) -> [String: String] {
-        guard case .script(let script) = definition.mapping, let credential else { return [:] }
+        guard let credential else { return [:] }
+        let values = Self.withoutSecrets(credential.values)
+        if case .script(let script) = definition.mapping {
+            return values.filter { script.credential.contains($0.key) }
+        }
+        return values
+    }
+
+    private static func withoutSecrets(_ values: [String: String]) -> [String: String] {
         let secret: Set = ["token", "refreshToken", "idToken"]
-        return credential.values.filter { script.credential.contains($0.key) && !secret.contains($0.key) }
+        return values.filter { !secret.contains($0.key) }
+    }
+
+    private func isExpectedAccount(_ credential: Credential) -> Bool {
+        guard let identity = definition.identity else { return true }
+        return credential[identity.field] == identity.equals
+    }
+
+    /// Fails closed when the credential now belongs to another account.
+    private func checkIdentity(_ credential: Credential?) throws {
+        guard let identity = definition.identity else { return }
+        guard let credential, isExpectedAccount(credential) else {
+            throw DataSourceError(.lookup, .sessionExpired(hint: identity.hint))
+        }
     }
 
     private func fetch() async throws -> (response: Response, credential: Credential?) {
+        for file in requiredFiles where !FileManager.default.fileExists(atPath: file) {
+            // ClaudeBar never starts a login itself (#216).
+            AppLog.probes.error("\(providerId) \(kind): no \(file) — refusing to run")
+            throw DataSourceError(.lookup, .authenticationRequired)
+        }
         var found = try lookUp()
+        try checkIdentity(found?.credential)
+        let result = try await fetchWith(&found)
+        if definition.identity != nil {
+            try checkIdentity((try? credentials?.find())?.credential)
+        }
+        return result
+    }
+
+    private func fetchWith(_ found: inout FoundCredential?) async throws -> (response: Response, credential: Credential?) {
 
         if let refresher, let current = found, refresher.isDue(current.credential) {
             do {

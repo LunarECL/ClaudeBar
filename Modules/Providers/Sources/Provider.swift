@@ -15,10 +15,26 @@ public final class Provider: AIProvider {
 
     // MARK: - Identity
 
+    /// Which login this is — the default one, or one the person added.
+    public nonisolated let account: ProviderAccount
+    /// `codex` for the default login, `codex.<account>` for an added one.
     public let id: String
-    public let name: String
     public let cliCommand: String
-    public var dashboardURL: URL? { definition.links.dashboard }
+
+    /// The account's email when the definition names providers by it, else the product.
+    public var name: String {
+        guard definition.accounts?.nameFromEmail == true, let accountEmail else { return definition.name }
+        return accountEmail
+    }
+
+    public var accountEmail: String? { snapshot?.accountEmail ?? account.email }
+
+    /// Whether this provider is named by its account — what the menu bar and
+    /// the popover show beside its usage.
+    public var isNamedByAccount: Bool { definition.accounts?.nameFromEmail == true }
+    /// The dashboard for the plan the last usage reported (#328: an API
+    /// account's is Console billing, a subscription's claude.ai usage).
+    public var dashboardURL: URL? { definition.links.dashboard(for: snapshot?.accountTier) }
     public var statusPageURL: URL? { definition.links.status }
 
     public var isEnabled: Bool {
@@ -45,28 +61,32 @@ public final class Provider: AIProvider {
     /// *Share Claude Code*, for a provider whose plan can issue guest passes.
     public let guestPasses: GuestPasses?
     private let settings: any ProviderSettingsRepository
+    @ObservationIgnored private var refreshTask: Task<UsageSnapshot, Error>?
 
     public init(
         definition: ProviderDefinition,
         dataSources: [DataSource],
         settings: any ProviderSettingsRepository,
+        account: ProviderAccount? = nil,
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
     ) {
+        let account = account ?? ProviderAccount(providerId: definition.id, label: "")
         self.definition = definition
-        self.id = definition.id
-        self.name = definition.name
+        self.account = account
+        self.id = account.id
         self.cliCommand = definition.cli ?? ""
         self.dataSources = dataSources
         self.dailyUsage = dailyUsage
         self.guestPasses = guestPasses
         self.settings = settings
-        self.isEnabled = settings.isEnabled(forProvider: definition.id, defaultValue: definition.enabledByDefault)
+        self.isEnabled = settings.isEnabled(forProvider: account.id, defaultValue: definition.enabledByDefault)
     }
 
     /// The data source in use: the one the person picked, else the default.
+    /// One choice covers every account of the provider.
     public var activeKind: String {
-        if let chosen = settings.dataSourceKind(forProvider: id), dataSource(chosen) != nil {
+        if let chosen = settings.dataSourceKind(forProvider: definition.id), dataSource(chosen) != nil {
             return chosen
         }
         return definition.defaultDataSource
@@ -76,7 +96,7 @@ public final class Provider: AIProvider {
     @discardableResult
     public func use(_ kind: String) -> Bool {
         guard dataSource(kind) != nil else { return false }
-        settings.setDataSourceKind(kind, forProvider: id)
+        settings.setDataSourceKind(kind, forProvider: definition.id)
         return true
     }
 
@@ -114,9 +134,33 @@ public final class Provider: AIProvider {
     /// fallback's, which would send the person chasing the wrong problem.
     @discardableResult
     public func refresh(_ kind: RefreshKind) async throws -> UsageSnapshot {
-        guard var current = dataSource(activeKind) else {
+        guard let active = dataSource(activeKind) else {
             throw ProbeError.noData
         }
+        // Held back until one explicit refresh succeeded (#216): a CLI that
+        // was never signed in may open a browser login on its own.
+        if kind != .interactive, active.definition.verifyBeforeBackground, !isVerified {
+            if let snapshot { return snapshot }
+            let error = ProbeError.executionFailed(active.definition.unverifiedMessage ?? "Not checked yet. Click Refresh.")
+            lastError = error
+            throw error
+        }
+        // Overlapping refreshes share one result.
+        if let refreshTask { return try await refreshTask.value }
+        let task = Task { try await run(from: active, kind) }
+        refreshTask = task
+        defer { refreshTask = nil }
+        let usage = try await task.value
+        if kind == .interactive, active.definition.verifyBeforeBackground {
+            markVerified()
+        }
+        return usage
+    }
+
+    // MARK: - Private
+
+    private func run(from start: DataSource, _ kind: RefreshKind) async throws -> UsageSnapshot {
+        var current = start
         isSyncing = true
         defer { isSyncing = false }
 
@@ -125,7 +169,7 @@ public final class Provider: AIProvider {
         while true {
             do {
                 let usage = try await current.fetchUsage()
-                return succeed(await withDailyUsage(usage, kind), from: current.kind)
+                return succeed(identified(await withDailyUsage(usage, kind)), from: current.kind)
             } catch {
                 let reason = Self.reason(of: error)
                 if case .rateLimited? = reason {
@@ -157,7 +201,43 @@ public final class Provider: AIProvider {
         throw lastError ?? ProbeError.noData
     }
 
-    // MARK: - Private
+    /// An added account is checked by being added; the default login once
+    /// an explicit refresh succeeds, remembered as `<id>.verifiedAtLeastOnce`.
+    private var isVerified: Bool {
+        !account.isDefault || settings.isOn("verifiedAtLeastOnce", forProvider: definition.id) == true
+    }
+
+    private func markVerified() {
+        guard !isVerified else { return }
+        settings.setOn(true, "verifiedAtLeastOnce", forProvider: definition.id)
+    }
+
+    /// The usage as this account's: its id on every quota, its saved email
+    /// when the source named none.
+    private func identified(_ usage: UsageSnapshot) -> UsageSnapshot {
+        guard usage.providerId != id || (usage.accountEmail == nil && account.email != nil) else { return usage }
+        return UsageSnapshot(
+            providerId: id,
+            quotas: usage.quotas.map { quota in
+                UsageQuota(
+                    percentRemaining: quota.percentRemaining, quotaType: quota.quotaType, providerId: id,
+                    resetsAt: quota.resetsAt, resetText: quota.resetText, windowDuration: quota.windowDuration,
+                    dollarRemaining: quota.dollarRemaining, dollarUsed: quota.dollarUsed, dollarCap: quota.dollarCap,
+                    group: quota.group, compactTitle: quota.compactTitle, menuBarTitle: quota.menuBarTitle,
+                    currency: quota.currency
+                )
+            },
+            capturedAt: usage.capturedAt,
+            accountEmail: usage.accountEmail ?? account.email,
+            accountOrganization: usage.accountOrganization,
+            loginMethod: usage.loginMethod,
+            accountTier: usage.accountTier,
+            costUsage: usage.costUsage,
+            bedrockUsage: usage.bedrockUsage,
+            dailyUsageReport: usage.dailyUsageReport,
+            extensionMetrics: usage.extensionMetrics
+        )
+    }
 
     private func dataSource(_ kind: String) -> DataSource? {
         dataSources.first { $0.kind == kind }
@@ -166,14 +246,14 @@ public final class Provider: AIProvider {
     /// The fallback a data source names, unless a provider setting turns it off.
     private func enabledFallback(of source: DataSource) -> DataSource? {
         guard let fallback = source.definition.fallback else { return nil }
-        if let setting = fallback.enabledBySetting, settings.isOn(setting, forProvider: id) == false {
+        if let setting = fallback.enabledBySetting, settings.isOn(setting, forProvider: definition.id) == false {
             return nil
         }
         return dataSource(fallback.to)
     }
 
     private func withDailyUsage(_ usage: UsageSnapshot, _ kind: RefreshKind) async -> UsageSnapshot {
-        guard kind == .interactive,
+        guard kind != .background,
               let dailyUsage,
               let report = try? await dailyUsage.analyzeToday(),
               !report.today.isEmpty || !report.previous.isEmpty else {
@@ -209,6 +289,12 @@ public final class Provider: AIProvider {
         } else {
             lastError = error
             lastFailedStep = nil
+        }
+        // An added account that is signed out shows nothing rather than its
+        // last usage, which would read as still current.
+        if !account.isDefault, let tag = (lastError as? ProbeError)?.tag,
+           tag == "authenticationRequired" || tag == "sessionExpired" {
+            snapshot = nil
         }
     }
 

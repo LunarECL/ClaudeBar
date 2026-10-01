@@ -29,6 +29,15 @@ struct ActionBarSpec {
             return mock
         }
 
+        private static func makeUsageProbe(tier: AccountTier?) -> MockUsageProbe {
+            let probe = MockUsageProbe()
+            given(probe).probe().willReturn(
+                UsageSnapshot(providerId: "claude", quotas: [], capturedAt: Date(), accountTier: tier)
+            )
+            given(probe).isAvailable().willReturn(true)
+            return probe
+        }
+
         @Test
         func `Claude dashboard URL is Anthropic billing`() {
             let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())

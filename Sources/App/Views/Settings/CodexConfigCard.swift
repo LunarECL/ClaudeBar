@@ -1,12 +1,9 @@
 import SwiftUI
 import Domain
 import Infrastructure
-import Providers
 
 /// Codex provider configuration card for SettingsView.
 struct CodexConfigCard: View {
-    let monitor: QuotaMonitor
-
     @State private var settings = AppSettings.shared
     @Environment(\.appTheme) private var theme
 
@@ -75,7 +72,7 @@ struct CodexConfigCard: View {
                     .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
 
-                Text("Data fetching method")
+                Text("Data fetching method for all Codex accounts")
                     .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
@@ -99,10 +96,12 @@ struct CodexConfigCard: View {
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: codexProbeMode) { _, newValue in
+                    // Only persist the preference — no probe here. Selecting a
+                    // mode is not explicit intent to run it: the RPC probe
+                    // spawns `codex app-server`, which can open the ChatGPT
+                    // browser login for an unauthenticated CLI (issue #216).
+                    // The Refresh button / Connect action is the explicit path.
                     settings.codex.setCodexProbeMode(newValue)
-                    Task {
-                        await monitor.refresh(providerId: "codex")
-                    }
                 }
             }
 
@@ -118,7 +117,7 @@ struct CodexConfigCard: View {
                             .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
                             .foregroundStyle(codexProbeMode == .rpc ? theme.textPrimary : theme.textSecondary)
 
-                        Text("Uses codex app-server via JSON-RPC. Default, works with any auth.")
+                        Text("Uses codex app-server via JSON-RPC. Default, works with any auth. ClaudeBar never starts the Codex login itself.")
                             .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
                             .foregroundStyle(theme.textTertiary)
                     }
@@ -143,23 +142,9 @@ struct CodexConfigCard: View {
             }
 
             if codexProbeMode == .api {
-                let hasCredentials = (monitor.provider(for: "codex") as? Provider)?.hasKey(for: "api") ?? false
-
-                HStack(spacing: 6) {
-                    Image(systemName: hasCredentials ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(hasCredentials ? theme.statusHealthy : theme.statusWarning)
-
-                    Text(hasCredentials ? "OAuth credentials found" : "No OAuth credentials found")
-                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                        .foregroundStyle(hasCredentials ? theme.statusHealthy : theme.statusWarning)
-                }
-
-                if !hasCredentials {
-                    Text("Run `codex` in terminal to authenticate, then credentials will be available.")
-                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textTertiary)
-                }
+                Text("API mode needs file-based ChatGPT credentials in each account’s Codex folder.")
+                    .font(.callout)
+                    .foregroundStyle(theme.textSecondary)
             }
         }
     }

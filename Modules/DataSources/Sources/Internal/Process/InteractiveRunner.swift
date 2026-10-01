@@ -50,6 +50,12 @@ public struct InteractiveRunner: Sendable {
         /// Without it, any idle gap ends the capture — which truncates TUIs that
         /// paint a placeholder first and fill it in asynchronously (issue #271).
         public var completionRule: CLICompletionRule?
+        /// How long to wait after launch before sending `input`.
+        ///
+        /// TUIs that redraw their input box during startup can swallow text
+        /// typed while the first paint is still in flight. Probes that type into
+        /// a TUI raise this so the command lands on a settled screen.
+        public var inputDelay: TimeInterval
         /// Quality of service for the spawned process tree.
         ///
         /// Defaults to the ambient `ProbeExecutionContext` value. Because default
@@ -66,6 +72,7 @@ public struct InteractiveRunner: Sendable {
             environmentExclusions: [String] = [],
             environmentAdditions: [String: String] = [:],
             completionRule: CLICompletionRule? = nil,
+            inputDelay: TimeInterval = 0.4,
             qualityOfService: QualityOfService = ProbeExecutionContext.qualityOfService
         ) {
             self.timeout = timeout
@@ -75,6 +82,7 @@ public struct InteractiveRunner: Sendable {
             self.environmentExclusions = environmentExclusions
             self.environmentAdditions = environmentAdditions
             self.completionRule = completionRule
+            self.inputDelay = inputDelay
             self.qualityOfService = qualityOfService
         }
     }
@@ -168,8 +176,9 @@ public struct InteractiveRunner: Sendable {
         try process.run()
         didLaunch = true
 
-        // Allow process to initialize
-        usleep(400_000)
+        // Allow the process to initialize; `inputDelay` gives TUIs time to finish
+        // their startup paint before typed input lands (see Options.inputDelay).
+        usleep(UInt32(max(0, options.inputDelay) * 1_000_000))
 
         // Send the input command
         try sendInput(input, to: primaryHandle)

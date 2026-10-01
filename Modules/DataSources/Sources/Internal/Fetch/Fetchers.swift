@@ -110,7 +110,7 @@ struct JSONRPCFetcher: Fetching {
 
     func fetch(with credential: Credential?) async throws -> Response {
         let directory = call.workingDirectory == .probe ? ProbeWorkingDirectory.resolve() : nil
-        let transport = try makeTransport(call.cli, call.args, directory)
+        let transport = try makeTransport(call.cli, call.args, Self.environment(call.environment), directory)
         defer { transport.close() }
 
         let session = RPCSession(transport: transport)
@@ -121,9 +121,22 @@ struct JSONRPCFetcher: Fetching {
                 try session.notify(method, params: step.params)
             }
         }
-        let message = try await session.request(call.call, params: call.params)
+        var message = try await session.request(call.call, params: call.params)
+        for followUp in call.then {
+            message[followUp.as] = try await session.request(followUp.request, params: followUp.params)
+        }
         AppLog.probes.debug("\(call.cli) \(call.call) answered")
         return Response(body: try JSONSerialization.data(withJSONObject: message))
+    }
+
+    /// The app's environment changed as the call asks, or `nil` to inherit it
+    /// untouched. Each process gets its own; the app's is never mutated.
+    static func environment(_ change: CLICall.Environment) -> [String: String]? {
+        guard !change.unset.isEmpty || !change.set.isEmpty else { return nil }
+        var environment = ProcessInfo.processInfo.environment
+        for name in change.unset { environment.removeValue(forKey: name) }
+        environment.merge(change.set) { _, new in new }
+        return environment
     }
 }
 

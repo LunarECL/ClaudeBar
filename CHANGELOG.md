@@ -7,12 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.4.94] - 2026-10-01
+
+### Changed
+- Breaking: Claude's Dashboard button (⌘D) now opens your usage page on claude.ai on a subscription (Max, Pro, Team) instead of the Console billing page. Pay-as-you-go API accounts still get the Console; on a subscription, open console.anthropic.com yourself if you need it. ([#328](https://github.com/tddworks/ClaudeBar/pull/328))
+
 ### Added
+- Codex: add separate ChatGPT accounts, identify them by email, and pin both quotas in the menu bar. Each login keeps its own usage and refreshes. [#308](https://github.com/tddworks/ClaudeBar/issues/308)
 - Z.ai: paste your GLM API key in Settings → Providers → Z.ai → API KEY. It wins over the settings.json token and env vars, and works even when no Z.ai URL is in settings.json (quota then comes from api.z.ai).
 - Codex: the GPT-5.3-Codex-Spark research preview has its own 5h and weekly windows, separate from your main limits. Those Spark windows now show as extra rows after your session and weekly gauges. ([#178](https://github.com/tddworks/ClaudeBar/issues/178))
 - Popover keyboard shortcuts: Escape closes the popover (or an open share overlay first), and ⌘1–⌘9 switch between the provider pills. Tooltips on the pills and action buttons now show each shortcut (⌘D, ⌘R, ⌘S, ⌘, and ⌘Q already worked).
+- Kimi: API mode has a Region picker (Settings → Providers → Kimi → Kimi Configuration): China (kimi.com) or International (kimi.ai), matching the platform your account is signed in to. The console link follows the region. https://github.com/tddworks/ClaudeBar/issues/new
 
 ### Fixed
+- Kimi: CLI mode failed with "No quota data found" because the CLI's one-time "Trust this folder?" prompt swallowed the typed `/usage`. The probe now runs in its own folder (trusted once), reads the CLI 2.x "Monthly limit" layout, and types `/usage` after the startup paint settles. https://github.com/tddworks/ClaudeBar/issues/new
 - ClaudeBar no longer grows in memory the longer it runs. It could reach several GB after a day or two and then peg the CPU and freeze the menu bar panel. [#313](https://github.com/tddworks/ClaudeBar/issues/313)
 - Z.ai: the auth env var is now also read through your login shell, so a key exported in `~/.zshrc` or `~/.bash_profile` is found even when ClaudeBar starts from Finder or Login Items. [#170](https://github.com/tddworks/ClaudeBar/issues/170)
 - Cost Usage no longer counts dollars for models you run locally. With Claude Code pointed at ollama or LM Studio the card kept adding Anthropic Sonnet prices; it now shows $0.00, while Token Usage keeps counting. ([#190](https://github.com/tddworks/ClaudeBar/issues/190))
@@ -21,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Claude now always falls back between its two probe modes when one fails. A pre-check could report the other probe unusable and skip the rescue, silently, leaving "Claude Unavailable" on screen — in both directions. ([#317](https://github.com/tddworks/ClaudeBar/issues/317))
 - The "Claude Code Started" / "Claude Code Finished" pair that fired on every quota poll is gone: sessions ClaudeBar spawns itself are now marked and its installed hooks skip them. ([#222](https://github.com/tddworks/ClaudeBar/issues/222))
 - Codex: the probe no longer stalls on Codex 0.150's "Do you trust the contents of this directory?" prompt. Codex now runs in ClaudeBar's own probe folder and the prompt is answered for you, so the Codex tab shows your usage again. https://github.com/tddworks/ClaudeBar/issues/267
+- Codex (RPC mode): starting the app, opening the popover or Settings no longer risks launching the ChatGPT login in your browser. Refreshes you didn't click stay passive until you refresh or connect once. ClaudeBar never starts the Codex login itself. https://github.com/tddworks/ClaudeBar/issues/216
 - `claudebar://open` now opens the popover and `claudebar://refresh` refreshes, instead of both opening the Settings window. Also fixes tapping the Touch Bar widget. https://github.com/tddworks/ClaudeBar/pull/310
 - Cursor now shows Auto and API cards when those fields are in the usage response, next to Monthly. The menu bar still defaults to Monthly; set the secondary quota to API to see both. ([#303](https://github.com/tddworks/ClaudeBar/issues/303))
 - Touch Bar gauges now colour by their quota's status. In Remaining and Pace modes the colour was keyed to the displayed number as if it were usage, so 93% remaining drew red with a `!` and 18% remaining drew blue.
@@ -1093,7 +1104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.93...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.94...HEAD
+[0.4.94]: https://github.com/tddworks/ClaudeBar/compare/v0.4.93...v0.4.94
 [0.4.93]: https://github.com/tddworks/ClaudeBar/compare/v0.4.92...v0.4.93
 [0.4.92]: https://github.com/tddworks/ClaudeBar/compare/v0.4.91...v0.4.92
 [0.4.91]: https://github.com/tddworks/ClaudeBar/compare/v0.4.90...v0.4.91

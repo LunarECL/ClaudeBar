@@ -124,10 +124,11 @@ struct CodexDefinitionTests {
     func `when rpc and the terminal both fail the rpc failure is reported and the last usage kept`() async throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
-        // First refresh: initialize, then usage. Second: initialize, then an RPC error.
+        // First refresh: initialize, usage, the account. Second: initialize, then an RPC error.
         let answers = [
             #"{"id":1,"result":{}}"#,
             #"{"id":2,"result":{"rateLimits":{"planType":"pro","primary":{"usedPercent":30}}}}"#,
+            #"{"id":3,"result":{"account":null}}"#,
             #"{"id":1,"result":{}}"#,
             #"{"id":2,"error":{"message":"Authentication required"}}"#,
         ]

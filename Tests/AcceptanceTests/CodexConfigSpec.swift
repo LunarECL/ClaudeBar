@@ -43,7 +43,7 @@ struct CodexConfigSpec {
                     providerId: "codex",
                     cliExecutor: MockCLIExecutor(),
                     network: network,
-                    makeTransport: { _, _, _ in transport },
+                    makeTransport: { _, _, _, _ in transport },
                     environment: { _ in nil },
                     homeDirectory: home,
                     now: { Date() }

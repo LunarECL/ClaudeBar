@@ -1,6 +1,7 @@
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 
 /// Providers pane: master list of every registered provider with enable
 /// toggles; selecting a row drills into that provider's configuration.
@@ -225,11 +226,12 @@ private struct ProviderDetailView: View {
     /// The provider-specific config card, when one exists.
     @ViewBuilder
     private var configCard: some View {
-        switch provider.id {
+        switch (provider as? Provider)?.definition.id ?? provider.id {
         case "claude":
             ClaudeConfigCard(monitor: monitor)
         case "codex":
-            CodexConfigCard(monitor: monitor)
+            CodexConfigCard()
+            CodexAccountsCard(monitor: monitor)
         case "kimi":
             KimiConfigCard(monitor: monitor)
         case "minimax":

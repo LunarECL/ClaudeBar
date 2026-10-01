@@ -3,7 +3,8 @@
   "name": "Claude",
   "cli": "claude",
   "links": {
-    "dashboard": "https://console.anthropic.com/settings/billing",
+    "dashboard": "https://claude.ai/new#settings/usage",
+    "dashboardByPlan": { "claudeApi": "https://console.anthropic.com/settings/billing" },
     "status": "https://status.anthropic.com"
   },
   "enabledByDefault": true,

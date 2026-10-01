@@ -62,20 +62,48 @@ public struct JSONRPCCall: Sendable, Equatable, Codable {
         }
     }
 
+    /// A request after the call, its whole answer added to the response
+    /// under `as` — e.g. the account behind the usage.
+    public struct FollowUp: Sendable, Equatable, Codable {
+        public let request: String
+        public let params: JSONValue?
+        public let `as`: String
+
+        public init(request: String, params: JSONValue? = nil, as name: String) {
+            self.request = request
+            self.params = params
+            self.as = name
+        }
+    }
+
     public let cli: String
     public let args: [String]
     public let workingDirectory: WorkingDirectory?
     public let handshake: [Step]
     public let call: String
     public let params: JSONValue?
+    public let then: [FollowUp]
+    /// Variables to remove from, and add to, the CLI's environment.
+    public let environment: CLICall.Environment
 
-    public init(cli: String, args: [String], workingDirectory: WorkingDirectory? = nil, handshake: [Step] = [], call: String, params: JSONValue? = nil) {
+    public init(
+        cli: String,
+        args: [String],
+        workingDirectory: WorkingDirectory? = nil,
+        handshake: [Step] = [],
+        call: String,
+        params: JSONValue? = nil,
+        then: [FollowUp] = [],
+        environment: CLICall.Environment = CLICall.Environment()
+    ) {
         self.cli = cli
         self.args = args
         self.workingDirectory = workingDirectory
         self.handshake = handshake
         self.call = call
         self.params = params
+        self.then = then
+        self.environment = environment
     }
 
     public init(from decoder: Decoder) throws {
@@ -86,6 +114,8 @@ public struct JSONRPCCall: Sendable, Equatable, Codable {
         handshake = try container.decodeIfPresent([Step].self, forKey: .handshake) ?? []
         call = try container.decode(String.self, forKey: .call)
         params = try container.decodeIfPresent(JSONValue.self, forKey: .params)
+        then = try container.decodeIfPresent([FollowUp].self, forKey: .then) ?? []
+        environment = try container.decodeIfPresent(CLICall.Environment.self, forKey: .environment) ?? CLICall.Environment()
     }
 }
 

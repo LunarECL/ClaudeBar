@@ -13,27 +13,33 @@ struct JSONScope {
     let current: Any?
     let headers: [String: String]
     let key: String?
+    /// Non-secret credential values — `$credential.email`.
+    let credential: [String: String]
 
     /// A scope at the root of a document.
-    init(root: Any?, headers: [String: String] = [:]) {
-        self.init(root: root, current: root, headers: headers, key: nil)
+    init(root: Any?, headers: [String: String] = [:], credential: [String: String] = [:]) {
+        self.init(root: root, current: root, headers: headers, key: nil, credential: credential)
     }
 
-    private init(root: Any?, current: Any?, headers: [String: String], key: String?) {
+    private init(root: Any?, current: Any?, headers: [String: String], key: String?, credential: [String: String]) {
         self.root = root
         self.current = current
         self.headers = headers
         self.key = key
+        self.credential = credential
     }
 
     /// The same document, reading relative paths from `current` — which may
     /// be missing, and then every relative path reads nothing.
     func moved(to current: Any?, key: String? = nil) -> JSONScope {
-        JSONScope(root: root, current: current, headers: headers, key: key ?? self.key)
+        JSONScope(root: root, current: current, headers: headers, key: key ?? self.key, credential: credential)
     }
 
     func value(_ path: String) -> Any? {
         if path == "$key" { return key }
+        if path.hasPrefix("$credential.") {
+            return credential[String(path.dropFirst("$credential.".count))]
+        }
         if path.hasPrefix("$header.") {
             return headers[String(path.dropFirst("$header.".count)).lowercased()]
         }

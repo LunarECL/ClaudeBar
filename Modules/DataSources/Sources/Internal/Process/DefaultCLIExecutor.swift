@@ -19,14 +19,20 @@ public struct DefaultCLIExecutor: CLIExecutor {
     /// each command with the rule its own screen needs (#317).
     public let completionRule: CLICompletionRule?
 
+    /// How long to wait after launch before sending input, so typed commands
+    /// land on a settled TUI screen (see InteractiveRunner.Options.inputDelay).
+    private let inputDelay: TimeInterval
+
     public init(
         environmentExclusions: [String] = [],
         environmentAdditions: [String: String] = [:],
-        completionRule: CLICompletionRule? = nil
+        completionRule: CLICompletionRule? = nil,
+        inputDelay: TimeInterval = 0.4
     ) {
         self.environmentExclusions = environmentExclusions
         self.environmentAdditions = environmentAdditions
         self.completionRule = completionRule
+        self.inputDelay = inputDelay
     }
 
     public func locate(_ binary: String) -> String? {
@@ -52,7 +58,8 @@ public struct DefaultCLIExecutor: CLIExecutor {
             autoResponses: autoResponses,
             environmentExclusions: environmentExclusions,
             environmentAdditions: environmentAdditions,
-            completionRule: completionRule
+            completionRule: completionRule,
+            inputDelay: inputDelay
         )
         let inputText = input ?? ""
 

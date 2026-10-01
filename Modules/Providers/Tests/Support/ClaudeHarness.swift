@@ -62,7 +62,7 @@ struct ClaudeHarness {
             providerId: "claude",
             cliExecutor: cli,
             network: network,
-            makeTransport: { _, _, _ in MockRPCTransport() },
+            makeTransport: { _, _, _, _ in MockRPCTransport() },
             security: { arguments in
                 guard arguments.first == "find-generic-password", let password else { return (44, "") }
                 return (0, password)
@@ -106,7 +106,7 @@ struct ClaudeHarness {
             providerId: "claude",
             cliExecutor: cli,
             network: network,
-            makeTransport: { _, _, _ in MockRPCTransport() },
+            makeTransport: { _, _, _, _ in MockRPCTransport() },
             scripts: Providers.builtInScripts,
             environment: { _ in nil },
             homeDirectory: home,

@@ -199,3 +199,32 @@ This plan covered the API probe. What was learned afterwards, mostly about the R
 - **API mode credits**: `x-codex-credits-balance` (header) or `credits.balance` (body) is shown against a hard-coded limit of 1000. The API doesn't return a limit. Headers `x-codex-primary-used-percent` / `x-codex-secondary-used-percent` take precedence. Reset times always come from `rate_limit.*_window`.
 - **No fallback between the modes the person picks.** Only `rpc` falls back, to the hidden `tty`. A failing `api` doesn't try `rpc`.
 - **Extra buckets (#178)**: GPT-5.3-Codex-Spark (Pro research preview) has its own 5h + weekly windows, separate from the main limits. Both modes carry the data. RPC: `account/rateLimits/read` returns `result.rateLimitsByLimitId`, a map of `RateLimitSnapshot` keyed by limit id (`codex` is the main bucket and mirrors the top-level `rateLimits`; other keys are the extras). API: the body has `additional_rate_limits`, an array of `{limit_name, metered_feature, rate_limit}` where `rate_limit` is a `RateLimitStatusDetails` object that may be null and holds nested `primary_window` / `secondary_window` objects with the same `used_percent` / `reset_at` / `reset_after_seconds` fields as the main windows (plus `limit_window_seconds`, kept as the quota's `windowDuration`). Both paths append the extra quotas **after** the main session/weekly rows — the menu bar renders `quotas.first`, so the main limits must lead. Labels are trimmed for the menu (`Codex Spark` / `codex_spark` → "Spark"); the extra weekly window becomes "Spark 7d". Entries with no parseable window are skipped, and an absent map/field leaves the snapshot unchanged.
+- **Passive until verified (#216)**: spawning `codex app-server` (or the TTY fallback) while the CLI is unauthenticated can make the CLI open the ChatGPT browser login all by itself — ClaudeBar never runs `codex login`, the login flow is the CLI's own behavior. Two gates: (1) only `.interactive` refreshes — genuine clicks: the Refresh button, Touch Bar / notch refresh, `claudebar://refresh`, provider switch, probe-mode test — may run the RPC probe, and a success persists `codex.verifiedAtLeastOnce` via `CodexSettingsRepository`; `.background` (the menu-bar poll) and `.passive` (the popover-open refresh, a third `RefreshKind` case added for this) return the last snapshot without spawning, or surface "Codex CLI session not checked. Click Refresh or Connect to check Codex status." through `lastError`. The popover renders Claude's daily-usage cards, so `.passive` is deliberately not `.background`: Claude attaches the daily report for both `.interactive` and `.passive` and only skips the JSONL scan on the background poll (#204); the default implementation ignores the kind, so the other 18 providers are unaffected. (2) Defense in depth, `CodexUsageProbe.probe()` refuses to spawn the CLI at all when `~/.codex/auth.json` does not exist (throws `authenticationRequired`) — the file's *existence* is checked, not its contents, so API-key users keep working, and the API probe keeps its own OAuth gate on `loadCredentials()`. The loader resolves the auth path exactly like the CLI: `$CODEX_HOME/auth.json` when `CODEX_HOME` is set, `~/.codex/auth.json` otherwise. `isAvailable()` deliberately still only checks the binary — it answers "provider exists", not "allowed to actively probe"; the verified flag is the third state.
+
+
+## Independent Codex accounts
+
+Additional accounts reuse `ProviderAccountConfig` and `MultiAccountSettingsRepository`.
+Each becomes a separate `CodexProvider` in `QuotaMonitor`, with compound ID
+`codex.<local UUID>`. The default retains `codex`. Registering instances lets the
+existing enable toggles, refreshes, overview and three menu-bar selections operate
+independently, without introducing another provider-state owner. The optional
+`MultiAccountProvider` picker protocol is not used: users can pin two accounts at
+once instead of selecting only one active account within Codex.
+
+Settings contain the email, canonical Codex directory and expected ChatGPT account
+ID, never tokens. Setup rejects duplicate directories (including symlinks), the
+default directory and duplicate ChatGPT account IDs. Email is a display identifier,
+not an authentication key; separate workspaces can share an email.
+
+`CodexAccountUsageProbe` validates the expected account ID before and after a
+probe. Both modes get the same explicit home; file API refresh writes only there.
+RPC sets CODEX_HOME on the child process and forces file credential storage for
+added accounts. It disables the inherited-environment TTY fallback for those
+accounts. Missing/replaced credentials fail closed. A provider coalesces simultaneous
+refreshes so overlapping UI/background polls cannot rotate its refresh token twice.
+
+RPC identity comes from `account/read` with `refreshToken: false`, which also
+supports the default Keychain login. File credentials provide the email from the
+ID token as display metadata only; decoding that claim does not verify a token.
+Full email remains in menu-bar tooltips when a visible label is shortened.

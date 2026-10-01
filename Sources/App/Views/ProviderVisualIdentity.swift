@@ -550,7 +550,7 @@ enum ProviderVisualIdentityLookup {
 
     /// Get provider theme color by ID
     static func color(for providerId: String, scheme: ColorScheme) -> Color {
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude":
             return scheme == .dark
                 ? BaseTheme.coralAccent
@@ -640,7 +640,7 @@ enum ProviderVisualIdentityLookup {
         let primaryColor = color(for: providerId, scheme: scheme)
         let secondaryColor: Color
 
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude":
             secondaryColor = scheme == .dark
                 ? BaseTheme.pinkHot
@@ -735,7 +735,7 @@ enum ProviderVisualIdentityLookup {
 
     /// Get provider icon asset name by ID
     static func iconAssetName(for providerId: String) -> String {
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude": return "ClaudeIcon"
         case "codex": return "CodexIcon"
         case "gemini": return "GeminiIcon"
@@ -761,7 +761,7 @@ enum ProviderVisualIdentityLookup {
 
     /// Get provider display name by ID
     static func name(for providerId: String) -> String {
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude": return "Claude"
         case "codex": return "Codex"
         case "gemini": return "Gemini"
@@ -787,7 +787,7 @@ enum ProviderVisualIdentityLookup {
 
     /// Get provider SF symbol icon by ID
     static func symbolIcon(for providerId: String) -> String {
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude": return "brain.fill"
         case "codex": return "chevron.left.forwardslash.chevron.right"
         case "gemini": return "sparkles"

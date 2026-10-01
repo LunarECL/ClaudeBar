@@ -31,7 +31,7 @@ A key that's missing means "use the default", so a fresh install starts with an 
 |---|---|---|
 | `app.*` | App-wide preferences: theme, menu bar readout, refresh, burn rate, status colors, notch, Touch Bar | `"app": { "burnRateWarningEnabled": true, "burnRateThreshold": 1.5 }` |
 | `providers.<id>.*` | Per-provider switches, keyed by the provider id | `"providers": { "gemini": { "isEnabled": false } }` |
-| `<provider>.*` | Settings only one provider has: probe mode, env var name, region, config path | `"codex": { "probeMode": "rpc" }` |
+| `<provider>.*` | Settings only one provider has: probe mode, env var name, region, config path | `"kimi": { "probeMode": "api", "region": "international" }` |
 | `hook.*` | [Session hooks](features/session-hooks/README.md) | `"hook": { "enabled": true }` |
 | `notify.*` | [Notify!](features/notify/README.md) device link and surfaces | `"notify": { "enabled": true, "widgetEnabled": true }` |
 | `extensions.<extension-id>.*` | Non-secret fields of a user [extension](features/extensions/README.md)'s config | `"extensions": { "my-api": { "baseURL": "https://…" } }` |
@@ -76,3 +76,13 @@ Deleting the file resets every setting to its default. Secrets stay where they a
 ## See also
 
 [Troubleshooting](troubleshooting.md) · [ARCHITECTURE.md](architecture/ARCHITECTURE.md) for how the settings repositories are split per provider
+
+
+## Additional Codex accounts
+
+`providers.codex.accounts` stores `ProviderAccountConfig` entries: an opaque local
+`accountId`, empty `label`, login `email`, and `probeConfig.codexHome` plus
+`probeConfig.chatgptAccountId`. Tokens remain in that Codex home's `auth.json`.
+Instances use `codex.<accountId>` for enabled state and menu bar selection/settings;
+the original account keeps `codex`. `codex.probeMode` remains shared.
+Removing an account deletes its entry and menu bar selection, not its Codex files.

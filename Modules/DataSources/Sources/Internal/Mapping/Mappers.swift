@@ -11,7 +11,7 @@ struct JSONMapper: Reading {
         guard let document = try? JSONSerialization.jsonObject(with: response.body) else {
             throw ProbeError.parseFailed("Response is not JSON")
         }
-        let scope = JSONScope(root: document, headers: response.headers)
+        let scope = JSONScope(root: document, headers: response.headers, credential: facts.credential)
 
         var quotas = mapping.quotas.flatMap { self.quotas(for: $0, in: scope, providerId: providerId) }
         if quotas.isEmpty, let empty = mapping.whenEmpty {
@@ -30,6 +30,7 @@ struct JSONMapper: Reading {
             providerId: providerId,
             quotas: quotas,
             capturedAt: now(),
+            accountEmail: mapping.email.lazy.compactMap { scope.string($0) }.first { !$0.isEmpty },
             accountTier: mapping.plan.flatMap { plan(for: $0, in: scope) },
             costUsage: cost
         )

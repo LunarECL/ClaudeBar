@@ -63,7 +63,7 @@ struct ClaudeConfigSpec {
                         providerId: "claude",
                         cliExecutor: cli,
                         network: network,
-                        makeTransport: { _, _, _ in MockRPCTransport() },
+                        makeTransport: { _, _, _, _ in MockRPCTransport() },
                         scripts: Providers.builtInScripts,
                         environment: { _ in nil },
                         homeDirectory: home,

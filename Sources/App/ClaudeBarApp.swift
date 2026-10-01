@@ -73,7 +73,7 @@ struct ClaudeBarApp: App {
     @State private var hookServerTask: Task<Void, Never>?
 
     /// Alerts users when quota status degrades
-    private let quotaAlerter = NotificationAlerter()
+    private let quotaAlerter = NotificationAlerter(accountSettings: JSONSettingsRepository.shared)
 
     /// Sends session start/end notifications
     private let sessionAlertSender = SystemAlertSender()
@@ -131,7 +131,7 @@ struct ClaudeBarApp: App {
             AmpCodeProvider(probe: AmpCodeUsageProbe(), settingsRepository: settingsRepository),
             KimiProvider(
                 cliProbe: KimiCLIUsageProbe(),
-                apiProbe: KimiUsageProbe(),
+                apiProbe: KimiUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
             KiroProvider(probe: KiroUsageProbe(), settingsRepository: settingsRepository),
@@ -173,6 +173,13 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
         ])
+        // Codex accounts added beside the default login (#326): codex.json's
+        // `accounts` data sources, filled from each account's saved folder.
+        for config in settingsRepository.accounts(forProvider: "codex") {
+            if let provider = AddedAccounts.provider("codex", configuration: config, settings: settingsRepository) {
+                repository.add(provider)
+            }
+        }
         AppLog.providers.info("Created \(repository.all.count) providers")
 
         // Initialize the domain service with quota alerter

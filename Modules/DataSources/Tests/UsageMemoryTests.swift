@@ -25,7 +25,7 @@ struct UsageMemoryTests {
             providerId: "test",
             cliExecutor: MockCLIExecutor(),
             network: network,
-            makeTransport: { _, _, _ in MockRPCTransport() },
+            makeTransport: { _, _, _, _ in MockRPCTransport() },
             environment: { _ in nil },
             homeDirectory: FileManager.default.temporaryDirectory,
             now: { clock.now }

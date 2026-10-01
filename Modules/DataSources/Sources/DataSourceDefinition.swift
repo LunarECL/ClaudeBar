@@ -28,6 +28,16 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
     public let context: [String: JSONFileCredential]
     /// What to do once when the mapping reports a failure, then try again.
     public let recover: [String: Recovery]
+    /// Files that must exist before anything runs — a CLI that finds no
+    /// login may open a browser login on its own (#216). Missing: *Key needed*.
+    public let requiresFiles: [String]
+    /// The credential must belong to this account, before and after the fetch.
+    public let identity: Identity?
+    /// A background or popover-open refresh must not run this data source
+    /// until one explicit refresh has succeeded (#216).
+    public let verifyBeforeBackground: Bool
+    /// What a refresh that was held back says until then.
+    public let unverifiedMessage: String?
 
     public init(
         kind: String,
@@ -41,7 +51,11 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         fallbackOn: [String: String] = [:],
         cache: Cache? = nil,
         context: [String: JSONFileCredential] = [:],
-        recover: [String: Recovery] = [:]
+        recover: [String: Recovery] = [:],
+        requiresFiles: [String] = [],
+        identity: Identity? = nil,
+        verifyBeforeBackground: Bool = false,
+        unverifiedMessage: String? = nil
     ) {
         self.kind = kind
         self.label = label
@@ -55,6 +69,10 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         self.cache = cache
         self.context = context
         self.recover = recover
+        self.requiresFiles = requiresFiles
+        self.identity = identity
+        self.verifyBeforeBackground = verifyBeforeBackground
+        self.unverifiedMessage = unverifiedMessage
     }
 
     public init(from decoder: Decoder) throws {
@@ -71,6 +89,10 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         cache = try container.decodeIfPresent(Cache.self, forKey: .cache)
         context = try container.decodeIfPresent([String: JSONFileCredential].self, forKey: .context) ?? [:]
         recover = try container.decodeIfPresent([String: Recovery].self, forKey: .recover) ?? [:]
+        requiresFiles = try container.decodeIfPresent([String].self, forKey: .requiresFiles) ?? []
+        identity = try container.decodeIfPresent(Identity.self, forKey: .identity)
+        verifyBeforeBackground = try container.decodeIfPresent(Bool.self, forKey: .verifyBeforeBackground) ?? false
+        unverifiedMessage = try container.decodeIfPresent(String.self, forKey: .unverifiedMessage)
     }
 }
 
@@ -135,5 +157,20 @@ public enum Recovery: Sendable, Equatable, Codable {
             try patch.encode(keys, forKey: .keys)
             try patch.encode(value, forKey: .value)
         }
+    }
+}
+
+/// Whose credential this must be: `credential[field] == equals`, or the
+/// session is treated as expired with `hint` — a folder signed in to another
+/// account never reports that account's usage as this one's.
+public struct Identity: Sendable, Equatable, Codable {
+    public let field: String
+    public let equals: String
+    public let hint: String?
+
+    public init(field: String, equals: String, hint: String? = nil) {
+        self.field = field
+        self.equals = equals
+        self.hint = hint
     }
 }

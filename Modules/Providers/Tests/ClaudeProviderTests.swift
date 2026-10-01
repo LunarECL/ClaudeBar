@@ -60,7 +60,7 @@ struct ClaudeProviderTests {
         #expect(provider.id == "claude")
         #expect(provider.name == "Claude")
         #expect(provider.cliCommand == "claude")
-        #expect(provider.dashboardURL == URL(string: "https://console.anthropic.com/settings/billing"))
+        #expect(provider.dashboardURL == URL(string: "https://claude.ai/new#settings/usage"))
         #expect(provider.statusPageURL == URL(string: "https://status.anthropic.com"))
         #expect(provider.isEnabled)
         #expect(provider.activeKind == "cli")

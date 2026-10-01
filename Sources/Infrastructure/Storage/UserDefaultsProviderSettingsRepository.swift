@@ -67,6 +67,10 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         return userDefaults.object(forKey: key) as? Bool
     }
 
+    public func setOn(_ on: Bool, _ setting: String, forProvider id: String) {
+        userDefaults.set(on, forKey: "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())")
+    }
+
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         let key = Self.enabledKey(forProvider: id)
         userDefaults.set(enabled, forKey: key)
@@ -280,6 +284,14 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(mode.rawValue, forKey: Keys.codexProbeMode)
     }
 
+    public func codexVerifiedAtLeastOnce() -> Bool {
+        userDefaults.object(forKey: Keys.codexVerifiedAtLeastOnce) as? Bool ?? false
+    }
+
+    public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
+        userDefaults.set(verified, forKey: Keys.codexVerifiedAtLeastOnce)
+    }
+
     // MARK: - KimiSettingsRepository
 
     public func kimiProbeMode() -> KimiProbeMode {
@@ -291,6 +303,19 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
 
     public func setKimiProbeMode(_ mode: KimiProbeMode) {
         userDefaults.set(mode.rawValue, forKey: Keys.kimiProbeMode)
+    }
+
+    public func kimiRegion() -> KimiRegion {
+        // Legacy compatibility: key absent means user upgraded from a pre-region
+        // version, which only supported the China platform (kimi.com).
+        guard let rawValue = userDefaults.string(forKey: Keys.kimiRegion) else {
+            return .china
+        }
+        return KimiRegion(rawValue: rawValue) ?? .china
+    }
+
+    public func setKimiRegion(_ region: KimiRegion) {
+        userDefaults.set(region.rawValue, forKey: Keys.kimiRegion)
     }
 
     // MARK: - BedrockSettingsRepository
@@ -499,8 +524,10 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let claudeCliFallbackEnabled = "providerConfig.claudeCliFallbackEnabled"
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
+        static let codexVerifiedAtLeastOnce = "providerConfig.codexVerifiedAtLeastOnce"
         // Kimi settings
         static let kimiProbeMode = "providerConfig.kimiProbeMode"
+        static let kimiRegion = "providerConfig.kimiRegion"
         static let zaiConfigPath = "providerConfig.zaiConfigPath"
         static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
         static let zaiApiKey = "com.claudebar.credentials.zai-api-key"

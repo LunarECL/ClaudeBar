@@ -6,10 +6,19 @@ import Foundation
 /// `DataSource` and never name a worker.
 public enum DataSources {
     /// Starts a CLI for a JSON-RPC conversation.
-    public typealias TransportFactory = @Sendable (_ executable: String, _ arguments: [String], _ workingDirectory: URL?) throws -> any RPCTransport
+    public typealias TransportFactory = @Sendable (_ executable: String, _ arguments: [String], _ environment: [String: String]?, _ workingDirectory: URL?) throws -> any RPCTransport
 
     /// The text of a mapping script, by the file name a definition gives.
     public typealias ScriptSource = @Sendable (_ file: String) -> String?
+
+    /// A definition's path as the app sees it: `~` and `${VARIABLE:-default}` filled in.
+    public static func expandPath(
+        _ path: String,
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
+    ) -> String {
+        Paths.expand(path, homeDirectory: homeDirectory, environment: environment)
+    }
 
     /// A data source on the real network, CLI, Keychain and file system.
     public static func make(_ definition: DataSourceDefinition, providerId: String, scripts: @escaping ScriptSource = { _ in nil }) -> DataSource {
@@ -18,8 +27,8 @@ public enum DataSources {
             providerId: providerId,
             makeCLIExecutor: CLIFetcher.system,
             network: URLSession.shared,
-            makeTransport: { executable, arguments, directory in
-                try ProcessRPCTransport(executable: executable, arguments: arguments, workingDirectory: directory)
+            makeTransport: { executable, arguments, environment, directory in
+                try ProcessRPCTransport(executable: executable, arguments: arguments, environment: environment, workingDirectory: directory)
             },
             security: KeychainReader.system,
             scripts: scripts,
@@ -108,6 +117,9 @@ public enum DataSources {
                 case .patchJSONFile(let path, let keys, let value):
                     JSONFilePatch(path: path, keys: keys, value: value, homeDirectory: homeDirectory, environment: environment)
                 }
+            },
+            requiredFiles: definition.requiresFiles.map {
+                Paths.expand($0, homeDirectory: homeDirectory, environment: environment)
             },
             now: now
         )

@@ -19,6 +19,10 @@ final class InMemoryProviderSettings: ProviderSettingsRepository, @unchecked Sen
         flags["\(id).\(setting)"]
     }
 
+    func setOn(_ on: Bool, _ setting: String, forProvider id: String) {
+        flags["\(id).\(setting)"] = on
+    }
+
     func isEnabled(forProvider id: String) -> Bool {
         enabled[id] ?? true
     }

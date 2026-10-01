@@ -161,21 +161,38 @@ struct FirstOfReader: CredentialFinding {
 /// Reading credential values out of a JSON document, and writing refreshed
 /// ones back without changing a value's JSON type.
 enum CredentialDocument {
+    /// `"$.tokens.id_token#jwt.email"` reads a claim out of a JWT's payload —
+    /// display metadata only; the token is not verified.
     static func values(_ fields: [String: String], in document: [String: Any]) -> [String: String] {
         let scope = JSONScope(root: document)
         var values: [String: String] = [:]
-        for (name, path) in fields {
-            if let value = scope.string(path).map(Credential.trimmed), !value.isEmpty {
+        for (name, field) in fields {
+            let parts = field.components(separatedBy: "#jwt.")
+            var value = scope.string(parts[0])
+            if parts.count == 2 {
+                value = value.flatMap { claim(parts[1], in: $0) }
+            }
+            if let value = value.map(Credential.trimmed), !value.isEmpty {
                 values[name] = value
             }
         }
         return values
     }
 
+    static func claim(_ name: String, in token: String) -> String? {
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return nil }
+        var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard let data = Data(base64Encoded: payload),
+              let claims = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        return JSONPath.string(JSONPath.walk(claims, JSONPath.components(name)))
+    }
+
     static func updated(_ document: [String: Any], with credential: Credential, fields: [String: String]) -> [String: Any] {
         var updated = document
         let scope = JSONScope(root: document)
-        for (name, path) in fields where path != "$" {
+        for (name, path) in fields where path != "$" && !path.contains("#jwt.") {
             guard let value = credential[name] else { continue }
             // A number stays a number: Claude Code reads `expiresAt` as one.
             if scope.value(path) is NSNumber || (scope.value(path) == nil && name == "expiresAt"),

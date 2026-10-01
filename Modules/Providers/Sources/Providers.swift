@@ -7,10 +7,21 @@ import Foundation
 public enum Providers {
     /// A built-in definition, shipped in this module's `Resources/Providers/`.
     public static func builtIn(_ id: String) throws -> ProviderDefinition {
+        try ProviderDefinition.parse(try builtInData(id))
+    }
+
+    /// The built-in definition's JSON, as shipped.
+    public static func builtInData(_ id: String) throws -> Data {
         guard let url = Bundle.module.url(forResource: id, withExtension: "json") else {
             throw DefinitionError.missingFile(id)
         }
-        return try ProviderDefinition.parse(Data(contentsOf: url))
+        return try Data(contentsOf: url)
+    }
+
+    /// A `{{account.…}}` the account's saved values did not fill.
+    private static func hasUnfilledValue(_ source: DataSourceDefinition) -> Bool {
+        guard let data = try? JSONEncoder().encode(source) else { return true }
+        return String(decoding: data, as: UTF8.self).contains("{{account.")
     }
 
     /// A mapping script shipped beside the built-in definitions.
@@ -37,6 +48,28 @@ public enum Providers {
             settings: settings,
             dailyUsage: dailyUsage,
             guestPasses: guestPasses
+        )
+    }
+
+    /// An added account of a built-in provider: the definition's
+    /// `accounts.dataSources`, filled from the account's saved values. `nil`
+    /// when the provider has no accounts or the saved values are incomplete.
+    @MainActor
+    public static func make(
+        _ id: String,
+        account: ProviderAccountConfig,
+        settings: any ProviderSettingsRepository
+    ) throws -> Provider? {
+        guard account.accountId != ProviderAccount.defaultAccountId,
+              let definition = try ProviderDefinition.parse(try builtInData(id), account: account.probeConfig),
+              !definition.dataSources.contains(where: { Self.hasUnfilledValue($0) }) else { return nil }
+        return Provider(
+            definition: definition,
+            dataSources: definition.dataSources.map {
+                DataSources.make($0, providerId: definition.id, scripts: builtInScripts)
+            },
+            settings: settings,
+            account: account.toProviderAccount(providerId: id)
         )
     }
 

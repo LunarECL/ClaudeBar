@@ -13,7 +13,7 @@ struct DataSourceTests {
             providerId: "test",
             cliExecutor: MockCLIExecutor(),
             network: network,
-            makeTransport: { _, _, _ in MockRPCTransport() },
+            makeTransport: { _, _, _, _ in MockRPCTransport() },
             environment: { environment[$0] },
             homeDirectory: FileManager.default.temporaryDirectory,
             now: { Date(timeIntervalSince1970: 1_700_000_000) }
@@ -205,7 +205,7 @@ struct DataSourceTests {
             providerId: "test",
             cliExecutor: MockCLIExecutor(),
             network: MockNetworkClient(),
-            makeTransport: { executable, arguments, directory in
+            makeTransport: { executable, arguments, _, directory in
                 started.record(executable, arguments, directory)
                 return transport
             },

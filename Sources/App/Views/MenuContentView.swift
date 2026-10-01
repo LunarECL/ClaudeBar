@@ -148,11 +148,14 @@ struct MenuContentView: View {
             withAnimation(.easeOut(duration: 0.6)) {
                 animateIn = true
             }
-            // Then fetch data in background
+            // Then fetch data — passively: opening the popover is not explicit
+            // intent, so Codex in RPC mode must not spawn `codex app-server`
+            // here before the session was explicitly verified (issue #216).
+            // Other providers treat .passive like an interactive refresh.
             if settings.overviewModeEnabled {
-                await refreshAllEnabled()
+                await refreshAllEnabled(kind: .passive)
             } else {
-                await refresh(providerId: selectedProviderId)
+                await refresh(providerId: selectedProviderId, kind: .passive)
             }
 
             // Check for updates when menu opens (no UI unless update found)
@@ -480,6 +483,9 @@ struct MenuContentView: View {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
                     accountCard(displayName: displayName, snapshot: snapshot)
                 }
+                if (provider as? Provider)?.isNamedByAccount == true, provider.lastError != nil {
+                    compactErrorState(provider: provider)
+                }
                 statsGrid(snapshot: snapshot)
             }
             .opacity(animateIn ? 1 : 0)
@@ -513,6 +519,9 @@ struct MenuContentView: View {
             providerSectionHeader(provider: provider)
 
             if let snapshot = provider.snapshot {
+                if (provider as? Provider)?.isNamedByAccount == true, provider.lastError != nil {
+                    compactErrorState(provider: provider)
+                }
                 statsGrid(snapshot: snapshot)
             } else if provider.isSyncing {
                 LoadingSpinnerView()
@@ -527,6 +536,7 @@ struct MenuContentView: View {
             ProviderIconView(providerId: provider.id, size: 20, showGlow: false)
 
             Text(provider.name)
+                .fixedSize(horizontal: false, vertical: true)
                 .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
 
@@ -546,6 +556,7 @@ struct MenuContentView: View {
                 .foregroundStyle(theme.statusWarning)
 
             Text(provider.lastError?.localizedDescription ?? "Unavailable")
+                .help(provider.lastError?.localizedDescription ?? "Unavailable")
                 .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                 .foregroundStyle(theme.textTertiary)
                 .lineLimit(1)
@@ -952,16 +963,18 @@ struct MenuContentView: View {
     // MARK: - Actions
 
     /// Refresh all enabled providers concurrently
-    private func refreshAllEnabled() async {
+    /// - Parameter kind: `.interactive` for explicit clicks (Refresh button),
+    ///   `.passive` for the popover-open refresh (issue #216).
+    private func refreshAllEnabled(kind: RefreshKind = .interactive) async {
         await withTaskGroup(of: Void.self) { group in
             // The `isSyncing` guard reads main-actor provider state, so evaluate
             // it here on the main actor (this closure inherits the caller's
-            // isolation). Each child task then awaits `refresh()`, whose heavy
+            // isolation). Each child task then awaits `refresh(_:)`, whose heavy
             // probe work still suspends off-main, keeping the refreshes concurrent.
             for provider in monitor.enabledProviders where !provider.isSyncing {
                 group.addTask {
                     do {
-                        try await provider.refresh()
+                        try await provider.refresh(kind)
                     } catch {
                         // Provider stores error in lastError
                     }
@@ -971,7 +984,9 @@ struct MenuContentView: View {
     }
 
     /// Refresh a specific provider by ID
-    private func refresh(providerId: String) async {
+    /// - Parameter kind: `.interactive` for explicit clicks (Refresh button,
+    ///   provider switch), `.passive` for the popover-open refresh (issue #216).
+    private func refresh(providerId: String, kind: RefreshKind = .interactive) async {
         guard let provider = monitor.provider(for: providerId) else {
             return
         }
@@ -980,7 +995,7 @@ struct MenuContentView: View {
         guard !provider.isSyncing else { return }
 
         do {
-            try await provider.refresh()
+            try await provider.refresh(kind)
         } catch {
             // Provider stores error in lastError
         }
@@ -1031,6 +1046,7 @@ struct ProviderPill: View {
                     .font(.system(size: 10, weight: .semibold))
 
                 Text(providerName)
+                    .help(providerName)
                     .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                     .lineLimit(1)
                     .fixedSize()

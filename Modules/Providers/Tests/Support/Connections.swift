@@ -1,7 +1,9 @@
 import DataSources
+import Domain
 import Foundation
 import Mockable
 import Providers
+import Testing
 
 /// Builds a built-in `Provider` whose data sources run on stubbed connections,
 /// so a definition is tested end to end — lookup, fetch, mapping, lifecycle —
@@ -11,6 +13,8 @@ struct StubbedProvider {
     let network = MockNetworkClient()
     let cli = MockCLIExecutor()
     let transport = MockRPCTransport()
+    /// Every CLI started for JSON-RPC: its arguments and environment.
+    let launches = Launches()
     let home: URL
     let settings: InMemoryProviderSettings
     var environment: [String: String] = [:]
@@ -20,11 +24,24 @@ struct StubbedProvider {
             .appendingPathComponent("providers-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
         settings = InMemoryProviderSettings(dataSourceKinds: dataSourceKind.map { [providerId: $0] } ?? [:])
+        if providerId == "codex" {
+            // A signed-in CLI: Codex refuses to start without a login (#216).
+            let directory = home.appendingPathComponent(".codex", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data("{}".utf8).write(to: directory.appendingPathComponent("auth.json"))
+        }
     }
 
-    func make(_ id: String) throws -> Provider {
-        let definition = try Providers.builtIn(id)
+    /// The default login, or — with `account` — an added one.
+    func make(_ id: String, account: ProviderAccountConfig? = nil) throws -> Provider {
+        let definition: ProviderDefinition
+        if let account {
+            definition = try #require(try ProviderDefinition.parse(Providers.builtInData(id), account: account.probeConfig))
+        } else {
+            definition = try Providers.builtIn(id)
+        }
         let transport = self.transport
+        let launches = self.launches
         let environment = self.environment
         let sources = definition.dataSources.map {
             DataSources.make(
@@ -32,13 +49,21 @@ struct StubbedProvider {
                 providerId: definition.id,
                 cliExecutor: cli,
                 network: network,
-                makeTransport: { _, _, _ in transport },
+                makeTransport: { _, arguments, environment, _ in
+                    launches.record(arguments, environment)
+                    return transport
+                },
                 environment: { environment[$0] },
                 homeDirectory: home,
                 now: { Date() }
             )
         }
-        return Provider(definition: definition, dataSources: sources, settings: settings)
+        return Provider(
+            definition: definition,
+            dataSources: sources,
+            settings: settings,
+            account: account?.toProviderAccount(providerId: id)
+        )
     }
 
     func cleanUp() {
@@ -47,13 +72,25 @@ struct StubbedProvider {
 
     // MARK: - Stubbing helpers
 
-    /// Answers the JSON-RPC handshake's `initialize`, then `answer` for the call.
-    nonisolated func answerRPC(_ answer: String) {
-        let received = Counter()
-        given(transport).send(.any).willReturn(())
+    /// Answers each JSON-RPC request with its own id: `initialize` with
+    /// nothing, `account/read` with `account`, anything else with `answer` —
+    /// however many times the provider starts the CLI.
+    nonisolated func answerRPC(_ answer: String, account: String = #"{"id":3,"result":{"account":null}}"#) {
+        let lastRequest = LastRequest()
+        given(transport).send(.any).willProduce { @Sendable data in
+            lastRequest.set(data)
+        }
         given(transport).close().willReturn(())
         given(transport).receive().willProduce { @Sendable in
-            Data((received.next() == 1 ? #"{"id":1,"result":{}}"# : answer).utf8)
+            let (id, method) = lastRequest.get()
+            let reply = switch method {
+            case "initialize": #"{"id":1,"result":{}}"#
+            case "account/read": account
+            default: answer
+            }
+            var message = (try? JSONSerialization.jsonObject(with: Data(reply.utf8))) as? [String: Any] ?? [:]
+            message["id"] = id
+            return try! JSONSerialization.data(withJSONObject: message)
         }
     }
 
@@ -99,5 +136,52 @@ final class Counter: @unchecked Sendable {
         defer { lock.unlock() }
         value += 1
         return value
+    }
+}
+
+/// The CLIs a test's provider started, in order.
+final class Launches: @unchecked Sendable {
+    private var all: [(arguments: [String], environment: [String: String]?)] = []
+    private let lock = NSLock()
+
+    func record(_ arguments: [String], _ environment: [String: String]?) {
+        lock.lock()
+        defer { lock.unlock() }
+        all.append((arguments, environment))
+    }
+
+    var last: (arguments: [String], environment: [String: String]?)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return all.last
+    }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return all.count
+    }
+}
+
+/// The last JSON-RPC request a fake transport was sent.
+final class LastRequest: @unchecked Sendable {
+    private var id = 0
+    private var method = ""
+    private let lock = NSLock()
+
+    func set(_ data: Data) {
+        let message = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        lock.lock()
+        defer { lock.unlock() }
+        if let id = message["id"] as? Int, let method = message["method"] as? String {
+            self.id = id
+            self.method = method
+        }
+    }
+
+    func get() -> (id: Int, method: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (id, method)
     }
 }

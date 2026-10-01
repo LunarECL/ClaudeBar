@@ -252,12 +252,15 @@ public struct JSONMapping: Sendable, Equatable, Codable {
     public let cost: CostRule?
     /// What to do when no quota answered.
     public let whenEmpty: EmptyRule?
+    /// The account's email — the first path that answers, `$credential.` included.
+    public let email: [String]
 
-    public init(plan: PlanRule? = nil, quotas: [QuotaRule], cost: CostRule? = nil, whenEmpty: EmptyRule? = nil) {
+    public init(plan: PlanRule? = nil, quotas: [QuotaRule], cost: CostRule? = nil, whenEmpty: EmptyRule? = nil, email: [String] = []) {
         self.plan = plan
         self.quotas = quotas
         self.cost = cost
         self.whenEmpty = whenEmpty
+        self.email = email
     }
 
     public init(from decoder: Decoder) throws {
@@ -266,6 +269,11 @@ public struct JSONMapping: Sendable, Equatable, Codable {
         quotas = try container.decodeIfPresent([QuotaRule].self, forKey: .quotas) ?? []
         cost = try container.decodeIfPresent(CostRule.self, forKey: .cost)
         whenEmpty = try container.decodeIfPresent(EmptyRule.self, forKey: .whenEmpty)
+        if let one = try? container.decodeIfPresent(String.self, forKey: .email) {
+            email = [one]
+        } else {
+            email = try container.decodeIfPresent([String].self, forKey: .email) ?? []
+        }
     }
 }
 
