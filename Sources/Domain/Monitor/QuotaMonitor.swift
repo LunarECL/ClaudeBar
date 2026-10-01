@@ -476,11 +476,16 @@ public final class QuotaMonitor {
     }
 
     /// Applies a full provider order and persists it through the settings
-    /// repository (when one is wired). IDs missing from the list keep their
-    /// registration position; unknown IDs are ignored on the next read.
+    /// repository (when one is wired). IDs that no longer exist in
+    /// `providers.all` — extensions removed, a deleted Codex account — are
+    /// dropped before anything is stored or persisted, so the saved order
+    /// never accumulates dead ids. IDs missing from the list keep their
+    /// registration position.
     public func setProviderOrder(_ order: [String]) {
-        storedProviderOrder = order
-        settingsRepository?.setProviderOrder(order)
+        let live = Set(providers.all.map(\.id))
+        let filtered = order.filter { live.contains($0) }
+        storedProviderOrder = filtered
+        settingsRepository?.setProviderOrder(filtered)
     }
 
     /// Sets a provider's enabled state.
