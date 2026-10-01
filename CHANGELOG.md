@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Pick which quotas to show per provider: in Settings → Providers → provider, hide windows you never use (e.g. Gemini Flash 2.0). Hidden windows vanish from the popover and no longer color the menu bar. [#140](https://github.com/tddworks/ClaudeBar/issues/140)
+
 ---
 
 ## [0.4.94] - 2026-10-01

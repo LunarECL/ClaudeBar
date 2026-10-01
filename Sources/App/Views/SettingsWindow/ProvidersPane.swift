@@ -182,6 +182,8 @@ private struct ProviderDetailView: View {
                 if provider.isEnabled {
                     configCard
 
+                    QuotaVisibilityCard(provider: provider)
+
                     SettingsCard {
                         SettingsFieldLabel(text: "CUSTOM WEB CARD")
                             .padding(.bottom, 8)
@@ -255,5 +257,61 @@ private struct ProviderDetailView: View {
                 )
             }
         }
+    }
+}
+
+// MARK: - Quota Visibility (issue #140)
+
+/// Per-provider quota visibility: one toggle per quota window in the live
+/// snapshot, so users of multi-quota providers (Gemini CLI, Antigravity, …)
+/// can hide the windows they never use. Hidden windows vanish from the
+/// popover cards and stop driving the menu bar status. Until the provider
+/// has reported data there is nothing to toggle.
+private struct QuotaVisibilityCard: View {
+    let provider: any AIProvider
+
+    @State private var settings = AppSettings.shared
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        SettingsCard {
+            SettingsFieldLabel(text: "VISIBLE QUOTAS")
+                .padding(.bottom, 12)
+
+            if let quotas = provider.snapshot?.quotas, !quotas.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(quotas.enumerated()), id: \.element.quotaType) { index, quota in
+                        if index > 0 {
+                            SettingsRowDivider()
+                        }
+                        toggleRow(quota)
+                    }
+                }
+            } else {
+                Text("No quota data yet — refresh \(provider.name) once, then choose which windows to show.")
+                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+            }
+        }
+    }
+
+    private func toggleRow(_ quota: UsageQuota) -> some View {
+        let quotaKey = quota.quotaType.quotaKey
+        return SettingsRow(
+            title: quota.compactTitle ?? quota.quotaType.displayName,
+            subtitle: quotaKey,
+            trailing: SettingsSwitch(isOn: Binding(
+                get: { !settings.hiddenQuotaKeys(forProvider: provider.id).contains(quotaKey) },
+                set: { visible in
+                    var keys = settings.hiddenQuotaKeys(forProvider: provider.id)
+                    if visible {
+                        keys.remove(quotaKey)
+                    } else {
+                        keys.insert(quotaKey)
+                    }
+                    settings.setHiddenQuotaKeys(keys, forProvider: provider.id)
+                }
+            ))
+        )
     }
 }

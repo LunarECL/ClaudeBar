@@ -255,12 +255,17 @@ final class StatusItemLabelDriver {
 
     /// Status of the selected provider, considering the burn-rate setting.
     /// Mirrors the dropdown's status logic for the icon-only fallback.
+    /// Quota windows the user hid for this provider (issue #140) don't color it.
     private var effectiveSelectedProviderStatus: QuotaStatus {
         guard let snapshot = monitor.selectedProvider?.snapshot else { return .healthy }
+        let hiddenQuotaKeys = settings.hiddenQuotaKeys(forProvider: snapshot.providerId)
         if settings.burnRateWarningEnabled {
-            return snapshot.paceAwareOverallStatus(burnRateThreshold: settings.burnRateThreshold)
+            return snapshot.visiblePaceAwareOverallStatus(
+                hiding: hiddenQuotaKeys,
+                burnRateThreshold: settings.burnRateThreshold
+            )
         }
-        return snapshot.overallStatus
+        return snapshot.visibleOverallStatus(hiding: hiddenQuotaKeys)
     }
 
     private func render(_ content: LabelContent) {

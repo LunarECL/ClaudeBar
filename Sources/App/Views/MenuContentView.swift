@@ -335,12 +335,17 @@ struct MenuContentView: View {
     }
 
     /// Status of the currently selected provider, nil when it has no snapshot.
+    /// Quota windows the user hid for this provider (issue #140) don't color it.
     private var selectedProviderStatus: QuotaStatus? {
         guard let snapshot = selectedProvider?.snapshot else { return nil }
+        let hiddenQuotaKeys = settings.hiddenQuotaKeys(forProvider: snapshot.providerId)
         if settings.burnRateWarningEnabled {
-            return snapshot.paceAwareOverallStatus(burnRateThreshold: settings.burnRateThreshold)
+            return snapshot.visiblePaceAwareOverallStatus(
+                hiding: hiddenQuotaKeys,
+                burnRateThreshold: settings.burnRateThreshold
+            )
         }
-        return snapshot.overallStatus
+        return snapshot.visibleOverallStatus(hiding: hiddenQuotaKeys)
     }
 
     /// What the header pill says. A provider that failed to probe reads as
@@ -543,7 +548,11 @@ struct MenuContentView: View {
 
             Spacer()
 
-            let status = provider.snapshot?.overallStatus ?? .healthy
+            // Hidden quota windows (issue #140) don't color the overview badge.
+            let hiddenQuotaKeys = settings.hiddenQuotaKeys(forProvider: provider.id)
+            let status = provider.snapshot.map {
+                $0.visibleOverallStatus(hiding: hiddenQuotaKeys)
+            } ?? .healthy
             Text(provider.isSyncing ? "Syncing..." : status.badgeText)
                 .badge(theme.statusColor(for: status))
         }
@@ -625,9 +634,12 @@ struct MenuContentView: View {
 
     /// Sections for aggregating providers (e.g. Oh My Pi): one collapsible
     /// block per upstream account, so ten flat cards become scannable.
+    /// Quotas hidden for this provider (issue #140) don't appear; sections
+    /// left with neither quotas nor a note disappear entirely.
     @ViewBuilder
-    private func quotaGroupSections(snapshot: UsageSnapshot) -> some View {
-        let groups = snapshot.quotaGroups
+    private func quotaGroupSections(snapshot: UsageSnapshot, hiddenQuotaKeys: Set<String>) -> some View {
+        let groups = snapshot.visibleQuotaGroups(hiding: hiddenQuotaKeys)
+            .filter { !$0.quotas.isEmpty || $0.note != nil }
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(groups.enumerated()), id: \.element.id) { groupIndex, group in
                 let baseDelay = Double(groups.prefix(groupIndex).reduce(0) { $0 + $1.quotas.count }) * 0.08
@@ -733,24 +745,28 @@ struct MenuContentView: View {
 
     @ViewBuilder
     private func statsGrid(snapshot: UsageSnapshot) -> some View {
+        // Quotas the user hid for this provider (issue #140) neither render
+        // as cards nor shape the group sections.
+        let hiddenQuotaKeys = settings.hiddenQuotaKeys(forProvider: snapshot.providerId)
+        let visibleQuotas = snapshot.visibleQuotas(hiding: hiddenQuotaKeys)
         VStack(spacing: 10) {
             // Grouped sections cover aggregating providers even when every
             // account lacks quota data (note-only sections must still render).
             if snapshot.hasQuotaGroups {
-                quotaGroupSections(snapshot: snapshot)
+                quotaGroupSections(snapshot: snapshot, hiddenQuotaKeys: hiddenQuotaKeys)
             }
 
-            if !snapshot.hasQuotaGroups, !snapshot.quotas.isEmpty {
-                let sharedReset = snapshot.quotas.sharedResetDescription()
+            if !snapshot.hasQuotaGroups, !visibleQuotas.isEmpty {
+                let sharedReset = visibleQuotas.sharedResetDescription()
                 if let sharedReset {
                     sharedResetRow(sharedReset)
                 }
             }
 
-            if !snapshot.hasQuotaGroups, !snapshot.quotas.isEmpty {
-                let sharedReset = snapshot.quotas.sharedResetDescription()
+            if !snapshot.hasQuotaGroups, !visibleQuotas.isEmpty {
+                let sharedReset = visibleQuotas.sharedResetDescription()
                 TwoColumnCardGrid(
-                    items: Array(snapshot.quotas.enumerated()),
+                    items: Array(visibleQuotas.enumerated()),
                     id: \.element.quotaType
                 ) { entry in
                     WrappedStatCard(

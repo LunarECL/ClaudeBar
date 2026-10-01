@@ -169,10 +169,13 @@ struct ClaudeBarApp: App {
         AppLog.providers.info("Created \(repository.all.count) providers")
 
         // Initialize the domain service with quota alerter
-        // QuotaMonitor automatically validates selected provider on init
+        // QuotaMonitor automatically validates selected provider on init.
+        // The settings repository lets the monitor honor per-provider hidden
+        // quota keys (issue #140) in lowestQuota/status selectors.
         let monitor = QuotaMonitor(
             providers: repository,
-            alerter: quotaAlerter
+            alerter: quotaAlerter,
+            settingsRepository: settingsRepository
         )
         self.monitor = monitor
         AppLog.monitor.info("QuotaMonitor initialized")
