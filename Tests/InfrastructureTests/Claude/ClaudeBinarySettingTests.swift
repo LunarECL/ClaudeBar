@@ -6,9 +6,12 @@ import Mockable
 
 /// Issue #210: the Claude CLI binary is user-configurable for setups where
 /// the real binary is not the `claude` on PATH (an aliased name, a wrapper
-/// install, a versioned binary). These tests pin the wiring contract: whatever
-/// `ClaudeSettingsRepository.resolvedClaudeBinary()` resolves is the binary the
-/// probes locate and execute — exactly the way `ClaudeBarApp` constructs them.
+/// install, a versioned binary). These tests pin the wiring contract:
+/// whatever `ClaudeSettingsRepository.resolvedClaudeBinary()` resolves is the
+/// binary the guest-pass source locates and executes — exactly the way
+/// `ClaudeBarApp` constructs it. The definition-driven CLI data sources are
+/// pinned on their side by `runningCLI` tests in ProvidersTests
+/// (ClaudeCLIDefinitionTests).
 ///
 /// Shell aliases and functions are deliberately unsupported: a subprocess can
 /// only exec a binary path or a PATH-resolvable name, never a shell command
@@ -27,123 +30,64 @@ struct ClaudeBinarySettingTests {
         UserDefaults().removePersistentDomain(forName: testSuiteName)
     }
 
-    private static let usageOutput = """
-    Opus 4.5 · Claude Max · user@example.com's Organization
-
-    Current session
-    ████████████████░░░░ 65% left
-    Resets in 2h 15m
-
-    Current week (all models)
-    ██████████░░░░░░░░░░ 35% left
-    Resets Dec 28
-    """
-
     private static let passOutput = """
     > /passes
       ⎿  Referral link copied to clipboard!
     """
 
-    // MARK: - ClaudeUsageProbe
+    // MARK: - The resolver
 
     @Test
-    func `unset setting probes with the default claude binary`() async {
+    func `unset setting resolves to the default claude binary`() {
+        // Given — nothing configured
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        // Then
+        #expect(repository.claudeBinary() == "")
+        #expect(repository.resolvedClaudeBinary() == "claude")
+    }
+
+    @Test
+    func `a configured binary is resolved as-is, trimmed`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setClaudeBinary("  /opt/tools/bin/claude-work \n")
+
+        #expect(repository.resolvedClaudeBinary() == "/opt/tools/bin/claude-work")
+    }
+
+    // MARK: - The guest-pass source
+
+    @Test
+    func `unset setting locates the default claude binary`() async {
         // Given — no binary configured; the wiring must fall back to "claude"
         let repository = makeRepository()
         defer { cleanupDefaults() }
 
         let mockExecutor = MockCLIExecutor()
-        // Only matches when the probe locates the default binary.
+        // Only matches when the source locates the default binary.
         given(mockExecutor).locate(.value("claude")).willReturn("/usr/local/bin/claude")
 
-        let probe = ClaudeUsageProbe(
+        let source = ClaudeGuestPassSource(
             claudeBinary: repository.resolvedClaudeBinary(),
             cliExecutor: mockExecutor
         )
 
         // Then — available proves the locate ran for "claude", not another name
-        #expect(await probe.isAvailable() == true)
+        #expect(await source.isAvailable() == true)
     }
 
     @Test
-    func `configured binary reaches the usage probe execute call`() async throws {
+    func `configured binary reaches the guest-pass execute call`() async throws {
         // Given — a non-standard binary persisted in settings
         let repository = makeRepository()
         defer { cleanupDefaults() }
         repository.setClaudeBinary("/opt/tools/bin/claude-work")
 
         let mockExecutor = MockCLIExecutor()
-        // Only matches when the probe executes the configured binary.
-        given(mockExecutor).execute(
-            binary: .value("/opt/tools/bin/claude-work"),
-            args: .matching { $0.first == "/usage" },
-            input: .any,
-            timeout: .any,
-            workingDirectory: .any,
-            autoResponses: .any
-        ).willReturn(CLIResult(output: Self.usageOutput, exitCode: 0))
-
-        let accountInfo = MockAccountInfoResolving()
-        given(accountInfo).resolve().willReturn(nil)
-
-        let probe = ClaudeUsageProbe(
-            claudeBinary: repository.resolvedClaudeBinary(),
-            cliExecutor: mockExecutor,
-            accountInfoResolver: accountInfo
-        )
-
-        // When — parsed quota data can only come from the stub above, so a
-        // successful probe proves the configured binary was executed
-        let snapshot = try await probe.probe()
-
-        // Then
-        #expect(snapshot.accountTier == .claudeMax)
-        #expect(snapshot.quotas.count >= 1)
-    }
-
-    @Test
-    func `empty setting falls back to the default claude binary in the usage probe`() async {
-        // Given — the user cleared the field
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-        repository.setClaudeBinary("   ")
-
-        let mockExecutor = MockCLIExecutor()
-        given(mockExecutor).locate(.value("claude")).willReturn("/usr/local/bin/claude")
-
-        let probe = ClaudeUsageProbe(
-            claudeBinary: repository.resolvedClaudeBinary(),
-            cliExecutor: mockExecutor
-        )
-
-        #expect(await probe.isAvailable() == true)
-    }
-
-    // MARK: - ClaudePassProbe
-
-    @Test
-    func `unset setting probes passes with the default claude binary`() async {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        let mockExecutor = MockCLIExecutor()
-        given(mockExecutor).locate(.value("claude")).willReturn("/usr/local/bin/claude")
-
-        let probe = ClaudePassProbe(
-            claudeBinary: repository.resolvedClaudeBinary(),
-            cliExecutor: mockExecutor
-        )
-
-        #expect(await probe.isAvailable() == true)
-    }
-
-    @Test
-    func `configured binary reaches the pass probe execute call`() async throws {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-        repository.setClaudeBinary("/opt/tools/bin/claude-work")
-
-        let mockExecutor = MockCLIExecutor()
+        // Only matches when the source executes the configured binary.
         given(mockExecutor).execute(
             binary: .value("/opt/tools/bin/claude-work"),
             args: .matching { $0.first == "/passes" },
@@ -155,7 +99,7 @@ struct ClaudeBinarySettingTests {
 
         let clipboard = MockClipboardReader(content: "https://claude.ai/referral/TEST123")
 
-        let probe = ClaudePassProbe(
+        let source = ClaudeGuestPassSource(
             claudeBinary: repository.resolvedClaudeBinary(),
             cliExecutor: mockExecutor,
             clipboardReader: clipboard
@@ -163,25 +107,26 @@ struct ClaudeBinarySettingTests {
 
         // The referral URL only comes from the stubbed run of the configured
         // binary, so a returned pass proves that binary was executed
-        let pass = try await probe.probe()
+        let pass = try await source.fetch()
 
         #expect(pass.referralURL.absoluteString == "https://claude.ai/referral/TEST123")
     }
 
     @Test
-    func `empty setting falls back to the default claude binary in the pass probe`() async {
+    func `whitespace setting falls back to the default claude binary`() async {
+        // Given — the user cleared the field, leaving blanks
         let repository = makeRepository()
         defer { cleanupDefaults() }
-        repository.setClaudeBinary("")
+        repository.setClaudeBinary("   ")
 
         let mockExecutor = MockCLIExecutor()
         given(mockExecutor).locate(.value("claude")).willReturn("/usr/local/bin/claude")
 
-        let probe = ClaudePassProbe(
+        let source = ClaudeGuestPassSource(
             claudeBinary: repository.resolvedClaudeBinary(),
             cliExecutor: mockExecutor
         )
 
-        #expect(await probe.isAvailable() == true)
+        #expect(await source.isAvailable() == true)
     }
 }
