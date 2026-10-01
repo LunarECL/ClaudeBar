@@ -56,6 +56,17 @@ struct KimiProviderTests {
     }
 
     @Test
+    func `dashboard URL follows the international region`() {
+        let defaults = UserDefaults(suiteName: "KimiProviderTests.\(UUID().uuidString)")!
+        let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        settings.setKimiRegion(.international)
+        let mockProbe = MockUsageProbe()
+        let kimi = KimiProvider(probe: mockProbe, settingsRepository: settings)
+
+        #expect(kimi.dashboardURL == URL(string: "https://www.kimi.ai/code/console"))
+    }
+
+    @Test
     func `kimi provider has no status page URL`() {
         let settings = makeSettingsRepository()
         let mockProbe = MockUsageProbe()

@@ -32,7 +32,11 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
     ) {
         self.claudeBinary = claudeBinary
         self.timeout = timeout
-        self.cliExecutor = cliExecutor ?? DefaultCLIExecutor()
+        self.cliExecutor = cliExecutor ?? DefaultCLIExecutor(
+            // Same loopback risk as the usage probe: /passes spawns a full
+            // claude session whose hooks would fire. Mark it (issue #222).
+            environmentAdditions: ClaudeUsageProbe.probeEnvironment
+        )
         self.clipboardReader = clipboardReader ?? SystemClipboardReader()
     }
 
@@ -56,7 +60,7 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
     /// Probes the CLI for guest pass information.
     /// The /passes command copies the referral URL to clipboard.
     public func probe() async throws -> ClaudePass {
-        let workingDir = probeWorkingDirectory()
+        let workingDir = ProbeWorkingDirectory.resolve()
         AppLog.probes.info("Starting Claude probe with /passes command...")
 
         let result: CLIResult
@@ -181,14 +185,4 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
     }
 
     // MARK: - Helpers
-
-    private func probeWorkingDirectory() -> URL {
-        let fm = FileManager.default
-        let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fm.temporaryDirectory
-        let dir = base
-            .appendingPathComponent("ClaudeBar", isDirectory: true)
-            .appendingPathComponent("Probe", isDirectory: true)
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }
 }

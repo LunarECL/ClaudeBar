@@ -347,6 +347,14 @@ public final class JSONSettingsRepository:
         store.write(value: mode.rawValue, key: "codex.probeMode")
     }
 
+    public func codexVerifiedAtLeastOnce() -> Bool {
+        store.read(key: "codex.verifiedAtLeastOnce") ?? false
+    }
+
+    public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
+        store.write(value: verified, key: "codex.verifiedAtLeastOnce")
+    }
+
     // MARK: - KimiSettingsRepository
 
     public func kimiProbeMode() -> KimiProbeMode {
@@ -359,6 +367,18 @@ public final class JSONSettingsRepository:
 
     public func setKimiProbeMode(_ mode: KimiProbeMode) {
         store.write(value: mode.rawValue, key: "kimi.probeMode")
+    }
+
+    public func kimiRegion() -> KimiRegion {
+        guard let raw: String = store.read(key: "kimi.region"),
+              let region = KimiRegion(rawValue: raw) else {
+            return .china
+        }
+        return region
+    }
+
+    public func setKimiRegion(_ region: KimiRegion) {
+        store.write(value: region.rawValue, key: "kimi.region")
     }
 
     // MARK: - ZaiSettingsRepository

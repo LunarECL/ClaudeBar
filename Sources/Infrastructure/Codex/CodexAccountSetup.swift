@@ -47,7 +47,7 @@ public enum CodexAccountSetup {
         let loader = CodexCredentialLoader(codexHome: home)
         return CodexProvider(
             rpcProbe: CodexAccountUsageProbe(
-                probe: CodexUsageProbe(client: DefaultCodexRPCClient(codexHome: home, includeAccountIdentity: true)),
+                probe: CodexUsageProbe(client: DefaultCodexRPCClient(codexHome: home, includeAccountIdentity: true), credentialLoader: loader),
                 credentialLoader: loader, expectedAccountId: accountId),
             apiProbe: CodexAccountUsageProbe(
                 probe: CodexAPIUsageProbe(credentialLoader: loader),

@@ -35,13 +35,58 @@ Before 0.36:
   ╰──────────────────────────────────────────────────────────────────╯
 ```
 
+2.x (captured from 2.1.1): the panel gained Session usage and Context window
+sections, and new plans replaced the weekly window with a monthly total — the
+plan line is now `Monthly limit`:
+
+```
+  ╭ Usage ────────────────────────────────────────────────────────────────╮
+  │ Session usage                                                         │
+  │   No token usage recorded yet.                                        │
+  │ Context window                                                        │
+  │   ░░░░░░░░░░░░░░░░░░░░      0%  (0 / 1M)                              │
+  │ Plan usage                                                            │
+  │   5h limit       ░░░░░░░░░░░░░░░░░░░░  0% used  resets in 2h 41m      │
+  │   Monthly limit  ░░░░░░░░░░░░░░░░░░░░  2% used  resets in 24d 16h 42m │
+  │                  kimi 2% · code 0%                                    │
+  ╰───────────────────────────────────────────────────────────────────────╯
+```
+
 Parsing rules, line by line:
 
-- A line is a quota line if it contains `weekly` (→ weekly) or `5h` / `hour` (→ session). Everything else is ignored.
+- A line is a quota line if it contains `weekly` (→ weekly), `monthly` (→ `.timeLimit("Monthly")`, a 30-day window) or `5h` / `hour` (→ session). Everything else — including the `Context window … 0%  (0 / 1M)` and `kimi 2% · code 0%` lines — is ignored.
 - `N% left` is remaining; `N% used` is converted to `100 - N`, clamped at 0. The old format puts the reset in parentheses, the new one doesn't.
 - Reset durations combine `d`, `h`, `m` and `s` parts (`resets in 45s` appears in the new format).
 - **Keep the first line of each type.** The TUI redraws the panel on refresh and resize, which used to produce duplicate quotas.
 - The raw PTY output is parsed line by line; it isn't rendered through `TerminalRenderer` the way Claude's is, and ANSI codes aren't stripped. Stripping was added (`141a065`) and removed the same day (`ceebb1c`) without a recorded reason. If a CLI release starts colouring the percentage or reset text, look here first.
+
+### Typing `/usage` without losing it
+
+The probe runs the CLI in a dedicated directory
+(`~/Library/Application Support/ClaudeBar/Probe`, same one the Claude probe
+uses). Inheriting the app's cwd is not safe: the CLI shows a one-time
+**"Trust this folder?"** prompt per folder (project MCP trust), the typed
+`/usage` lands in that prompt instead of the input box, and the probe reports
+"No quota data found" on every run. An auto-response presses Enter on the
+prompt, the choice is remembered per folder, and it never appears again.
+
+The probe types `/usage` twice, on purpose:
+
+1. As **delayed input** (`InteractiveRunner.Options.inputDelay`, 1.5 s). Typing
+   the instant the `context:` footer first painted raced the TUI's startup
+   redraw — the text landed in an input box that a redraw then discarded, the
+   panel never rendered, and the probe reported "No quota data found". The
+   delay lets the startup paint settle first.
+2. Through the **auto-response markers** (`💫`, `context:`) as backup. Each
+   marker fires at most once, and a duplicate `/usage` is harmless because
+   parsing keeps the first panel occurrence.
+
+The probe also passes a `CLICompletionRule` (`usageCompletionRule`): the
+`context:` footer is present from startup while the usage panel only arrives
+after a network round-trip to the billing API, so a 3 s idle gap does not mean
+the screen is done. `% used` / `% left` (or an error/auth screen) marks the
+settled screen. Pre-0.36 CLIs without the footer never match the pending
+marker and behave as before.
 
 ### Version numbers
 
@@ -50,16 +95,27 @@ The 0.36 / 0.41 versions are from the #289 report, which doesn't say which packa
 ## API mode: Kimi billing gateway
 
 ```
-POST https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages
+POST <webBaseURL>/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages
 Body: {"scope":["FEATURE_CODING"]}
 ```
 
-A Connect-RPC endpoint used by the web console. The token is sent both as `Authorization: Bearer <token>` and as `Cookie: kimi-auth=<token>`, along with browser-like headers (`Origin`/`Referer` of kimi.com, a Chrome User-Agent, `connect-protocol-version: 1`, `x-msh-platform: web`, `r-timezone`).
+A Connect-RPC endpoint used by the web console. The token is sent both as `Authorization: Bearer <token>` and as `Cookie: kimi-auth=<token>`, along with browser-like headers (`Origin`/`Referer` of the region's web base, a Chrome User-Agent, `connect-protocol-version: 1`, `x-msh-platform: web`, `r-timezone`).
+
+### Region
+
+Kimi runs two separate platforms — China (`kimi.com`) and International
+(`kimi.ai`) — with separate accounts, cookies and quotas. `KimiRegion`
+(`Sources/Domain/Provider/Kimi/KimiRegion.swift`) carries everything that
+differs: the usage URL, Origin/Referer, console URL and cookie domains. The
+setting (`kimi.region` in settings.json, default `china`) is read per probe,
+like MiniMax's region. The international usage URL is inferred by analogy with
+the documented kimi.com endpoint and has not been verified against a live
+international account.
 
 ### Token resolution
 
 1. `KIMI_AUTH_TOKEN` from the app's process environment.
-2. The `kimi-auth` cookie for `kimi.com` / `www.kimi.com` from browser cookie stores (SweetCookieKit, default browser import order; expired cookies skipped). This is why API mode needs Full Disk Access.
+2. The `kimi-auth` cookie for the selected region's domains (`kimi.com` / `www.kimi.com`, or `kimi.ai` / `www.kimi.ai`) from browser cookie stores (SweetCookieKit, default browser import order; expired cookies skipped). This is why API mode needs Full Disk Access.
 
 If neither resolves, the probe reports itself unavailable, so the provider is skipped without an error.
 

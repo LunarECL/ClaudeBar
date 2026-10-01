@@ -8,18 +8,31 @@ public struct DefaultCLIExecutor: CLIExecutor {
     /// preventing tokens like `CLAUDE_CODE_OAUTH_TOKEN` from being inherited.
     private let environmentExclusions: [String]
 
+    /// Environment variables to set on the subprocess (after exclusions and
+    /// terminal defaults). Probes pass `CLAUDEBAR_PROBE=1` so ClaudeBar's
+    /// installed hook command can skip the sessions it spawns itself (#222).
+    private let environmentAdditions: [String: String]
+
     /// Rule that tells the PTY run when the screen has settled. Without one, any
     /// idle gap ends the capture, truncating TUIs that fill in asynchronously
     /// (issue #271). Readable from tests so a probe can be checked for pairing
     /// each command with the rule its own screen needs (#317).
     let completionRule: CLICompletionRule?
 
+    /// How long to wait after launch before sending input, so typed commands
+    /// land on a settled TUI screen (see InteractiveRunner.Options.inputDelay).
+    private let inputDelay: TimeInterval
+
     public init(
         environmentExclusions: [String] = [],
-        completionRule: CLICompletionRule? = nil
+        environmentAdditions: [String: String] = [:],
+        completionRule: CLICompletionRule? = nil,
+        inputDelay: TimeInterval = 0.4
     ) {
         self.environmentExclusions = environmentExclusions
+        self.environmentAdditions = environmentAdditions
         self.completionRule = completionRule
+        self.inputDelay = inputDelay
     }
 
     public func locate(_ binary: String) -> String? {
@@ -44,7 +57,9 @@ public struct DefaultCLIExecutor: CLIExecutor {
             arguments: args,
             autoResponses: autoResponses,
             environmentExclusions: environmentExclusions,
-            completionRule: completionRule
+            environmentAdditions: environmentAdditions,
+            completionRule: completionRule,
+            inputDelay: inputDelay
         )
         let inputText = input ?? ""
 

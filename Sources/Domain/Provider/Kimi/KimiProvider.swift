@@ -14,7 +14,10 @@ public final class KimiProvider: AIProvider {
     public let cliCommand: String = "kimi"
 
     public var dashboardURL: URL? {
-        URL(string: "https://www.kimi.com/code/console")
+        if let kimiSettings = settingsRepository as? KimiSettingsRepository {
+            return URL(string: kimiSettings.kimiRegion().consoleURL)
+        }
+        return URL(string: KimiRegion.china.consoleURL)
     }
 
     public var statusPageURL: URL? {

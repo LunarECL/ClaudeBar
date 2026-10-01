@@ -66,6 +66,16 @@ public final class CodexProvider: AIProvider {
     /// The settings repository for persisting provider settings
     private let settingsRepository: any ProviderSettingsRepository
 
+    /// Whether an explicit user action (Refresh / Connect) has successfully
+    /// probed the Codex CLI at least once. Read from the persisted
+    /// `CodexSettingsRepository` flag at init and kept in sync locally, so a
+    /// success on this run lifts the gate immediately (issue #216).
+    private var hasVerifiedSession: Bool
+
+    /// The message surfaced while the Codex CLI session has not been checked
+    /// by an explicit user action yet (issue #216).
+    static let notCheckedMessage = "Codex CLI session not checked. Click Refresh or Connect to check Codex status."
+
     /// Returns the active probe based on current mode
     private var activeProbe: any UsageProbe {
         switch probeMode {
@@ -74,6 +84,18 @@ public final class CodexProvider: AIProvider {
         case .api:
             // Fall back to RPC if API probe not available
             return apiProbe ?? rpcProbe
+        }
+    }
+
+    /// Whether the active probe is the RPC probe — the only one with the
+    /// spawn-a-subprocess side effect this gate exists for (issue #216).
+    private var backgroundProbeIsRPC: Bool {
+        switch probeMode {
+        case .rpc:
+            return true
+        case .api:
+            // Without an API probe the provider falls back to the RPC probe
+            return apiProbe == nil
         }
     }
 
@@ -90,6 +112,10 @@ public final class CodexProvider: AIProvider {
         self.apiProbe = nil
         self.settingsRepository = settingsRepository
         self.isEnabled = settingsRepository.isEnabled(forProvider: account.id)
+        self.hasVerifiedSession = Self.initialVerifiedSession(
+            account: account,
+            settingsRepository: settingsRepository as? CodexSettingsRepository
+        )
     }
 
     /// Creates a Codex provider with both RPC and API probes
@@ -108,6 +134,7 @@ public final class CodexProvider: AIProvider {
         self.apiProbe = apiProbe
         self.settingsRepository = settingsRepository
         self.isEnabled = settingsRepository.isEnabled(forProvider: account.id)
+        self.hasVerifiedSession = Self.initialVerifiedSession(account: account, settingsRepository: settingsRepository)
     }
 
     // MARK: - AIProvider Protocol
@@ -116,9 +143,38 @@ public final class CodexProvider: AIProvider {
         await activeProbe.isAvailable()
     }
 
+    /// Refreshes the usage data and updates the snapshot.
+    /// Interactive refresh: delegates to the kind-aware implementation.
     @discardableResult
     public func refresh() async throws -> UsageSnapshot {
-        // Coalesce concurrent polls for this account, including OAuth refresh.
+        try await refresh(.interactive)
+    }
+
+    /// Refreshes the usage data and updates the snapshot.
+    ///
+    /// The RPC probe spawns `codex app-server`, and an unauthenticated Codex
+    /// CLI can open the ChatGPT browser login all by itself. Probing is an
+    /// active operation, so it only runs on `.interactive` refreshes — a
+    /// genuine click (Refresh / Connect). Automatic refreshes stay passive
+    /// until such a click has succeeded at least once: `.background` (the
+    /// menu-bar poll) and `.passive` (popover open) return the last snapshot
+    /// without spawning anything, or surface `notCheckedMessage` when there is
+    /// nothing to show yet. A successful interactive refresh that ran the RPC
+    /// probe persists the verified flag (issue #216).
+    ///
+    /// Concurrent refreshes of one account share a single probe, so
+    /// overlapping UI and background polls cannot rotate its refresh token twice.
+    @discardableResult
+    public func refresh(_ kind: RefreshKind) async throws -> UsageSnapshot {
+        if kind != .interactive, backgroundProbeIsRPC, !hasVerifiedSession {
+            if let snapshot {
+                return snapshot
+            }
+            let error = ProbeError.executionFailed(Self.notCheckedMessage)
+            lastError = error
+            throw error
+        }
+
         if let refreshTask { return try await refreshTask.value }
         let probe = activeProbe
         let account = account
@@ -137,6 +193,9 @@ public final class CodexProvider: AIProvider {
             let newSnapshot = try await task.value
             snapshot = newSnapshot
             lastError = nil
+            if kind == .interactive, backgroundProbeIsRPC {
+                markSessionVerified()
+            }
             return newSnapshot
         } catch {
             lastError = error
@@ -164,6 +223,25 @@ public final class CodexProvider: AIProvider {
             bedrockUsage: value.bedrockUsage, dailyUsageReport: value.dailyUsageReport,
             extensionMetrics: value.extensionMetrics
         )
+    }
+
+    /// The default account reads the persisted flag. An added account was
+    /// probed by the explicit add-account flow before it could exist, and its
+    /// probe fails closed without credentials, so it starts verified.
+    private static func initialVerifiedSession(
+        account: ProviderAccount,
+        settingsRepository: (any CodexSettingsRepository)?
+    ) -> Bool {
+        guard account.isDefault else { return true }
+        return settingsRepository?.codexVerifiedAtLeastOnce() ?? false
+    }
+
+    /// Persists that the Codex CLI session was checked by an explicit user
+    /// action, so later background refreshes may probe again (issue #216).
+    private func markSessionVerified() {
+        guard !hasVerifiedSession else { return }
+        hasVerifiedSession = true
+        (settingsRepository as? CodexSettingsRepository)?.setCodexVerifiedAtLeastOnce(true)
     }
 
     /// Whether API mode is available (API probe was provided)

@@ -229,7 +229,7 @@ private struct ProviderDetailView: View {
         case "claude":
             ClaudeConfigCard(monitor: monitor)
         case "codex":
-            CodexConfigCard(monitor: monitor)
+            CodexConfigCard()
             CodexAccountsCard(monitor: monitor)
         case "kimi":
             KimiConfigCard(monitor: monitor)

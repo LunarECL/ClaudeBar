@@ -59,17 +59,29 @@ public struct CodexCredentialLoader: Sendable {
     /// Refresh age threshold: 8 days (matching Codex JS reference)
     private static let refreshAgeMs: Double = 8 * 24 * 60 * 60 * 1000
 
-    public init(homeDirectory: String) {
-        self.codexHome = (homeDirectory as NSString).appendingPathComponent(".codex")
+    /// Resolves the Codex home the way the `codex` CLI does: `$CODEX_HOME`
+    /// when set, `~/.codex` otherwise (issue #216).
+    public init(
+        homeDirectory: String = NSHomeDirectory(),
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
+        if let codexHome = environment["CODEX_HOME"], !codexHome.isEmpty {
+            self.codexHome = codexHome
+        } else {
+            self.codexHome = (homeDirectory as NSString).appendingPathComponent(".codex")
+        }
     }
 
     /// Explicit homes never fall back to the desktop/CLI login.
-    public init(codexHome: String = ProcessInfo.processInfo.environment["CODEX_HOME"]
-                ?? (NSHomeDirectory() as NSString).appendingPathComponent(".codex")) {
+    public init(codexHome: String) {
         self.codexHome = codexHome
     }
 
     /// The path to the auth file.
+    ///
+    /// The `codex` CLI honors `CODEX_HOME` and keeps `auth.json` there, so the
+    /// loader must look in the same place — otherwise a `CODEX_HOME` user
+    /// looks permanently logged out (issue #216).
     public var authFilePath: String {
         (codexHome as NSString).appendingPathComponent("auth.json")
     }

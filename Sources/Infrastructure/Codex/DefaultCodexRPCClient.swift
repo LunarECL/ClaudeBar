@@ -12,7 +12,7 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     private var nextID = 1
 
     /// Package-internal: allows tests to inject a mock transport for the production (no-injection) code path.
-    var transportFactory: ((String, [String]) throws -> RPCTransport)?
+    var transportFactory: ((String, [String], URL?) throws -> RPCTransport)?
 
     /// Default initializer - uses real CLI executor and creates transport lazily.
     public init(executable: String = "codex", cliExecutor: CLIExecutor? = nil, codexHome: String? = nil, includeAccountIdentity: Bool = false) {
@@ -42,6 +42,16 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     /// alike, and cannot stall a non-interactive pipe on an approval prompt.
     /// The read-only sandbox still keeps anything Codex might run boxed in.
     static let baseArguments = ["-s", "read-only", "-a", "never"]
+
+    /// Codex 0.150+ asks "Do you trust the contents of this directory?" before
+    /// it does anything interactive, including `/status`. The answer is the
+    /// number of the trust option in its selection list (#267). Unlike Claude,
+    /// Codex keeps trust state in SQLite with no file ClaudeBar can write, so
+    /// auto-answering the prompt is the only dismissal we can do; the answer
+    /// persists across probes once given.
+    static let trustAutoResponses = [
+        "Do you trust the contents of this directory?": "1"
+    ]
 
     public func isAvailable() -> Bool {
         let binaryName = executable
@@ -97,10 +107,18 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
             activeTransport = transport
             ownsTransport = false
         } else {
-            let factory = transportFactory ?? { exec, args in
-                try ProcessRPCTransport(executable: exec, arguments: args, environment: self.processEnvironment)
+            // The app-server trust-checks the directory it starts in, so the
+            // transport runs in the dedicated probe directory (#267).
+            let workingDirectory = ProbeWorkingDirectory.resolve()
+            let factory = transportFactory ?? { exec, args, dir in
+                try ProcessRPCTransport(
+                    executable: exec,
+                    arguments: args,
+                    environment: self.processEnvironment,
+                    workingDirectory: dir
+                )
             }
-            activeTransport = try factory(executable, Self.baseArguments + accountArguments + ["app-server"])
+            activeTransport = try factory(executable, Self.baseArguments + accountArguments + ["app-server"], workingDirectory)
             ownsTransport = true
         }
         defer {
@@ -173,13 +191,16 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     private func fetchViaTTY() async throws -> CodexRateLimitsResponse {
         AppLog.probes.info("Starting Codex TTY fallback...")
 
+        // Run in the dedicated probe directory and auto-answer the
+        // directory-trust prompt, or Codex 0.150+ stalls before `/status`
+        // can run (#267).
         let result = try await cliExecutor.execute(
             binary: executable,
             args: Self.baseArguments,
             input: "/status\n",
             timeout: 20.0,
-            workingDirectory: nil,
-            autoResponses: [:]
+            workingDirectory: ProbeWorkingDirectory.resolve(),
+            autoResponses: Self.trustAutoResponses
         )
 
         AppLog.probes.debug("Codex TTY raw output:\n\(result.output)")

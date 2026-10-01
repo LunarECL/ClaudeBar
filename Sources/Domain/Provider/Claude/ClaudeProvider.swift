@@ -303,13 +303,13 @@ public final class ClaudeProvider: AIProvider {
         }
     }
 
-    /// Attaches the daily-usage report for interactive refreshes only.
-    /// Background refreshes (the menu-bar poll) skip the JSONL scan to stay cheap
-    /// — the menu-bar label never renders the daily report, and the dropdown that
-    /// does always refreshes interactively (issue #204).
+    /// Attaches the daily-usage report for refreshes whose output the popover
+    /// renders: explicit clicks and the popover-open `.passive` refresh.
+    /// Background refreshes (the menu-bar poll) skip the JSONL scan to stay
+    /// cheap — the menu-bar label never renders the daily report (issue #204).
     private func report(for snapshot: UsageSnapshot, kind: RefreshKind) async -> UsageSnapshot {
         switch kind {
-        case .interactive:
+        case .interactive, .passive:
             return await attachDailyReport(to: snapshot)
         case .background:
             return snapshot
