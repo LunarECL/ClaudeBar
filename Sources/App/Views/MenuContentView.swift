@@ -475,14 +475,21 @@ struct MenuContentView: View {
                 overviewContent(providers: providers)
             }
         } else if let provider = selectedProvider, let snapshot = provider.snapshot {
+            let report = RefreshReport.of(provider)
             VStack(spacing: 12) {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
-                    accountCard(displayName: displayName, snapshot: snapshot)
+                    accountCard(
+                        displayName: displayName, snapshot: snapshot,
+                        freshness: report?.freshness ?? "Updated \(snapshot.ageDescription)"
+                    )
+                } else if let freshness = report?.freshness {
+                    freshnessLine(freshness)
                 }
-                if (provider as? Account)?.isNamedByAccount == true, provider.lastError != nil {
-                    compactErrorState(provider: provider)
+                if let failure = report?.failure {
+                    failureNotice(failure)
                 }
                 statsGrid(snapshot: snapshot)
+                    .opacity(report?.isLastSeen == true ? 0.55 : 1)
             }
             .opacity(animateIn ? 1 : 0)
             .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
@@ -515,10 +522,12 @@ struct MenuContentView: View {
             providerSectionHeader(provider: provider)
 
             if let snapshot = provider.snapshot {
-                if (provider as? Account)?.isNamedByAccount == true, provider.lastError != nil {
-                    compactErrorState(provider: provider)
+                let report = RefreshReport.of(provider)
+                if let failure = report?.failure {
+                    failureNotice(failure)
                 }
                 statsGrid(snapshot: snapshot)
+                    .opacity(report?.isLastSeen == true ? 0.55 : 1)
             } else if provider.isSyncing {
                 LoadingSpinnerView()
             } else {
@@ -545,6 +554,43 @@ struct MenuContentView: View {
         .padding(.horizontal, 4)
     }
 
+    /// "Updated 2m ago · via RPC" when there is no account card to carry it.
+    private func freshnessLine(_ text: String) -> some View {
+        HStack {
+            Text(text)
+                .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                .foregroundStyle(theme.textTertiary)
+            Spacer()
+        }
+        .padding(.horizontal, 4)
+    }
+
+    /// A failed refresh over the last usage: the step that failed, then what to do.
+    private func failureNotice(_ failure: RefreshReport.Failure) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(theme.statusWarning)
+
+            VStack(alignment: .leading, spacing: 2) {
+                if let headline = failure.headline {
+                    Text(headline)
+                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textPrimary)
+                }
+                Text(failure.detail)
+                    .help(failure.detail)
+                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+
     private func compactErrorState(provider: any AIProvider) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -563,7 +609,7 @@ struct MenuContentView: View {
     }
 
 
-    private func accountCard(displayName: String, snapshot: UsageSnapshot) -> some View {
+    private func accountCard(displayName: String, snapshot: UsageSnapshot, freshness: String) -> some View {
         HStack(spacing: 10) {
             // Avatar circle
             ZStack {
@@ -597,7 +643,7 @@ struct MenuContentView: View {
                     }
                 }
 
-                Text("Updated \(snapshot.ageDescription)")
+                Text(freshness)
                     .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
@@ -820,12 +866,16 @@ struct MenuContentView: View {
                     .foregroundStyle(theme.statusWarning)
             }
 
-            Text("\(selectedProvider?.name ?? selectedProviderId) Unavailable")
+            // A provider that is data names the step that failed first.
+            let failure = selectedProvider.flatMap { RefreshReport.of($0)?.failure }
+            Text(failure?.headline ?? "\(selectedProvider?.name ?? selectedProviderId) Unavailable")
                 .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
 
             // Show actual error message if available, otherwise generic message
-            Text(selectedProvider?.lastError?.localizedDescription ?? "Install CLI or check configuration")
+            Text(failure?.headline != nil
+                 ? "\(selectedProvider?.name ?? selectedProviderId) Unavailable · \(failure?.detail ?? "")"
+                 : selectedProvider?.lastError?.localizedDescription ?? "Install CLI or check configuration")
                 .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textTertiary)
                 .multilineTextAlignment(.center)

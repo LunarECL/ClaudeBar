@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Claude and Codex: the popover says which data source answered ("via RPC", or "via Terminal" after a fallback) and, when a refresh fails, which step went wrong ("Couldn't read your key"), keeping the last usage dimmed. ([#351](https://github.com/tddworks/ClaudeBar/issues/351))
+
 ### Fixed
 - Notifications, provider pills, the Touch Bar, the status export and Notify! now follow the burn-rate warning setting like the menu bar does, so a quota that's on pace no longer sends a warning while the menu bar says healthy. ([#357](https://github.com/tddworks/ClaudeBar/issues/357))
 

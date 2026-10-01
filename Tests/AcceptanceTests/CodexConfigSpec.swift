@@ -131,6 +131,40 @@ struct CodexConfigSpec {
         }
     }
 
+    // MARK: - #351: A failed key lookup names its step
+
+    @Suite("Scenario: A failed key lookup names its step")
+    @MainActor
+    struct FailedLookupNamesItsStep {
+
+        @Test
+        func `the last usage stays, the lookup step is named, and its source is kept`() async throws {
+            // Given — Codex on its API data source, showing usage
+            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let home = try CodexConfigSpec.makeHome()
+            defer { try? FileManager.default.removeItem(at: home) }
+            try CodexConfigSpec.writeAuth(in: home)
+            let network = MockNetworkClient()
+            given(network).request(.any).willReturn((
+                Data(#"{"rate_limit":{"primary_window":{"used_percent":38}}}"#.utf8),
+                HTTPURLResponse(url: URL(string: "https://chatgpt.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            ))
+            let codex = try CodexConfigSpec.makeCodex(settings: settings, home: home, network: network)
+            codex.provider.use("api")
+            try await codex.refresh()
+
+            // When — the key is gone and Codex refreshes
+            try FileManager.default.removeItem(at: home.appendingPathComponent(".codex/auth.json"))
+            await #expect(throws: (any Error).self) { try await codex.refresh() }
+
+            // Then — the popover can say "Couldn't read your key", with the
+            // last usage still on screen, last seen via API
+            #expect(codex.lastFailedStep == .lookup)
+            #expect(codex.snapshot?.quotas.first?.percentRemaining == 62)
+            #expect(codex.answeredByLabel == "API")
+        }
+    }
+
     // MARK: - #34: API mode credential availability
 
     @Suite("Scenario: API mode credential availability")

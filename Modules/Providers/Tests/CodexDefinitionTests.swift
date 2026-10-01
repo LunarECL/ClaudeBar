@@ -118,6 +118,7 @@ struct CodexDefinitionTests {
         #expect(usage.quota(for: .session)?.percentRemaining == 80)
         #expect(usage.quota(for: .weekly)?.percentRemaining == 35)
         #expect(codex.answeredBy == "tty")
+        #expect(codex.answeredByLabel == "Terminal")
     }
 
     @Test

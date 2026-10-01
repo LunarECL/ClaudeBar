@@ -43,6 +43,11 @@ public final class Account: AIProvider {
     /// The kind of the data source that produced `snapshot` — *via RPC*.
     public internal(set) var answeredBy: String?
 
+    /// What Settings calls that data source — *RPC*, *API*, *Terminal*.
+    public var answeredByLabel: String? {
+        answeredBy.map { provider.definition.dataSource($0)?.label ?? $0 }
+    }
+
     init(provider: Provider, login: ProviderAccount, values: [String: String]) {
         self.provider = provider
         self.id = login.id
