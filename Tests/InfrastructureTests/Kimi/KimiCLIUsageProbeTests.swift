@@ -213,8 +213,8 @@ struct KimiCLIUsageProbeTests {
     }
 
     @Test
-    func `completion rule is never pending without the status footer`() {
-        // Pre-0.36 CLIs have no "context:" footer — they must behave as before.
-        #expect(KimiCLIUsageProbe.usageCompletionRule.isPending("💫 > ") == false)
+    func `completion rule settles on a pre-0.36 screen without the status footer`() {
+        // Pre-0.36 CLIs have no "context:" footer; their quota line still ends the wait.
+        #expect(KimiCLIUsageProbe.usageCompletionRule.isPending("💫 > /usage\nWeekly limit  100% left") == false)
     }
 }

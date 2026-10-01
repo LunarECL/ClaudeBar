@@ -29,11 +29,11 @@ public struct KimiCLIUsageProbe: UsageProbe {
     /// The `context:` status footer paints at startup and the usage panel only
     /// arrives after a network round-trip to the billing API, so "no new data
     /// for 3 s" doesn't mean the screen is done. A quota line (`% used` / `% left`)
-    /// or an error/auth screen marks the settled screen. CLIs without the footer
-    /// (pre-0.36) never match the pending marker and behave as before.
+    /// or an error/auth screen marks the settled screen; until one appears the
+    /// capture keeps waiting, up to the probe timeout.
     static let usageCompletionRule = CLICompletionRule(
-        pendingMarkers: ["context:"],
         readyMarkers: ["% used", "% left", "No token usage", "rate limit", "Error", "login"]
+            .map { CLICompletionRule.Marker($0) }
     )
 
     public init(
