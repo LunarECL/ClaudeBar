@@ -173,7 +173,7 @@ public protocol BedrockSettingsRepository: ProviderSettingsRepository {
 }
 
 /// Claude-specific settings repository, extending base ProviderSettingsRepository.
-/// Includes configuration for probe mode (CLI vs API).
+/// Includes configuration for probe mode (CLI vs API) and the CLI binary to execute.
 /// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.
 /// App uses UserDefaultsProviderSettingsRepository.
 public protocol ClaudeSettingsRepository: ProviderSettingsRepository {
@@ -189,6 +189,26 @@ public protocol ClaudeSettingsRepository: ProviderSettingsRepository {
 
     /// Sets whether CLI fallback is enabled in API mode
     func setClaudeCliFallbackEnabled(_ enabled: Bool)
+
+    /// Gets the custom Claude CLI binary (empty string = use the default "claude").
+    /// A real binary path or a PATH-resolvable name works; shell aliases and
+    /// functions do not, because a subprocess can only exec a binary (#210).
+    func claudeBinary() -> String
+
+    /// Sets the custom Claude CLI binary (empty string to use the default "claude")
+    func setClaudeBinary(_ binary: String)
+}
+
+public extension ClaudeSettingsRepository {
+    /// The Claude CLI binary the probes should execute, resolving the user's
+    /// setting: a configured path or name is used as-is (trimmed), and an unset,
+    /// empty, or whitespace-only setting falls back to the default "claude".
+    /// The value is passed to the CLI executor as a binary, never interpreted
+    /// as a shell command line (#210).
+    func resolvedClaudeBinary() -> String {
+        let trimmed = claudeBinary().trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "claude" : trimmed
+    }
 }
 
 /// Codex-specific settings repository, extending base ProviderSettingsRepository.

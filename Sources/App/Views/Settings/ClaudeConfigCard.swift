@@ -13,6 +13,7 @@ struct ClaudeConfigCard: View {
     @State private var claudeBudgetExpanded: Bool = false
     @State private var claudeProbeMode: ClaudeProbeMode = .cli
     @State private var claudeCliFallbackEnabled: Bool = true
+    @State private var claudeBinaryInput: String = ""
     @State private var budgetInput: String = ""
 
     var body: some View {
@@ -23,6 +24,7 @@ struct ClaudeConfigCard: View {
         .onAppear {
             claudeProbeMode = settings.claude.claudeProbeMode()
             claudeCliFallbackEnabled = settings.claude.claudeCliFallbackEnabled()
+            claudeBinaryInput = settings.claude.claudeBinary()
             if settings.claudeApiBudget > 0 {
                 budgetInput = String(describing: settings.claudeApiBudget)
             }
@@ -132,6 +134,40 @@ struct ClaudeConfigCard: View {
                     Task {
                         await monitor.refresh(providerId: "claude")
                     }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("CLI BINARY")
+                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textSecondary)
+                    .tracking(0.5)
+
+                TextField("", text: $claudeBinaryInput, prompt: Text("claude").foregroundStyle(theme.textTertiary))
+                    .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(theme.glassBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(theme.glassBorder, lineWidth: 1)
+                            )
+                    )
+                    .onChange(of: claudeBinaryInput) { _, newValue in
+                        settings.claude.setClaudeBinary(newValue)
+                    }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Leave empty to use `claude` from PATH.")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textTertiary)
+
+                    Text("Enter a full binary path (e.g. /opt/tools/bin/claude-work) or a name findable in PATH. Shell aliases and functions (c, claudel…) cannot be launched by another app — point this at the real binary they call.")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textTertiary)
                 }
             }
 

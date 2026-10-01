@@ -333,6 +333,14 @@ public final class JSONSettingsRepository:
         store.write(value: enabled, key: "claude.cliFallbackEnabled")
     }
 
+    public func claudeBinary() -> String {
+        store.read(key: "claude.binary") ?? ""
+    }
+
+    public func setClaudeBinary(_ binary: String) {
+        store.write(value: binary, key: "claude.binary")
+    }
+
     // MARK: - CodexSettingsRepository
 
     public func codexProbeMode() -> CodexProbeMode {

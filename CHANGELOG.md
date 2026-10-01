@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Claude: the CLI binary is configurable (Settings → Providers → Claude → Claude Configuration → CLI Binary) for installs where `claude` lives under another name or path. Shell aliases can't be exec'd by an app — point it at the real binary. [#210](https://github.com/tddworks/ClaudeBar/issues/210)
+
 ---
 
 ## [0.4.94] - 2026-10-01

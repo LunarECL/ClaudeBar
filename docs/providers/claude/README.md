@@ -21,6 +21,12 @@ Shows your Claude Code 5-hour session and weekly limits, any model-specific week
 
 Each mode falls back to the other when it fails. In API mode, **CLI fallback** (on by default) controls whether `claude /usage` runs when the API can't answer; turn it off if running the CLI causes prompts (e.g. SSH key prompts) and you'd rather see the error. A rate-limit error never triggers the fallback, because the CLI hits the same backend.
 
+## Custom Claude binary
+
+CLI mode and guest passes exec the Claude binary directly. If yours is not the `claude` on your PATH — a versioned install (`claude-work`), a different prefix, a wrapper script — set **Settings → Providers → Claude → Claude Configuration → CLI Binary** to the binary's full path, or to a name that can be found in PATH. Leave it empty to keep using `claude`.
+
+A shell alias or function (`alias c=claude`, `claudel() { … }`) does **not** work here: ClaudeBar launches a process, not a shell, and a process can't run an alias. Point the setting at the real binary (or script) the alias calls — `which c` in a terminal shows where it leads.
+
 ## Permissions
 
 - **Keychain.** On macOS, `claude login` stores its token only in the Keychain item `Claude Code-credentials`. API mode reads it through Apple's `/usr/bin/security` tool, so it normally doesn't show a Keychain prompt. When ClaudeBar refreshes an expired token it writes the new one back to the same place.

@@ -14,6 +14,13 @@ Contributor notes for the Claude provider. For setup, see the [README](README.md
 | Guest passes | `claude /passes`, which copies the link to the clipboard | Max only (#243) |
 | Daily usage | `~/.claude/projects/*/*.jsonl` | Deduplicated by `(message.id, requestId)`, because Claude Code writes the same usage more than once |
 
+## Configurable CLI binary (#210)
+
+- `ClaudeSettingsRepository.claudeBinary()` stores the user's value — key `claude.binary` in `~/.claudebar/settings.json`, `providerConfig.claudeBinary` in the legacy UserDefaults store. The resolver `resolvedClaudeBinary()`, a default protocol implementation in the Domain layer, trims the value and falls back to `"claude"` when it is unset, empty, or whitespace-only.
+- `ClaudeBarApp.init` reads the resolved value once at construction and passes it into `ClaudeUsageProbe(claudeBinary:)` / `ClaudePassProbe(claudeBinary:)`. Both probes then locate (`CLIExecutor.locate`) and execute exactly that binary for `/usage`, `/cost`, and `/passes`.
+- Security posture: the value is only ever the `binary:` argument of `CLIExecutor.execute` — argv[0] of a `Process`, resolved by `BinaryLocator`, which passes absolute paths through unchanged and `which`es bare names. It is never interpreted as a shell command line; nothing in the codebase builds a `sh -c`. Shell aliases and functions are unsupported by construction, because a subprocess has no shell to resolve them — the Settings help text says so (#210).
+- Changing the setting takes effect on the next app launch: the probes are built once in the composition root, not per refresh.
+
 ## Fallback chain
 
 `ClaudeProvider` runs the chosen mode first and, if it fails, the other one:

@@ -426,4 +426,6 @@ private final class FakeClaudeSettings: ClaudeSettingsRepository, @unchecked Sen
     func setClaudeProbeMode(_ mode: ClaudeProbeMode) { probeMode = mode }
     func claudeCliFallbackEnabled() -> Bool { cliFallbackEnabled }
     func setClaudeCliFallbackEnabled(_ enabled: Bool) { cliFallbackEnabled = enabled }
+    func claudeBinary() -> String { "" }
+    func setClaudeBinary(_ binary: String) {}
 }

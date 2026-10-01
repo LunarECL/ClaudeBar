@@ -252,6 +252,14 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(enabled, forKey: Keys.claudeCliFallbackEnabled)
     }
 
+    public func claudeBinary() -> String {
+        userDefaults.string(forKey: Keys.claudeBinary) ?? ""
+    }
+
+    public func setClaudeBinary(_ binary: String) {
+        userDefaults.set(binary, forKey: Keys.claudeBinary)
+    }
+
     // MARK: - CodexSettingsRepository
 
     public func codexProbeMode() -> CodexProbeMode {
@@ -503,6 +511,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         // Claude settings
         static let claudeProbeMode = "providerConfig.claudeProbeMode"
         static let claudeCliFallbackEnabled = "providerConfig.claudeCliFallbackEnabled"
+        static let claudeBinary = "providerConfig.claudeBinary"
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
         static let codexVerifiedAtLeastOnce = "providerConfig.codexVerifiedAtLeastOnce"

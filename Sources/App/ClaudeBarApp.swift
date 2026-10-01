@@ -83,9 +83,15 @@ struct ClaudeBarApp: App {
         // Each probe checks isAvailable() for credentials/prerequisites
         let repository = AIProviders(providers: [
             ClaudeProvider(
-                cliProbe: ClaudeUsageProbe(),
+                cliProbe: ClaudeUsageProbe(
+                    // User-configured CLI binary (#210): a real path or
+                    // PATH-resolvable name, defaulting to "claude".
+                    claudeBinary: settingsRepository.resolvedClaudeBinary()
+                ),
                 apiProbe: ClaudeAPIUsageProbe(),
-                passProbe: ClaudePassProbe(),
+                passProbe: ClaudePassProbe(
+                    claudeBinary: settingsRepository.resolvedClaudeBinary()
+                ),
                 settingsRepository: settingsRepository,
                 dailyUsageAnalyzer: ClaudeDailyUsageAnalyzer(
                     // Inference routed at a loopback endpoint costs nothing (#190).
