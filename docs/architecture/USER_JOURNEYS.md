@@ -10,7 +10,7 @@ description: The provider redesign seen from outside in — four people, eleven 
 > them, and only then says what the model must be. Where a journey and the
 > model disagree, the journey wins and the model moves.
 >
-> **The mockup:** [provider-user-journeys.html](../mockups/provider-user-journeys.html)
+> **The mockup:** [provider-user-journeys.html](../../design-concept/provider-user-journeys.html)
 > — open it in a browser; ← → step through the moments, `#7` jumps to one.
 >
 > | Question | Document |
