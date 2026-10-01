@@ -44,7 +44,8 @@ public enum MiniMaxRegion: String, Sendable, Equatable, CaseIterable {
         }
     }
 
-    /// Dashboard URL for coding plan payment page (Coding Plan 付费页面 URL)
+    /// Dashboard URL for the Token Plan payment page (Token Plan 付费页面 URL).
+    /// The URL path still says `coding-plan`; MiniMax kept the old path after the rename.
     public var dashboardURL: URL {
         switch self {
         case .international:

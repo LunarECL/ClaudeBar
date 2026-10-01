@@ -104,7 +104,15 @@ public struct MiniMaxUsageProbe: UsageProbe {
 
     // MARK: - Response Parsing (Static for testability)
 
-    /// Parses the MiniMax Coding Plan remains API response into a UsageSnapshot
+    /// Parses the MiniMax Token Plan remains API response into a UsageSnapshot.
+    ///
+    /// Each model yields one quota for its interval (5h) window, plus a second
+    /// `"<model> Weekly"` quota when the response reports a weekly percentage.
+    /// Token Plan responses carry `*_remaining_percent` and zero counts; legacy
+    /// Coding Plan responses carry request counts only, which are used as a fallback.
+    ///
+    /// - Throws: `UsageError` when the response is malformed, MiniMax reports an
+    ///   error status, or no models are returned.
     static func parseResponse(_ data: Data, providerId: String) throws -> UsageSnapshot {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -180,11 +188,15 @@ public struct MiniMaxUsageProbe: UsageProbe {
         )
     }
 
+    /// Length in seconds of a window given its start and end as epoch milliseconds.
+    /// Returns nil when either bound is missing or the window isn't positive,
+    /// so a quota never claims a window the API didn't actually report.
     private static func windowDuration(start: Int64?, end: Int64?) -> TimeInterval? {
         guard let start, let end, end > start else { return nil }
         return Double(end - start) / 1000.0
     }
 
+    /// Keeps an API-reported percentage within 0...100.
     private static func clampPercentage(_ value: Double) -> Double {
         min(max(value, 0), 100)
     }
@@ -202,15 +214,22 @@ struct BaseResp: Decodable {
     let statusMsg: String?
 }
 
+/// One model's remaining allowance. All `*Time` fields are epoch milliseconds.
 struct ModelRemain: Decodable {
     let modelName: String
+    /// Legacy Coding Plan count shape; both counts are 0 on Token Plan keys.
     let currentIntervalTotalCount: Int
+    /// Despite the name, this is the count LEFT, not used.
     let currentIntervalUsageCount: Int
+    /// Token Plan shape: percent REMAINING in the interval (5h) window, 0...100.
     let currentIntervalRemainingPercent: Double?
+    /// Token Plan shape: percent REMAINING in the weekly window, 0...100.
     let currentWeeklyRemainingPercent: Double?
     let remainsTime: Int?
+    /// Interval (5h) window bounds.
     let startTime: Int64?
     let endTime: Int64?
+    /// Weekly window bounds.
     let weeklyStartTime: Int64?
     let weeklyEndTime: Int64?
 }
