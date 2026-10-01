@@ -182,6 +182,13 @@ struct ClaudeBarApp: App {
         for account in codex.accounts.dropFirst() {
             repository.add(account)
         }
+        // Providers people made in Add Provider (~/.claudebar/providers), after
+        // the built-ins; their keys come from ClaudeBar's vault.
+        let vault = ProviderVault()
+        for definition in ProviderCatalog().custom() {
+            Providers.register(custom: definition)
+            repository.add(Providers.make(definition, settings: settingsRepository, secrets: vault).defaultAccount)
+        }
         AppLog.providers.info("Created \(repository.all.count) providers")
 
         // Initialize the domain service with quota alerter

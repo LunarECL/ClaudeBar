@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add Provider: track a service ClaudeBar doesn't ship. Settings → Providers → Add Provider… starts from an API, a command, a file or a copy; test it, click the numbers to map them, name it. Keys stay in your Keychain. ([#354](https://github.com/tddworks/ClaudeBar/issues/354))
 - Claude and Codex: the popover says which data source answered ("via RPC", or "via Terminal" after a fallback) and, when a refresh fails, which step went wrong ("Couldn't read your key"), keeping the last usage dimmed. ([#351](https://github.com/tddworks/ClaudeBar/issues/351))
 
 ### Fixed

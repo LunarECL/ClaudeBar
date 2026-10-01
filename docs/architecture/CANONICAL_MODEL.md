@@ -402,7 +402,7 @@ context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
 | `StatusPolicy` | **built** (#357): `StatusPolicy` in `Quotas` with `quota.status(under:)` / `usage.overallStatus(under:)`; `QuotaMonitor.statusPolicy` read live from the burn-rate settings; alerts, pills, cards, Touch Bars, status export and Notify! all read under it. Left: `menuBarLabel(…)` still takes the two burn-rate values instead of the policy, and pace falls back to `quotaType.duration` when no window is known | the menu-bar label takes the policy; the `Window` law removes the guess; `StatusColorPolicy` (colours, high contrast) moves to the App |
 | `Account.budget` | two one-off settings: `app.claudeApiBudget` (+ `…Enabled`, edited in Claude's card) and `bedrock.dailyBudget`; Bedrock turns its budget into a fake `Daily Budget` quota | a `Budget` beside the account's `Cost`, judged as `BudgetStatus`, never a quota; the old keys read as the default account's budget |
 | page state | `MenuBarLabel`, `CountdownColon`, `PopoverContentHeight`, `MenuBarStackedSize` in `Domain/Provider`; `menuBarLabel(…)` on `QuotaMonitor` | the App |
-| `ProviderDefinition` · *Add Provider* | — (extensions are hand-written on disk) | Data Sources + Providers + a Settings sheet |
+| `ProviderDefinition` · *Add Provider* | **built** (#354): *Start from API · CLI · File · Copy a provider* → *Connect* (*Test Connection*) → *Map fields* (click a value, live card; money, % used/left, a balance; a CLI's text by its line) → *Look* → *Save*; `ProviderDraft` → `ProviderCatalog` (`~/.claudebar/providers/<id>.json`, origin custom, minted id) and the key in the vault (`setting`); *Delete*. Not yet: *Edit*, several quotas from one response | Export/Import (#355); Edit |
 
 ### The order of the work
 

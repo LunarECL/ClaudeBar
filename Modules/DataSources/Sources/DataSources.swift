@@ -21,7 +21,12 @@ public enum DataSources {
     }
 
     /// A data source on the real network, CLI, Keychain and file system.
-    public static func make(_ definition: DataSourceDefinition, providerId: String, scripts: @escaping ScriptSource = { _ in nil }) -> DataSource {
+    public static func make(
+        _ definition: DataSourceDefinition,
+        providerId: String,
+        scripts: @escaping ScriptSource = { _ in nil },
+        secrets: (any SecretStore)? = nil
+    ) -> DataSource {
         make(
             definition,
             providerId: providerId,
@@ -32,6 +37,7 @@ public enum DataSources {
             },
             security: KeychainReader.system,
             scripts: scripts,
+            secrets: secrets,
             environment: { ProcessInfo.processInfo.environment[$0] },
             homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
             now: { Date() }
@@ -49,6 +55,7 @@ public enum DataSources {
         makeTransport: @escaping TransportFactory,
         security: @escaping @Sendable ([String]) -> (status: Int32, output: String) = { _ in (1, "") },
         scripts: @escaping ScriptSource = { _ in nil },
+        secrets: (any SecretStore)? = nil,
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         now: @escaping @Sendable () -> Date
@@ -61,6 +68,7 @@ public enum DataSources {
             makeTransport: makeTransport,
             security: security,
             scripts: scripts,
+            secrets: secrets,
             environment: environment,
             homeDirectory: homeDirectory,
             now: now
@@ -75,6 +83,7 @@ public enum DataSources {
         makeTransport: @escaping TransportFactory,
         security: @escaping KeychainReader.Security,
         scripts: @escaping ScriptSource,
+        secrets: (any SecretStore)?,
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         now: @escaping @Sendable () -> Date
@@ -86,6 +95,8 @@ public enum DataSources {
             JSONRPCFetcher(call: call, cliExecutor: makeCLIExecutor(CLICall(cli: call.cli)), makeTransport: makeTransport)
         case .cli(let call):
             CLIFetcher(call: call, makeExecutor: makeCLIExecutor)
+        case .file(let call):
+            FileFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
         }
 
         let mapper: any Reading = switch definition.mapping {
@@ -101,7 +112,8 @@ public enum DataSources {
             lookup = base
         }
 
-        let readers = Readers(environment: environment, homeDirectory: homeDirectory, security: security)
+        let readers = Readers(environment: environment, homeDirectory: homeDirectory, security: security,
+                              secrets: secrets, providerId: providerId)
         return DataSource(
             definition: definition,
             providerId: providerId,
@@ -129,6 +141,8 @@ public enum DataSources {
         let environment: @Sendable (String) -> String?
         let homeDirectory: URL
         let security: KeychainReader.Security
+        let secrets: (any SecretStore)?
+        let providerId: String
 
         func reader(for lookup: CredentialLookup) -> any CredentialFinding {
             switch lookup {
@@ -138,6 +152,8 @@ public enum DataSources {
                 JSONFileReader(file: file, homeDirectory: homeDirectory, environment: environment)
             case .keychain(let item):
                 KeychainReader(item: item, security: security)
+            case .setting(let name):
+                SettingReader(name: name, providerId: providerId, secrets: secrets)
             case .firstOf(let lookups):
                 FirstOfReader(readers: lookups.map { reader(for: $0) })
             case .refreshing(let base, _):

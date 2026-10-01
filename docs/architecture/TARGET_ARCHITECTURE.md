@@ -372,7 +372,7 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | 3 | the look (✅ #353), the Data source section (✅ #352) and the settings form move into the JSON; the `switch id` tables and the simple config cards go | adding a provider edits no Swift |
 | 4 ✅ | the kernel laws: `Left` (no fake 100%), `Window` (no guessed length) | balance definitions map money only |
 | 5 | the CLI and cookie providers (Gemini, Kiro, Cursor, AmpCode, Antigravity, Alibaba, …): `CLIFetcher`, `BrowserCookieReader`, …; Bedrock via `Fetch.cloudWatch` and the `AWSClients` module; extensions read as definitions; *PROBE MODE* → *DATA SOURCE* | no `XxxUsageProbe` is left |
-| 6 | *Add Provider*, *Export*, *Import* — the screens of [USER_JOURNEYS.md](USER_JOURNEYS.md) moments 5–11, outer loop from its §5 scenarios | a person adds, shares and imports a provider without a restart, and no exported file contains a key |
+| 6 | *Add Provider* (✅ #354), *Export*, *Import* — the screens of [USER_JOURNEYS.md](USER_JOURNEYS.md) moments 5–11, outer loop from its §5 scenarios | a person adds, shares and imports a provider without a restart, and no exported file contains a key |
 | 7 | Claude (PTY CLI, multi-account, guest passes, budget); the renames (`Usage`, `Plan`, `Cost`, `DataSourceError`) | `AIProvider` folds into `Provider` |
 
 ## 8.1 · What Claude added

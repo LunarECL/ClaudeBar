@@ -570,7 +570,7 @@ enum ProviderVisualIdentityLookup {
     /// Get provider theme color by ID
     /// The look a definition gives, for screens that only hold an id.
     private static func look(for providerId: String) -> ProviderLook? {
-        Providers.builtInDefinition(forLineupId: providerId)?.profile.look
+        Providers.definition(forLineupId: providerId)?.profile.look
     }
 
     static func color(for providerId: String, scheme: ColorScheme) -> Color {
@@ -770,7 +770,7 @@ enum ProviderVisualIdentityLookup {
 
     /// Get provider display name by ID
     static func name(for providerId: String) -> String {
-        if let definition = Providers.builtInDefinition(forLineupId: providerId) { return definition.profile.name }
+        if let definition = Providers.definition(forLineupId: providerId) { return definition.profile.name }
         switch providerId {
         case "gemini": return "Gemini"
         case "copilot": return "GitHub Copilot"

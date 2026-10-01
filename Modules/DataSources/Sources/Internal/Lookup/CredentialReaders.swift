@@ -230,3 +230,17 @@ extension Credential {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
+
+/// `setting` — a key the person gave ClaudeBar, read from its vault.
+struct SettingReader: CredentialFinding {
+    let name: String
+    let providerId: String
+    let secrets: (any SecretStore)?
+
+    func find() throws -> FoundCredential? {
+        guard let value = secrets?.secret(name, provider: providerId).map(Credential.trimmed), !value.isEmpty else {
+            return nil
+        }
+        return FoundCredential(credential: Credential(["token": value]), save: nil)
+    }
+}

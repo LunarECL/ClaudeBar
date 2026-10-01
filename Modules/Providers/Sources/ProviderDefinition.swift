@@ -204,6 +204,7 @@ public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {
     case unknownDataSource(String, String)
     case missingFile(String)
     case missingAccountValue(String, String)
+    case duplicateProvider(String)
 
     public var errorDescription: String? {
         switch self {
@@ -212,6 +213,7 @@ public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {
         case .unknownDataSource(let id, let kind): "Provider '\(id)' names data source '\(kind)', which it doesn't have"
         case .missingFile(let name): "No provider definition named '\(name)'"
         case .missingAccountValue(let id, let name): "A '\(id)' account has no saved '\(name)'"
+        case .duplicateProvider(let id): "A provider named '\(id)' already exists"
         }
     }
 }

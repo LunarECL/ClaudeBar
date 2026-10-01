@@ -10,6 +10,17 @@ public enum Fetch: Sendable, Equatable {
     case jsonRpc(JSONRPCCall)
     /// A CLI run in a terminal, its screen captured — the *CLI* choice.
     case cli(CLICall)
+    /// A file on this Mac that some tool keeps up to date — the *File* choice.
+    case file(FileCall)
+}
+
+/// `{ "path": "~/.tool/usage.json" }` — `~` and `${VAR:-default}` expand.
+public struct FileCall: Sendable, Equatable, Codable {
+    public let path: String
+
+    public init(path: String) {
+        self.path = path
+    }
 }
 
 /// `{{name}}` placeholders in `url`, `headers` and `body` are filled from the
@@ -232,13 +243,14 @@ public struct CLICall: Sendable, Equatable, Codable {
 // MARK: - JSON
 
 extension Fetch: Codable {
-    private static let tags = ["http", "jsonRpc", "cli"]
+    private static let tags = ["http", "jsonRpc", "cli", "file"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
         switch try container.singleTag(of: Self.tags, in: "fetch") {
         case "http": self = .http(try container.decode(HTTPRequest.self, forKey: TagKey("http")))
         case "jsonRpc": self = .jsonRpc(try container.decode(JSONRPCCall.self, forKey: TagKey("jsonRpc")))
+        case "file": self = .file(try container.decode(FileCall.self, forKey: TagKey("file")))
         default: self = .cli(try container.decode(CLICall.self, forKey: TagKey("cli")))
         }
     }
@@ -249,6 +261,7 @@ extension Fetch: Codable {
         case .http(let request): try container.encode(request, forKey: TagKey("http"))
         case .jsonRpc(let call): try container.encode(call, forKey: TagKey("jsonRpc"))
         case .cli(let call): try container.encode(call, forKey: TagKey("cli"))
+        case .file(let call): try container.encode(call, forKey: TagKey("file"))
         }
     }
 }

@@ -10,6 +10,7 @@ struct ProvidersPane: View {
 
     @Environment(\.appTheme) private var theme
     @State private var selectedProviderId: String?
+    @State private var addingProvider = false
 
     var body: some View {
         if let providerId = selectedProviderId,
@@ -37,7 +38,16 @@ struct ProvidersPane: View {
                         }
                     }
                 }
+
+                HStack {
+                    Spacer()
+                    Button("Add Provider…") { addingProvider = true }
+                }
+                .padding(.top, 4)
             }
+        }
+        .sheet(isPresented: $addingProvider) {
+            AddProviderSheet(monitor: monitor) { addingProvider = false }
         }
     }
 }
@@ -254,7 +264,10 @@ private struct ProviderDetailView: View {
         case "bedrock":
             BedrockConfigCard(monitor: monitor)
         default:
-            if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
+            if let custom = (provider as? Account)?.provider, custom.definition.profile.origin == .custom {
+                DataSourceSection(provider: custom, monitor: monitor)
+                DeleteCustomProviderCard(provider: custom, monitor: monitor, onDeleted: onBack)
+            } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
                 ExtensionConfigCard(
                     provider: extProvider,
                     configRepository: AppSettings.shared.extensionConfig

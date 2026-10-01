@@ -89,7 +89,7 @@ public final class NotificationAlerter: QuotaAlerter, @unchecked Sendable {
             return account.email.map { "Codex · \($0)" } ?? "Codex"
         }
         // A provider that is data names itself in its profile.
-        if let definition = Providers.builtInDefinitions[providerId] {
+        if let definition = Providers.definition(forLineupId: providerId) {
             return definition.profile.name
         }
         switch providerId {

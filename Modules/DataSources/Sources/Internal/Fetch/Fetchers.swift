@@ -224,3 +224,25 @@ struct CLIFetcher: Fetching {
         )
     }
 }
+
+/// `file` — reads a file some tool keeps up to date. Ready while it exists.
+struct FileFetcher: Fetching {
+    let call: FileCall
+    let homeDirectory: URL
+    let environment: @Sendable (String) -> String?
+
+    private var path: String {
+        Paths.expand(call.path, homeDirectory: homeDirectory, environment: environment)
+    }
+
+    func isReady() -> Bool {
+        FileManager.default.fileExists(atPath: path)
+    }
+
+    func fetch(with credential: Credential?) async throws -> Response {
+        guard let data = FileManager.default.contents(atPath: path) else {
+            throw UsageError.executionFailed("No file at \(call.path)")
+        }
+        return Response(body: data)
+    }
+}
