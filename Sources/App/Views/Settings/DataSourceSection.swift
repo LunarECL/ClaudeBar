@@ -140,6 +140,9 @@ struct DataSourceSection: View {
 
             testConnection
         }
+        // Fill the card, aligned with its header — a disclosure group centres
+        // content that is narrower than itself.
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func choiceRow(_ choice: DataSourceSectionText.Choice) -> some View {
