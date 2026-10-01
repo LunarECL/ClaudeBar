@@ -4,7 +4,29 @@
 
 Add API-based usage probing for Codex, following the same dual-probe pattern as Claude (CLI/API mode switching). The Codex API probe reads OAuth credentials from `~/.codex/auth.json`, refreshes tokens via OpenAI's OAuth endpoint, and fetches usage data from the ChatGPT backend API.
 
-## Architecture Diagram
+## Current shape: Codex is data
+
+Since `20be605` Codex has no Swift of its own. It is
+[`Modules/Providers/Resources/Providers/codex.json`](../../../Modules/Providers/Resources/Providers/codex.json),
+run by the one `Provider` and the `DataSources` workers
+([TARGET_ARCHITECTURE.md](../../architecture/TARGET_ARCHITECTURE.md) §3):
+
+| Data source | Credential | Fetch | Mapping | Fallback |
+|---|---|---|---|---|
+| `rpc` (default) | — | `jsonRpc`: `codex -s read-only -a never app-server` in the probe directory; `initialize` → `initialized` → `account/rateLimits/read` | `json`: `result.rateLimits.primary/secondary`, `rateLimitsByLimitId` (skipping `codex`), free-plan `whenEmpty` | `tty` |
+| `api` | `jsonFile` `~/.codex/auth.json`, `refresh.oauth2` every 8 days or on 401/403 | `http` `GET chatgpt.com/backend-api/wham/usage` | `json`: headers first, `rate_limit.*_window`, `additional_rate_limits[]`, `plan_type`, credits against 1000 | — |
+| `tty` (hidden) | — | `cli`: `codex -s read-only -a never`, types `/status`, answers the trust prompt with `1` | `text`: the three error phrases, `5h limit` / `Weekly limit` → `NN% left` within 12 lines | — |
+
+Every finding below is now a line in that file, pinned by
+`Modules/Providers/Tests/CodexDefinitionTests.swift`, which runs the old
+probes' fixtures through it. Two behaviours changed on purpose: when RPC and
+the terminal both fail, the **RPC** error is reported (the root cause, as for
+Claude); and `resetText` for a reset already passed reads "Resets soon" in
+both modes. The `CodexProvider`, `CodexUsageProbe`, `CodexAPIUsageProbe`,
+`DefaultCodexRPCClient` and `CodexCredentialLoader` named in the plan below
+no longer exist.
+
+## Architecture Diagram (the original plan)
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────┐
@@ -175,5 +197,5 @@ This plan covered the API probe. What was learned afterwards, mostly about the R
 - **Directory-trust prompt (#267)**: Codex 0.150+ asks "Do you trust the contents of this directory?" before it does anything interactive, and it trust-checks the directory on **both** probe paths: the `app-server` RPC handshake and the TTY fallback. A probe that inherits the app's cwd (`/` from Finder/launchd) stalls until timeout, surfacing as "Could not find usage limits in Codex output". Unlike Claude, Codex 0.150 keeps trust state in SQLite with no file ClaudeBar can write, so both paths run in `Application Support/ClaudeBar/Probe` (`ProbeWorkingDirectory.resolve()`, shared with the Claude probes) and the TTY fallback auto-answers the prompt with `"1"` (the trust option's number). The answer persists once given.
 - **Process leak (#113)**: each refresh starts its own `app-server`. The transport the probe creates **must** be closed in a `defer`. Before this was fixed, thousands of orphaned `codex app-server` processes built up.
 - **API mode credits**: `x-codex-credits-balance` (header) or `credits.balance` (body) is shown against a hard-coded limit of 1000. The API doesn't return a limit. Headers `x-codex-primary-used-percent` / `x-codex-secondary-used-percent` take precedence. Reset times always come from `rate_limit.*_window`.
-- **No fallback between modes.** `CodexProvider` runs only the selected probe. Unlike Claude, a failing mode doesn't try the other.
+- **No fallback between the modes the person picks.** Only `rpc` falls back, to the hidden `tty`. A failing `api` doesn't try `rpc`.
 - **Extra buckets (#178)**: GPT-5.3-Codex-Spark (Pro research preview) has its own 5h + weekly windows, separate from the main limits. Both modes carry the data. RPC: `account/rateLimits/read` returns `result.rateLimitsByLimitId`, a map of `RateLimitSnapshot` keyed by limit id (`codex` is the main bucket and mirrors the top-level `rateLimits`; other keys are the extras). API: the body has `additional_rate_limits`, an array of `{limit_name, metered_feature, rate_limit}` where `rate_limit` is a `RateLimitStatusDetails` object that may be null and holds nested `primary_window` / `secondary_window` objects with the same `used_percent` / `reset_at` / `reset_after_seconds` fields as the main windows (plus `limit_window_seconds`, kept as the quota's `windowDuration`). Both paths append the extra quotas **after** the main session/weekly rows — the menu bar renders `quotas.first`, so the main limits must lead. Labels are trimmed for the menu (`Codex Spark` / `codex_spark` → "Spark"); the extra weekly window becomes "Spark 7d". Entries with no parseable window are skipped, and an absent map/field leaves the snapshot unchanged.
