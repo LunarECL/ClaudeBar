@@ -41,6 +41,22 @@ struct DefaultCLIExecutorTests {
         #expect(result.output.contains("Current session"))
     }
 
+    @Test("Delivers typed input after the configured delay")
+    func deliversDelayedInput() async throws {
+        // /bin/cat echoes back whatever it reads; the delay must not lose the
+        // input, and the session must stay open long enough to receive it.
+        let result = try await DefaultCLIExecutor(inputDelay: 1.0).execute(
+            binary: "/bin/cat",
+            args: [],
+            input: "delayed-hello",
+            timeout: 10,
+            workingDirectory: nil,
+            autoResponses: [:]
+        )
+
+        #expect(result.output.contains("delayed-hello"))
+    }
+
     @Test("Throws when the binary cannot be located")
     func throwsForMissingBinary() async {
         await #expect(throws: (any Error).self) {

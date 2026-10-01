@@ -384,4 +384,23 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.minimaxRegion() == .international)
     }
 
+    // MARK: - Kimi Settings
+
+    @Test
+    func `kimiRegion defaults to china`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.kimiRegion() == .china)
+    }
+
+    @Test
+    func `setKimiRegion persists value`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setKimiRegion(.international)
+        #expect(repo.kimiRegion() == .international)
+    }
+
 }

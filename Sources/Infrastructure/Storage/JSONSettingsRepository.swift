@@ -369,6 +369,18 @@ public final class JSONSettingsRepository:
         store.write(value: mode.rawValue, key: "kimi.probeMode")
     }
 
+    public func kimiRegion() -> KimiRegion {
+        guard let raw: String = store.read(key: "kimi.region"),
+              let region = KimiRegion(rawValue: raw) else {
+            return .china
+        }
+        return region
+    }
+
+    public func setKimiRegion(_ region: KimiRegion) {
+        store.write(value: region.rawValue, key: "kimi.region")
+    }
+
     // MARK: - ZaiSettingsRepository
 
     public func zaiConfigPath() -> String {

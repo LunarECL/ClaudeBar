@@ -11,6 +11,7 @@ struct KimiConfigCard: View {
 
     @State private var kimiConfigExpanded: Bool = false
     @State private var kimiProbeMode: KimiProbeMode = .cli
+    @State private var kimiRegion: KimiRegion = .china
 
     var body: some View {
         DisclosureGroup(isExpanded: $kimiConfigExpanded) {
@@ -48,6 +49,7 @@ struct KimiConfigCard: View {
         )
         .onAppear {
             kimiProbeMode = settings.kimi.kimiProbeMode()
+            kimiRegion = settings.kimi.kimiRegion()
         }
     }
 
@@ -102,6 +104,32 @@ struct KimiConfigCard: View {
                     Task {
                         await monitor.refresh(providerId: "kimi")
                     }
+                }
+            }
+
+            if kimiProbeMode == .api {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("REGION")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                        .tracking(0.5)
+
+                    Picker("", selection: $kimiRegion) {
+                        ForEach(KimiRegion.allCases, id: \.self) { region in
+                            Text(region.displayName).tag(region)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: kimiRegion) { _, newValue in
+                        settings.kimi.setKimiRegion(newValue)
+                        Task {
+                            await monitor.refresh(providerId: "kimi")
+                        }
+                    }
+
+                    Text("Pick the platform your account is signed in to: kimi.com (China) or kimi.ai (international).")
+                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textTertiary)
                 }
             }
 
