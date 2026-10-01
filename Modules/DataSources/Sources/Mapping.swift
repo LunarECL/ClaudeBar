@@ -6,6 +6,31 @@ import Foundation
 public enum Mapping: Sendable, Equatable {
     case json(JSONMapping)
     case text(TextMapping)
+    /// A format no rule can say — a TUI screen, a money shape — read by a
+    /// JavaScript file run in JavaScriptCore, with no file, network or
+    /// process access.
+    case script(ScriptMapping)
+}
+
+/// `{ "script": { "file": "claude-usage-screen.js", "credential": ["subscriptionType"] } }`
+///
+/// The script defines `read(response, context)` and returns
+/// `{ quotas, plan, cost, account }` or `{ error }`. It sees only the
+/// credential values named here — never a token.
+public struct ScriptMapping: Sendable, Equatable, Codable {
+    public let file: String
+    public let credential: [String]
+
+    public init(file: String, credential: [String] = []) {
+        self.file = file
+        self.credential = credential
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        file = try container.decode(String.self, forKey: .file)
+        credential = try container.decodeIfPresent([String].self, forKey: .credential) ?? []
+    }
 }
 
 // MARK: - Shared vocabulary
@@ -153,6 +178,7 @@ public enum ErrorRef: Sendable, Equatable, Codable {
     case noData
     case parseFailed(String)
     case sessionExpired(String?)
+    case executionFailed(String)
 
     public var probeError: ProbeError {
         switch self {
@@ -163,6 +189,7 @@ public enum ErrorRef: Sendable, Equatable, Codable {
         case .noData: .noData
         case .parseFailed(let reason): .parseFailed(reason)
         case .sessionExpired(let hint): .sessionExpired(hint: hint)
+        case .executionFailed(let reason): .executionFailed(reason)
         }
     }
 
@@ -181,9 +208,13 @@ public enum ErrorRef: Sendable, Equatable, Codable {
             return
         }
         let container = try decoder.container(keyedBy: TagKey.self)
-        let tag = try container.singleTag(of: ["parseFailed", "sessionExpired"], in: "error")
+        let tag = try container.singleTag(of: ["parseFailed", "sessionExpired", "executionFailed"], in: "error")
         let text = try container.decode(String.self, forKey: TagKey(tag))
-        self = tag == "parseFailed" ? .parseFailed(text) : .sessionExpired(text)
+        switch tag {
+        case "parseFailed": self = .parseFailed(text)
+        case "executionFailed": self = .executionFailed(text)
+        default: self = .sessionExpired(text)
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -194,6 +225,9 @@ public enum ErrorRef: Sendable, Equatable, Codable {
         case .sessionExpired(let hint?):
             var container = encoder.container(keyedBy: TagKey.self)
             try container.encode(hint, forKey: TagKey("sessionExpired"))
+        case .executionFailed(let reason):
+            var container = encoder.container(keyedBy: TagKey.self)
+            try container.encode(reason, forKey: TagKey("executionFailed"))
         default:
             var container = encoder.singleValueContainer()
             let tag: String = switch self {
@@ -505,8 +539,9 @@ public struct TextMapping: Sendable, Equatable, Codable {
 extension Mapping: Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
-        switch try container.singleTag(of: ["json", "text"], in: "mapping") {
+        switch try container.singleTag(of: ["json", "text", "script"], in: "mapping") {
         case "json": self = .json(try container.decode(JSONMapping.self, forKey: TagKey("json")))
+        case "script": self = .script(try container.decode(ScriptMapping.self, forKey: TagKey("script")))
         default: self = .text(try container.decode(TextMapping.self, forKey: TagKey("text")))
         }
     }
@@ -516,6 +551,7 @@ extension Mapping: Codable {
         switch self {
         case .json(let mapping): try container.encode(mapping, forKey: TagKey("json"))
         case .text(let mapping): try container.encode(mapping, forKey: TagKey("text"))
+        case .script(let mapping): try container.encode(mapping, forKey: TagKey("script"))
         }
     }
 }

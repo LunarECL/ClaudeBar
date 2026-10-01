@@ -2,6 +2,27 @@
 
 Contributor notes for the Claude provider. For setup, see the [README](README.md).
 
+## Current shape: Claude is data
+
+Claude has no provider class or probes of its own. It is
+[`Modules/Providers/Resources/Providers/claude.json`](../../../Modules/Providers/Resources/Providers/claude.json)
+plus three mapping scripts beside it, run by the one `Provider` and the
+`DataSources` workers ([TARGET_ARCHITECTURE.md](../../architecture/TARGET_ARCHITECTURE.md)):
+
+| Data source | Fetch | Mapping | Then |
+|---|---|---|---|
+| `cli` (default) | `cli`: `claude /usage --allowed-tools ""` in the probe directory, `CLAUDE_CODE_OAUTH_TOKEN` unset, `CLAUDEBAR_PROBE=1`, the ready markers, screen rendered by the terminal emulator | `claude-usage-screen.js`, with `~/.claude.json`'s account fields as context | `subscriptionRequired` hands off to `cliCost`; any other failure falls back to `api`; `folderTrustRequired` patches `projects[<probe dir>].hasTrustDialogAccepted` once and retries |
+| `cliCost` (hidden) | `cli`: `claude /cost`, no ready markers | `claude-cost-screen.js` | falls back to `api` |
+| `api` | `http` `GET …/api/oauth/usage`; key from `~/.claude/.credentials.json`, the Keychain item, then `CLAUDE_CODE_OAUTH_TOKEN`; OAuth refresh with a JSON body 5 minutes before `expiresAt` (written back as a number) | `claude-usage-api.js`, which sees the credential's `subscriptionType` and never a token | cached 15 minutes (the background floor); a 429 is remembered; falls back to `cli` unless `claude.cliFallbackEnabled` is off |
+
+The scripts run in JavaScriptCore with no file, network or process access;
+reset text is parsed by the host's `humanDate()`. Daily usage and guest passes
+are attached to the provider at composition (`ClaudeBarApp`). The rules below
+still hold — they are now lines in `claude.json`, pinned by
+`Modules/Providers/Tests/Claude*Tests.swift`. Where this page names
+`ClaudeProvider`, `ClaudeUsageProbe`, `ClaudeAPIUsageProbe` or
+`ClaudeCredentialLoader`, read "the definition"; those types are gone.
+
 ## Sources
 
 | Probe | Source | Notes |

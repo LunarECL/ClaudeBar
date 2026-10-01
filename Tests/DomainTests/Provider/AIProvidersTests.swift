@@ -23,7 +23,7 @@ struct AIProvidersTests {
     func `all returns all registered providers`() {
         let settings = makeSettingsRepository()
         let providers = AIProviders(providers: [
-            ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings),
+            StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings),
             StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings),
             GeminiProvider(probe: MockUsageProbe(), settingsRepository: settings)
         ])
@@ -43,7 +43,7 @@ struct AIProvidersTests {
     @Test
     func `enabled returns only providers with isEnabled true`() {
         let settings = makeSettingsRepository()
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let gemini = GeminiProvider(probe: MockUsageProbe(), settingsRepository: settings)
 
@@ -61,7 +61,7 @@ struct AIProvidersTests {
     @Test
     func `enabled returns empty when all providers disabled`() {
         let settings = makeSettingsRepository()
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
 
         claude.isEnabled = false
@@ -75,7 +75,7 @@ struct AIProvidersTests {
     @Test
     func `enabled returns all when all providers enabled`() {
         let settings = makeSettingsRepository()
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
 
         // Both enabled by default
@@ -89,7 +89,7 @@ struct AIProvidersTests {
     @Test
     func `provider by id returns correct provider`() {
         let settings = makeSettingsRepository()
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
 
         let providers = AIProviders(providers: [claude, codex])
@@ -102,7 +102,7 @@ struct AIProvidersTests {
     func `provider by id returns nil for unknown id`() {
         let settings = makeSettingsRepository()
         let providers = AIProviders(providers: [
-            ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         ])
 
         #expect(providers.provider(id: "unknown") == nil)
@@ -113,7 +113,7 @@ struct AIProvidersTests {
     @Test
     func `toggling provider isEnabled updates enabled list`() {
         let settings = makeSettingsRepository()
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let providers = AIProviders(providers: [claude])
 
         #expect(providers.enabled.count == 1)
@@ -132,7 +132,7 @@ struct AIProvidersTests {
     @Test
     func `add appends new provider to all`() {
         let settings = makeSettingsRepository()
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let providers = AIProviders(providers: [claude])
 
         #expect(providers.all.count == 1)
@@ -147,10 +147,10 @@ struct AIProvidersTests {
     @Test
     func `add does not duplicate existing provider`() {
         let settings = makeSettingsRepository()
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let providers = AIProviders(providers: [claude])
 
-        let anotherClaude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let anotherClaude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         providers.add(anotherClaude)
 
         #expect(providers.all.count == 1)
@@ -163,7 +163,7 @@ struct AIProvidersTests {
 
         #expect(providers.all.isEmpty)
 
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         providers.add(claude)
 
         #expect(providers.all.count == 1)
@@ -175,7 +175,7 @@ struct AIProvidersTests {
     @Test
     func `remove deletes provider by id`() {
         let settings = makeSettingsRepository()
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let providers = AIProviders(providers: [claude, codex])
 
@@ -190,7 +190,7 @@ struct AIProvidersTests {
     @Test
     func `remove does nothing for unknown id`() {
         let settings = makeSettingsRepository()
-        let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         let providers = AIProviders(providers: [claude])
 
         providers.remove(id: "unknown")

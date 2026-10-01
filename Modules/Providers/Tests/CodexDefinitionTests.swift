@@ -24,7 +24,7 @@ struct CodexDefinitionTests {
         #expect(codex.cli == "codex")
         #expect(codex.dataSources.map(\.kind) == ["rpc", "api", "tty"])
         #expect(codex.defaultDataSource == "rpc")
-        #expect(codex.dataSource("rpc")?.fallback == "tty")
+        #expect(codex.dataSource("rpc")?.fallback?.to == "tty")
         #expect(codex.dataSource("tty")?.hidden == true)
         #expect(codex.links.dashboard == URL(string: "https://platform.openai.com/usage"))
     }

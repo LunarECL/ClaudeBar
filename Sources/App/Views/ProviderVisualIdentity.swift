@@ -28,31 +28,6 @@ public protocol ProviderVisualIdentity {
     func themeGradient(for scheme: ColorScheme) -> LinearGradient
 }
 
-// MARK: - ClaudeProvider Visual Identity
-
-extension ClaudeProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "brain.fill" }
-
-    public var iconAssetName: String { "ClaudeIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? BaseTheme.coralAccent
-            : Color(red: 0.95, green: 0.48, blue: 0.38)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark ? BaseTheme.pinkHot : Color(red: 0.92, green: 0.45, blue: 0.72)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - Provider Visual Identity
 
 /// A provider built from a definition takes its look from the id tables

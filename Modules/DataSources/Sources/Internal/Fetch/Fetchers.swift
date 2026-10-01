@@ -84,12 +84,14 @@ struct HTTPFetcher: Fetching {
     /// `Retry-After` as seconds, or as an HTTP date.
     static func retryAfter(_ value: String?, now: Date) -> TimeInterval? {
         guard let value = value?.trimmingCharacters(in: .whitespaces), !value.isEmpty else { return nil }
-        if let seconds = TimeInterval(value) { return max(0, seconds) }
+        // `0` or a negative wait is no answer: retrying at once would hammer the endpoint.
+        if let seconds = TimeInterval(value) { return seconds > 0 ? seconds : nil }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-        guard let date = formatter.date(from: value) else { return nil }
-        return max(0, date.timeIntervalSince(now))
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        guard let date = formatter.date(from: value), date > now else { return nil }
+        return date.timeIntervalSince(now)
     }
 }
 
@@ -161,26 +163,51 @@ final class RPCSession: @unchecked Sendable {
     }
 }
 
-/// `cli` — runs the CLI in a terminal and answers with what the screen showed.
+/// `cli` — runs the CLI in a terminal and answers with what the screen showed,
+/// drawn by a terminal emulator first when the call asks for it.
 struct CLIFetcher: Fetching {
+    /// The executor for one call: its environment changes and ready markers.
+    typealias MakeExecutor = @Sendable (CLICall) -> any CLIExecutor
+
     let call: CLICall
-    let cliExecutor: any CLIExecutor
+    let makeExecutor: MakeExecutor
 
     func isReady() -> Bool {
-        cliExecutor.locate(call.cli) != nil
+        makeExecutor(call).locate(call.cli) != nil
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
         let directory = call.workingDirectory == .probe ? ProbeWorkingDirectory.resolve() : nil
-        let result = try await cliExecutor.execute(
-            binary: call.cli,
-            args: call.args,
-            input: call.input,
-            timeout: call.timeout,
-            workingDirectory: directory,
-            autoResponses: call.autoResponses
-        )
+        let result: CLIResult
+        do {
+            result = try await makeExecutor(call).execute(
+                binary: call.cli,
+                args: call.args,
+                input: call.input,
+                timeout: call.timeout,
+                workingDirectory: directory,
+                autoResponses: call.autoResponses
+            )
+        } catch let error as ProbeError {
+            throw error
+        } catch {
+            throw ProbeError.executionFailed(error.localizedDescription)
+        }
         AppLog.probes.debug("\(call.cli) screen captured (\(result.output.count) chars)")
-        return Response(text: result.output)
+        switch call.screen {
+        case .raw: return Response(text: result.output)
+        case .rendered: return Response(text: TerminalRenderer(cols: 160, rows: 50).render(result.output))
+        }
+    }
+
+    /// The real terminal: `DefaultCLIExecutor` with the call's environment and ready markers.
+    static let system: MakeExecutor = { call in
+        DefaultCLIExecutor(
+            environmentExclusions: call.environment.unset,
+            environmentAdditions: call.environment.set,
+            completionRule: call.readyWhen.isEmpty
+                ? nil
+                : CLICompletionRule(readyMarkers: call.readyWhen.map { CLICompletionRule.Marker($0.text, endsRow: $0.endsRow) })
+        )
     }
 }

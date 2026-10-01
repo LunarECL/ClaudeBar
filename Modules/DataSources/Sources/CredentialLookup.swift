@@ -15,6 +15,9 @@ public indirect enum CredentialLookup: Sendable, Equatable {
     case environment(String)
     /// A JSON file on this Mac holds the token and its companions.
     case jsonFile(JSONFileCredential)
+    /// A generic-password Keychain item whose password is JSON (or the token
+    /// itself, with `"token": "$"`).
+    case keychain(KeychainCredential)
     /// The first lookup that answers wins.
     case firstOf([CredentialLookup])
     /// A lookup whose token is kept fresh by an OAuth 2 refresh.
@@ -39,7 +42,38 @@ public struct Credential: Sendable, Equatable {
     }
 }
 
-/// A JSON file and where in it each credential value lives.
+/// A Keychain item and where in its JSON password each credential value lives.
+public struct KeychainCredential: Sendable, Equatable, Codable {
+    public let service: String
+    /// Credential name → JSON path in the password. `token` is required.
+    public let fields: [String: String]
+
+    public init(service: String, fields: [String: String]) {
+        self.service = service
+        self.fields = fields
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: TagKey.self)
+        service = try container.decode(String.self, forKey: TagKey("service"))
+        var fields: [String: String] = [:]
+        for key in container.allKeys where key.stringValue != "service" {
+            fields[key.stringValue] = try container.decode(String.self, forKey: key)
+        }
+        self.fields = fields
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: TagKey.self)
+        try container.encode(service, forKey: TagKey("service"))
+        for (name, path) in fields {
+            try container.encode(path, forKey: TagKey(name))
+        }
+    }
+}
+
+/// A JSON file and where in it each credential value lives. `path` may start
+/// with `~/` or `${VARIABLE:-~}/`.
 public struct JSONFileCredential: Sendable, Equatable, Codable {
     /// `~` expands to the home directory.
     public let path: String
@@ -83,6 +117,42 @@ public struct OAuth2Refresh: Sendable, Equatable, Codable {
     public let expiredCodes: [String]
     /// What to tell the person when the session has expired.
     public let hint: String?
+    /// `form` (RFC 6749's default) or `json`.
+    public let bodyFormat: BodyFormat
+    public let scope: String?
+    /// Refresh when the credential's `expiresAt` is within `skew` seconds.
+    public let dueWhen: Expiry?
+
+    public enum BodyFormat: String, Sendable, Equatable, Codable {
+        case form
+        case json
+    }
+
+    /// When a token expires: the credential value holding the instant, its
+    /// unit, and how early to refresh. A missing value means "refresh now".
+    public struct Expiry: Sendable, Equatable, Codable {
+        public enum Unit: String, Sendable, Equatable, Codable {
+            case seconds
+            case milliseconds
+        }
+
+        public let expiresAt: String
+        public let unit: Unit
+        public let skew: TimeInterval
+
+        public init(expiresAt: String = "expiresAt", unit: Unit = .seconds, skew: TimeInterval = 0) {
+            self.expiresAt = expiresAt
+            self.unit = unit
+            self.skew = skew
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            expiresAt = try container.decodeIfPresent(String.self, forKey: .expiresAt) ?? "expiresAt"
+            unit = try container.decodeIfPresent(Unit.self, forKey: .unit) ?? .seconds
+            skew = try container.decodeIfPresent(TimeInterval.self, forKey: .skew) ?? 0
+        }
+    }
 
     public init(
         tokenURL: String,
@@ -90,7 +160,10 @@ public struct OAuth2Refresh: Sendable, Equatable, Codable {
         every: TimeInterval? = nil,
         onStatus: [Int] = [],
         expiredCodes: [String] = [],
-        hint: String? = nil
+        hint: String? = nil,
+        bodyFormat: BodyFormat = .form,
+        scope: String? = nil,
+        dueWhen: Expiry? = nil
     ) {
         self.tokenURL = tokenURL
         self.clientId = clientId
@@ -98,6 +171,9 @@ public struct OAuth2Refresh: Sendable, Equatable, Codable {
         self.onStatus = onStatus
         self.expiredCodes = expiredCodes
         self.hint = hint
+        self.bodyFormat = bodyFormat
+        self.scope = scope
+        self.dueWhen = dueWhen
     }
 
     public init(from decoder: Decoder) throws {
@@ -108,13 +184,16 @@ public struct OAuth2Refresh: Sendable, Equatable, Codable {
         onStatus = try container.decodeIfPresent([Int].self, forKey: .onStatus) ?? []
         expiredCodes = try container.decodeIfPresent([String].self, forKey: .expiredCodes) ?? []
         hint = try container.decodeIfPresent(String.self, forKey: .hint)
+        bodyFormat = try container.decodeIfPresent(BodyFormat.self, forKey: .bodyFormat) ?? .form
+        scope = try container.decodeIfPresent(String.self, forKey: .scope)
+        dueWhen = try container.decodeIfPresent(Expiry.self, forKey: .dueWhen)
     }
 }
 
 // MARK: - JSON
 
 extension CredentialLookup: Codable {
-    private static let tags = ["environment", "jsonFile", "firstOf"]
+    private static let tags = ["environment", "jsonFile", "keychain", "firstOf"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
@@ -124,6 +203,8 @@ extension CredentialLookup: Codable {
             base = .environment(try container.decode(String.self, forKey: TagKey("environment")))
         case "jsonFile":
             base = .jsonFile(try container.decode(JSONFileCredential.self, forKey: TagKey("jsonFile")))
+        case "keychain":
+            base = .keychain(try container.decode(KeychainCredential.self, forKey: TagKey("keychain")))
         default:
             base = .firstOf(try container.decode([CredentialLookup].self, forKey: TagKey("firstOf")))
         }
@@ -146,6 +227,8 @@ extension CredentialLookup: Codable {
             try container.encode(name, forKey: TagKey("environment"))
         case .jsonFile(let file):
             try container.encode(file, forKey: TagKey("jsonFile"))
+        case .keychain(let item):
+            try container.encode(item, forKey: TagKey("keychain"))
         case .firstOf(let lookups):
             try container.encode(lookups, forKey: TagKey("firstOf"))
         case .refreshing(let base, let refresh):

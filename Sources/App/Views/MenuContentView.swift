@@ -1,6 +1,7 @@
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 #if ENABLE_SPARKLE
 import Sparkle
 #endif
@@ -105,8 +106,7 @@ struct MenuContentView: View {
             }
 
             // Share Pass Overlay
-            if showSharePass, let claudeProvider = selectedProvider as? ClaudeProvider,
-               let guestPass = claudeProvider.guestPass {
+            if showSharePass, let guestPass = guestPasses?.pass {
                 SharePassOverlay(pass: guestPass) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showSharePass = false
@@ -115,11 +115,10 @@ struct MenuContentView: View {
             }
 
             // Share Pass Error Overlay
-            if let claudeProvider = selectedProvider as? ClaudeProvider,
-               let passError = claudeProvider.passError {
+            if let guestPasses, let passError = guestPasses.error {
                 SharePassErrorOverlay(message: passError.localizedDescription) {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        claudeProvider.clearPassError()
+                        guestPasses.clearError()
                     }
                 }
             }
@@ -213,9 +212,9 @@ struct MenuContentView: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 showSharePass = false
             }
-        } else if let claudeProvider = selectedProvider as? ClaudeProvider, claudeProvider.passError != nil {
+        } else if let guestPasses, guestPasses.error != nil {
             withAnimation(.easeInOut(duration: 0.2)) {
-                claudeProvider.clearPassError()
+                guestPasses.clearError()
             }
         } else {
             onClose?()
@@ -873,9 +872,8 @@ struct MenuContentView: View {
             Spacer()
 
             // Share Button (Claude only) - icon only
-            if let claudeProvider = selectedProvider as? ClaudeProvider,
-               claudeProvider.supportsGuestPasses {
-                let isFetchingPasses = claudeProvider.isFetchingPasses
+            if let guestPasses, guestPasses.isOffered(for: selectedProvider?.snapshot) {
+                let isFetchingPasses = guestPasses.isFetching
                 Button {
                     Task { await fetchAndShowPasses() }
                 } label: {
@@ -988,17 +986,22 @@ struct MenuContentView: View {
         }
     }
 
+    /// The selected provider's guest passes, when it has any to offer.
+    private var guestPasses: GuestPasses? {
+        (selectedProvider as? Provider)?.guestPasses
+    }
+
     /// Fetch guest passes and show the share view
     private func fetchAndShowPasses() async {
-        guard let claudeProvider = selectedProvider as? ClaudeProvider else {
+        guard let guestPasses else {
             return
         }
 
         // Prevent duplicate fetches
-        guard !claudeProvider.isFetchingPasses else { return }
+        guard !guestPasses.isFetching else { return }
 
         do {
-            _ = try await claudeProvider.fetchPasses()
+            _ = try await guestPasses.fetch()
             withAnimation(.easeInOut(duration: 0.2)) {
                 showSharePass = true
             }

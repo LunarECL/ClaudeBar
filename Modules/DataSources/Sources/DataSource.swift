@@ -16,6 +16,10 @@ public struct DataSource: Sendable {
     private let refresher: (any CredentialRefreshing)?
     private let fetcher: any Fetching
     private let mapper: any Reading
+    private let contextFiles: [String: JSONFileReader]
+    private let recoveries: [String: any Recovering]
+    private let memory: UsageMemory
+    private let now: @Sendable () -> Date
 
     init(
         definition: DataSourceDefinition,
@@ -23,7 +27,10 @@ public struct DataSource: Sendable {
         credentials: (any CredentialFinding)?,
         refresher: (any CredentialRefreshing)?,
         fetcher: any Fetching,
-        mapper: any Reading
+        mapper: any Reading,
+        contextFiles: [String: JSONFileReader],
+        recoveries: [String: any Recovering],
+        now: @escaping @Sendable () -> Date
     ) {
         self.definition = definition
         self.providerId = providerId
@@ -31,9 +38,17 @@ public struct DataSource: Sendable {
         self.refresher = refresher
         self.fetcher = fetcher
         self.mapper = mapper
+        self.contextFiles = contextFiles
+        self.recoveries = recoveries
+        self.memory = UsageMemory()
+        self.now = now
     }
 
     public var kind: String { definition.kind }
+
+    /// How long a fetched usage is served again — also the provider's
+    /// background refresh floor while this data source is active.
+    public var cacheTTL: TimeInterval? { definition.cache?.ttl }
 
     /// Whether the key lookup finds a key — *OAuth credentials found*.
     /// `true` for a data source that needs none.
@@ -53,30 +68,103 @@ public struct DataSource: Sendable {
     /// Looks up the key and fetches. Nothing is mapped and nothing is saved.
     /// Throws a `DataSourceError` naming the step that failed.
     public func fetchResponse() async throws -> Response {
+        try await fetch().response
+    }
+
+    /// *Fetching usage data…* — `mapping.read(fetchResponse())`, served from
+    /// the cache while it is fresh, and refused without a request while a
+    /// rate limit lasts. Throws a `DataSourceError` naming the step that failed.
+    public func fetchUsage() async throws -> UsageSnapshot {
+        if let ttl = cacheTTL, let cached = memory.snapshot(within: ttl, now: now()) {
+            return cached
+        }
+        if let retryAt = memory.rateLimit(now: now()) {
+            throw DataSourceError(.fetch, .rateLimited(retryAt: retryAt))
+        }
+        do {
+            let usage = try await fetchAndRead(recovering: true)
+            if cacheTTL != nil { memory.remember(usage, at: now()) }
+            return usage
+        } catch let error as DataSourceError {
+            if case .rateLimited(let retryAt) = error.reason { memory.remember(rateLimitUntil: retryAt) }
+            throw error
+        }
+    }
+
+    /// *Map fields*' live card: reads a response already fetched.
+    public func read(_ response: Response) throws -> UsageSnapshot {
+        try read(response, credential: nil)
+    }
+
+    // MARK: - Private
+
+    private func fetchAndRead(recovering: Bool) async throws -> UsageSnapshot {
+        let (response, credential) = try await fetch()
+        do {
+            return try read(response, credential: credential)
+        } catch let failure as DataSourceError {
+            guard recovering, let recovery = recoveries[failure.reason.tag], recovery.recover() else { throw failure }
+            AppLog.probes.info("\(providerId) \(kind): recovered from \(failure.reason.tag), trying once more")
+            return try await fetchAndRead(recovering: false)
+        }
+    }
+
+    private func read(_ response: Response, credential: Credential?) throws -> UsageSnapshot {
+        let facts = MappingFacts(
+            credential: visibleCredential(credential),
+            context: contextFiles.mapValues { $0.fields() }
+        )
+        do {
+            return try mapper.read(response, facts: facts, providerId: providerId)
+        } catch {
+            throw DataSourceError.wrap(error, as: .mapping)
+        }
+    }
+
+    /// Only the values a script mapping asks for — never a token.
+    private func visibleCredential(_ credential: Credential?) -> [String: String] {
+        guard case .script(let script) = definition.mapping, let credential else { return [:] }
+        let secret: Set = ["token", "refreshToken", "idToken"]
+        return credential.values.filter { script.credential.contains($0.key) && !secret.contains($0.key) }
+    }
+
+    private func fetch() async throws -> (response: Response, credential: Credential?) {
         var found = try lookUp()
 
         if let refresher, let current = found, refresher.isDue(current.credential) {
             do {
                 found = try await refreshed(current, by: refresher)
-            } catch let error as DataSourceError where error.reason.isSessionExpired {
-                throw error
-            } catch {
-                // A proactive refresh that fails is not fatal: the token we
-                // have may still work. Only "log in again" stops the fetch.
-                AppLog.probes.warning("\(providerId) \(kind): refresh failed, trying the current token")
+            } catch let error as DataSourceError {
+                if let rotated = rotated(since: current) {
+                    // Another program — the CLI that owns the credential —
+                    // already refreshed it. Its token is the one to use.
+                    found = rotated
+                } else if error.reason.isSessionExpired {
+                    throw error
+                } else {
+                    // A proactive refresh that fails is not fatal: the token
+                    // we have may still work.
+                    AppLog.probes.warning("\(providerId) \(kind): refresh failed, trying the current token")
+                }
             }
         }
 
         do {
-            return try await fetcher.fetch(with: found?.credential)
+            return (try await fetcher.fetch(with: found?.credential), found?.credential)
         } catch let refused as HTTPStatusError {
             guard let refresher, let current = found, refresher.retryStatuses.contains(refused.status) else {
                 throw DataSourceError(.fetch, refused.reason)
             }
             AppLog.probes.info("\(providerId) \(kind): HTTP \(refused.status), refreshing the token once")
-            let renewed = try await refreshed(current, by: refresher)
+            let renewed: FoundCredential
             do {
-                return try await fetcher.fetch(with: renewed.credential)
+                renewed = try await refreshed(current, by: refresher)
+            } catch {
+                guard let rotated = rotated(since: current) else { throw error }
+                renewed = rotated
+            }
+            do {
+                return (try await fetcher.fetch(with: renewed.credential), renewed.credential)
             } catch {
                 throw Self.fetchError(error)
             }
@@ -84,24 +172,6 @@ public struct DataSource: Sendable {
             throw Self.fetchError(error)
         }
     }
-
-    /// *Fetching usage data…* — `mapping.read(fetchResponse())`.
-    /// Throws a `DataSourceError` naming the step that failed.
-    public func fetchUsage() async throws -> UsageSnapshot {
-        let response = try await fetchResponse()
-        return try read(response)
-    }
-
-    /// *Map fields*' live card: reads a response already fetched.
-    public func read(_ response: Response) throws -> UsageSnapshot {
-        do {
-            return try mapper.read(response, providerId: providerId)
-        } catch {
-            throw DataSourceError.wrap(error, as: .mapping)
-        }
-    }
-
-    // MARK: - Private
 
     private func lookUp() throws -> FoundCredential? {
         guard let credentials else { return nil }
@@ -115,6 +185,14 @@ public struct DataSource: Sendable {
             throw DataSourceError(.lookup, .authenticationRequired)
         }
         return found
+    }
+
+    /// The credential looked up again, when its token is no longer `current`'s.
+    private func rotated(since current: FoundCredential) -> FoundCredential? {
+        guard let fresh = try? credentials?.find(),
+              fresh.credential.token != current.credential.token else { return nil }
+        AppLog.probes.info("\(providerId) \(kind): the credential changed on disk; using the new one")
+        return fresh
     }
 
     /// Refreshes the token and writes it back where it was found.
@@ -142,6 +220,23 @@ extension ProbeError {
         if case .sessionExpired = self { return true }
         return false
     }
+
+    /// The name a definition uses for this failure — `fallbackOn` and `recover` keys.
+    public var tag: String {
+        switch self {
+        case .cliNotFound: "cliNotFound"
+        case .authenticationRequired: "authenticationRequired"
+        case .sessionExpired: "sessionExpired"
+        case .parseFailed: "parseFailed"
+        case .timeout: "timeout"
+        case .noData: "noData"
+        case .updateRequired: "updateRequired"
+        case .folderTrustRequired: "folderTrustRequired"
+        case .executionFailed: "executionFailed"
+        case .subscriptionRequired: "subscriptionRequired"
+        case .rateLimited: "rateLimited"
+        }
+    }
 }
 
 // MARK: - The workers' roles (internal: the factory picks them)
@@ -150,6 +245,13 @@ extension ProbeError {
 struct FoundCredential: Sendable {
     var credential: Credential
     let save: (@Sendable (Credential) -> Void)?
+}
+
+/// What a mapping may read besides the response: the credential values it was
+/// allowed to see, and the fields of each context file.
+struct MappingFacts: Sendable {
+    var credential: [String: String] = [:]
+    var context: [String: [String: String]] = [:]
 }
 
 protocol CredentialFinding: Sendable {
@@ -169,11 +271,49 @@ protocol Fetching: Sendable {
 }
 
 protocol Reading: Sendable {
-    func read(_ response: Response, providerId: String) throws -> UsageSnapshot
+    func read(_ response: Response, facts: MappingFacts, providerId: String) throws -> UsageSnapshot
+}
+
+/// A fix tried once when the mapping reports a failure. `true` when it changed
+/// something worth trying again for.
+protocol Recovering: Sendable {
+    func recover() -> Bool
 }
 
 /// An HTTP answer outside 2xx, kept with its status so a refresh can be tried.
 struct HTTPStatusError: Error, Sendable {
     let status: Int
     let reason: ProbeError
+}
+
+/// The last usage and a rate limit's end, kept between refreshes.
+final class UsageMemory: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last: (usage: UsageSnapshot, at: Date)?
+    private var retryAt: Date?
+
+    func snapshot(within ttl: TimeInterval, now: Date) -> UsageSnapshot? {
+        lock.lock(); defer { lock.unlock() }
+        guard let last, now.timeIntervalSince(last.at) < ttl else { return nil }
+        return last.usage
+    }
+
+    func remember(_ usage: UsageSnapshot, at date: Date) {
+        lock.lock(); defer { lock.unlock() }
+        last = (usage, date)
+    }
+
+    func rateLimit(now: Date) -> Date? {
+        lock.lock(); defer { lock.unlock() }
+        guard let retryAt, retryAt > now else {
+            retryAt = nil
+            return nil
+        }
+        return retryAt
+    }
+
+    func remember(rateLimitUntil date: Date) {
+        lock.lock(); defer { lock.unlock() }
+        retryAt = date
+    }
 }

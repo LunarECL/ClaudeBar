@@ -143,7 +143,8 @@ Modules/DataSources/
 │       │              BrowserCookieReader · OAuth2Refresher
 │       ├── Fetch/     HTTPFetcher · JSONRPCFetcher · CLIFetcher · TerminalFetcher ·
 │       │              FileFetcher · ScriptFetcher · CloudWatchFetcher
-│       ├── Mapping/   JSONMapper (+ the path dialect) · TextMapper
+│       ├── Mapping/   JSONMapper (+ the path dialect) · TextMapper · ScriptMapper ·
+│       │              HumanDate
 │       ├── Process/   DefaultCLIExecutor · ProcessRPCTransport · InteractiveRunner ·
 │       │              BinaryLocator · LoginShellEnvironment · TerminalRenderer
 │       └── Network/   URLSessionNetworkClient
@@ -164,7 +165,7 @@ Modules/Providers/
 │   ├── Providers.swift                 the factory: makeCatalog(settings:vault:cloudWatch:)
 │   └── Internal/
 │       └── DefinitionFiles.swift       reads *.json from Bundle.module or a folder
-├── Resources/Providers/                codex.json · deepseek.json · …   — the vendors
+├── Resources/Providers/                codex.json · claude.json · claude-*.js · …   — the vendors
 └── Tests/
     ├── ProviderTests.swift
     ├── CatalogTests.swift              every bundled definition decodes

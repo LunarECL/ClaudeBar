@@ -61,6 +61,12 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(kind, forKey: "providerConfig.\(id)ProbeMode")
     }
 
+    /// `providerConfig.<id><Setting>` — e.g. `providerConfig.claudeCliFallbackEnabled`.
+    public func isOn(_ setting: String, forProvider id: String) -> Bool? {
+        let key = "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())"
+        return userDefaults.object(forKey: key) as? Bool
+    }
+
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         let key = Self.enabledKey(forProvider: id)
         userDefaults.set(enabled, forKey: key)

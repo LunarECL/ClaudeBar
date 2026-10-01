@@ -21,9 +21,14 @@ struct ClaudeBarApp: App {
     /// A built-in provider from its bundled definition. A definition that fails
     /// to load is a packaging bug the catalog tests catch before release.
     @MainActor
-    private static func builtIn(_ id: String, settings: any ProviderSettingsRepository) -> any AIProvider {
+    private static func builtIn(
+        _ id: String,
+        settings: any ProviderSettingsRepository,
+        dailyUsage: (any DailyUsageAnalyzing)? = nil,
+        guestPasses: GuestPasses? = nil
+    ) -> any AIProvider {
         do {
-            return try Providers.make(id, settings: settings)
+            return try Providers.make(id, settings: settings, dailyUsage: dailyUsage, guestPasses: guestPasses)
         } catch {
             preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
         }
@@ -94,19 +99,17 @@ struct ClaudeBarApp: App {
         // Each provider manages its own isEnabled state (persisted via ProviderSettingsRepository)
         // Each probe checks isAvailable() for credentials/prerequisites
         let repository = AIProviders(providers: [
-            ClaudeProvider(
-                cliProbe: ClaudeUsageProbe(),
-                apiProbe: ClaudeAPIUsageProbe(),
-                passProbe: ClaudePassProbe(),
-                settingsRepository: settingsRepository,
-                dailyUsageAnalyzer: ClaudeDailyUsageAnalyzer(
-                    // Inference routed at a loopback endpoint costs nothing (#190).
+            // Claude is data: Modules/Providers/Resources/Providers/claude.json
+            // and the mapping scripts beside it. What isn't usage rides along:
+            // today's usage from local session logs (#190 keeps loopback
+            // inference free) and guest passes.
+            Self.builtIn(
+                "claude",
+                settings: settingsRepository,
+                dailyUsage: ClaudeDailyUsageAnalyzer(
                     isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
                 ),
-                // The Domain layer holds no logger, so the provider reports
-                // what the UI cannot show — a fallback probe that ran and then
-                // failed — through here (#317). Never any credential value.
-                diagnose: { AppLog.probes.info($0) }
+                guestPasses: GuestPasses(probe: ClaudePassProbe())
             ),
             // Codex is data: Modules/Providers/Resources/Providers/codex.json.
             Self.builtIn("codex", settings: settingsRepository),

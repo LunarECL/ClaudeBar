@@ -60,7 +60,7 @@ struct NotificationsSpec {
                 capturedAt: Date()
             ))
 
-            let claude = ClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude]),
                 alerter: mockAlerter,
@@ -109,7 +109,7 @@ struct NotificationsSpec {
                 capturedAt: Date()
             ))
 
-            let claude = ClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude]),
                 alerter: mockAlerter,
@@ -160,7 +160,7 @@ struct NotificationsSpec {
             given(codexProbe).isAvailable().willReturn(true)
             given(codexProbe).probe().willThrow(ProbeError.timeout)
 
-            let claude = ClaudeProvider(probe: claudeProbe, settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
             let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude, codex]),

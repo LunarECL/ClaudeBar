@@ -11,7 +11,14 @@ struct OAuth2Refresher: CredentialRefreshing {
 
     var retryStatuses: [Int] { refresh.onStatus }
 
+    /// Never without a refresh token: there is nothing to trade.
     func isDue(_ credential: Credential) -> Bool {
+        guard credential["refreshToken"] != nil else { return false }
+        if let expiry = refresh.dueWhen {
+            guard let raw = credential[expiry.expiresAt], let value = Double(raw) else { return true }
+            let expiresAt = expiry.unit == .milliseconds ? value / 1000 : value
+            return now().timeIntervalSince1970 + expiry.skew >= expiresAt
+        }
         guard let every = refresh.every else { return false }
         guard let refreshedAt = credential["refreshedAt"].flatMap(Self.parseDate) else { return true }
         return now().timeIntervalSince(refreshedAt) > every
@@ -24,13 +31,21 @@ struct OAuth2Refresher: CredentialRefreshing {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 15
-        request.httpBody = Self.formBody([
+        var fields = [
             ("grant_type", "refresh_token"),
-            ("client_id", refresh.clientId),
             ("refresh_token", refreshToken),
-        ])
+            ("client_id", refresh.clientId),
+        ]
+        if let scope = refresh.scope { fields.append(("scope", scope)) }
+        switch refresh.bodyFormat {
+        case .form:
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            request.httpBody = Self.formBody(fields)
+        case .json:
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: Dictionary(uniqueKeysWithValues: fields))
+        }
 
         let (data, response) = try await network.request(request)
         guard let http = response as? HTTPURLResponse else {
@@ -58,6 +73,10 @@ struct OAuth2Refresher: CredentialRefreshing {
         }
         if let idToken = body["id_token"] as? String {
             renewed["idToken"] = idToken
+        }
+        if let expiry = refresh.dueWhen, let expiresIn = JSONPath.number(body["expires_in"]) {
+            let expiresAt = now().timeIntervalSince1970 + expiresIn
+            renewed[expiry.expiresAt] = String(Int64(expiry.unit == .milliseconds ? expiresAt * 1000 : expiresAt))
         }
         renewed["refreshedAt"] = ISO8601DateFormatter().string(from: now())
         AppLog.probes.info("Token refreshed")

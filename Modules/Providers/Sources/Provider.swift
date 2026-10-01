@@ -39,14 +39,27 @@ public final class Provider: AIProvider {
     // MARK: - Data sources
 
     public let dataSources: [DataSource]
+    /// Today's and yesterday's usage, read on an interactive refresh only —
+    /// a background poll stays cheap (#204).
+    public let dailyUsage: (any DailyUsageAnalyzing)?
+    /// *Share Claude Code*, for a provider whose plan can issue guest passes.
+    public let guestPasses: GuestPasses?
     private let settings: any ProviderSettingsRepository
 
-    public init(definition: ProviderDefinition, dataSources: [DataSource], settings: any ProviderSettingsRepository) {
+    public init(
+        definition: ProviderDefinition,
+        dataSources: [DataSource],
+        settings: any ProviderSettingsRepository,
+        dailyUsage: (any DailyUsageAnalyzing)? = nil,
+        guestPasses: GuestPasses? = nil
+    ) {
         self.definition = definition
         self.id = definition.id
         self.name = definition.name
         self.cliCommand = definition.cli ?? ""
         self.dataSources = dataSources
+        self.dailyUsage = dailyUsage
+        self.guestPasses = guestPasses
         self.settings = settings
         self.isEnabled = settings.isEnabled(forProvider: definition.id, defaultValue: definition.enabledByDefault)
     }
@@ -75,46 +88,110 @@ public final class Provider: AIProvider {
 
     // MARK: - AIProvider
 
+    /// Ready when the active data source is — or, failing that, the fallback
+    /// it would hand over to.
     public func isAvailable() async -> Bool {
         guard let active = dataSource(activeKind) else { return false }
-        return await active.isReady()
+        if await active.isReady() { return true }
+        guard let fallback = enabledFallback(of: active) else { return false }
+        return await fallback.isReady()
     }
 
-    /// Fetches with the active data source; when that fails, tries its
-    /// fallback once. A failure keeps the last usage on screen.
+    /// A data source that serves cached usage sets how often the background
+    /// may ask (Claude's API: 15 minutes, #204).
+    public var backgroundRefreshFloor: Duration? {
+        dataSource(activeKind)?.cacheTTL.map { .seconds($0) }
+    }
+
     @discardableResult
     public func refresh() async throws -> UsageSnapshot {
-        guard let active = dataSource(activeKind) else {
+        try await refresh(.interactive)
+    }
+
+    /// Fetches with the active data source and follows its hand-offs and
+    /// fallback until one answers. A failure keeps the last usage on screen
+    /// and reports the first real failure — not a hand-off, and not a
+    /// fallback's, which would send the person chasing the wrong problem.
+    @discardableResult
+    public func refresh(_ kind: RefreshKind) async throws -> UsageSnapshot {
+        guard var current = dataSource(activeKind) else {
             throw ProbeError.noData
         }
         isSyncing = true
         defer { isSyncing = false }
 
-        do {
-            return succeed(try await active.fetchUsage(), from: active.kind)
-        } catch let primary {
-            if Self.mayFallBack(after: primary),
-               let fallbackKind = active.definition.fallback,
-               let fallback = dataSource(fallbackKind) {
-                AppLog.probes.warning("\(id) \(active.kind) failed (\(primary.localizedDescription)), trying \(fallbackKind)")
-                do {
-                    return succeed(try await fallback.fetchUsage(), from: fallback.kind)
-                } catch {
-                    // Both failed: report the active one's failure — it is the
-                    // root cause, and the fallback's would send the person
-                    // chasing the wrong problem.
-                    AppLog.probes.info("\(id) \(fallbackKind) fallback also failed: \(error.localizedDescription)")
+        var tried: Set = [current.kind]
+        var reported: Error?
+        while true {
+            do {
+                let usage = try await current.fetchUsage()
+                return succeed(await withDailyUsage(usage, kind), from: current.kind)
+            } catch {
+                let reason = Self.reason(of: error)
+                if case .rateLimited? = reason {
+                    // A rate limit is not a reason to hit another endpoint.
+                    reported = reported ?? error
+                    break
                 }
+                if let tag = reason?.tag, let next = current.definition.fallbackOn[tag],
+                   !tried.contains(next), let handOff = dataSource(next) {
+                    AppLog.probes.info("\(id) \(current.kind) handed off to \(next) (\(tag))")
+                    tried.insert(next)
+                    current = handOff
+                    continue
+                }
+                reported = reported ?? error
+                if let fallback = enabledFallback(of: current), !tried.contains(fallback.kind) {
+                    AppLog.probes.warning("\(id) \(current.kind) failed (\(error.localizedDescription)), trying \(fallback.kind)")
+                    tried.insert(fallback.kind)
+                    current = fallback
+                    continue
+                }
+                break
             }
-            fail(primary)
-            throw lastError ?? primary
         }
+        if let reported, tried.count > 1 {
+            AppLog.probes.info("\(id): every data source failed; reporting \(reported.localizedDescription)")
+        }
+        fail(reported ?? ProbeError.noData)
+        throw lastError ?? ProbeError.noData
     }
 
     // MARK: - Private
 
     private func dataSource(_ kind: String) -> DataSource? {
         dataSources.first { $0.kind == kind }
+    }
+
+    /// The fallback a data source names, unless a provider setting turns it off.
+    private func enabledFallback(of source: DataSource) -> DataSource? {
+        guard let fallback = source.definition.fallback else { return nil }
+        if let setting = fallback.enabledBySetting, settings.isOn(setting, forProvider: id) == false {
+            return nil
+        }
+        return dataSource(fallback.to)
+    }
+
+    private func withDailyUsage(_ usage: UsageSnapshot, _ kind: RefreshKind) async -> UsageSnapshot {
+        guard kind == .interactive,
+              let dailyUsage,
+              let report = try? await dailyUsage.analyzeToday(),
+              !report.today.isEmpty || !report.previous.isEmpty else {
+            return usage
+        }
+        return UsageSnapshot(
+            providerId: usage.providerId,
+            quotas: usage.quotas,
+            capturedAt: usage.capturedAt,
+            accountEmail: usage.accountEmail,
+            accountOrganization: usage.accountOrganization,
+            loginMethod: usage.loginMethod,
+            accountTier: usage.accountTier,
+            costUsage: usage.costUsage,
+            bedrockUsage: usage.bedrockUsage,
+            dailyUsageReport: report,
+            extensionMetrics: usage.extensionMetrics
+        )
     }
 
     private func succeed(_ usage: UsageSnapshot, from kind: String) -> UsageSnapshot {
@@ -135,10 +212,7 @@ public final class Provider: AIProvider {
         }
     }
 
-    /// A rate limit is not a reason to hit another endpoint.
-    private static func mayFallBack(after error: Error) -> Bool {
-        let reason = (error as? DataSourceError)?.reason ?? (error as? ProbeError)
-        if case .rateLimited? = reason { return false }
-        return true
+    private static func reason(of error: Error) -> ProbeError? {
+        (error as? DataSourceError)?.reason ?? (error as? ProbeError)
     }
 }

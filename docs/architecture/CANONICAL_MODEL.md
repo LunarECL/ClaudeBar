@@ -105,7 +105,9 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │                       http(request) · jsonRpc(cli, handshake, call) · cli(args) ·
 │       │       │   │                       terminal(cli, keys) · file(path) · script(path)
 │       │       │   ├── mapping: Mapping    WHAT THE BYTES SAY — a closed sum:
-│       │       │   │                       json(paths, each, used|left, resets) · text(patterns)
+│       │       │   │                       json(paths, each, used|left, resets) · text(patterns) ·
+│       │       │   │                       script(file) — JavaScript in JavaScriptCore, no I/O,
+│       │       │   │                       for a format no rule can say (a TUI screen)
 │       │       │   └── fallback: kind?     the data source to try when this one fails — Codex's
 │       │       │                           RPC falls back to its terminal
 │       │       ├── fetchResponse() → Response   "Test Connection" — looks up the key and fetches;
@@ -194,7 +196,7 @@ format, never for a vendor:
 |---|---|
 | `CredentialLookup` | `EnvironmentReader` · `SettingReader` · `JSONFileReader` · `KeychainReader` · `BrowserCookieReader` · `OAuth2Refresher` |
 | `Fetch` | `HTTPFetcher` · `JSONRPCFetcher` · `CLIFetcher` · `TerminalFetcher` · `FileFetcher` · `ScriptFetcher` |
-| `Mapping` | `JSONMapper` · `TextMapper` |
+| `Mapping` | `JSONMapper` · `TextMapper` · `ScriptMapper` (JavaScriptCore; host `humanDate()`) |
 
 **Why closed sums.** The JSON decoder must know every tag, and the *Add
 Provider* sheet offers a fixed list. A new provider is a JSON file — open, no

@@ -1,6 +1,7 @@
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 
 /// Claude provider configuration card for SettingsView.
 struct ClaudeConfigCard: View {
@@ -172,8 +173,7 @@ struct ClaudeConfigCard: View {
             }
 
             if claudeProbeMode == .api {
-                let credentialLoader = ClaudeCredentialLoader()
-                let hasCredentials = credentialLoader.loadCredentials() != nil
+                let hasCredentials = (monitor.provider(for: "claude") as? Provider)?.hasKey(for: "api") ?? false
 
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "clock.arrow.circlepath")

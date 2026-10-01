@@ -34,7 +34,7 @@ struct UpdatesSpec {
             given(settings).isEnabled(forProvider: .any).willReturn(true)
             given(settings).setEnabled(.any, forProvider: .any).willReturn()
 
-            let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
             let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
 
             // Then

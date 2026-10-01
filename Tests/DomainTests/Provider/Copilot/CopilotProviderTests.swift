@@ -245,7 +245,7 @@ struct CopilotProviderTests {
         let baseSettings = MockRepositoryFactory.makeSettingsRepository()
         let mockProbe = MockUsageProbe()
         let copilot = CopilotProvider(probe: mockProbe, settingsRepository: copilotSettings)
-        let claude = ClaudeProvider(probe: mockProbe, settingsRepository: baseSettings)
+        let claude = StubClaudeProvider(probe: mockProbe, settingsRepository: baseSettings)
         let codex = StubCodexProvider(probe: mockProbe, settingsRepository: baseSettings)
         let gemini = GeminiProvider(probe: mockProbe, settingsRepository: baseSettings)
 

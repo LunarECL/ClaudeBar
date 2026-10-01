@@ -35,7 +35,7 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
         self.cliExecutor = cliExecutor ?? DefaultCLIExecutor(
             // Same loopback risk as the usage probe: /passes spawns a full
             // claude session whose hooks would fire. Mark it (issue #222).
-            environmentAdditions: ClaudeUsageProbe.probeEnvironment
+            environmentAdditions: [HookConstants.probeEnvironmentKey: "1"]
         )
         self.clipboardReader = clipboardReader ?? SystemClipboardReader()
     }

@@ -7,7 +7,7 @@ struct JSONMapper: Reading {
     let mapping: JSONMapping
     let now: @Sendable () -> Date
 
-    func read(_ response: Response, providerId: String) throws -> UsageSnapshot {
+    func read(_ response: Response, facts: MappingFacts, providerId: String) throws -> UsageSnapshot {
         guard let document = try? JSONSerialization.jsonObject(with: response.body) else {
             throw ProbeError.parseFailed("Response is not JSON")
         }
@@ -172,7 +172,7 @@ struct TextMapper: Reading {
     let mapping: TextMapping
     let now: @Sendable () -> Date
 
-    func read(_ response: Response, providerId: String) throws -> UsageSnapshot {
+    func read(_ response: Response, facts: MappingFacts, providerId: String) throws -> UsageSnapshot {
         let screen = Self.stripANSI(response.text)
         let lower = screen.lowercased()
 

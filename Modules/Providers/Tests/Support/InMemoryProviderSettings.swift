@@ -7,9 +7,16 @@ final class InMemoryProviderSettings: ProviderSettingsRepository, @unchecked Sen
     private var enabled: [String: Bool] = [:]
     private var kinds: [String: String] = [:]
     private var cardURLs: [String: String] = [:]
+    /// `"<provider>.<setting>"` → on/off, as `settings.json` keeps them.
+    private var flags: [String: Bool]
 
-    init(dataSourceKinds: [String: String] = [:]) {
+    init(dataSourceKinds: [String: String] = [:], flags: [String: Bool] = [:]) {
         self.kinds = dataSourceKinds
+        self.flags = flags
+    }
+
+    func isOn(_ setting: String, forProvider id: String) -> Bool? {
+        flags["\(id).\(setting)"]
     }
 
     func isEnabled(forProvider id: String) -> Bool {

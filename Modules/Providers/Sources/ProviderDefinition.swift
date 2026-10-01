@@ -74,8 +74,9 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         guard kinds.contains(defaultDataSource) else {
             throw DefinitionError.unknownDataSource(id, defaultDataSource)
         }
-        for case let fallback? in dataSources.map(\.fallback) where !kinds.contains(fallback) {
-            throw DefinitionError.unknownDataSource(id, fallback)
+        let handOffs = dataSources.flatMap { [$0.fallback?.to].compactMap { $0 } + Array($0.fallbackOn.values) }
+        for kind in handOffs where !kinds.contains(kind) {
+            throw DefinitionError.unknownDataSource(id, kind)
         }
     }
 

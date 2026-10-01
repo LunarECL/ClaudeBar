@@ -308,6 +308,11 @@ public final class JSONSettingsRepository:
         store.write(value: kind, key: "\(id).probeMode")
     }
 
+    /// `<id>.<setting>` — e.g. `claude.cliFallbackEnabled`, the key the Claude card writes.
+    public func isOn(_ setting: String, forProvider id: String) -> Bool? {
+        store.read(key: "\(id).\(setting)")
+    }
+
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         store.write(value: enabled, key: "providers.\(id).isEnabled")
     }

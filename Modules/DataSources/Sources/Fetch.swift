@@ -92,6 +92,65 @@ public struct JSONRPCCall: Sendable, Equatable, Codable {
 /// Runs `cli args…` in a terminal, types `input`, answers prompts it
 /// recognises from `autoResponses`, and returns what the screen showed.
 public struct CLICall: Sendable, Equatable, Codable {
+    /// Variables to remove from, and add to, the CLI's environment.
+    public struct Environment: Sendable, Equatable, Codable {
+        public let unset: [String]
+        public let set: [String: String]
+
+        public init(unset: [String] = [], set: [String: String] = [:]) {
+            self.unset = unset
+            self.set = set
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            unset = try container.decodeIfPresent([String].self, forKey: .unset) ?? []
+            set = try container.decodeIfPresent([String: String].self, forKey: .set) ?? [:]
+        }
+    }
+
+    /// Text that means the screen has finished drawing: a phrase, or
+    /// `{ "row": "…" }` for a phrase that must end its row.
+    public struct ReadyMarker: Sendable, Equatable, Codable {
+        public let text: String
+        public let endsRow: Bool
+
+        public init(_ text: String, endsRow: Bool = false) {
+            self.text = text
+            self.endsRow = endsRow
+        }
+
+        private enum Keys: String, CodingKey { case row }
+
+        public init(from decoder: Decoder) throws {
+            if let text = try? decoder.singleValueContainer().decode(String.self) {
+                self.init(text)
+                return
+            }
+            let container = try decoder.container(keyedBy: Keys.self)
+            self.init(try container.decode(String.self, forKey: .row), endsRow: true)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            if endsRow {
+                var container = encoder.container(keyedBy: Keys.self)
+                try container.encode(text, forKey: .row)
+            } else {
+                var container = encoder.singleValueContainer()
+                try container.encode(text)
+            }
+        }
+    }
+
+    /// How the captured output reaches the mapping.
+    public enum Screen: String, Sendable, Equatable, Codable {
+        /// The raw bytes, escape codes and all.
+        case raw
+        /// Drawn by a terminal emulator first, so a TUI's cursor moves land
+        /// where they put the text.
+        case rendered
+    }
+
     public let cli: String
     public let args: [String]
     public let input: String?
@@ -99,14 +158,30 @@ public struct CLICall: Sendable, Equatable, Codable {
     public let workingDirectory: WorkingDirectory?
     /// Prompt text → what to type when it appears.
     public let autoResponses: [String: String]
+    public let environment: Environment
+    public let readyWhen: [ReadyMarker]
+    public let screen: Screen
 
-    public init(cli: String, args: [String] = [], input: String? = nil, timeout: TimeInterval = 20, workingDirectory: WorkingDirectory? = nil, autoResponses: [String: String] = [:]) {
+    public init(
+        cli: String,
+        args: [String] = [],
+        input: String? = nil,
+        timeout: TimeInterval = 20,
+        workingDirectory: WorkingDirectory? = nil,
+        autoResponses: [String: String] = [:],
+        environment: Environment = Environment(),
+        readyWhen: [ReadyMarker] = [],
+        screen: Screen = .raw
+    ) {
         self.cli = cli
         self.args = args
         self.input = input
         self.timeout = timeout
         self.workingDirectory = workingDirectory
         self.autoResponses = autoResponses
+        self.environment = environment
+        self.readyWhen = readyWhen
+        self.screen = screen
     }
 
     public init(from decoder: Decoder) throws {
@@ -117,6 +192,9 @@ public struct CLICall: Sendable, Equatable, Codable {
         timeout = try container.decodeIfPresent(TimeInterval.self, forKey: .timeout) ?? 20
         workingDirectory = try container.decodeIfPresent(WorkingDirectory.self, forKey: .workingDirectory)
         autoResponses = try container.decodeIfPresent([String: String].self, forKey: .autoResponses) ?? [:]
+        environment = try container.decodeIfPresent(Environment.self, forKey: .environment) ?? Environment()
+        readyWhen = try container.decodeIfPresent([ReadyMarker].self, forKey: .readyWhen) ?? []
+        screen = try container.decodeIfPresent(Screen.self, forKey: .screen) ?? .raw
     }
 }
 

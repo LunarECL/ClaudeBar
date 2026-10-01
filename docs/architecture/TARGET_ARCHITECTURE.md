@@ -210,7 +210,7 @@ public enum Fetch: Sendable, Equatable, Codable {
          cloudWatch(CloudWatchQuery)
 }
 public enum Mapping: Sendable, Equatable, Codable {
-    case json(JSONMappingRules), text(TextMappingRules)
+    case json(JSONMappingRules), text(TextMappingRules), script(ScriptMapping)
 }
 
 // DataSources — what came back, before anyone read it ("Response" on the Map fields step)
@@ -345,6 +345,7 @@ other field), because the CLI that owns that file must keep working.
 |---|---|---|
 | each worker | its protocol or format, alone | `@testable`, built with a mocked connection (`NetworkClient`, `CLIExecutor`, `RPCTransport`); Chicago: assert on the payload / snapshot |
 | `JSONMapper` · `TextMapper` | every mapping feature | small JSON/text fixtures, one feature per test |
+| a mapping script | the old probe's screens and responses, quota for quota | run through its definition in `ProvidersTests` (`ClaudeHarness`), never by calling JavaScript directly |
 | `DataSource` | look up → fetch → map, `fetchResponse` stops before mapping, 401-refresh-retry, each error's step | built with mocked connections |
 | `Provider` | lifecycle: keeps usage on failure, fallback, `use`, enabled persists | data sources over mocked connections |
 | each definition | **golden test**: today's recorded responses (`Tests/…/Fixtures/codex/`) through the definition produce exactly the snapshot today's probe produced | the fixtures are captured from the current probe tests before the probe is deleted |
@@ -366,6 +367,23 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | 5 | the CLI and cookie providers (Gemini, Kiro, Cursor, AmpCode, Antigravity, Alibaba, …): `CLIFetcher`, `BrowserCookieReader`, …; Bedrock via `Fetch.cloudWatch` and the `AWSClients` module; extensions read as definitions; *PROBE MODE* → *DATA SOURCE* | no `XxxUsageProbe` is left |
 | 6 | *Add Provider*, *Export*, *Import* — the screens of [USER_JOURNEYS.md](USER_JOURNEYS.md) moments 5–11, outer loop from its §5 scenarios | a person adds, shares and imports a provider without a restart, and no exported file contains a key |
 | 7 | Claude (PTY CLI, multi-account, guest passes, budget); the renames (`Usage`, `Plan`, `Cost`, `DataSourceError`) | `AIProvider` folds into `Provider` |
+
+## 8.1 · What Claude added
+
+Claude needed more than Codex, and each need became a generic piece, never a
+vendor type:
+
+| Need | Generic piece |
+|---|---|
+| a TUI screen and human reset dates no rule can say | `Mapping.script` — a JavaScript file in JavaScriptCore, no I/O, host `humanDate()`; the scripts ship beside the definition |
+| Claude Code's Keychain item | `CredentialLookup.keychain(service, fields)` via `security`, hex-decoded, written back as compact JSON |
+| expiry in milliseconds, a JSON refresh body with `scope` | `OAuth2Refresh.dueWhen`, `bodyFormat`, `scope`; values keep their JSON type on write-back; a failed refresh re-reads the store |
+| `env`, ready markers and a rendered screen for the CLI | `CLICall.environment`, `readyWhen`, `screen` |
+| `/cost` only for API-billed accounts; API→CLI only while a setting allows | `fallbackOn` (hand-off by failure) and `fallback.enabledBySetting`; the provider follows the chain and reports the first real failure |
+| 15-minute cache, a remembered 429 | `cache.ttl` (also the background floor) and rate-limit memory on `DataSource` |
+| the account's email and billing type | `context` files handed to the mapping |
+| the folder-trust prompt | `recover.patchJSONFile`, tried once |
+| today's usage and guest passes | `Provider.dailyUsage` (interactive refreshes only) and the `GuestPasses` capability |
 
 ## 9 · Open
 

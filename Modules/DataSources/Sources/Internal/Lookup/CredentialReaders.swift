@@ -7,48 +7,42 @@ struct EnvironmentReader: CredentialFinding {
     let environment: @Sendable (String) -> String?
 
     func find() throws -> FoundCredential? {
-        guard let value = environment(name), !value.isEmpty else { return nil }
+        guard let value = environment(name).map(Credential.trimmed), !value.isEmpty else { return nil }
         return FoundCredential(credential: Credential(["token": value]), save: nil)
     }
 }
 
 /// `jsonFile` — a JSON file holds the token and its companions. A refreshed
-/// token is written back into the same file, every other field kept, because
-/// the CLI that owns the file must keep working.
+/// token is written back into the same file, every other field kept and every
+/// value keeping its JSON type, because the CLI that owns the file must keep
+/// working.
 struct JSONFileReader: CredentialFinding {
     let file: JSONFileCredential
     let homeDirectory: URL
+    let environment: @Sendable (String) -> String?
 
     var url: URL {
-        if file.path.hasPrefix("~/") {
-            return homeDirectory.appendingPathComponent(String(file.path.dropFirst(2)))
-        }
-        return URL(fileURLWithPath: file.path)
+        URL(fileURLWithPath: Paths.expand(file.path, homeDirectory: homeDirectory, environment: environment))
     }
 
     func find() throws -> FoundCredential? {
         guard let document = readDocument() else { return nil }
-        let scope = JSONScope(root: document)
-        var values: [String: String] = [:]
-        for (name, path) in file.fields {
-            if let value = scope.string(path), !value.isEmpty {
-                values[name] = value
-            }
-        }
+        let values = CredentialDocument.values(file.fields, in: document)
         guard values["token"] != nil else { return nil }
         let reader = self
         return FoundCredential(credential: Credential(values), save: { reader.write($0) })
     }
 
+    /// The fields without requiring a token — what a context file supplies.
+    func fields() -> [String: String] {
+        readDocument().map { CredentialDocument.values(file.fields, in: $0) } ?? [:]
+    }
+
     func write(_ credential: Credential) {
-        guard var document = readDocument() else { return }
-        for (name, path) in file.fields {
-            if let value = credential[name] {
-                document = JSONPath.set(value, at: path, in: document)
-            }
-        }
+        guard let document = readDocument() else { return }
+        let updated = CredentialDocument.updated(document, with: credential, fields: file.fields)
         do {
-            let data = try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys])
+            let data = try JSONSerialization.data(withJSONObject: updated, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: url, options: .atomic)
             AppLog.credentials.info("Saved refreshed credentials to \(file.path)")
         } catch {
@@ -59,6 +53,94 @@ struct JSONFileReader: CredentialFinding {
     private func readDocument() -> [String: Any]? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+}
+
+/// `keychain` — a generic-password item read and written with macOS's
+/// `security` tool. A refreshed token is written back as compact JSON: a
+/// pretty-printed password comes back hex-encoded from `security -w` (#255).
+struct KeychainReader: CredentialFinding {
+    /// Runs `/usr/bin/security` with these arguments: exit status and stdout.
+    typealias Security = @Sendable (_ arguments: [String]) -> (status: Int32, output: String)
+
+    let item: KeychainCredential
+    let security: Security
+
+    func find() throws -> FoundCredential? {
+        let (status, output) = security(["find-generic-password", "-s", item.service, "-w"])
+        guard status == 0 else {
+            AppLog.credentials.error("Keychain read of '\(item.service)' failed: security exited \(status)")
+            return nil
+        }
+        let password = Credential.trimmed(output)
+        guard !password.isEmpty else { return nil }
+
+        let values: [String: String]
+        if let data = Self.decode(password), let document = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            values = CredentialDocument.values(item.fields, in: document)
+        } else if item.fields["token"] == "$" {
+            values = ["token": password]
+        } else {
+            // Shape only — never the payload, which is the token itself.
+            AppLog.credentials.error("Keychain item '\(item.service)' did not hold the expected JSON")
+            return nil
+        }
+        guard values["token"] != nil else { return nil }
+        let reader = self
+        let original = password
+        return FoundCredential(credential: Credential(values), save: { reader.write($0, over: original) })
+    }
+
+    func write(_ credential: Credential, over password: String) {
+        guard let data = Self.decode(password),
+              let document = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return }
+        let updated = CredentialDocument.updated(document, with: credential, fields: item.fields)
+        guard let compact = try? JSONSerialization.data(withJSONObject: updated),
+              let payload = String(data: compact, encoding: .utf8) else { return }
+        let (status, _) = security(["add-generic-password", "-U", "-s", item.service, "-a", NSUserName(), "-w", payload])
+        if status == 0 {
+            AppLog.credentials.info("Saved refreshed credentials to Keychain item '\(item.service)'")
+        } else {
+            AppLog.credentials.error("Failed to save credentials to Keychain item '\(item.service)' (exit \(status))")
+        }
+    }
+
+    /// `security -w` hex-encodes a password with bytes outside printable ASCII
+    /// on macOS 26. JSON never starts with a hex digit, so all-hex is the encoded form.
+    static func decode(_ password: String) -> Data? {
+        if password.count % 2 == 0, !password.isEmpty {
+            var bytes = [UInt8]()
+            var index = password.startIndex
+            var isHex = true
+            while index < password.endIndex {
+                let next = password.index(index, offsetBy: 2)
+                guard let byte = UInt8(password[index..<next], radix: 16) else { isHex = false; break }
+                bytes.append(byte)
+                index = next
+            }
+            if isHex { return Data(bytes) }
+        }
+        return password.data(using: .utf8)
+    }
+
+    /// The real `security` tool, run synchronously with both pipes drained.
+    static let system: Security = { arguments in
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        process.arguments = arguments
+        let output = Pipe()
+        let errors = Pipe()
+        process.standardOutput = output
+        process.standardError = errors
+        do {
+            try process.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            _ = errors.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return (process.terminationStatus, String(decoding: data, as: UTF8.self))
+        } catch {
+            return (-1, "")
+        }
     }
 }
 
@@ -73,5 +155,61 @@ struct FirstOfReader: CredentialFinding {
             }
         }
         return nil
+    }
+}
+
+/// Reading credential values out of a JSON document, and writing refreshed
+/// ones back without changing a value's JSON type.
+enum CredentialDocument {
+    static func values(_ fields: [String: String], in document: [String: Any]) -> [String: String] {
+        let scope = JSONScope(root: document)
+        var values: [String: String] = [:]
+        for (name, path) in fields {
+            if let value = scope.string(path).map(Credential.trimmed), !value.isEmpty {
+                values[name] = value
+            }
+        }
+        return values
+    }
+
+    static func updated(_ document: [String: Any], with credential: Credential, fields: [String: String]) -> [String: Any] {
+        var updated = document
+        let scope = JSONScope(root: document)
+        for (name, path) in fields where path != "$" {
+            guard let value = credential[name] else { continue }
+            // A number stays a number: Claude Code reads `expiresAt` as one.
+            if scope.value(path) is NSNumber || (scope.value(path) == nil && name == "expiresAt"),
+               let number = Double(value) {
+                updated = JSONPath.set(NSNumber(value: number), at: path, in: updated)
+            } else {
+                updated = JSONPath.set(value, at: path, in: updated)
+            }
+        }
+        return updated
+    }
+}
+
+/// `~/…` and `${VARIABLE:-default}/…` in a file path.
+enum Paths {
+    static func expand(_ path: String, homeDirectory: URL, environment: @Sendable (String) -> String?) -> String {
+        var path = path
+        if path.hasPrefix("${"), let close = path.firstIndex(of: "}") {
+            let inner = path[path.index(path.startIndex, offsetBy: 2)..<close]
+            let parts = inner.components(separatedBy: ":-")
+            let value = environment(parts[0]).flatMap { $0.isEmpty ? nil : $0 } ?? (parts.count > 1 ? parts[1] : "")
+            path = value + path[path.index(after: close)...]
+        }
+        if path == "~" { return homeDirectory.path }
+        if path.hasPrefix("~/") {
+            return homeDirectory.appendingPathComponent(String(path.dropFirst(2))).path
+        }
+        return path
+    }
+}
+
+extension Credential {
+    /// A value as a person meant it: no surrounding whitespace or newlines.
+    static func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

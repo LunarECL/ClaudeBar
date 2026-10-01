@@ -27,6 +27,10 @@ public protocol ProviderSettingsRepository: Sendable {
 
     /// Saves the data source a provider uses.
     func setDataSourceKind(_ kind: String, forProvider id: String)
+
+    /// A provider's on/off setting by name — `claude.cliFallbackEnabled` is
+    /// `isOn("cliFallbackEnabled", forProvider: "claude")`. `nil` when never set.
+    func isOn(_ setting: String, forProvider id: String) -> Bool?
 }
 
 public extension ProviderSettingsRepository {
@@ -35,6 +39,9 @@ public extension ProviderSettingsRepository {
 
     /// Default for conformers that keep no choice.
     func setDataSourceKind(_ kind: String, forProvider id: String) {}
+
+    /// Default for conformers that keep no such setting.
+    func isOn(_ setting: String, forProvider id: String) -> Bool? { nil }
 }
 
 /// Z.ai-specific settings repository, extending base ProviderSettingsRepository.

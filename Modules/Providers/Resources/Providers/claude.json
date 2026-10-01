@@ -1,0 +1,137 @@
+{
+  "id": "claude",
+  "name": "Claude",
+  "cli": "claude",
+  "links": {
+    "dashboard": "https://console.anthropic.com/settings/billing",
+    "status": "https://status.anthropic.com"
+  },
+  "enabledByDefault": true,
+  "defaultDataSource": "cli",
+  "dataSources": [
+    {
+      "kind": "cli",
+      "label": "CLI",
+      "summary": "Uses claude /usage command",
+      "fetch": {
+        "cli": {
+          "cli": "claude",
+          "args": ["/usage", "--allowed-tools", ""],
+          "input": "",
+          "timeout": 20,
+          "workingDirectory": "probe",
+          "environment": { "unset": ["CLAUDE_CODE_OAUTH_TOKEN"], "set": { "CLAUDEBAR_PROBE": "1" } },
+          "readyWhen": [{ "row": "Current session" }, "% used", "% left", "rate limited", "Error:", "/usage is only available"],
+          "screen": "rendered",
+          "autoResponses": {
+            "Esc to cancel": "\r",
+            "Ready to code here?": "\r",
+            "Press Enter to continue": "\r",
+            "ctrl+t to disable": "\r",
+            "Yes, I trust this folder": "\r"
+          }
+        }
+      },
+      "context": {
+        "account": {
+          "path": "${CLAUDE_CONFIG_DIR:-~}/.claude.json",
+          "email": "$.oauthAccount.emailAddress",
+          "organization": "$.oauthAccount.displayName",
+          "billingType": "$.oauthAccount.billingType"
+        }
+      },
+      "mapping": { "script": { "file": "claude-usage-screen.js" } },
+      "recover": {
+        "folderTrustRequired": {
+          "patchJSONFile": {
+            "path": "${CLAUDE_CONFIG_DIR:-~}/.claude.json",
+            "keys": ["projects", "{{probeDirectory}}", "hasTrustDialogAccepted"],
+            "value": true
+          }
+        }
+      },
+      "fallbackOn": { "subscriptionRequired": "cliCost" },
+      "fallback": "api"
+    },
+    {
+      "kind": "cliCost",
+      "label": "CLI cost",
+      "hidden": true,
+      "fetch": {
+        "cli": {
+          "cli": "claude",
+          "args": ["/cost", "--allowed-tools", ""],
+          "input": "",
+          "timeout": 20,
+          "workingDirectory": "probe",
+          "environment": { "unset": ["CLAUDE_CODE_OAUTH_TOKEN"], "set": { "CLAUDEBAR_PROBE": "1" } },
+          "screen": "rendered",
+          "autoResponses": {
+            "Esc to cancel": "\r",
+            "Ready to code here?": "\r",
+            "Press Enter to continue": "\r",
+            "ctrl+t to disable": "\r",
+            "Yes, I trust this folder": "\r"
+          }
+        }
+      },
+      "mapping": { "script": { "file": "claude-cost-screen.js" } },
+      "fallback": "api"
+    },
+    {
+      "kind": "api",
+      "label": "API",
+      "summary": "Calls Anthropic API directly",
+      "credential": {
+        "firstOf": [
+          {
+            "jsonFile": {
+              "path": "~/.claude/.credentials.json",
+              "token": "$.claudeAiOauth.accessToken",
+              "refreshToken": "$.claudeAiOauth.refreshToken",
+              "expiresAt": "$.claudeAiOauth.expiresAt",
+              "subscriptionType": "$.claudeAiOauth.subscriptionType"
+            }
+          },
+          {
+            "keychain": {
+              "service": "Claude Code-credentials",
+              "token": "$.claudeAiOauth.accessToken",
+              "refreshToken": "$.claudeAiOauth.refreshToken",
+              "expiresAt": "$.claudeAiOauth.expiresAt",
+              "subscriptionType": "$.claudeAiOauth.subscriptionType"
+            }
+          },
+          { "environment": "CLAUDE_CODE_OAUTH_TOKEN" }
+        ],
+        "refresh": {
+          "oauth2": {
+            "tokenURL": "https://platform.claude.com/v1/oauth/token",
+            "clientId": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+            "scope": "user:profile user:inference user:sessions:claude_code",
+            "bodyFormat": "json",
+            "dueWhen": { "expiresAt": "expiresAt", "unit": "milliseconds", "skew": 300 },
+            "onStatus": [401, 403],
+            "hint": "Run `claude` in terminal to log in again."
+          }
+        }
+      },
+      "fetch": {
+        "http": {
+          "url": "https://api.anthropic.com/api/oauth/usage",
+          "headers": {
+            "Authorization": "Bearer {{token}}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "anthropic-beta": "oauth-2025-04-20",
+            "User-Agent": "ClaudeBar"
+          },
+          "timeout": 15
+        }
+      },
+      "cache": { "ttl": 900 },
+      "mapping": { "script": { "file": "claude-usage-api.js", "credential": ["subscriptionType"] } },
+      "fallback": { "to": "cli", "enabledBySetting": "cliFallbackEnabled" }
+    }
+  ]
+}
