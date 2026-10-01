@@ -26,6 +26,12 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     /// `user:inference` scope and cannot access quota data via `/usage`.
     static let envExclusions = ["CLAUDE_CODE_OAUTH_TOKEN"]
 
+    /// Environment set on every claude session ClaudeBar spawns for quota
+    /// probing. The hook command ClaudeBar installs skips sessions marked with
+    /// `CLAUDEBAR_PROBE`, so a routine quota poll can't loop back through the
+    /// user's hooks as a "Claude Code Started/Finished" pair (#222).
+    public static let probeEnvironment = [HookConstants.probeEnvironmentKey: "1"]
+
     /// Reported when `claude /usage` shows the API-billing cost panel — or says
     /// `/usage` is "only available for subscription plans" — for an account the
     /// config file says is a subscription. Surfaced only if the usage API cannot
@@ -47,6 +53,7 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         self.timeout = timeout
         self.cliExecutor = cliExecutor ?? DefaultCLIExecutor(
             environmentExclusions: Self.envExclusions,
+            environmentAdditions: Self.probeEnvironment,
             completionRule: .claudeUsage
         )
         // `/cost` needs no rule: the CLI paints its cost panel in full during
@@ -56,7 +63,8 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         // API-billed account never paints a quota bar and that rule's markers are
         // quota-bar markers. See `probeCost` for the measurements.
         self.costExecutor = cliExecutor ?? DefaultCLIExecutor(
-            environmentExclusions: Self.envExclusions
+            environmentExclusions: Self.envExclusions,
+            environmentAdditions: Self.probeEnvironment
         )
         self.terminalRenderer = TerminalRenderer(cols: 160, rows: 50)
         self.accountInfoResolver = accountInfoResolver
