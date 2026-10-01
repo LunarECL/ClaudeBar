@@ -62,7 +62,7 @@ struct ProviderSelectionSpec {
             ))
 
             let claude = ClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = CodexProvider(probe: codexProbe, settingsRepository: settings)
+            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude, codex]),
                 clock: TestClock()
@@ -104,7 +104,7 @@ struct ProviderSelectionSpec {
             // Given — Claude enabled, Codex disabled
             let settings = Self.makeSettings()
             let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
@@ -122,7 +122,7 @@ struct ProviderSelectionSpec {
             // Given — both enabled
             let settings = Self.makeSettings()
             let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude, codex]),
                 clock: TestClock()
@@ -156,7 +156,7 @@ struct ProviderSelectionSpec {
             // Given — Claude is selected
             let settings = Self.makeSettings()
             let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude, codex]),
                 clock: TestClock()
@@ -176,7 +176,7 @@ struct ProviderSelectionSpec {
             // Given — Claude disabled before init
             let settings = Self.makeSettings()
             let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
             claude.isEnabled = false
 
             // When — monitor initializes
@@ -209,7 +209,7 @@ struct ProviderSelectionSpec {
             given(settings).setEnabled(.any, forProvider: .any).willReturn()
 
             let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(

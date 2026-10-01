@@ -1,6 +1,7 @@
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 
 /// Codex provider configuration card for SettingsView.
 struct CodexConfigCard: View {
@@ -142,8 +143,7 @@ struct CodexConfigCard: View {
             }
 
             if codexProbeMode == .api {
-                let credentialLoader = CodexCredentialLoader()
-                let hasCredentials = credentialLoader.loadCredentials() != nil
+                let hasCredentials = (monitor.provider(for: "codex") as? Provider)?.hasKey(for: "api") ?? false
 
                 HStack(spacing: 6) {
                     Image(systemName: hasCredentials ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")

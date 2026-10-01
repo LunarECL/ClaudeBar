@@ -298,6 +298,16 @@ public final class JSONSettingsRepository:
         store.read(key: "providers.\(id).isEnabled") ?? defaultValue
     }
 
+    /// Same key the Claude and Codex cards write (`<id>.probeMode`), so a
+    /// mode picked before the data-source redesign still applies.
+    public func dataSourceKind(forProvider id: String) -> String? {
+        store.read(key: "\(id).probeMode")
+    }
+
+    public func setDataSourceKind(_ kind: String, forProvider id: String) {
+        store.write(value: kind, key: "\(id).probeMode")
+    }
+
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         store.write(value: enabled, key: "providers.\(id).isEnabled")
     }

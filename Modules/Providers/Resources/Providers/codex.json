@@ -1,0 +1,173 @@
+{
+  "id": "codex",
+  "name": "Codex",
+  "cli": "codex",
+  "links": {
+    "dashboard": "https://platform.openai.com/usage",
+    "status": "https://status.openai.com"
+  },
+  "enabledByDefault": true,
+  "defaultDataSource": "rpc",
+  "dataSources": [
+    {
+      "kind": "rpc",
+      "label": "RPC",
+      "summary": "Uses codex app-server RPC",
+      "fetch": {
+        "jsonRpc": {
+          "cli": "codex",
+          "args": ["-s", "read-only", "-a", "never", "app-server"],
+          "workingDirectory": "probe",
+          "handshake": [
+            { "request": "initialize", "params": { "clientInfo": { "name": "claudebar", "version": "1.0.0" } } },
+            { "notify": "initialized" }
+          ],
+          "call": "account/rateLimits/read"
+        }
+      },
+      "mapping": {
+        "json": {
+          "quotas": [
+            {
+              "kind": "session",
+              "at": "$.result.rateLimits.primary",
+              "usedPercent": "usedPercent",
+              "resetsAt": { "epochSeconds": "resetsAt" },
+              "window": { "minutes": "windowDurationMins" }
+            },
+            {
+              "kind": "weekly",
+              "at": "$.result.rateLimits.secondary",
+              "usedPercent": "usedPercent",
+              "resetsAt": { "epochSeconds": "resetsAt" },
+              "window": { "minutes": "windowDurationMins" }
+            },
+            {
+              "kind": "time",
+              "each": "$.result.rateLimitsByLimitId",
+              "skipKeys": ["codex"],
+              "name": {
+                "firstOf": ["limitName", "limitId", "$key"],
+                "dropPrefixes": [{ "prefix": "codex_", "capitalize": true }, { "prefix": "codex " }]
+              },
+              "windows": [{ "at": "primary" }, { "at": "secondary", "suffix": " 7d" }],
+              "usedPercent": "usedPercent",
+              "resetsAt": { "epochSeconds": "resetsAt" },
+              "window": { "minutes": "windowDurationMins" }
+            }
+          ],
+          "whenEmpty": {
+            "if": { "path": "$.result.rateLimits.planType", "equals": "free" },
+            "quotas": [{ "kind": "session", "usedPercent": 0, "resetText": "Free plan" }],
+            "otherwise": "No rate limits available yet - make some API calls first"
+          }
+        }
+      },
+      "fallback": "tty"
+    },
+    {
+      "kind": "api",
+      "label": "API",
+      "summary": "Calls ChatGPT API directly",
+      "credential": {
+        "jsonFile": {
+          "path": "~/.codex/auth.json",
+          "token": "$.tokens.access_token",
+          "refreshToken": "$.tokens.refresh_token",
+          "account": "$.tokens.account_id",
+          "idToken": "$.tokens.id_token",
+          "refreshedAt": "$.last_refresh"
+        },
+        "refresh": {
+          "oauth2": {
+            "tokenURL": "https://auth.openai.com/oauth/token",
+            "clientId": "app_EMoamEEZ73f0CkXaXp7hrann",
+            "every": 691200,
+            "onStatus": [401, 403],
+            "expiredCodes": ["refresh_token_expired", "refresh_token_reused", "refresh_token_invalidated"],
+            "hint": "Run `codex` in terminal to log in again."
+          }
+        }
+      },
+      "fetch": {
+        "http": {
+          "url": "https://chatgpt.com/backend-api/wham/usage",
+          "headers": {
+            "Authorization": "Bearer {{token}}",
+            "ChatGPT-Account-Id": "{{account}}",
+            "Accept": "application/json",
+            "User-Agent": "OpenUsage"
+          },
+          "timeout": 15
+        }
+      },
+      "mapping": {
+        "json": {
+          "plan": "$.plan_type",
+          "quotas": [
+            {
+              "kind": "session",
+              "at": "$.rate_limit.primary_window",
+              "usedPercent": ["$header.x-codex-primary-used-percent", "used_percent"],
+              "resetsAt": [{ "epochSeconds": "reset_at" }, { "secondsFromNow": "reset_after_seconds" }]
+            },
+            {
+              "kind": "weekly",
+              "at": "$.rate_limit.secondary_window",
+              "usedPercent": ["$header.x-codex-secondary-used-percent", "used_percent"],
+              "resetsAt": [{ "epochSeconds": "reset_at" }, { "secondsFromNow": "reset_after_seconds" }]
+            },
+            {
+              "kind": "time",
+              "each": "$.additional_rate_limits",
+              "name": {
+                "firstOf": ["limit_name", "metered_feature"],
+                "dropPrefixes": [{ "prefix": "codex_", "capitalize": true }, { "prefix": "codex " }]
+              },
+              "windows": [
+                { "at": "rate_limit.primary_window" },
+                { "at": "rate_limit.secondary_window", "suffix": " 7d" }
+              ],
+              "usedPercent": "used_percent",
+              "resetsAt": [{ "epochSeconds": "reset_at" }, { "secondsFromNow": "reset_after_seconds" }],
+              "window": { "seconds": "limit_window_seconds" }
+            }
+          ],
+          "cost": {
+            "remaining": ["$header.x-codex-credits-balance", "$.credits.balance"],
+            "limit": 1000
+          }
+        }
+      }
+    },
+    {
+      "kind": "tty",
+      "label": "Terminal",
+      "hidden": true,
+      "fetch": {
+        "cli": {
+          "cli": "codex",
+          "args": ["-s", "read-only", "-a", "never"],
+          "input": "/status\n",
+          "timeout": 20,
+          "workingDirectory": "probe",
+          "autoResponses": { "Do you trust the contents of this directory?": "1" }
+        }
+      },
+      "mapping": {
+        "text": {
+          "errors": [
+            { "contains": ["data not available yet"], "error": { "parseFailed": "Data not available yet" } },
+            { "contains": ["update available"], "alsoContains": ["codex"], "error": "updateRequired" },
+            { "contains": ["not logged in", "please log in"], "error": "authenticationRequired" }
+          ],
+          "quotas": [
+            { "kind": "session", "label": "5h limit", "leftPercent": "([0-9]{1,3})%\\s+left", "lookahead": 12 },
+            { "kind": "weekly", "label": "Weekly limit", "leftPercent": "([0-9]{1,3})%\\s+left", "lookahead": 12 }
+          ],
+          "whenEmpty": "Could not find usage limits in Codex output"
+        }
+      }
+    }
+  ]
+}

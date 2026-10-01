@@ -39,6 +39,107 @@ let project = Project(
             )
         ),
 
+        // MARK: - Modules (one per bounded context — docs/architecture/MODULAR_DESIGN.md)
+
+        // Diagnostics — AppLog; the only module anything may import.
+        .target(
+            name: "Diagnostics",
+            destinations: .macOS,
+            product: .staticFramework,
+            bundleId: "com.tddworks.claudebar.diagnostics",
+            deploymentTargets: .macOS("15.0"),
+            sources: ["Modules/Diagnostics/Sources/**"],
+            settings: .settings(
+                base: [
+                    "SWIFT_STRICT_CONCURRENCY": "complete",
+                ]
+            )
+        ),
+
+        // DataSources — DataSource, its definition, the closed sums and their
+        // workers, and the ports for what lies outside (CLI, network, RPC).
+        .target(
+            name: "DataSources",
+            destinations: .macOS,
+            product: .staticFramework,
+            bundleId: "com.tddworks.claudebar.datasources",
+            deploymentTargets: .macOS("15.0"),
+            sources: ["Modules/DataSources/Sources/**"],
+            dependencies: [
+                .target(name: "Domain"),
+                .target(name: "Diagnostics"),
+                .external(name: "Mockable"),
+                .external(name: "SwiftTerm"),
+                .external(name: "Subprocess"),
+            ],
+            settings: .settings(
+                base: [
+                    "SWIFT_STRICT_CONCURRENCY": "complete",
+                ]
+            )
+        ),
+
+        // Providers — the one Provider lifecycle, ProviderDefinition and the
+        // catalog; the built-in definitions ship in its Resources.
+        .target(
+            name: "Providers",
+            destinations: .macOS,
+            product: .staticFramework,
+            bundleId: "com.tddworks.claudebar.providers",
+            deploymentTargets: .macOS("15.0"),
+            sources: ["Modules/Providers/Sources/**"],
+            resources: ["Modules/Providers/Resources/**"],
+            dependencies: [
+                .target(name: "Domain"),
+                .target(name: "DataSources"),
+                .target(name: "Diagnostics"),
+            ],
+            settings: .settings(
+                base: [
+                    "SWIFT_STRICT_CONCURRENCY": "complete",
+                ]
+            )
+        ),
+
+        .target(
+            name: "DataSourcesTests",
+            destinations: .macOS,
+            product: .unitTests,
+            bundleId: "com.tddworks.claudebar.datasources-tests",
+            deploymentTargets: .macOS("15.0"),
+            sources: ["Modules/DataSources/Tests/**"],
+            dependencies: [
+                .target(name: "DataSources"),
+                .target(name: "Domain"),
+                .external(name: "Mockable"),
+            ],
+            settings: .settings(
+                base: [
+                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "MOCKING",
+                ]
+            )
+        ),
+
+        .target(
+            name: "ProvidersTests",
+            destinations: .macOS,
+            product: .unitTests,
+            bundleId: "com.tddworks.claudebar.providers-tests",
+            deploymentTargets: .macOS("15.0"),
+            sources: ["Modules/Providers/Tests/**"],
+            dependencies: [
+                .target(name: "Providers"),
+                .target(name: "DataSources"),
+                .target(name: "Domain"),
+                .external(name: "Mockable"),
+            ],
+            settings: .settings(
+                base: [
+                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "MOCKING",
+                ]
+            )
+        ),
+
         // MARK: - Infrastructure Layer
         .target(
             name: "Infrastructure",
@@ -49,6 +150,8 @@ let project = Project(
             sources: ["Sources/Infrastructure/**"],
             dependencies: [
                 .target(name: "Domain"),
+                .target(name: "Diagnostics"),
+                .target(name: "DataSources"),
                 .external(name: "Mockable"),
                 .external(name: "SwiftTerm"),
                 .external(name: "AWSCloudWatch"),
@@ -82,6 +185,9 @@ let project = Project(
             entitlements: .file(path: "Sources/App/entitlements.plist"),
             dependencies: [
                 .target(name: "Domain"),
+                .target(name: "Diagnostics"),
+                .target(name: "DataSources"),
+                .target(name: "Providers"),
                 .target(name: "Infrastructure"),
                 .external(name: "Sparkle"),
                 .external(name: "MenuBarExtraAccess"),
@@ -140,6 +246,8 @@ let project = Project(
             sources: ["Tests/InfrastructureTests/**"],
             dependencies: [
                 .target(name: "Infrastructure"),
+                .target(name: "DataSources"),
+                .target(name: "Diagnostics"),
                 .target(name: "Domain"),
                 .external(name: "Mockable"),
                 .external(name: "AWSCloudWatch"),
@@ -182,6 +290,8 @@ let project = Project(
             dependencies: [
                 .target(name: "Domain"),
                 .target(name: "Infrastructure"),
+                .target(name: "DataSources"),
+                .target(name: "Providers"),
                 .external(name: "Mockable"),
                 .external(name: "AWSCloudWatch"),
                 .external(name: "AWSSTS"),
@@ -208,6 +318,8 @@ let project = Project(
                     .testableTarget(target: .target("DomainTests")),
                     .testableTarget(target: .target("InfrastructureTests")),
                     .testableTarget(target: .target("AppTests")),
+                    .testableTarget(target: .target("DataSourcesTests")),
+                    .testableTarget(target: .target("ProvidersTests")),
                 ],
                 configuration: .debug
             ),

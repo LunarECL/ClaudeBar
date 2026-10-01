@@ -161,7 +161,7 @@ struct NotificationsSpec {
             given(codexProbe).probe().willThrow(ProbeError.timeout)
 
             let claude = ClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = CodexProvider(probe: codexProbe, settingsRepository: settings)
+            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude, codex]),
                 clock: TestClock()

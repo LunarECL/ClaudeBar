@@ -1,6 +1,7 @@
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 import MenuBarExtraAccess
 #if ENABLE_SPARKLE
 import Sparkle
@@ -17,6 +18,17 @@ extension Notification.Name {
 
 @main
 struct ClaudeBarApp: App {
+    /// A built-in provider from its bundled definition. A definition that fails
+    /// to load is a packaging bug the catalog tests catch before release.
+    @MainActor
+    private static func builtIn(_ id: String, settings: any ProviderSettingsRepository) -> any AIProvider {
+        do {
+            return try Providers.make(id, settings: settings)
+        } catch {
+            preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
+        }
+    }
+
     /// The main domain service - monitors all AI providers
     /// This is the single source of truth for providers and their state
     @State private var monitor: QuotaMonitor
@@ -96,11 +108,8 @@ struct ClaudeBarApp: App {
                 // failed — through here (#317). Never any credential value.
                 diagnose: { AppLog.probes.info($0) }
             ),
-            CodexProvider(
-                rpcProbe: CodexUsageProbe(),
-                apiProbe: CodexAPIUsageProbe(),
-                settingsRepository: settingsRepository
-            ),
+            // Codex is data: Modules/Providers/Resources/Providers/codex.json.
+            Self.builtIn("codex", settings: settingsRepository),
             GeminiProvider(probe: GeminiUsageProbe(), settingsRepository: settingsRepository),
             AntigravityProvider(probe: AntigravityUsageProbe(), settingsRepository: settingsRepository),
             ZaiProvider(

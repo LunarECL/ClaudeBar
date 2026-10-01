@@ -39,7 +39,7 @@ struct ThemesSpec {
             // Given — all providers
             let settings = Self.makeSettings()
             let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
 
             // Then — unique identities for theme mapping
             #expect(claude.id == "claude")

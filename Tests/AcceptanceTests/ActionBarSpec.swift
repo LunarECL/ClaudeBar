@@ -36,7 +36,7 @@ struct ActionBarSpec {
 
         @Test
         func `Codex dashboard URL is OpenAI usage`() {
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
             #expect(codex.dashboardURL?.absoluteString == "https://platform.openai.com/usage")
         }
 

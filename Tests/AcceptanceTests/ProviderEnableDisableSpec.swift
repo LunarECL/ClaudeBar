@@ -56,7 +56,7 @@ struct ProviderEnableDisableSpec {
             // No setup — Codex should never be called
 
             let claude = ClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = CodexProvider(probe: codexProbe, settingsRepository: settings)
+            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
@@ -94,7 +94,7 @@ struct ProviderEnableDisableSpec {
             ))
 
             let claude = ClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = CodexProvider(probe: codexProbe, settingsRepository: settings)
+            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude, codex]),
                 clock: TestClock()
@@ -126,7 +126,7 @@ struct ProviderEnableDisableSpec {
             // Given — Claude selected, Codex disabled
             let settings = ProviderEnableDisableSpec.makeSettings()
             let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(

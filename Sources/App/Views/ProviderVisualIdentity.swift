@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import Domain
+import Providers
 import Synchronization
 
 // MARK: - Provider Visual Identity Protocol
@@ -52,30 +53,22 @@ extension ClaudeProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - CodexProvider Visual Identity
+// MARK: - Provider Visual Identity
 
-extension CodexProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "chevron.left.forwardslash.chevron.right" }
+/// A provider built from a definition takes its look from the id tables
+/// below — the same values its hand-written class used — until the look moves
+/// into the definition itself (docs/architecture/TARGET_ARCHITECTURE.md §8, slice 3).
+extension Provider: ProviderVisualIdentity {
+    public var symbolIcon: String { ProviderVisualIdentityLookup.symbolIcon(for: id) }
 
-    public var iconAssetName: String { "CodexIcon" }
+    public var iconAssetName: String { ProviderVisualIdentityLookup.iconAssetName(for: id) }
 
     public func themeColor(for scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? BaseTheme.tealBright
-            : Color(red: 0.18, green: 0.72, blue: 0.68)
+        ProviderVisualIdentityLookup.color(for: id, scheme: scheme)
     }
 
     public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.25, green: 0.65, blue: 0.85)
-                    : Color(red: 0.12, green: 0.52, blue: 0.72)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ProviderVisualIdentityLookup.gradient(for: id, scheme: scheme)
     }
 }
 

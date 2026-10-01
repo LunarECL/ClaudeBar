@@ -35,7 +35,7 @@ struct UpdatesSpec {
             given(settings).setEnabled(.any, forProvider: .any).willReturn()
 
             let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
 
             // Then
             #expect(claude.statusPageURL?.absoluteString == "https://status.anthropic.com")

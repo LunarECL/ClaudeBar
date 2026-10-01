@@ -273,7 +273,7 @@ struct AntigravityProviderTests {
         let mockProbe = MockUsageProbe()
         let antigravity = AntigravityProvider(probe: mockProbe, settingsRepository: settings)
         let claude = ClaudeProvider(probe: mockProbe, settingsRepository: settings)
-        let codex = CodexProvider(probe: mockProbe, settingsRepository: settings)
+        let codex = StubCodexProvider(probe: mockProbe, settingsRepository: settings)
         let gemini = GeminiProvider(probe: mockProbe, settingsRepository: settings)
         let copilot = CopilotProvider(probe: mockProbe, settingsRepository: copilotSettings)
 

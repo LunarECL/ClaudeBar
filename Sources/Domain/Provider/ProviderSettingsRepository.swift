@@ -20,6 +20,21 @@ public protocol ProviderSettingsRepository: Sendable {
 
     /// Sets the custom card URL for a provider (empty string or nil to remove)
     func setCustomCardURL(_ url: String?, forProvider id: String)
+
+    /// The `kind` of the data source a provider uses — what Settings calls
+    /// PROBE MODE. `nil` until the person picks one.
+    func dataSourceKind(forProvider id: String) -> String?
+
+    /// Saves the data source a provider uses.
+    func setDataSourceKind(_ kind: String, forProvider id: String)
+}
+
+public extension ProviderSettingsRepository {
+    /// Default for conformers that keep no choice: the definition's default applies.
+    func dataSourceKind(forProvider id: String) -> String? { nil }
+
+    /// Default for conformers that keep no choice.
+    func setDataSourceKind(_ kind: String, forProvider id: String) {}
 }
 
 /// Z.ai-specific settings repository, extending base ProviderSettingsRepository.

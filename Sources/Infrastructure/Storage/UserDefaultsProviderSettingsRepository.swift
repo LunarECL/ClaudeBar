@@ -52,6 +52,15 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         return userDefaults.bool(forKey: key)
     }
 
+    /// Same key the Claude and Codex modes use (`providerConfig.<id>ProbeMode`).
+    public func dataSourceKind(forProvider id: String) -> String? {
+        userDefaults.string(forKey: "providerConfig.\(id)ProbeMode")
+    }
+
+    public func setDataSourceKind(_ kind: String, forProvider id: String) {
+        userDefaults.set(kind, forKey: "providerConfig.\(id)ProbeMode")
+    }
+
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         let key = Self.enabledKey(forProvider: id)
         userDefaults.set(enabled, forKey: key)

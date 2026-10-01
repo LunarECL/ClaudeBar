@@ -1,0 +1,42 @@
+import Domain
+import Foundation
+
+/// A settings repository that keeps everything in memory — the real behaviour
+/// a `Provider` relies on, without touching `~/.claudebar/settings.json`.
+final class InMemoryProviderSettings: ProviderSettingsRepository, @unchecked Sendable {
+    private var enabled: [String: Bool] = [:]
+    private var kinds: [String: String] = [:]
+    private var cardURLs: [String: String] = [:]
+
+    init(dataSourceKinds: [String: String] = [:]) {
+        self.kinds = dataSourceKinds
+    }
+
+    func isEnabled(forProvider id: String) -> Bool {
+        enabled[id] ?? true
+    }
+
+    func isEnabled(forProvider id: String, defaultValue: Bool) -> Bool {
+        enabled[id] ?? defaultValue
+    }
+
+    func setEnabled(_ enabled: Bool, forProvider id: String) {
+        self.enabled[id] = enabled
+    }
+
+    func customCardURL(forProvider id: String) -> String? {
+        cardURLs[id]
+    }
+
+    func setCustomCardURL(_ url: String?, forProvider id: String) {
+        cardURLs[id] = url
+    }
+
+    func dataSourceKind(forProvider id: String) -> String? {
+        kinds[id]
+    }
+
+    func setDataSourceKind(_ kind: String, forProvider id: String) {
+        kinds[id] = kind
+    }
+}
