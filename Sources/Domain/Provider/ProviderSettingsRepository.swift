@@ -20,6 +20,15 @@ public protocol ProviderSettingsRepository: Sendable {
 
     /// Sets the custom card URL for a provider (empty string or nil to remove)
     func setCustomCardURL(_ url: String?, forProvider id: String)
+
+    /// Gets the user's provider display order as provider IDs, empty when the
+    /// user never reordered. IDs missing from the list keep their registration
+    /// position; IDs of providers that no longer exist are ignored.
+    func providerOrder() -> [String]
+
+    /// Persists the user's provider display order.
+    /// An empty list clears the stored order.
+    func setProviderOrder(_ order: [String])
 }
 
 /// Z.ai-specific settings repository, extending base ProviderSettingsRepository.

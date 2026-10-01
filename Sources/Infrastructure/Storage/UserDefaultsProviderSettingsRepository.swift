@@ -69,6 +69,19 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         }
     }
 
+    public func providerOrder() -> [String] {
+        userDefaults.stringArray(forKey: Keys.providerOrder) ?? []
+    }
+
+    /// An empty order removes the key: nothing stored means registration order.
+    public func setProviderOrder(_ order: [String]) {
+        if order.isEmpty {
+            userDefaults.removeObject(forKey: Keys.providerOrder)
+        } else {
+            userDefaults.set(order, forKey: Keys.providerOrder)
+        }
+    }
+
     // MARK: - ZaiSettingsRepository
 
     public func zaiConfigPath() -> String {
@@ -503,6 +516,8 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         // Claude settings
         static let claudeProbeMode = "providerConfig.claudeProbeMode"
         static let claudeCliFallbackEnabled = "providerConfig.claudeCliFallbackEnabled"
+        // Provider display order (issue #141)
+        static let providerOrder = "providerConfig.providerOrder"
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
         static let codexVerifiedAtLeastOnce = "providerConfig.codexVerifiedAtLeastOnce"

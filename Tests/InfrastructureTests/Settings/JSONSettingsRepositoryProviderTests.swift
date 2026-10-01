@@ -111,6 +111,49 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.customCardURL(forProvider: "gemini") == nil)
     }
 
+    // MARK: - Provider Order
+
+    @Test
+    func `providerOrder defaults to empty`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.providerOrder() == [])
+    }
+
+    @Test
+    func `setProviderOrder persists value`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setProviderOrder(["gemini", "claude", "codex"])
+
+        // Read back through a fresh repository over the same file, so the
+        // value really hit settings.json and not just memory.
+        let store = JSONSettingsStore(fileURL: dir.appendingPathComponent("settings.json"))
+        let reloaded = JSONSettingsRepository(store: store)
+        #expect(reloaded.providerOrder() == ["gemini", "claude", "codex"])
+    }
+
+    @Test
+    func `setProviderOrder empty clears the stored order`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setProviderOrder(["gemini", "claude", "codex"])
+        repo.setProviderOrder([])
+        #expect(repo.providerOrder() == [])
+    }
+
+    @Test
+    func `providerOrder round-trips a partial order`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setProviderOrder(["codex"])
+        #expect(repo.providerOrder() == ["codex"])
+    }
+
     // MARK: - Claude Settings
 
     @Test
