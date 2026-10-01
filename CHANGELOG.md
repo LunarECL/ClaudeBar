@@ -7,14 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Breaking: Claude's Dashboard button (⌘D) now opens your usage page on claude.ai on a subscription (Max, Pro, Team) instead of the Console billing page. Pay-as-you-go API accounts still get the Console; on a subscription, open console.anthropic.com yourself if you need it. ([#328](https://github.com/tddworks/ClaudeBar/pull/328))
+
 ### Added
 - Z.ai: paste your GLM API key in Settings → Providers → Z.ai → API KEY. It wins over the settings.json token and env vars, and works even when no Z.ai URL is in settings.json (quota then comes from api.z.ai).
 - Codex: the GPT-5.3-Codex-Spark research preview has its own 5h and weekly windows, separate from your main limits. Those Spark windows now show as extra rows after your session and weekly gauges. ([#178](https://github.com/tddworks/ClaudeBar/issues/178))
 - Popover keyboard shortcuts: Escape closes the popover (or an open share overlay first), and ⌘1–⌘9 switch between the provider pills. Tooltips on the pills and action buttons now show each shortcut (⌘D, ⌘R, ⌘S, ⌘, and ⌘Q already worked).
 - Kimi: API mode has a Region picker (Settings → Providers → Kimi → Kimi Configuration): China (kimi.com) or International (kimi.ai), matching the platform your account is signed in to. The console link follows the region. https://github.com/tddworks/ClaudeBar/issues/new
-
-### Changed
-- Claude: the Dashboard button (⌘D) now opens your usage page on claude.ai when you're on a subscription (Max, Pro, Team). It used to open the Console billing page, which is only useful for pay-as-you-go API accounts; those still go there.
 
 ### Fixed
 - Kimi: CLI mode failed with "No quota data found" because the CLI's one-time "Trust this folder?" prompt swallowed the typed `/usage`. The probe now runs in its own folder (trusted once), reads the CLI 2.x "Monthly limit" layout, and types `/usage` after the startup paint settles. https://github.com/tddworks/ClaudeBar/issues/new
