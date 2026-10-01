@@ -170,9 +170,12 @@ struct ClaudeBarApp: App {
 
         // Initialize the domain service with quota alerter
         // QuotaMonitor automatically validates selected provider on init
+        // The settings repository carries the user's provider order (issue #141),
+        // so the popover, overview and ⌘1–⌘9 follow it.
         let monitor = QuotaMonitor(
             providers: repository,
-            alerter: quotaAlerter
+            alerter: quotaAlerter,
+            settingsRepository: settingsRepository
         )
         self.monitor = monitor
         AppLog.monitor.info("QuotaMonitor initialized")
