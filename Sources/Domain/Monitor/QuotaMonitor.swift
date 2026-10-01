@@ -396,6 +396,15 @@ public final class QuotaMonitor {
         }
     }
 
+    /// Selects the enabled provider in the given 1-based slot, counted the way
+    /// the popover lists them (⌘1 is the first pill). A slot with no provider
+    /// leaves the selection alone.
+    public func selectProvider(atPosition position: Int) {
+        let enabled = providers.enabled
+        guard enabled.indices.contains(position - 1) else { return }
+        selectedProviderId = enabled[position - 1].id
+    }
+
     /// Sets a provider's enabled state.
     /// When disabling the currently selected provider, automatically switches
     /// to the first available enabled provider.
