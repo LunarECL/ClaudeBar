@@ -105,6 +105,10 @@ public struct UsageSnapshot: Sendable, Equatable {
     /// metrics (accounts without usable quota data) become note-only
     /// sections after the quota sections, or attach to a matching section.
     public var quotaGroups: [QuotaGroup] {
+        Self.makeQuotaGroups(quotas: quotas, metrics: extensionMetrics)
+    }
+
+    private static func makeQuotaGroups(quotas: [UsageQuota], metrics: [ExtensionMetric]?) -> [QuotaGroup] {
         var order: [String] = []
         var buckets: [String: [UsageQuota]] = [:]
         for quota in quotas {
@@ -114,7 +118,7 @@ public struct UsageSnapshot: Sendable, Equatable {
         }
 
         var notes: [String: String] = [:]
-        for metric in extensionMetrics ?? [] {
+        for metric in metrics ?? [] {
             guard let group = metric.group else { continue }
             if buckets[group] == nil, notes[group] == nil { order.append(group) }
             if let existing = notes[group] {
@@ -131,6 +135,45 @@ public struct UsageSnapshot: Sendable, Equatable {
                 note: notes[key]
             )
         }
+    }
+
+    // MARK: - Hidden Quotas (issue #140)
+
+    /// The quotas whose persisted key is not in `hiddenKeys`, order preserved.
+    /// Stale keys (the probe no longer reports them) match nothing and are
+    /// ignored, so they never error.
+    public func visibleQuotas(hiding hiddenKeys: Set<String>) -> [UsageQuota] {
+        guard !hiddenKeys.isEmpty else { return quotas }
+        return quotas.filter { !hiddenKeys.contains($0.quotaType.quotaKey) }
+    }
+
+    /// `quotaGroups` with the hidden quota keys removed from each section.
+    /// Note-only sections (accounts without usable quota data) are not
+    /// quotas, so they always survive.
+    public func visibleQuotaGroups(hiding hiddenKeys: Set<String>) -> [QuotaGroup] {
+        Self.makeQuotaGroups(quotas: visibleQuotas(hiding: hiddenKeys), metrics: extensionMetrics)
+    }
+
+    /// The overall status among visible quotas only, so a hidden quota can
+    /// no longer color the provider.
+    public func visibleOverallStatus(hiding hiddenKeys: Set<String>) -> QuotaStatus {
+        visibleQuotas(hiding: hiddenKeys).map(\.status).max() ?? .healthy
+    }
+
+    /// The pace-aware overall status among visible quotas only.
+    public func visiblePaceAwareOverallStatus(
+        hiding hiddenKeys: Set<String>,
+        burnRateThreshold: Double
+    ) -> QuotaStatus {
+        visibleQuotas(hiding: hiddenKeys)
+            .map { $0.paceAwareStatus(burnRateThreshold: burnRateThreshold) }
+            .max() ?? .healthy
+    }
+
+    /// The lowest remaining visible quota, so a hidden quota cannot be the
+    /// headline number.
+    public func visibleLowestQuota(hiding hiddenKeys: Set<String>) -> UsageQuota? {
+        visibleQuotas(hiding: hiddenKeys).min(by: { $0.percentRemaining < $1.percentRemaining })
     }
 
     /// The overall status is the worst status among all quotas.
