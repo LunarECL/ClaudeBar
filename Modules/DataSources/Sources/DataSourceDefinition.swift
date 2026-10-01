@@ -9,6 +9,9 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
     public let kind: String
     public let label: String?
     public let summary: String?
+    /// One sentence Settings shows while this data source is picked — what it
+    /// needs that the summary doesn't say.
+    public let note: String?
     /// A data source only ever reached as another one's fallback.
     public let hidden: Bool
     public let credential: CredentialLookup?
@@ -43,6 +46,7 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         kind: String,
         label: String? = nil,
         summary: String? = nil,
+        note: String? = nil,
         hidden: Bool = false,
         credential: CredentialLookup? = nil,
         fetch: Fetch,
@@ -60,6 +64,7 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         self.kind = kind
         self.label = label
         self.summary = summary
+        self.note = note
         self.hidden = hidden
         self.credential = credential
         self.fetch = fetch
@@ -80,6 +85,7 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         kind = try container.decode(String.self, forKey: .kind)
         label = try container.decodeIfPresent(String.self, forKey: .label)
         summary = try container.decodeIfPresent(String.self, forKey: .summary)
+        note = try container.decodeIfPresent(String.self, forKey: .note)
         hidden = try container.decodeIfPresent(Bool.self, forKey: .hidden) ?? false
         credential = try container.decodeIfPresent(CredentialLookup.self, forKey: .credential)
         fetch = try container.decode(Fetch.self, forKey: .fetch)

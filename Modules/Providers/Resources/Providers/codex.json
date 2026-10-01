@@ -26,7 +26,7 @@
     {
       "kind": "rpc",
       "label": "RPC",
-      "summary": "Uses codex app-server RPC",
+      "summary": "Uses codex app-server via JSON-RPC. Default, works with any auth. ClaudeBar never starts the Codex login itself.",
       "fetch": {
         "jsonRpc": {
           "cli": "codex",
@@ -142,7 +142,8 @@
     {
       "kind": "api",
       "label": "API",
-      "summary": "Calls ChatGPT API directly",
+      "summary": "Calls ChatGPT API directly. Faster, uses OAuth credentials.",
+      "note": "API mode needs file-based ChatGPT credentials in each account’s Codex folder.",
       "credential": {
         "jsonFile": {
           "path": "${CODEX_HOME:-~/.codex}/auth.json",

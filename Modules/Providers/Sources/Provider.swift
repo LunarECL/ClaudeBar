@@ -118,6 +118,21 @@ public final class Provider {
         return true
     }
 
+    /// Whether a data source's fallback is on — a fallback the definition
+    /// lets the person turn off (`enabledBySetting`) reads that setting; any
+    /// other fallback is always on. `false` when there is no fallback.
+    public func isFallbackEnabled(from kind: String) -> Bool {
+        guard let fallback = definition.dataSource(kind)?.fallback else { return false }
+        guard let setting = fallback.enabledBySetting else { return true }
+        return settings.isOn(setting, forProvider: definition.id) != false
+    }
+
+    /// Turns a switchable fallback on or off; does nothing for one that isn't.
+    public func setFallbackEnabled(_ on: Bool, from kind: String) {
+        guard let setting = definition.dataSource(kind)?.fallback?.enabledBySetting else { return }
+        settings.setOn(on, setting, forProvider: definition.id)
+    }
+
     /// Whether a data source's key lookup finds a key for a login — what a
     /// config card shows as *credentials found*. The default login unless named.
     public func hasKey(for kind: String, account: Account? = nil) -> Bool {
@@ -173,6 +188,28 @@ public final class Provider {
             markVerified()
         }
         return usage
+    }
+
+    /// *Test Connection* — the active data source looks up the key and
+    /// fetches for a login (the default unless named), stopping BEFORE
+    /// mapping: what came back, or which step failed. An explicit test checks
+    /// a CLI session the way an explicit refresh does (#216).
+    public func testConnection(_ account: Account? = nil) async -> Result<Response, DataSourceError> {
+        let account = account ?? defaultAccount
+        guard let active = dataSource(activeKind, for: account) else {
+            return .failure(DataSourceError(.fetch, .noData))
+        }
+        do {
+            let response = try await active.fetchResponse()
+            if active.definition.verifyBeforeBackground {
+                markVerified()
+            }
+            return .success(response)
+        } catch let failure as DataSourceError {
+            return .failure(failure)
+        } catch {
+            return .failure(DataSourceError(.fetch, .executionFailed(error.localizedDescription)))
+        }
     }
 
     // MARK: - Private

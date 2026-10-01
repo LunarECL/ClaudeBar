@@ -238,3 +238,27 @@ extension CredentialLookup: Codable {
         }
     }
 }
+
+extension CredentialLookup {
+    /// *KEY LOOKUP ORDER* — where the key is looked for, in order, as a person
+    /// would find it: a file path, a Keychain item, `$VARIABLE`. Never a value.
+    public var lookupOrder: [String] {
+        switch self {
+        case .environment(let name): ["$\(name)"]
+        case .jsonFile(let file): [file.path]
+        case .keychain(let item): ["Keychain “\(item.service)”"]
+        case .firstOf(let lookups): lookups.flatMap(\.lookupOrder)
+        case .refreshing(let base, _): base.lookupOrder
+        }
+    }
+
+    /// What to do when no key answers, or it can no longer be refreshed —
+    /// the refresh's hint ("Run `claude` in terminal to log in again.").
+    public var hint: String? {
+        switch self {
+        case .refreshing(let base, let refresh): refresh.hint ?? base.hint
+        case .firstOf(let lookups): lookups.lazy.compactMap(\.hint).first
+        case .environment, .jsonFile, .keychain: nil
+        }
+    }
+}

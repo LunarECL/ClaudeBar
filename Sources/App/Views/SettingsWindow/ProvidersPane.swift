@@ -228,9 +228,14 @@ private struct ProviderDetailView: View {
     private var configCard: some View {
         switch (provider as? Account)?.provider.id ?? provider.id {
         case "claude":
-            ClaudeConfigCard(monitor: monitor)
+            if let claude = (provider as? Account)?.provider {
+                DataSourceSection(provider: claude, monitor: monitor)
+            }
+            ClaudeBudgetCard()
         case "codex":
-            CodexConfigCard()
+            if let codex = (provider as? Account)?.provider {
+                DataSourceSection(provider: codex, monitor: monitor)
+            }
             CodexAccountsCard(monitor: monitor)
         case "kimi":
             KimiConfigCard(monitor: monitor)

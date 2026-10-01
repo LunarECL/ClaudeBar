@@ -29,7 +29,7 @@
     {
       "kind": "cli",
       "label": "CLI",
-      "summary": "Uses claude /usage command",
+      "summary": "Runs `claude /usage` command. Works with any auth method.",
       "fetch": {
         "cli": {
           "cli": "claude",
@@ -127,7 +127,7 @@
     {
       "kind": "api",
       "label": "API",
-      "summary": "Calls Anthropic API directly",
+      "summary": "Calls Anthropic API directly. Faster, uses OAuth credentials.",
       "credential": {
         "firstOf": [
           {
