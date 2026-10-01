@@ -198,7 +198,6 @@ struct QuotaMonitorProviderOrderTests {
     /// extra Codex account looks like to the monitor (`StubClaudeProvider` pins
     /// its id, these need to pick one).
     @MainActor
-    @Observable
     private final class StubIDProvider: AIProvider {
         let id: String
         let name: String
