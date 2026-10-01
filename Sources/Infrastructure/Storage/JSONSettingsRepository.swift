@@ -298,6 +298,25 @@ public final class JSONSettingsRepository:
         store.read(key: "providers.\(id).isEnabled") ?? defaultValue
     }
 
+    /// Same key the Claude and Codex cards write (`<id>.probeMode`), so a
+    /// mode picked before the data-source redesign still applies.
+    public func dataSourceKind(forProvider id: String) -> String? {
+        store.read(key: "\(id).probeMode")
+    }
+
+    public func setDataSourceKind(_ kind: String, forProvider id: String) {
+        store.write(value: kind, key: "\(id).probeMode")
+    }
+
+    /// `<id>.<setting>` — e.g. `claude.cliFallbackEnabled`, the key the Claude card writes.
+    public func isOn(_ setting: String, forProvider id: String) -> Bool? {
+        store.read(key: "\(id).\(setting)")
+    }
+
+    public func setOn(_ on: Bool, _ setting: String, forProvider id: String) {
+        store.write(value: on, key: "\(id).\(setting)")
+    }
+
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         store.write(value: enabled, key: "providers.\(id).isEnabled")
     }
@@ -347,6 +366,14 @@ public final class JSONSettingsRepository:
         store.write(value: mode.rawValue, key: "codex.probeMode")
     }
 
+    public func codexVerifiedAtLeastOnce() -> Bool {
+        store.read(key: "codex.verifiedAtLeastOnce") ?? false
+    }
+
+    public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
+        store.write(value: verified, key: "codex.verifiedAtLeastOnce")
+    }
+
     // MARK: - KimiSettingsRepository
 
     public func kimiProbeMode() -> KimiProbeMode {
@@ -359,6 +386,18 @@ public final class JSONSettingsRepository:
 
     public func setKimiProbeMode(_ mode: KimiProbeMode) {
         store.write(value: mode.rawValue, key: "kimi.probeMode")
+    }
+
+    public func kimiRegion() -> KimiRegion {
+        guard let raw: String = store.read(key: "kimi.region"),
+              let region = KimiRegion(rawValue: raw) else {
+            return .china
+        }
+        return region
+    }
+
+    public func setKimiRegion(_ region: KimiRegion) {
+        store.write(value: region.rawValue, key: "kimi.region")
     }
 
     // MARK: - ZaiSettingsRepository

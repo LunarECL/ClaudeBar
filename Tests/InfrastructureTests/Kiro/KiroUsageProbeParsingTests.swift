@@ -71,7 +71,7 @@ struct KiroUsageProbeParsingTests {
     func `parse empty output throws error`() {
         let output = ""
         
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try KiroUsageProbe.parse(output)
         }
     }
@@ -80,7 +80,7 @@ struct KiroUsageProbeParsingTests {
     func `parse malformed output throws error`() {
         let output = "Some random text without quota data"
         
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try KiroUsageProbe.parse(output)
         }
     }
@@ -94,7 +94,7 @@ struct KiroUsageProbeParsingTests {
         
         // Should not crash with division by zero
         // Should skip quotas with zero total
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try KiroUsageProbe.parse(output)
         }
     }

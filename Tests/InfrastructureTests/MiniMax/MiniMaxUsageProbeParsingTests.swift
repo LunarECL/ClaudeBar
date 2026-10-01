@@ -198,7 +198,7 @@ struct MiniMaxUsageProbeParsingTests {
         let data = Data(Self.sampleErrorResponse.utf8)
 
         // When & Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
         }
     }
@@ -209,7 +209,7 @@ struct MiniMaxUsageProbeParsingTests {
         let data = Data(Self.sampleEmptyRemainsResponse.utf8)
 
         // When & Then
-        #expect(throws: ProbeError.noData) {
+        #expect(throws: UsageError.noData) {
             try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
         }
     }
@@ -246,7 +246,7 @@ struct MiniMaxUsageProbeParsingTests {
         let data = Data("not json".utf8)
 
         // When & Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
         }
     }

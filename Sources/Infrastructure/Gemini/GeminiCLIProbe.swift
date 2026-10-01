@@ -17,7 +17,7 @@ internal struct GeminiCLIProbe {
             AppLog.probes.error("Gemini binary 'gemini' not found in PATH")
             AppLog.probes.info("Current directory: \(FileManager.default.currentDirectoryPath)")
             AppLog.probes.info("PATH: \(env["PATH"] ?? "<not set>")")
-            throw ProbeError.cliNotFound("gemini")
+            throw UsageError.cliNotFound("gemini")
         }
 
         AppLog.probes.info("Starting Gemini CLI fallback...")
@@ -53,14 +53,14 @@ internal struct GeminiCLIProbe {
         let lower = clean.lowercased()
         if lower.contains("login with google") || lower.contains("use gemini api key") ||
            lower.contains("waiting for auth") {
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         // Parse model usage table
         let quotas = parseModelUsageTable(clean)
 
         guard !quotas.isEmpty else {
-            throw ProbeError.parseFailed("No usage data found in output")
+            throw UsageError.parseFailed("No usage data found in output")
         }
 
         return UsageSnapshot(
@@ -116,7 +116,7 @@ internal struct GeminiCLIProbe {
         return quotas
     }
 
-    private func mapError(_ error: Error) -> ProbeError {
+    private func mapError(_ error: Error) -> UsageError {
         if let runError = error as? InteractiveRunner.RunError {
             switch runError {
             case .binaryNotFound(let bin):

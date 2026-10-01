@@ -24,6 +24,18 @@ public struct KimiCLIUsageProbe: UsageProbe {
     private let timeout: TimeInterval
     private let cliExecutor: CLIExecutor
 
+    /// Keeps the PTY capture open while the usage panel is still being fetched.
+    ///
+    /// The `context:` status footer paints at startup and the usage panel only
+    /// arrives after a network round-trip to the billing API, so "no new data
+    /// for 3 s" doesn't mean the screen is done. A quota line (`% used` / `% left`)
+    /// or an error/auth screen marks the settled screen; until one appears the
+    /// capture keeps waiting, up to the probe timeout.
+    static let usageCompletionRule = CLICompletionRule(
+        readyMarkers: ["% used", "% left", "No token usage", "rate limit", "Error", "login"]
+            .map { CLICompletionRule.Marker($0) }
+    )
+
     public init(
         kimiBinary: String = "kimi",
         timeout: TimeInterval = 15.0,
@@ -31,7 +43,14 @@ public struct KimiCLIUsageProbe: UsageProbe {
     ) {
         self.kimiBinary = kimiBinary
         self.timeout = timeout
-        self.cliExecutor = cliExecutor ?? DefaultCLIExecutor()
+        // The delayed input lets the startup paint settle before `/usage` is
+        // typed; a redraw mid-startup used to swallow it and the probe reported
+        // "No quota data found". The auto-response markers stay as a backup for
+        // slower CLIs where the prompt appears after the delay.
+        self.cliExecutor = cliExecutor ?? DefaultCLIExecutor(
+            completionRule: Self.usageCompletionRule,
+            inputDelay: 1.5
+        )
     }
 
     public func isAvailable() async -> Bool {
@@ -44,30 +63,36 @@ public struct KimiCLIUsageProbe: UsageProbe {
 
     public func probe() async throws -> UsageSnapshot {
         guard cliExecutor.locate(kimiBinary) != nil else {
-            throw ProbeError.cliNotFound(kimiBinary)
+            throw UsageError.cliNotFound(kimiBinary)
         }
 
         AppLog.probes.info("Starting Kimi CLI probe with /usage command...")
+
+        let workingDir = Self.probeWorkingDirectory()
 
         let result: CLIResult
         do {
             result = try await cliExecutor.execute(
                 binary: kimiBinary,
                 args: [],
-                input: nil,
+                input: "/usage",
                 timeout: timeout,
-                workingDirectory: nil,
+                workingDirectory: workingDir,
                 autoResponses: [
                     // kimi CLI < 0.36 shows a 💫 prompt when ready for input.
                     "💫": "/usage\r",
                     // kimi CLI >= 0.36 dropped the 💫 prompt; its status footer
                     // ("context: N% ...") signals the TUI is ready instead.
                     "context:": "/usage\r",
+                    // First run in the dedicated probe directory asks once to
+                    // trust the folder; Enter accepts and it is remembered;
+                    // without this the prompt swallows the typed /usage.
+                    "Trust this folder": "\r",
                 ]
             )
         } catch {
             AppLog.probes.error("Kimi CLI probe failed: \(error.localizedDescription)")
-            throw ProbeError.executionFailed(error.localizedDescription)
+            throw UsageError.executionFailed(error.localizedDescription)
         }
 
         AppLog.probes.info("Kimi CLI /usage output:\n\(result.output)")
@@ -86,10 +111,13 @@ public struct KimiCLIUsageProbe: UsageProbe {
 
     /// Parses the Kimi CLI `/usage` output into a UsageSnapshot.
     ///
-    /// Looks for lines containing known quota labels ("Weekly limit", "5h limit").
-    /// Two output formats are supported:
+    /// Looks for lines containing known quota labels ("Weekly limit", "Monthly limit",
+    /// "5h limit"). Three output formats are supported:
     /// - kimi CLI < 0.36: `N% left  (resets in ...)`
     /// - kimi CLI >= 0.36: `N% used  resets in ...` (remaining = 100 - used)
+    /// - kimi CLI 2.x: restructured panel (Session usage / Context window / Plan usage
+    ///   sections) where the plan quota is "Monthly limit" — new plans dropped the
+    ///   weekly window, keeping the 5-hour window plus a monthly total.
     ///
     /// Expected format per quota line (with or without progress bars):
     /// ```
@@ -106,6 +134,8 @@ public struct KimiCLIUsageProbe: UsageProbe {
             let quotaType: QuotaType
             if lower.contains("weekly") {
                 quotaType = .weekly
+            } else if lower.contains("monthly") {
+                quotaType = .timeLimit("Monthly")
             } else if lower.contains("5h") || lower.contains("hour") {
                 quotaType = .session
             } else {
@@ -159,12 +189,13 @@ public struct KimiCLIUsageProbe: UsageProbe {
                 quotaType: quotaType,
                 providerId: "kimi",
                 resetsAt: resetsAt,
-                resetText: resetText
+                resetText: resetText,
+                windowDuration: quotaType.conventionalWindow.seconds
             ))
         }
 
         guard !quotas.isEmpty else {
-            throw ProbeError.parseFailed("No quota data found in Kimi CLI output")
+            throw UsageError.parseFailed("No quota data found in Kimi CLI output")
         }
 
         return UsageSnapshot(
@@ -175,6 +206,21 @@ public struct KimiCLIUsageProbe: UsageProbe {
     }
 
     // MARK: - Private Helpers
+
+    /// A directory of our own for the probe run. With no working directory the
+    /// CLI inherits the app's cwd, where its one-time "Trust this folder?"
+    /// prompt blocks the TUI and swallows the typed `/usage` (the Claude probe
+    /// isolates its runs for the same reason). The trust granted here is
+    /// remembered per folder, so the prompt appears at most once.
+    static func probeWorkingDirectory() -> URL {
+        let fm = FileManager.default
+        let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fm.temporaryDirectory
+        let dir = base
+            .appendingPathComponent("ClaudeBar", isDirectory: true)
+            .appendingPathComponent("Probe", isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
 
     /// Parses a relative duration string like "6d 23h 22m" or "4h 22m" into a future Date.
     static func parseResetDuration(_ text: String) -> Date? {

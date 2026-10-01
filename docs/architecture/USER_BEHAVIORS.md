@@ -310,8 +310,15 @@ Scenario: Disabled provider does not affect overall status
 
 **#24 — Dashboard opens correct URL per provider**
 ```
-Scenario: Open Claude dashboard
+Scenario: Open Claude dashboard on a subscription
   Given Claude is the selected provider
+  And the account is on a subscription plan (Max, Pro, Team, …) or its tier is not yet known
+  When the user clicks Dashboard
+  Then the browser opens "https://claude.ai/new#settings/usage"
+
+Scenario: Open Claude dashboard on a pay-as-you-go API account
+  Given Claude is the selected provider
+  And the account tier is API
   When the user clicks Dashboard
   Then the browser opens "https://console.anthropic.com/settings/billing"
 

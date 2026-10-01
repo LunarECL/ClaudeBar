@@ -14,7 +14,11 @@ public protocol KimiTokenProviding: Sendable {
 /// 1. `KIMI_AUTH_TOKEN` environment variable
 /// 2. `kimi-auth` cookie from browser cookie stores (via SweetCookieKit)
 public struct KimiCookieTokenProvider: KimiTokenProviding {
-    public init() {}
+    private let region: KimiRegion
+
+    public init(region: KimiRegion = .china) {
+        self.region = region
+    }
 
     public func resolveToken() throws -> String {
         // 1. Check environment variable
@@ -32,13 +36,13 @@ public struct KimiCookieTokenProvider: KimiTokenProviding {
         }
 
         AppLog.probes.error("Kimi: No authentication token found")
-        throw ProbeError.authenticationRequired
+        throw UsageError.authenticationRequired
     }
 
     private func fetchFromBrowser() -> String? {
         let cookieClient = BrowserCookieClient()
         let query = BrowserCookieQuery(
-            domains: ["www.kimi.com", "kimi.com"],
+            domains: region.cookieDomains,
             domainMatch: .suffix,
             includeExpired: false
         )

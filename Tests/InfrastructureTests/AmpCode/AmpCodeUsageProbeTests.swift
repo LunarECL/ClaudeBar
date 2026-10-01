@@ -85,7 +85,7 @@ struct AmpCodeUsageProbeTests {
         let probe = AmpCodeUsageProbe(cliExecutor: mockExecutor)
 
         // When & Then
-        await #expect(throws: ProbeError.cliNotFound("AmpCode")) {
+        await #expect(throws: UsageError.cliNotFound("AmpCode")) {
             try await probe.probe()
         }
     }
@@ -106,7 +106,7 @@ struct AmpCodeUsageProbeTests {
         let probe = AmpCodeUsageProbe(cliExecutor: mockExecutor)
 
         // When & Then
-        await #expect(throws: ProbeError.executionFailed("amp usage exited with code 1")) {
+        await #expect(throws: UsageError.executionFailed("amp usage exited with code 1")) {
             try await probe.probe()
         }
     }
@@ -119,12 +119,12 @@ struct AmpCodeUsageProbeTests {
         
         given(mockExecutor)
             .execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
-            .willThrow(ProbeError.executionFailed("timeout"))
+            .willThrow(UsageError.executionFailed("timeout"))
 
         let probe = AmpCodeUsageProbe(cliExecutor: mockExecutor)
 
         // When & Then
-        await #expect(throws: ProbeError.executionFailed("amp usage failed: timeout")) {
+        await #expect(throws: UsageError.executionFailed("amp usage failed: timeout")) {
             try await probe.probe()
         }
     }

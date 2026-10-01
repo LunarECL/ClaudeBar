@@ -4,13 +4,17 @@ description: Track Codex 5-hour and weekly limits through the codex app-server R
 
 # Codex
 
-Shows your OpenAI Codex rate-limit windows (usually the 5-hour session and weekly limits) with reset countdowns. API mode also shows your Codex credits balance when ChatGPT reports one.
+Shows your OpenAI Codex rate-limit windows (usually the 5-hour session and weekly limits) with reset countdowns. API mode also shows your Codex credits balance when ChatGPT reports one. Separate preview buckets such as GPT-5.3-Codex-Spark appear as extra rows after your main windows.
 
 ## Setup
 
 1. Install the [Codex CLI](https://github.com/openai/codex) and run `codex` once to sign in with your ChatGPT account.
 2. Settings → Providers → Codex: turn it on (it is on by default).
 3. Optional: in the same pane, **Codex Configuration → Probe Mode** picks RPC or API.
+
+## Multiple accounts
+
+Use **Codex Accounts → Add Codex Account** in the provider settings to link another independent ChatGPT login. Accounts are identified by email and can be pinned separately in the menu bar. See [multiple accounts](../../features/multi-account/README.md) for setup and reconnect instructions.
 
 ## Probe modes
 

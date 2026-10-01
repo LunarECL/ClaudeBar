@@ -1,6 +1,7 @@
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 #if ENABLE_SPARKLE
 import Sparkle
 #endif
@@ -11,6 +12,8 @@ struct MenuContentView: View {
     let monitor: QuotaMonitor
     let sessionMonitor: SessionMonitor
     let quotaAlerter: QuotaAlerter
+    /// Closes the popover (Escape). The presentation binding lives on the App.
+    var onClose: (() -> Void)?
     var onHookSettingsChanged: ((Bool) -> Void)?
 
     @Environment(\.appTheme) private var theme
@@ -103,8 +106,7 @@ struct MenuContentView: View {
             }
 
             // Share Pass Overlay
-            if showSharePass, let claudeProvider = selectedProvider as? ClaudeProvider,
-               let guestPass = claudeProvider.guestPass {
+            if showSharePass, let guestPass = guestPasses?.pass {
                 SharePassOverlay(pass: guestPass) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showSharePass = false
@@ -113,11 +115,10 @@ struct MenuContentView: View {
             }
 
             // Share Pass Error Overlay
-            if let claudeProvider = selectedProvider as? ClaudeProvider,
-               let passError = claudeProvider.passError {
+            if let guestPasses, let passError = guestPasses.error {
                 SharePassErrorOverlay(message: passError.localizedDescription) {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        claudeProvider.clearPassError()
+                        guestPasses.clearError()
                     }
                 }
             }
@@ -126,6 +127,8 @@ struct MenuContentView: View {
         .fixedSize(horizontal: false, vertical: true)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .background(TouchBarWindowAccessor())
+        .background(keyboardShortcuts)
+        .background(PopoverKeyWindowAccessor())
         .touchBar {
             ClaudeBarNativeTouchBar(monitor: monitor)
         }
@@ -145,11 +148,14 @@ struct MenuContentView: View {
             withAnimation(.easeOut(duration: 0.6)) {
                 animateIn = true
             }
-            // Then fetch data in background
+            // Then fetch data — passively: opening the popover is not explicit
+            // intent, so Codex in RPC mode must not spawn `codex app-server`
+            // here before the session was explicitly verified (issue #216).
+            // Other providers treat .passive like an interactive refresh.
             if settings.overviewModeEnabled {
-                await refreshAllEnabled()
+                await refreshAllEnabled(kind: .passive)
             } else {
-                await refresh(providerId: selectedProviderId)
+                await refresh(providerId: selectedProviderId, kind: .passive)
             }
 
             // Check for updates when menu opens (no UI unless update found)
@@ -177,6 +183,45 @@ struct MenuContentView: View {
             visibleScreenHeight: NSScreen.main?.visibleFrame.height ?? 800,
             overviewMode: settings.overviewModeEnabled
         )
+    }
+
+    // MARK: - Keyboard Shortcuts
+
+    /// Shortcuts with no button of their own: Escape, and ⌘1–⌘9 for the
+    /// provider pills. The action bar's buttons carry theirs directly.
+    private var keyboardShortcuts: some View {
+        ZStack {
+            Button("Close", action: handleEscape)
+                .keyboardShortcut(.cancelAction)
+
+            if !settings.overviewModeEnabled {
+                ForEach(1...9, id: \.self) { position in
+                    Button("Select provider \(position)") {
+                        monitor.selectProvider(atPosition: position)
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character(String(position))))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
+    }
+
+    /// Escape backs out one level: an open overlay first, then the popover.
+    private func handleEscape() {
+        if showSharePass {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showSharePass = false
+            }
+        } else if let guestPasses, guestPasses.error != nil {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                guestPasses.clearError()
+            }
+        } else {
+            onClose?()
+        }
     }
 
     // MARK: - Background Orbs
@@ -290,11 +335,7 @@ struct MenuContentView: View {
 
     /// Status of the currently selected provider, nil when it has no snapshot.
     private var selectedProviderStatus: QuotaStatus? {
-        guard let snapshot = selectedProvider?.snapshot else { return nil }
-        if settings.burnRateWarningEnabled {
-            return snapshot.paceAwareOverallStatus(burnRateThreshold: settings.burnRateThreshold)
-        }
-        return snapshot.overallStatus
+        selectedProvider?.snapshot?.overallStatus(under: settings.statusPolicy)
     }
 
     /// What the header pill says. A provider that failed to probe reads as
@@ -350,7 +391,7 @@ struct MenuContentView: View {
             return "Update available: v\(version)"
         }
         #endif
-        return "Settings"
+        return "Settings (⌘,)"
     }
 
     // MARK: - Provider Pills
@@ -363,7 +404,7 @@ struct MenuContentView: View {
     private var providerPills: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(enabledProviders, id: \.id) { provider in
+                ForEach(Array(enabledProviders.enumerated()), id: \.element.id) { index, provider in
                     ProviderPill(
                         providerId: provider.id,
                         providerName: provider.name,
@@ -373,6 +414,7 @@ struct MenuContentView: View {
                         // Avoid withAnimation to prevent constraint update loops in MenuBarExtra
                         selectedProviderId = provider.id
                     }
+                    .help(index < 9 ? "\(provider.name) (⌘\(index + 1))" : provider.name)
                 }
             }
             .background(HorizontalScrollBooster())
@@ -433,11 +475,21 @@ struct MenuContentView: View {
                 overviewContent(providers: providers)
             }
         } else if let provider = selectedProvider, let snapshot = provider.snapshot {
+            let report = RefreshReport.of(provider)
             VStack(spacing: 12) {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
-                    accountCard(displayName: displayName, snapshot: snapshot)
+                    accountCard(
+                        displayName: displayName, snapshot: snapshot,
+                        freshness: report?.freshness ?? "Updated \(snapshot.ageDescription)"
+                    )
+                } else if let freshness = report?.freshness {
+                    freshnessLine(freshness)
+                }
+                if let failure = report?.failure {
+                    failureNotice(failure)
                 }
                 statsGrid(snapshot: snapshot)
+                    .opacity(report?.isLastSeen == true ? 0.55 : 1)
             }
             .opacity(animateIn ? 1 : 0)
             .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
@@ -470,7 +522,12 @@ struct MenuContentView: View {
             providerSectionHeader(provider: provider)
 
             if let snapshot = provider.snapshot {
+                let report = RefreshReport.of(provider)
+                if let failure = report?.failure {
+                    failureNotice(failure)
+                }
                 statsGrid(snapshot: snapshot)
+                    .opacity(report?.isLastSeen == true ? 0.55 : 1)
             } else if provider.isSyncing {
                 LoadingSpinnerView()
             } else {
@@ -484,16 +541,54 @@ struct MenuContentView: View {
             ProviderIconView(providerId: provider.id, size: 20, showGlow: false)
 
             Text(provider.name)
+                .fixedSize(horizontal: false, vertical: true)
                 .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
 
             Spacer()
 
-            let status = provider.snapshot?.overallStatus ?? .healthy
+            let status = provider.snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy
             Text(provider.isSyncing ? "Syncing..." : status.badgeText)
                 .badge(theme.statusColor(for: status))
         }
         .padding(.horizontal, 4)
+    }
+
+    /// "Updated 2m ago · via RPC" when there is no account card to carry it.
+    private func freshnessLine(_ text: String) -> some View {
+        HStack {
+            Text(text)
+                .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                .foregroundStyle(theme.textTertiary)
+            Spacer()
+        }
+        .padding(.horizontal, 4)
+    }
+
+    /// A failed refresh over the last usage: the step that failed, then what to do.
+    private func failureNotice(_ failure: RefreshReport.Failure) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(theme.statusWarning)
+
+            VStack(alignment: .leading, spacing: 2) {
+                if let headline = failure.headline {
+                    Text(headline)
+                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textPrimary)
+                }
+                Text(failure.detail)
+                    .help(failure.detail)
+                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
     }
 
     private func compactErrorState(provider: any AIProvider) -> some View {
@@ -503,6 +598,7 @@ struct MenuContentView: View {
                 .foregroundStyle(theme.statusWarning)
 
             Text(provider.lastError?.localizedDescription ?? "Unavailable")
+                .help(provider.lastError?.localizedDescription ?? "Unavailable")
                 .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                 .foregroundStyle(theme.textTertiary)
                 .lineLimit(1)
@@ -513,7 +609,7 @@ struct MenuContentView: View {
     }
 
 
-    private func accountCard(displayName: String, snapshot: UsageSnapshot) -> some View {
+    private func accountCard(displayName: String, snapshot: UsageSnapshot, freshness: String) -> some View {
         HStack(spacing: 10) {
             // Avatar circle
             ZStack {
@@ -547,7 +643,7 @@ struct MenuContentView: View {
                     }
                 }
 
-                Text("Updated \(snapshot.ageDescription)")
+                Text(freshness)
                     .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
@@ -770,12 +866,16 @@ struct MenuContentView: View {
                     .foregroundStyle(theme.statusWarning)
             }
 
-            Text("\(selectedProvider?.name ?? selectedProviderId) Unavailable")
+            // A provider that is data names the step that failed first.
+            let failure = selectedProvider.flatMap { RefreshReport.of($0)?.failure }
+            Text(failure?.headline ?? "\(selectedProvider?.name ?? selectedProviderId) Unavailable")
                 .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
 
             // Show actual error message if available, otherwise generic message
-            Text(selectedProvider?.lastError?.localizedDescription ?? "Install CLI or check configuration")
+            Text(failure?.headline != nil
+                 ? "\(selectedProvider?.name ?? selectedProviderId) Unavailable · \(failure?.detail ?? "")"
+                 : selectedProvider?.lastError?.localizedDescription ?? "Install CLI or check configuration")
                 .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textTertiary)
                 .multilineTextAlignment(.center)
@@ -801,6 +901,7 @@ struct MenuContentView: View {
                 }
             }
             .keyboardShortcut("d")
+            .help("Open dashboard (⌘D)")
 
             // Refresh Button
             let isCurrentlyRefreshing = settings.overviewModeEnabled
@@ -823,13 +924,13 @@ struct MenuContentView: View {
                 }
             }
             .keyboardShortcut("r")
+            .help("Refresh (⌘R)")
 
             Spacer()
 
             // Share Button (Claude only) - icon only
-            if let claudeProvider = selectedProvider as? ClaudeProvider,
-               claudeProvider.supportsGuestPasses {
-                let isFetchingPasses = claudeProvider.isFetchingPasses
+            if let guestPasses, guestPasses.isOffered(for: selectedProvider?.snapshot) {
+                let isFetchingPasses = guestPasses.isFetching
                 Button {
                     Task { await fetchAndShowPasses() }
                 } label: {
@@ -850,7 +951,7 @@ struct MenuContentView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .help("Share Claude Code")
+                .help("Share Claude Code (⌘S)")
                 .keyboardShortcut("s")
             }
 
@@ -898,7 +999,7 @@ struct MenuContentView: View {
                 }
             }
             .buttonStyle(.plain)
-            .help("Quit ClaudeBar")
+            .help("Quit ClaudeBar (⌘Q)")
             .keyboardShortcut("q")
         }
         .opacity(animateIn ? 1 : 0)
@@ -908,16 +1009,18 @@ struct MenuContentView: View {
     // MARK: - Actions
 
     /// Refresh all enabled providers concurrently
-    private func refreshAllEnabled() async {
+    /// - Parameter kind: `.interactive` for explicit clicks (Refresh button),
+    ///   `.passive` for the popover-open refresh (issue #216).
+    private func refreshAllEnabled(kind: RefreshKind = .interactive) async {
         await withTaskGroup(of: Void.self) { group in
             // The `isSyncing` guard reads main-actor provider state, so evaluate
             // it here on the main actor (this closure inherits the caller's
-            // isolation). Each child task then awaits `refresh()`, whose heavy
+            // isolation). Each child task then awaits `refresh(_:)`, whose heavy
             // probe work still suspends off-main, keeping the refreshes concurrent.
             for provider in monitor.enabledProviders where !provider.isSyncing {
                 group.addTask {
                     do {
-                        try await provider.refresh()
+                        try await provider.refresh(kind)
                     } catch {
                         // Provider stores error in lastError
                     }
@@ -927,7 +1030,9 @@ struct MenuContentView: View {
     }
 
     /// Refresh a specific provider by ID
-    private func refresh(providerId: String) async {
+    /// - Parameter kind: `.interactive` for explicit clicks (Refresh button,
+    ///   provider switch), `.passive` for the popover-open refresh (issue #216).
+    private func refresh(providerId: String, kind: RefreshKind = .interactive) async {
         guard let provider = monitor.provider(for: providerId) else {
             return
         }
@@ -936,23 +1041,28 @@ struct MenuContentView: View {
         guard !provider.isSyncing else { return }
 
         do {
-            try await provider.refresh()
+            try await provider.refresh(kind)
         } catch {
             // Provider stores error in lastError
         }
     }
 
+    /// The selected provider's guest passes, when it has any to offer.
+    private var guestPasses: GuestPasses? {
+        (selectedProvider as? Account)?.guestPasses
+    }
+
     /// Fetch guest passes and show the share view
     private func fetchAndShowPasses() async {
-        guard let claudeProvider = selectedProvider as? ClaudeProvider else {
+        guard let guestPasses else {
             return
         }
 
         // Prevent duplicate fetches
-        guard !claudeProvider.isFetchingPasses else { return }
+        guard !guestPasses.isFetching else { return }
 
         do {
-            _ = try await claudeProvider.fetchPasses()
+            _ = try await guestPasses.fetch()
             withAnimation(.easeInOut(duration: 0.2)) {
                 showSharePass = true
             }
@@ -982,6 +1092,7 @@ struct ProviderPill: View {
                     .font(.system(size: 10, weight: .semibold))
 
                 Text(providerName)
+                    .help(providerName)
                     .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                     .lineLimit(1)
                     .fixedSize()
@@ -1141,7 +1252,7 @@ struct WrappedStatCard: View {
     }
 
     private var statusColor: Color {
-        theme.statusColor(for: quota.status)
+        theme.statusColor(for: quota.status(under: settings.statusPolicy))
     }
 
     private var isCappedSpend: Bool {
@@ -1182,7 +1293,7 @@ struct WrappedStatCard: View {
                     Text(quota.pace.displayName.uppercased())
                         .badge(paceColor)
                 } else {
-                    Text(quota.status.badgeText)
+                    Text(quota.status(under: settings.statusPolicy).badgeText)
                         .badge(statusColor)
                 }
             }

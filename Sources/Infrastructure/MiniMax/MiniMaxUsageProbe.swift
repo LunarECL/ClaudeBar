@@ -58,13 +58,13 @@ public struct MiniMaxUsageProbe: UsageProbe {
     public func probe() async throws -> UsageSnapshot {
         guard let apiKey = getApiKey(), !apiKey.isEmpty else {
             AppLog.probes.error("MiniMax: No API key configured (check env var or settings)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         AppLog.probes.info("Starting MiniMax probe...")
 
         guard let url = URL(string: apiURL) else {
-            throw ProbeError.executionFailed("Invalid MiniMax API URL")
+            throw UsageError.executionFailed("Invalid MiniMax API URL")
         }
 
         var request = URLRequest(url: url)
@@ -76,15 +76,15 @@ public struct MiniMaxUsageProbe: UsageProbe {
         let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         guard httpResponse.statusCode == 200 else {
             AppLog.probes.error("MiniMax API returned HTTP \(httpResponse.statusCode)")
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                throw ProbeError.authenticationRequired
+                throw UsageError.authenticationRequired
             }
-            throw ProbeError.executionFailed("MiniMax API returned HTTP \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("MiniMax API returned HTTP \(httpResponse.statusCode)")
         }
 
         // Log raw response at debug level
@@ -117,21 +117,21 @@ public struct MiniMaxUsageProbe: UsageProbe {
             if let rawString = String(data: data, encoding: .utf8) {
                 AppLog.probes.debug("MiniMax raw response: \(rawString.prefix(500))")
             }
-            throw ProbeError.parseFailed("Invalid JSON: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Invalid JSON: \(error.localizedDescription)")
         }
 
         // Check API error status
         if response.baseResp.statusCode != 0 {
             let message = response.baseResp.statusMsg ?? "Unknown error"
             AppLog.probes.error("MiniMax API error: \(response.baseResp.statusCode) - \(message)")
-            throw ProbeError.executionFailed("MiniMax API error: \(message)")
+            throw UsageError.executionFailed("MiniMax API error: \(message)")
         }
 
         let modelRemains = response.modelRemains ?? []
 
         guard !modelRemains.isEmpty else {
             AppLog.probes.error("MiniMax: Empty model_remains in response")
-            throw ProbeError.noData
+            throw UsageError.noData
         }
 
         let quotas = modelRemains.flatMap { model -> [UsageQuota] in

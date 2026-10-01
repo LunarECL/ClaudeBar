@@ -15,7 +15,7 @@ struct KimiUsageProbeTests {
 
         func resolveToken() throws -> String {
             guard let token else {
-                throw ProbeError.authenticationRequired
+                throw UsageError.authenticationRequired
             }
             return token
         }
@@ -131,7 +131,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: nil)
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -149,7 +149,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -167,7 +167,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -185,7 +185,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -203,7 +203,7 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -234,8 +234,97 @@ struct KimiUsageProbeTests {
             tokenProvider: MockTokenProvider(token: "valid-token")
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
+    }
+
+    // MARK: - Region Tests
+
+    /// Captures the request the probe sends so tests can assert URL and headers.
+    private final class CapturingNetworkClient: NetworkClient, @unchecked Sendable {
+        var result: (Data, URLResponse)
+        private let lock = NSLock()
+        private var storage: URLRequest?
+
+        var capturedRequest: URLRequest? {
+            withLock { storage }
+        }
+
+        private func withLock<T>(_ body: () -> T) -> T {
+            lock.lock(); defer { lock.unlock() }
+            return body()
+        }
+
+        init(result: (Data, URLResponse)) {
+            self.result = result
+        }
+
+        func request(_ request: URLRequest) async throws -> (Data, URLResponse) {
+            withLock { storage = request }
+            return result
+        }
+    }
+
+    private func makeSettingsRepository(region: KimiRegion) -> UserDefaultsProviderSettingsRepository {
+        let defaults = UserDefaults(suiteName: "KimiProbeTests.\(UUID().uuidString)")!
+        let repository = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        repository.setKimiRegion(region)
+        return repository
+    }
+
+    @Test
+    func `region defaults to china when no settings repository`() {
+        let probe = KimiUsageProbe(
+            networkClient: MockNetworkClient(),
+            tokenProvider: MockTokenProvider(token: "valid-token")
+        )
+
+        #expect(probe.region == .china)
+    }
+
+    @Test
+    func `region follows the settings repository`() {
+        let probe = KimiUsageProbe(
+            networkClient: MockNetworkClient(),
+            tokenProvider: MockTokenProvider(token: "valid-token"),
+            settingsRepository: makeSettingsRepository(region: .international)
+        )
+
+        #expect(probe.region == .international)
+    }
+
+    @Test
+    func `probe hits the kimi.com endpoint for the china region`() async throws {
+        let network = CapturingNetworkClient(result: makeSuccessResponse(json: Self.validResponseJSON))
+        let probe = KimiUsageProbe(
+            networkClient: network,
+            tokenProvider: MockTokenProvider(token: "valid-token"),
+            settingsRepository: makeSettingsRepository(region: .china)
+        )
+
+        _ = try await probe.probe()
+
+        let request = try #require(network.capturedRequest)
+        #expect(request.url?.absoluteString == "https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages")
+        #expect(request.value(forHTTPHeaderField: "Origin") == "https://www.kimi.com")
+        #expect(request.value(forHTTPHeaderField: "Referer") == "https://www.kimi.com/code/console")
+    }
+
+    @Test
+    func `probe hits the kimi.ai endpoint for the international region`() async throws {
+        let network = CapturingNetworkClient(result: makeSuccessResponse(json: Self.validResponseJSON))
+        let probe = KimiUsageProbe(
+            networkClient: network,
+            tokenProvider: MockTokenProvider(token: "valid-token"),
+            settingsRepository: makeSettingsRepository(region: .international)
+        )
+
+        _ = try await probe.probe()
+
+        let request = try #require(network.capturedRequest)
+        #expect(request.url?.absoluteString == "https://www.kimi.ai/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages")
+        #expect(request.value(forHTTPHeaderField: "Origin") == "https://www.kimi.ai")
+        #expect(request.value(forHTTPHeaderField: "Referer") == "https://www.kimi.ai/code/console")
     }
 }

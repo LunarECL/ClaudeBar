@@ -58,6 +58,7 @@ Or download the signed and notarized DMG from [Releases](https://github.com/tddw
 | Area | What you can do |
 |---|---|
 | Menu bar | Up to three providers as a percentage and reset countdown, or a status icon → [docs](docs/features/menu-bar/README.md) |
+| [Multiple Codex accounts](docs/features/multi-account/README.md) | Separate logins, identified by email, with independent quotas |
 | Alerts & colors | Healthy, warning, critical and depleted levels, pace-aware colors, custom colors and High Contrast → [docs](docs/features/status-colors/README.md) |
 | Notch | Quota and live Claude Code sessions in the MacBook notch → [docs](docs/features/notch/README.md) |
 | Touch Bar | Quota gauges on a MacBook Pro Touch Bar → [docs](docs/features/touch-bar/README.md) |

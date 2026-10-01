@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import Mockable
+import Providers
 @testable import Domain
 @testable import Infrastructure
 
@@ -28,15 +29,24 @@ struct ActionBarSpec {
             return mock
         }
 
+        private static func makeUsageProbe(tier: AccountTier?) -> MockUsageProbe {
+            let probe = MockUsageProbe()
+            given(probe).probe().willReturn(
+                UsageSnapshot(providerId: "claude", quotas: [], capturedAt: Date(), accountTier: tier)
+            )
+            given(probe).isAvailable().willReturn(true)
+            return probe
+        }
+
         @Test
         func `Claude dashboard URL is Anthropic billing`() {
-            let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
+            let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
             #expect(claude.dashboardURL?.absoluteString == "https://console.anthropic.com/settings/billing")
         }
 
         @Test
         func `Codex dashboard URL is OpenAI usage`() {
-            let codex = CodexProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
+            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
             #expect(codex.dashboardURL?.absoluteString == "https://platform.openai.com/usage")
         }
 
@@ -78,77 +88,51 @@ struct ActionBarSpec {
 
     @Suite("Scenario: Share Claude Code guest passes")
     @MainActor
-    struct GuestPasses {
+    struct GuestPassSharing {
 
-        private static func makeSettings() -> MockProviderSettingsRepository {
-            let settings = MockProviderSettingsRepository()
-            given(settings).isEnabled(forProvider: .any, defaultValue: .any).willReturn(true)
-            given(settings).isEnabled(forProvider: .any).willReturn(true)
-            given(settings).setEnabled(.any, forProvider: .any).willReturn()
-            return settings
-        }
-
-        private static func makeUsageProbe(tier: AccountTier?) -> MockUsageProbe {
-            let probe = MockUsageProbe()
-            given(probe).probe().willReturn(
-                UsageSnapshot(providerId: "claude", quotas: [], capturedAt: Date(), accountTier: tier)
-            )
-            given(probe).isAvailable().willReturn(true)
-            return probe
+        private static func usage(_ tier: AccountTier?) -> UsageSnapshot {
+            UsageSnapshot(providerId: "claude", quotas: [], capturedAt: Date(), accountTier: tier)
         }
 
         @Test
-        func `Claude supports guest passes when pass probe is provided`() {
-            // Without pass probe
-            let withoutPass = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
-            #expect(withoutPass.supportsGuestPasses == false)
+        func `Claude offers guest passes only when it has a pass probe`() throws {
+            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let withoutPasses = try Providers.make("claude", settings: settings).defaultAccount
+            let withPasses = try Providers.make("claude", settings: settings, guestPasses: GuestPasses(source: MockGuestPassSource())).defaultAccount
+
+            #expect(withoutPasses.guestPasses == nil)
+            #expect(withPasses.guestPasses != nil)
         }
 
         @Test
-        func `Max account sees the Share button`() async throws {
-            let claude = ClaudeProvider(
-                probe: Self.makeUsageProbe(tier: .claudeMax),
-                passProbe: MockClaudePassProbing(),
-                settingsRepository: Self.makeSettings()
-            )
+        func `Max account sees the Share button`() {
+            let passes = GuestPasses(source: MockGuestPassSource())
 
-            try await claude.refresh()
-
-            #expect(claude.supportsGuestPasses == true)
+            #expect(passes.isOffered(for: Self.usage(.claudeMax)))
         }
 
         @Test
-        func `Pro account does not see the Share button`() async throws {
+        func `Pro account does not see the Share button`() {
             // Issue #243: Anthropic issues invitation links to Max plans only.
-            let claude = ClaudeProvider(
-                probe: Self.makeUsageProbe(tier: .claudePro),
-                passProbe: MockClaudePassProbing(),
-                settingsRepository: Self.makeSettings()
-            )
+            let passes = GuestPasses(source: MockGuestPassSource())
 
-            try await claude.refresh()
-
-            #expect(claude.supportsGuestPasses == false)
+            #expect(passes.isOffered(for: Self.usage(.claudePro)) == false)
         }
 
         @Test
         func `failed pass fetch is reported instead of failing silently`() async {
-            let passProbe = MockClaudePassProbing()
-            given(passProbe).probe().willThrow(ProbeError.parseFailed("Could not find referral URL"))
-            let claude = ClaudeProvider(
-                probe: Self.makeUsageProbe(tier: .claudeMax),
-                passProbe: passProbe,
-                settingsRepository: Self.makeSettings()
-            )
+            let passSource = MockGuestPassSource()
+            given(passSource).fetch().willThrow(UsageError.parseFailed("Could not find referral URL"))
+            let passes = GuestPasses(source: passSource)
 
             do {
-                _ = try await claude.fetchPasses()
+                _ = try await passes.fetch()
             } catch {
                 // Expected to throw
             }
 
-            #expect(claude.passError != nil)
-            #expect(claude.guestPass == nil)
+            #expect(passes.error != nil)
+            #expect(passes.pass == nil)
         }
     }
 }

@@ -56,6 +56,17 @@ struct KimiProviderTests {
     }
 
     @Test
+    func `dashboard URL follows the international region`() {
+        let defaults = UserDefaults(suiteName: "KimiProviderTests.\(UUID().uuidString)")!
+        let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        settings.setKimiRegion(.international)
+        let mockProbe = MockUsageProbe()
+        let kimi = KimiProvider(probe: mockProbe, settingsRepository: settings)
+
+        #expect(kimi.dashboardURL == URL(string: "https://www.kimi.ai/code/console"))
+    }
+
+    @Test
     func `kimi provider has no status page URL`() {
         let settings = makeSettingsRepository()
         let mockProbe = MockUsageProbe()
@@ -173,7 +184,7 @@ struct KimiProviderTests {
     func `kimi provider clears error on successful refresh`() async throws {
         let settings = makeSettingsRepository()
         let failingProbe = MockUsageProbe()
-        given(failingProbe).probe().willThrow(ProbeError.authenticationRequired)
+        given(failingProbe).probe().willThrow(UsageError.authenticationRequired)
         let kimiWithFailingProbe = KimiProvider(probe: failingProbe, settingsRepository: settings)
 
         do {
@@ -199,7 +210,7 @@ struct KimiProviderTests {
     func `kimi provider stores error on refresh failure`() async {
         let settings = makeSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.authenticationRequired)
+        given(mockProbe).probe().willThrow(UsageError.authenticationRequired)
         let kimi = KimiProvider(probe: mockProbe, settingsRepository: settings)
 
         #expect(kimi.lastError == nil)
@@ -217,10 +228,10 @@ struct KimiProviderTests {
     func `kimi provider rethrows probe errors`() async {
         let settings = makeSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.authenticationRequired)
+        given(mockProbe).probe().willThrow(UsageError.authenticationRequired)
         let kimi = KimiProvider(probe: mockProbe, settingsRepository: settings)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await kimi.refresh()
         }
     }
@@ -249,7 +260,7 @@ struct KimiProviderTests {
     func `kimi provider resets isSyncing after refresh fails`() async {
         let settings = makeSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.timeout)
+        given(mockProbe).probe().willThrow(UsageError.timeout)
         let kimi = KimiProvider(probe: mockProbe, settingsRepository: settings)
 
         do {

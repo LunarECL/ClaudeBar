@@ -171,7 +171,7 @@ struct AlibabaUsageProbeTests {
             _ = try await probe.probe()
             Issue.record("Expected authenticationRequired error")
         } catch {
-            #expect(error as? ProbeError == .authenticationRequired)
+            #expect(error as? UsageError == .authenticationRequired)
         }
     }
 
@@ -190,7 +190,7 @@ struct AlibabaUsageProbeTests {
             _ = try await probe.probe()
             Issue.record("Expected authenticationRequired error")
         } catch {
-            #expect(error as? ProbeError == .authenticationRequired)
+            #expect(error as? UsageError == .authenticationRequired)
         }
     }
 
@@ -207,9 +207,9 @@ struct AlibabaUsageProbeTests {
 
         do {
             _ = try await probe.probe()
-            Issue.record("Expected ProbeError")
+            Issue.record("Expected UsageError")
         } catch {
-            #expect(error is ProbeError)
+            #expect(error is UsageError)
         }
     }
 
@@ -263,7 +263,7 @@ struct AlibabaUsageProbeTests {
             _ = try await probe.probe()
             Issue.record("Expected sessionExpired error")
         } catch {
-            #expect(error as? ProbeError == .sessionExpired())
+            #expect(error as? UsageError == .sessionExpired())
         }
     }
 
@@ -279,7 +279,7 @@ struct AlibabaUsageProbeTests {
             _ = try await probe.probe()
             Issue.record("Expected authenticationRequired error")
         } catch {
-            #expect(error as? ProbeError == .authenticationRequired)
+            #expect(error as? UsageError == .authenticationRequired)
         }
     }
 
@@ -311,7 +311,7 @@ struct AlibabaUsageProbeTests {
             _ = try await probe.probe()
             Issue.record("Expected authenticationRequired error")
         } catch {
-            #expect(error as? ProbeError == .authenticationRequired)
+            #expect(error as? UsageError == .authenticationRequired)
         }
     }
 
@@ -329,7 +329,7 @@ struct AlibabaUsageProbeTests {
             _ = try await probe.probe()
             Issue.record("Expected authenticationRequired error")
         } catch {
-            #expect(error as? ProbeError == .authenticationRequired)
+            #expect(error as? UsageError == .authenticationRequired)
         }
     }
 

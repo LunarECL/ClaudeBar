@@ -216,7 +216,7 @@ struct CopilotInternalAPIProbeTests {
         let settings = makeSettingsRepository(hasToken: false)
         let probe = CopilotInternalAPIProbe(settingsRepository: settings)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -233,7 +233,7 @@ struct CopilotInternalAPIProbeTests {
             settingsRepository: settings
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -250,7 +250,7 @@ struct CopilotInternalAPIProbeTests {
             settingsRepository: settings
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -267,7 +267,7 @@ struct CopilotInternalAPIProbeTests {
             settingsRepository: settings
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -285,7 +285,7 @@ struct CopilotInternalAPIProbeTests {
             settingsRepository: settings
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

@@ -84,10 +84,10 @@ struct VercelProviderTests {
     @Test
     func `refresh stores error on failure`() async {
         let probe = MockUsageProbe()
-        given(probe).probe().willThrow(ProbeError.authenticationRequired)
+        given(probe).probe().willThrow(UsageError.authenticationRequired)
         let provider = VercelProvider(probe: probe, settingsRepository: makeSettingsRepository())
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await provider.refresh()
         }
 
@@ -120,7 +120,7 @@ struct VercelProviderTests {
         }
 
         #expect(provider.isSyncing == true)
-        await #expect(throws: ProbeError.executionFailed("Vercel refresh already in progress")) {
+        await #expect(throws: UsageError.executionFailed("Vercel refresh already in progress")) {
             try await provider.refresh()
         }
         #expect(provider.isSyncing == true)

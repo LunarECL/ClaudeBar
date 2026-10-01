@@ -3,6 +3,7 @@ import CoreText
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 
 /// Drives the menu-bar status item imperatively (AppKit), bypassing SwiftUI's
 /// `MenuBarExtra` label hosting entirely.
@@ -210,8 +211,10 @@ final class StatusItemLabelDriver {
         )
         let hasCountdownColon = ([label].compactMap { $0 } + additionalLabels.map(\.label))
             .contains { !CountdownColon.ranges(in: $0.text).isEmpty }
-        let primaryProviderName = additionalLabels.isEmpty ? nil : monitor.enabledProviders
-            .first { $0.id == settings.menuBarPercentageProviderId }?.name
+        let primaryProvider = monitor.enabledProviders.first { $0.id == settings.menuBarPercentageProviderId }
+        let showsQuota = settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled
+        let primaryProviderName = !showsQuota || (additionalLabels.isEmpty && (primaryProvider as? Account)?.isNamedByAccount != true)
+            ? nil : primaryProvider?.name
 
         return LabelContent(
             label: label,
@@ -254,11 +257,7 @@ final class StatusItemLabelDriver {
     /// Status of the selected provider, considering the burn-rate setting.
     /// Mirrors the dropdown's status logic for the icon-only fallback.
     private var effectiveSelectedProviderStatus: QuotaStatus {
-        guard let snapshot = monitor.selectedProvider?.snapshot else { return .healthy }
-        if settings.burnRateWarningEnabled {
-            return snapshot.paceAwareOverallStatus(burnRateThreshold: settings.burnRateThreshold)
-        }
-        return snapshot.overallStatus
+        monitor.selectedProvider?.snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy
     }
 
     private func render(_ content: LabelContent) {
@@ -281,10 +280,8 @@ final class StatusItemLabelDriver {
         lastImage = image
         button.image = image
         button.imagePosition = .imageOnly
-        let primaryText = content.label.map {
-            [content.primaryProviderName, $0.text].compactMap { $0 }.joined(separator: " ")
-        }
-        let tooltip = ([primaryText].compactMap { $0 } + content.additionalLabels.map(\.text))
+        let primaryText = [content.primaryProviderName, content.label?.text].compactMap { $0 }.joined(separator: " ")
+        let tooltip = ([primaryText].filter { !$0.isEmpty } + content.additionalLabels.map(\.text))
             .joined(separator: " | ")
         button.toolTip = tooltip.isEmpty ? nil : tooltip
         button.setAccessibilityLabel(tooltip.isEmpty ? "ClaudeBar" : tooltip)
@@ -318,6 +315,12 @@ final class StatusItemLabelDriver {
             parts.append(providerIcon(for: providerId))
         }
 
+        let codexEmails = ([content.primaryProviderName].compactMap { $0 } + content.additionalLabels.map(\.providerName))
+            .filter { $0.contains("@") }
+        if let id = content.primaryProviderId, let name = content.primaryProviderName {
+            appendAccountLabel(id: id, email: name, emails: codexEmails, to: &parts)
+        }
+
         if let label = content.label {
             parts.append(quotaImage(label, stacked: content.stacked, size: content.stackedSize,
                                     colonVisible: content.colonVisible, theme: theme))
@@ -334,10 +337,18 @@ final class StatusItemLabelDriver {
                 text: " | ", color: theme.statusColor(for: label.status)
             ))
             parts.append(providerIcon(for: label.providerId))
+            appendAccountLabel(id: label.providerId, email: label.providerName, emails: codexEmails, to: &parts)
             parts.append(quotaImage(label.label, stacked: label.stacked, size: label.stackedSize,
                                     colonVisible: content.colonVisible, theme: theme))
         }
         return hStack(parts, spacing: 3)
+    }
+
+    private static func appendAccountLabel(id: String, email: String, emails: [String], to parts: inout [NSImage]) {
+        guard (id == "codex" || id.hasPrefix("codex.")), email.contains("@") else { return }
+        parts.append(StatusBarPercentageImageRenderer.image(
+            text: CodexAccountLabel.compact(email, among: emails), color: .primary
+        ))
     }
 
     private static func quotaImage(_ label: MenuBarLabel, stacked: Bool, size: MenuBarStackedSize,

@@ -122,7 +122,7 @@ struct VercelUsageProbeParsingTests {
         let data = Data("not json".utf8)
 
         // When & Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try VercelUsageProbe.parseResponse(data, providerId: "vercel-gateway")
         }
     }
@@ -133,7 +133,7 @@ struct VercelUsageProbeParsingTests {
         let data = Data("{\"total_used\": 4.50}".utf8)
 
         // When & Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try VercelUsageProbe.parseResponse(data, providerId: "vercel-gateway")
         }
     }
@@ -144,7 +144,7 @@ struct VercelUsageProbeParsingTests {
         let data = Data("{\"balance\": \"abc\", \"total_used\": 4.50}".utf8)
 
         // When & Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try VercelUsageProbe.parseResponse(data, providerId: "vercel-gateway")
         }
     }

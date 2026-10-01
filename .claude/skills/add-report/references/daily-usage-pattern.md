@@ -5,9 +5,11 @@ This documents the complete DailyUsage feature as a reference for new report car
 ## File Map
 
 ```
-Sources/Domain/DailyUsage/
+Modules/Quotas/Sources/           # interim: moves to Modules/UsageHistory
 ├── DailyUsageStat.swift          # Single day's data with formatting
-├── DailyUsageReport.swift        # Today vs yesterday with deltas
+└── DailyUsageReport.swift        # Today vs yesterday with deltas
+
+Modules/Providers/Sources/        # interim: moves to Modules/UsageHistory
 └── DailyUsageAnalyzing.swift     # @Mockable protocol
 
 Sources/Infrastructure/Claude/
@@ -18,9 +20,8 @@ Sources/Infrastructure/Claude/
 Sources/App/Views/
 └── DailyUsageCardView.swift      # Card + DailyUsageMetric enum
 
-Sources/Domain/Provider/
-├── UsageSnapshot.swift           # Has dailyUsageReport: DailyUsageReport?
-└── Claude/ClaudeProvider.swift   # Injects analyzer, calls attachDailyReport()
+Modules/Quotas/Sources/UsageSnapshot.swift   # Has dailyUsageReport (interim, see CANONICAL_MODEL §6)
+Modules/Providers/Sources/Provider.swift     # `dailyUsage`: attached on non-background refreshes
 
 Sources/App/
 ├── Views/MenuContentView.swift   # Renders in statsGrid()
@@ -49,7 +50,7 @@ ClaudeDailyUsageAnalyzer.analyzeToday()
     ↓ partition by date, aggregate with ModelPricing.cost()
 DailyUsageReport { today: DailyUsageStat, previous: DailyUsageStat }
     ↓
-ClaudeProvider.attachDailyReport(to: snapshot)
+Provider.withDailyUsage(_:_:)   (skipped for background refreshes)
     ↓
 UsageSnapshot.dailyUsageReport
     ↓
@@ -58,11 +59,12 @@ MenuContentView.statsGrid() → DailyUsageCardView × 3
 
 ## Key Design Decisions
 
-1. **Report on UsageSnapshot, not QuotaMonitor** — Reports are per-provider data,
-   not global state. Each provider owns its report via its snapshot.
+1. **Per provider, not QuotaMonitor** — Reports are per-provider data, not
+   global state. Daily usage rides on the snapshot today; a NEW report is a
+   capability on `Provider` instead (the kernel isn't growing).
 
-2. **Analyzer injected into Provider** — Protocol-based DI allows testing without
-   real file I/O. The provider calls the analyzer in refresh() and attaches results.
+2. **Analyzer injected into Provider** — `Providers.make(…, dailyUsage:)`;
+   protocol-based DI allows testing without real file I/O.
 
 3. **Performance: file modification date filter** — With 2000+ JSONL files, scanning
    all is too slow. Only files modified since the comparison period start are checked.

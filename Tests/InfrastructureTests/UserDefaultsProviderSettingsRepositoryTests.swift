@@ -192,4 +192,45 @@ struct UserDefaultsProviderSettingsRepositoryTests {
         repository.setClaudeCliFallbackEnabled(false)
         #expect(repository.claudeCliFallbackEnabled() == false)
     }
+
+    // MARK: - Kimi Region
+
+    @Test
+    func `kimiRegion defaults to china`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        #expect(repository.kimiRegion() == .china)
+    }
+
+    @Test
+    func `setKimiRegion persists value`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setKimiRegion(.international)
+        #expect(repository.kimiRegion() == .international)
+    }
+
+    // MARK: - Codex Verified Flag
+
+    @Test
+    func `codexVerifiedAtLeastOnce defaults to false`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        #expect(repository.codexVerifiedAtLeastOnce() == false)
+    }
+
+    @Test
+    func `setCodexVerifiedAtLeastOnce persists value`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setCodexVerifiedAtLeastOnce(true)
+        #expect(repository.codexVerifiedAtLeastOnce() == true)
+
+        repository.setCodexVerifiedAtLeastOnce(false)
+        #expect(repository.codexVerifiedAtLeastOnce() == false)
+    }
 }

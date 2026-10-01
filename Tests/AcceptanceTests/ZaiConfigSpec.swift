@@ -97,7 +97,7 @@ struct ZaiConfigSpec {
 
             let probe = MockUsageProbe()
             given(probe).isAvailable().willReturn(true)
-            given(probe).probe().willThrow(ProbeError.authenticationRequired)
+            given(probe).probe().willThrow(UsageError.authenticationRequired)
 
             let zai = ZaiProvider(probe: probe, settingsRepository: settings)
 

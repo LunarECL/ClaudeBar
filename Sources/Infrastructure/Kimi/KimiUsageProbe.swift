@@ -3,20 +3,19 @@ import Domain
 
 /// Probes the Kimi API for coding usage quota information.
 ///
-/// Kimi offers subscription tiers (Andante/Moderato/Allegretto) with weekly request quotas
-/// and a 5-hour rate limit. Auth uses the `kimi-auth` browser cookie.
+/// Kimi offers subscription tiers with a 5-hour rate limit plus a plan quota
+/// (weekly on legacy plans, monthly on new plans). Auth uses the `kimi-auth`
+/// browser cookie. Two platform regions are supported: China (kimi.com,
+/// default) and International (kimi.ai); pick the one your account is on.
 ///
-/// API: POST https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages
+/// API: POST <webBaseURL>/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages
 /// Body: {"scope":["FEATURE_CODING"]}
 public struct KimiUsageProbe: UsageProbe {
 
     private let networkClient: any NetworkClient
-    private let tokenProvider: any KimiTokenProviding
+    private let settingsRepository: (any KimiSettingsRepository)?
+    private let tokenProvider: (any KimiTokenProviding)?
     private let timeout: TimeInterval
-
-    private static let usageURL = URL(
-        string: "https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages"
-    )!
 
     /// Known tier mappings based on weekly limit
     private static let tierByLimit: [Int: String] = [
@@ -27,19 +26,30 @@ public struct KimiUsageProbe: UsageProbe {
 
     public init(
         networkClient: any NetworkClient = URLSession.shared,
-        tokenProvider: any KimiTokenProviding = KimiCookieTokenProvider(),
+        tokenProvider: (any KimiTokenProviding)? = nil,
+        settingsRepository: (any KimiSettingsRepository)? = nil,
         timeout: TimeInterval = 30
     ) {
         self.networkClient = networkClient
         self.tokenProvider = tokenProvider
+        self.settingsRepository = settingsRepository
         self.timeout = timeout
+    }
+
+    /// The platform region to talk to (China unless the user picked International).
+    var region: KimiRegion {
+        settingsRepository?.kimiRegion() ?? .china
+    }
+
+    private func resolveTokenProvider() -> any KimiTokenProviding {
+        tokenProvider ?? KimiCookieTokenProvider(region: region)
     }
 
     // MARK: - UsageProbe
 
     public func isAvailable() async -> Bool {
         do {
-            _ = try tokenProvider.resolveToken()
+            _ = try resolveTokenProvider().resolveToken()
             return true
         } catch {
             return false
@@ -47,23 +57,26 @@ public struct KimiUsageProbe: UsageProbe {
     }
 
     public func probe() async throws -> UsageSnapshot {
-        AppLog.probes.info("Starting Kimi probe...")
+        AppLog.probes.info("Starting Kimi probe (region: \(region.displayName))...")
 
         // Step 1: Resolve authentication token
         let token: String
         do {
-            token = try tokenProvider.resolveToken()
+            token = try resolveTokenProvider().resolveToken()
         } catch {
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         // Step 2: Build request
-        var request = URLRequest(url: Self.usageURL)
+        guard let usageURL = URL(string: region.usageURL) else {
+            throw UsageError.executionFailed("Invalid Kimi API URL")
+        }
+        var request = URLRequest(url: usageURL)
         request.httpMethod = "POST"
         request.timeoutInterval = timeout
         request.httpBody = try JSONSerialization.data(withJSONObject: ["scope": ["FEATURE_CODING"]])
 
-        Self.applyHeaders(&request, token: token)
+        Self.applyHeaders(&request, token: token, region: region)
 
         // Step 3: Make request
         let data: Data
@@ -72,11 +85,11 @@ public struct KimiUsageProbe: UsageProbe {
             (data, response) = try await networkClient.request(request)
         } catch {
             AppLog.probes.error("Kimi probe failed: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Kimi API request failed: \(error.localizedDescription)")
+            throw UsageError.executionFailed("Kimi API request failed: \(error.localizedDescription)")
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid HTTP response")
+            throw UsageError.executionFailed("Invalid HTTP response")
         }
 
         AppLog.probes.debug("Kimi API response status: \(httpResponse.statusCode)")
@@ -86,11 +99,11 @@ public struct KimiUsageProbe: UsageProbe {
             break
         case 401, 403:
             AppLog.probes.error("Kimi probe failed: authentication error (\(httpResponse.statusCode))")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         default:
             let body = String(data: data, encoding: .utf8) ?? "<binary>"
             AppLog.probes.error("Kimi probe failed: HTTP \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("Kimi API returned HTTP \(httpResponse.statusCode): \(body)")
+            throw UsageError.executionFailed("Kimi API returned HTTP \(httpResponse.statusCode): \(body)")
         }
 
         // Step 4: Log raw response for debugging
@@ -115,18 +128,18 @@ public struct KimiUsageProbe: UsageProbe {
     ///
     /// The response contains a `usages` array. We look for the entry with `scope == "FEATURE_CODING"`.
     /// From that entry:
-    /// - `detail` contains the weekly quota (limit, used, remaining, resetTime)
+    /// - `detail` contains the plan quota (weekly on legacy plans, monthly on new plans)
     /// - `limits` array contains rate limits (e.g., 5-hour window with 300min/TIME_UNIT_MINUTE)
     static func parseResponse(_ data: Data, providerId: String) throws -> UsageSnapshot {
         let decoded: KimiUsageResponse
         do {
             decoded = try JSONDecoder().decode(KimiUsageResponse.self, from: data)
         } catch {
-            throw ProbeError.parseFailed("Failed to decode Kimi response: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Failed to decode Kimi response: \(error.localizedDescription)")
         }
 
         guard let coding = decoded.usages.first(where: { $0.scope == "FEATURE_CODING" }) else {
-            throw ProbeError.parseFailed("Missing FEATURE_CODING scope in response")
+            throw UsageError.parseFailed("Missing FEATURE_CODING scope in response")
         }
 
         // Parse weekly quota from detail
@@ -147,7 +160,8 @@ public struct KimiUsageProbe: UsageProbe {
             quotaType: .weekly,
             providerId: providerId,
             resetsAt: weeklyResetDate,
-            resetText: "\(weekly.used)/\(weekly.limit) requests"
+            resetText: "\(weekly.used)/\(weekly.limit) requests",
+            windowDuration: QuotaType.weekly.conventionalWindow.seconds
         ))
 
         // Parse 5-hour rate limit from limits array
@@ -172,7 +186,8 @@ public struct KimiUsageProbe: UsageProbe {
                 quotaType: .session,
                 providerId: providerId,
                 resetsAt: rateResetDate,
-                resetText: "\(rate.used)/\(rate.limit) requests (5h)"
+                resetText: "\(rate.used)/\(rate.limit) requests (5h)",
+                windowDuration: QuotaType.session.conventionalWindow.seconds
             ))
         }
 
@@ -189,12 +204,12 @@ public struct KimiUsageProbe: UsageProbe {
 
     // MARK: - Private Helpers
 
-    private static func applyHeaders(_ request: inout URLRequest, token: String) {
+    private static func applyHeaders(_ request: inout URLRequest, token: String, region: KimiRegion) {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("kimi-auth=\(token)", forHTTPHeaderField: "Cookie")
-        request.setValue("https://www.kimi.com", forHTTPHeaderField: "Origin")
-        request.setValue("https://www.kimi.com/code/console", forHTTPHeaderField: "Referer")
+        request.setValue(region.webBaseURL, forHTTPHeaderField: "Origin")
+        request.setValue(region.consoleURL, forHTTPHeaderField: "Referer")
         request.setValue("*/*", forHTTPHeaderField: "Accept")
         request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
         request.setValue(
