@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Providers: put your busiest assistant first — Settings → Providers has up/down controls per provider, and the menu bar pills, overview and ⌘1–⌘9 shortcuts all follow your order. ([#141](https://github.com/tddworks/ClaudeBar/issues/141))
+
 ---
 
 ## [0.4.94] - 2026-10-01
