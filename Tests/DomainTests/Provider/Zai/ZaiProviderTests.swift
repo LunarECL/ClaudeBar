@@ -167,7 +167,7 @@ struct ZaiProviderTests {
         let settings = MockRepositoryFactory.makeZaiSettingsRepository()
         // Use two separate probes to simulate the behavior
         let failingProbe = MockUsageProbe()
-        given(failingProbe).probe().willThrow(ProbeError.timeout)
+        given(failingProbe).probe().willThrow(UsageError.timeout)
         let zaiWithFailingProbe = ZaiProvider(probe: failingProbe, settingsRepository: settings)
 
         do {
@@ -194,7 +194,7 @@ struct ZaiProviderTests {
     func `zai provider stores error on refresh failure`() async {
         let settings = MockRepositoryFactory.makeZaiSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.executionFailed("Connection failed"))
+        given(mockProbe).probe().willThrow(UsageError.executionFailed("Connection failed"))
         let zai = ZaiProvider(probe: mockProbe, settingsRepository: settings)
 
         #expect(zai.lastError == nil)
@@ -212,10 +212,10 @@ struct ZaiProviderTests {
     func `zai provider rethrows probe errors`() async {
         let settings = MockRepositoryFactory.makeZaiSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.executionFailed("API error"))
+        given(mockProbe).probe().willThrow(UsageError.executionFailed("API error"))
         let zai = ZaiProvider(probe: mockProbe, settingsRepository: settings)
 
-        await #expect(throws: ProbeError.executionFailed("API error")) {
+        await #expect(throws: UsageError.executionFailed("API error")) {
             try await zai.refresh()
         }
     }
@@ -244,7 +244,7 @@ struct ZaiProviderTests {
     func `zai provider resets isSyncing after refresh fails`() async {
         let settings = MockRepositoryFactory.makeZaiSettingsRepository()
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.timeout)
+        given(mockProbe).probe().willThrow(UsageError.timeout)
         let zai = ZaiProvider(probe: mockProbe, settingsRepository: settings)
 
         do {

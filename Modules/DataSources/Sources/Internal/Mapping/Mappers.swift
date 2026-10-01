@@ -1,5 +1,5 @@
 import Diagnostics
-import Domain
+import Quotas
 import Foundation
 
 /// `json` — reads a JSON response by paths into today's `UsageSnapshot`.
@@ -9,7 +9,7 @@ struct JSONMapper: Reading {
 
     func read(_ response: Response, facts: MappingFacts, providerId: String) throws -> UsageSnapshot {
         guard let document = try? JSONSerialization.jsonObject(with: response.body) else {
-            throw ProbeError.parseFailed("Response is not JSON")
+            throw UsageError.parseFailed("Response is not JSON")
         }
         let scope = JSONScope(root: document, headers: response.headers, credential: facts.credential)
 
@@ -18,7 +18,7 @@ struct JSONMapper: Reading {
             if let condition = empty.condition, scope.string(condition.path) == condition.equals {
                 quotas = empty.quotas.flatMap { self.quotas(for: $0, in: scope, providerId: providerId) }
             } else if let reason = empty.otherwise {
-                throw ProbeError.parseFailed(reason)
+                throw UsageError.parseFailed(reason)
             }
         }
 
@@ -182,7 +182,7 @@ struct TextMapper: Reading {
             let all = rule.alsoContains.allSatisfy { lower.contains($0.lowercased()) }
             if any && all {
                 AppLog.probes.error("\(providerId) screen reports: \(rule.contains.first ?? "an error")")
-                throw rule.error.probeError
+                throw rule.error.usageError
             }
         }
 
@@ -199,7 +199,7 @@ struct TextMapper: Reading {
         }
 
         guard !quotas.isEmpty else {
-            throw ProbeError.parseFailed(mapping.whenEmpty ?? "Could not find usage limits")
+            throw UsageError.parseFailed(mapping.whenEmpty ?? "Could not find usage limits")
         }
         return UsageSnapshot(providerId: providerId, quotas: quotas, capturedAt: now())
     }
@@ -226,7 +226,7 @@ struct TextMapper: Reading {
     }
 }
 
-/// "Resets in 2d 5h 30m" — the countdown today's probes write as `resetText`.
+/// "Resets in 2d 5h 30m" — the countdown a CLI's screen shows as `resetText`.
 enum Countdown {
     static func text(until date: Date, now: Date) -> String {
         let interval = date.timeIntervalSince(now)

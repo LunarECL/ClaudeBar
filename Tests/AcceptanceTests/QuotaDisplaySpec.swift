@@ -230,7 +230,7 @@ struct QuotaDisplaySpec {
             // Given — API returns 401
             let probe = MockUsageProbe()
             given(probe).isAvailable().willReturn(true)
-            given(probe).probe().willThrow(ProbeError.sessionExpired())
+            given(probe).probe().willThrow(UsageError.sessionExpired())
 
             let settings = MockProviderSettingsRepository()
             given(settings).isEnabled(forProvider: .any, defaultValue: .any).willReturn(true)

@@ -32,7 +32,7 @@ public struct OpenCodeUsageProbe: UsageProbe {
 
     public func probe() async throws -> UsageSnapshot {
         guard let opencodePath = cliExecutor.locate("opencode") else {
-            throw ProbeError.cliNotFound("opencode")
+            throw UsageError.cliNotFound("opencode")
         }
 
         let now = Date()
@@ -151,12 +151,12 @@ public struct OpenCodeUsageProbe: UsageProbe {
 
         guard result.exitCode == 0 else {
             AppLog.probes.error("OpenCode: DB query failed with exit code \(result.exitCode)")
-            throw ProbeError.executionFailed("opencode db exited with code \(result.exitCode)")
+            throw UsageError.executionFailed("opencode db exited with code \(result.exitCode)")
         }
 
         let output = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = output.data(using: .utf8) else {
-            throw ProbeError.parseFailed("Failed to encode query output")
+            throw UsageError.parseFailed("Failed to encode query output")
         }
 
         return data
@@ -173,7 +173,7 @@ public struct OpenCodeUsageProbe: UsageProbe {
         }
         let rows = try JSONDecoder().decode([Row].self, from: data)
         guard let row = rows.first else {
-            throw ProbeError.parseFailed("No primary window data")
+            throw UsageError.parseFailed("No primary window data")
         }
         return PrimaryWindow(
             fiveHourCost: row.five_hour_cost,

@@ -245,7 +245,7 @@ public struct CLICompletionRule: Sendable, Equatable {
     ///
     /// Ready markers cover both outcomes so a stalled or rate-limited endpoint
     /// ends the wait as soon as the CLI says so, instead of holding the run open
-    /// until the probe timeout.
+    /// until the fetch times out.
     ///
     /// Only `Current session` is a row marker. It is the Usage screen's section
     /// label, and the words also turn up mid-sentence in a SessionStart hook's

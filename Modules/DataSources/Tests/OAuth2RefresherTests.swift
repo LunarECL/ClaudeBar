@@ -1,4 +1,4 @@
-import Domain
+import Quotas
 import Foundation
 import Mockable
 import Testing
@@ -145,7 +145,7 @@ struct OAuth2RefresherTests {
             Self.response(400)
         ))
 
-        await #expect(throws: ProbeError.sessionExpired(hint: "Log in again.")) {
+        await #expect(throws: UsageError.sessionExpired(hint: "Log in again.")) {
             try await refresher(network: network).refresh(credential(expiresIn: -60))
         }
     }
@@ -155,14 +155,14 @@ struct OAuth2RefresherTests {
         let network = MockNetworkClient()
         given(network).request(.any).willReturn((Data(), Self.response(503)))
 
-        await #expect(throws: ProbeError.executionFailed("Token refresh failed: HTTP 503")) {
+        await #expect(throws: UsageError.executionFailed("Token refresh failed: HTTP 503")) {
             try await refresher(network: network).refresh(credential(expiresIn: -60))
         }
     }
 
     @Test
     func `a refresh with no refresh token needs authentication`() async throws {
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await refresher().refresh(credential(expiresIn: nil, refreshToken: nil))
         }
     }

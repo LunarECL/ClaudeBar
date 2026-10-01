@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 import Mockable
 import Providers
@@ -21,7 +21,7 @@ struct CodexAccountsTests {
         stub.answerRPC(Self.usage)
         let codex = try stub.make("codex")
 
-        await #expect(throws: ProbeError.self) { try await codex.refresh(.background) }
+        await #expect(throws: UsageError.self) { try await codex.refresh(.background) }
 
         #expect(stub.launches.count == 0)
         #expect(codex.lastError?.localizedDescription.contains("Click Refresh or Connect") == true)
@@ -34,7 +34,7 @@ struct CodexAccountsTests {
         stub.answerRPC(Self.usage)
         let codex = try stub.make("codex")
 
-        await #expect(throws: ProbeError.self) { try await codex.refresh(.passive) }
+        await #expect(throws: UsageError.self) { try await codex.refresh(.passive) }
 
         #expect(stub.launches.count == 0)
     }
@@ -74,7 +74,7 @@ struct CodexAccountsTests {
         stub.answerRPC(Self.usage)
         stub.answerTerminal("5h limit: 99% left")
 
-        await #expect(throws: ProbeError.authenticationRequired) { try await stub.make("codex").refresh() }
+        await #expect(throws: UsageError.authenticationRequired) { try await stub.make("codex").refresh() }
 
         #expect(stub.launches.count == 0)
     }
@@ -122,7 +122,7 @@ struct CodexAccountsTests {
         ))
 
         let usage = try await first.refresh()
-        await #expect(throws: ProbeError.self) { try await second.refresh() }
+        await #expect(throws: UsageError.self) { try await second.refresh() }
 
         #expect(first.id == "codex.a")
         #expect(second.id == "codex.b")
@@ -161,7 +161,7 @@ struct CodexAccountsTests {
         let account = try stub.make("codex", account: config("a", folder: folder, accountId: "original"))
 
         #expect(await account.isAvailable() == false)
-        await #expect(throws: ProbeError.self) { try await account.refresh() }
+        await #expect(throws: UsageError.self) { try await account.refresh() }
 
         #expect(stub.launches.count == 0)
         #expect(account.lastError?.localizedDescription.contains("original account") == true)
@@ -194,7 +194,7 @@ struct CodexAccountsTests {
         let b = try writeLogin(in: root, "b", email: "same@example.com", accountId: "same")
         let first = try add(a, to: [], root: root)
 
-        #expect(throws: ProbeError.executionFailed("This Codex account is already listed.")) {
+        #expect(throws: UsageError.executionFailed("This Codex account is already listed.")) {
             try add(b, to: [first], root: root)
         }
     }
@@ -217,7 +217,7 @@ struct CodexAccountsTests {
         let root = try temporaryRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        #expect(throws: ProbeError.executionFailed("No ChatGPT account found in this folder. Sign in with Codex using file credential storage, then choose the folder again.")) {
+        #expect(throws: UsageError.executionFailed("No ChatGPT account found in this folder. Sign in with Codex using file credential storage, then choose the folder again.")) {
             try add(root.appendingPathComponent("missing"), to: [], root: root)
         }
     }
@@ -228,7 +228,7 @@ struct CodexAccountsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let defaultFolder = try writeLogin(in: root, "default", email: "me@example.com", accountId: "me")
 
-        #expect(throws: ProbeError.executionFailed("This is the default Codex login, which is already listed.")) {
+        #expect(throws: UsageError.executionFailed("This is the default Codex login, which is already listed.")) {
             try add(defaultFolder, to: [], root: root)
         }
     }

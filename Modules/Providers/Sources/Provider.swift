@@ -1,6 +1,6 @@
 import DataSources
 import Diagnostics
-import Domain
+import Quotas
 import Foundation
 import Observation
 
@@ -45,7 +45,7 @@ public final class Provider: AIProvider {
 
     public private(set) var isSyncing = false
     public private(set) var snapshot: UsageSnapshot?
-    /// Today's `ProbeError`, so every screen that reads one keeps reading one.
+    /// Today's `UsageError`, so every screen that reads one keeps reading one.
     public private(set) var lastError: Error?
     /// Which step failed last — lookup, fetch or mapping. `nil` after a success.
     public private(set) var lastFailedStep: DataSourceError.Step?
@@ -135,13 +135,13 @@ public final class Provider: AIProvider {
     @discardableResult
     public func refresh(_ kind: RefreshKind) async throws -> UsageSnapshot {
         guard let active = dataSource(activeKind) else {
-            throw ProbeError.noData
+            throw UsageError.noData
         }
         // Held back until one explicit refresh succeeded (#216): a CLI that
         // was never signed in may open a browser login on its own.
         if kind != .interactive, active.definition.verifyBeforeBackground, !isVerified {
             if let snapshot { return snapshot }
-            let error = ProbeError.executionFailed(active.definition.unverifiedMessage ?? "Not checked yet. Click Refresh.")
+            let error = UsageError.executionFailed(active.definition.unverifiedMessage ?? "Not checked yet. Click Refresh.")
             lastError = error
             throw error
         }
@@ -197,8 +197,8 @@ public final class Provider: AIProvider {
         if let reported, tried.count > 1 {
             AppLog.probes.info("\(id): every data source failed; reporting \(reported.localizedDescription)")
         }
-        fail(reported ?? ProbeError.noData)
-        throw lastError ?? ProbeError.noData
+        fail(reported ?? UsageError.noData)
+        throw lastError ?? UsageError.noData
     }
 
     /// An added account is checked by being added; the default login once
@@ -292,13 +292,13 @@ public final class Provider: AIProvider {
         }
         // An added account that is signed out shows nothing rather than its
         // last usage, which would read as still current.
-        if !account.isDefault, let tag = (lastError as? ProbeError)?.tag,
+        if !account.isDefault, let tag = (lastError as? UsageError)?.tag,
            tag == "authenticationRequired" || tag == "sessionExpired" {
             snapshot = nil
         }
     }
 
-    private static func reason(of error: Error) -> ProbeError? {
-        (error as? DataSourceError)?.reason ?? (error as? ProbeError)
+    private static func reason(of error: Error) -> UsageError? {
+        (error as? DataSourceError)?.reason ?? (error as? UsageError)
     }
 }

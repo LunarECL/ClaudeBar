@@ -39,10 +39,11 @@ public struct HTTPRequest: Sendable, Equatable, Codable {
     }
 }
 
-/// Where a CLI runs. `probe` is ClaudeBar's own trusted directory, so a CLI's
-/// folder-trust prompt never blocks a probe.
+/// Where a CLI runs. `dedicated` is ClaudeBar's own trusted directory, so a
+/// CLI's folder-trust prompt never blocks a fetch.
 public enum WorkingDirectory: String, Sendable, Equatable, Codable {
-    case probe
+    /// ClaudeBar's own folder, so a CLI's folder-trust prompt never blocks it.
+    case dedicated
 }
 
 /// Starts `cli args…`, sends the `handshake` in order, then `call`, and answers

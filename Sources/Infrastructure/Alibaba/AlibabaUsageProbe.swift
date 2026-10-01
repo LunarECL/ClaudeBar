@@ -62,7 +62,7 @@ public struct AlibabaUsageProbe: UsageProbe {
         switch source {
         case .manual:
             guard let cookie = settingsRepository.getAlibabaManualCookie(), !cookie.isEmpty else {
-                throw ProbeError.authenticationRequired
+                throw UsageError.authenticationRequired
             }
             return cookie
         case .auto:
@@ -72,7 +72,7 @@ public struct AlibabaUsageProbe: UsageProbe {
 
     private func extractBrowserCookies() throws -> String {
         guard let cookie = cookieProvider.extractBrowserCookies(), !cookie.isEmpty else {
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
         return cookie
     }
@@ -89,15 +89,15 @@ public struct AlibabaUsageProbe: UsageProbe {
 
         let (data, response) = try await networkClient.request(request)
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         guard httpResponse.statusCode == 200 else {
-            throw ProbeError.executionFailed("HTTP \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("HTTP \(httpResponse.statusCode)")
         }
 
         return try Self.parseResponse(data, providerId: "alibaba")
@@ -121,15 +121,15 @@ public struct AlibabaUsageProbe: UsageProbe {
 
         let (data, response) = try await networkClient.request(request)
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            throw ProbeError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
+            throw UsageError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
         }
 
         guard httpResponse.statusCode == 200 else {
-            throw ProbeError.executionFailed("HTTP \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("HTTP \(httpResponse.statusCode)")
         }
 
         return try Self.parseResponse(data, providerId: "alibaba")
@@ -150,7 +150,7 @@ public struct AlibabaUsageProbe: UsageProbe {
         let (data, _) = try await networkClient.request(request)
         guard let html = String(data: data, encoding: .utf8),
               let token = Self.extractSecTokenFromHTML(html) else {
-            throw ProbeError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
+            throw UsageError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
         }
 
         return token
@@ -220,51 +220,51 @@ public struct AlibabaUsageProbe: UsageProbe {
 
     static func parseResponse(_ data: Data, providerId: String) throws -> UsageSnapshot {
         guard !data.isEmpty else {
-            throw ProbeError.parseFailed("Empty response body")
+            throw UsageError.parseFailed("Empty response body")
         }
 
         let object: Any
         do {
             object = try JSONSerialization.jsonObject(with: data)
         } catch {
-            throw ProbeError.parseFailed("Invalid JSON: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Invalid JSON: \(error.localizedDescription)")
         }
 
         guard let dictionary = object as? [String: Any] else {
-            throw ProbeError.parseFailed("Unexpected payload format")
+            throw UsageError.parseFailed("Unexpected payload format")
         }
 
         // Check for login required
         if let code = findFirstString(forKeys: ["code", "status"], in: dictionary) {
             let normalized = code.lowercased()
             if normalized.contains("needlogin") || normalized.contains("login") {
-                throw ProbeError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
+                throw UsageError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
             }
         }
 
         if let message = findFirstString(forKeys: ["message", "msg"], in: dictionary) {
             let normalized = message.lowercased()
             if normalized.contains("log in") || normalized.contains("login") {
-                throw ProbeError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
+                throw UsageError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
             }
         }
 
         // Check for auth errors
         if let statusCode = findFirstInt(forKeys: ["statusCode", "status_code"], in: dictionary),
            statusCode == 401 || statusCode == 403 {
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         // Find the active instance info with quota data
         let expanded = expandedJSON(dictionary)
         guard let expandedDict = expanded as? [String: Any] else {
-            throw ProbeError.parseFailed("Could not expand response")
+            throw UsageError.parseFailed("Could not expand response")
         }
 
         let instanceInfo = findActiveInstanceInfo(in: expandedDict)
         // Prefer quota from active instance, then fall back to full payload search
         guard let quotaInfo = findQuotaInfo(in: instanceInfo ?? [:]) ?? findQuotaInfo(in: expandedDict) else {
-            throw ProbeError.parseFailed("Missing coding plan quota data")
+            throw UsageError.parseFailed("Missing coding plan quota data")
         }
 
         let planName = findPlanName(in: expandedDict)
@@ -316,7 +316,7 @@ public struct AlibabaUsageProbe: UsageProbe {
         }
 
         guard !quotas.isEmpty else {
-            throw ProbeError.parseFailed("No quota windows found in payload")
+            throw UsageError.parseFailed("No quota windows found in payload")
         }
 
         return UsageSnapshot(

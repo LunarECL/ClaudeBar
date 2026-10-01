@@ -1,5 +1,5 @@
 import Diagnostics
-import Domain
+import Quotas
 import Foundation
 
 /// ONE type that fetches for every provider: its definition, made live by
@@ -262,7 +262,7 @@ public struct DataSource: Sendable {
     }
 }
 
-extension ProbeError {
+extension UsageError {
     var isSessionExpired: Bool {
         if case .sessionExpired = self { return true }
         return false
@@ -330,7 +330,7 @@ protocol Recovering: Sendable {
 /// An HTTP answer outside 2xx, kept with its status so a refresh can be tried.
 struct HTTPStatusError: Error, Sendable {
     let status: Int
-    let reason: ProbeError
+    let reason: UsageError
 }
 
 /// The last usage and a rate limit's end, kept between refreshes.

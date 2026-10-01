@@ -1,4 +1,4 @@
-import Domain
+import Quotas
 import Foundation
 import Mockable
 import Testing
@@ -197,7 +197,7 @@ struct DataSourceTests {
         given(transport).close().willReturn(())
         given(transport).receive().willReturn(Data(#"{"id":1,"result":{}}"#.utf8))
         let definition = try decode("""
-        {"kind":"rpc","fetch":{"jsonRpc":{"cli":"codex","args":["app-server"],"workingDirectory":"probe","call":"read"}},
+        {"kind":"rpc","fetch":{"jsonRpc":{"cli":"codex","args":["app-server"],"workingDirectory":"dedicated","call":"read"}},
          "mapping":{"json":{"quotas":[]}}}
         """)
         let source = DataSources.make(
@@ -218,7 +218,7 @@ struct DataSourceTests {
 
         #expect(started.executable == "codex")
         #expect(started.arguments == ["app-server"])
-        #expect(started.directory == ProbeWorkingDirectory.resolve())
+        #expect(started.directory == CLIWorkingDirectory.resolve())
     }
 
     // MARK: - The path dialect

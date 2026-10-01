@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 import Testing
 
@@ -104,7 +104,7 @@ struct ClaudeCostScreenTests {
     func `a rate-limited cost screen is an error rather than a cost of zero`() {
         let rateLimited = Self.costCommandOutput + "\nError: Usage endpoint is rate limited. Please try again in a moment."
 
-        #expect(throws: ProbeError.executionFailed("Rate limited - too many requests")) {
+        #expect(throws: UsageError.executionFailed("Rate limited - too many requests")) {
             try read(rateLimited)
         }
     }
@@ -113,7 +113,7 @@ struct ClaudeCostScreenTests {
     func `a logged-out cost screen is an error rather than a cost of zero`() {
         let loggedOut = Self.costCommandOutput + "\nInvalid API key · Please log in with /login"
 
-        #expect(throws: ProbeError.authenticationRequired) {
+        #expect(throws: UsageError.authenticationRequired) {
             try read(loggedOut)
         }
     }
@@ -129,7 +129,7 @@ struct ClaudeCostScreenTests {
          Esc to cancel
         """
 
-        #expect(throws: ProbeError.parseFailed("Could not find total cost")) {
+        #expect(throws: UsageError.parseFailed("Could not find total cost")) {
             try read(beforeThePanel)
         }
     }

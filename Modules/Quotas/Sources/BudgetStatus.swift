@@ -2,6 +2,10 @@ import Foundation
 
 /// Represents the budget status for cost-based tracking.
 /// Similar to QuotaStatus but for budget thresholds instead of percentage remaining.
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — becomes `Budget` — the user's ceiling on a `Cost` — and its
+///   ON TRACK · NEAR LIMIT · OVER BUDGET judgement (§0.1).
 public enum BudgetStatus: String, Sendable, Equatable, Hashable, Comparable {
     /// Cost is below 80% of budget
     case withinBudget

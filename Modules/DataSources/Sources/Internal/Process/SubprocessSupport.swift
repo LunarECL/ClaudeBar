@@ -1,9 +1,9 @@
-import Domain
+import Quotas
 import Foundation
 import Subprocess
 import System
 
-/// Shared plumbing for probes that shell out through `Subprocess`.
+/// Shared plumbing for fetches that shell out through `Subprocess`.
 ///
 /// The PTY runners (`InteractiveRunner`, `PersistentSession`) deliberately stay
 /// on `Foundation.Process`: they need `openpty` so CLI tools believe they are
@@ -48,7 +48,7 @@ public enum SubprocessSupport {
     /// A non-zero exit code is returned, not thrown — callers decide whether it
     /// matters, matching how the `Process`-based code behaved.
     ///
-    /// - Parameter qualityOfService: Defaults to the ambient probe QoS so
+    /// - Parameter qualityOfService: Defaults to the ambient fetch QoS so
     ///   background refreshes keep spawning throttled process trees (issue #204).
     public static func run(
         executablePath: String,
@@ -57,7 +57,7 @@ public enum SubprocessSupport {
         workingDirectory: FilePath? = nil,
         input: String? = nil,
         outputLimit: Int = defaultOutputLimit,
-        qualityOfService: QualityOfService = ProbeExecutionContext.qualityOfService
+        qualityOfService: QualityOfService = FetchContext.qualityOfService
     ) async throws -> Output {
         var platformOptions = PlatformOptions()
         // Both enums use Darwin QoS class values, but they are distinct Swift types.

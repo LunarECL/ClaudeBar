@@ -1,6 +1,6 @@
 import Diagnostics
 import Darwin
-import Domain
+import Quotas
 import Foundation
 
 /// RPC transport that communicates via Process stdin/stdout pipes.
@@ -29,7 +29,7 @@ public final class ProcessRPCTransport: RPCTransport, @unchecked Sendable {
         guard let executablePath = BinaryLocator.which(executable) else {
             AppLog.probes.error("RPC transport: '\(executable)' not found in PATH")
             AppLog.probes.debug("Shell PATH: \(BinaryLocator.shellPath())")
-            throw ProbeError.cliNotFound(executable)
+            throw UsageError.cliNotFound(executable)
         }
 
         AppLog.probes.debug("RPC transport: Found '\(executable)' at: \(executablePath)")
@@ -51,7 +51,7 @@ public final class ProcessRPCTransport: RPCTransport, @unchecked Sendable {
             try process.run()
         } catch {
             AppLog.probes.error("RPC transport: Failed to start '\(executable)' at \(executablePath): \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Failed to start \(executable): \(error.localizedDescription)")
+            throw UsageError.executionFailed("Failed to start \(executable): \(error.localizedDescription)")
         }
     }
 
@@ -65,7 +65,7 @@ public final class ProcessRPCTransport: RPCTransport, @unchecked Sendable {
             try stdinPipe.fileHandleForWriting.write(contentsOf: message)
         } catch {
             AppLog.probes.error("RPC transport: Failed to write to stdin: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("RPC transport write failed: \(error.localizedDescription)")
+            throw UsageError.executionFailed("RPC transport write failed: \(error.localizedDescription)")
         }
     }
 
@@ -76,7 +76,7 @@ public final class ProcessRPCTransport: RPCTransport, @unchecked Sendable {
             }
             return data
         }
-        throw ProbeError.executionFailed("Process closed unexpectedly")
+        throw UsageError.executionFailed("Process closed unexpectedly")
     }
 
     public func close() {

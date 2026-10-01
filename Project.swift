@@ -30,6 +30,9 @@ let project = Project(
             deploymentTargets: .macOS("15.0"),
             sources: ["Sources/Domain/**"],
             dependencies: [
+                .target(name: "Quotas"),
+                .target(name: "DataSources"),
+                .target(name: "Providers"),
                 .external(name: "Mockable"),
             ],
             settings: .settings(
@@ -40,6 +43,22 @@ let project = Project(
         ),
 
         // MARK: - Modules (one per bounded context — docs/architecture/MODULAR_DESIGN.md)
+
+        // Quotas — the usage model every module speaks: UsageSnapshot,
+        // UsageQuota, UsageError, plans and costs. Depends on nothing.
+        .target(
+            name: "Quotas",
+            destinations: .macOS,
+            product: .staticFramework,
+            bundleId: "com.tddworks.claudebar.quotas",
+            deploymentTargets: .macOS("15.0"),
+            sources: ["Modules/Quotas/Sources/**"],
+            settings: .settings(
+                base: [
+                    "SWIFT_STRICT_CONCURRENCY": "complete",
+                ]
+            )
+        ),
 
         // Diagnostics — AppLog; the only module anything may import.
         .target(
@@ -66,7 +85,7 @@ let project = Project(
             deploymentTargets: .macOS("15.0"),
             sources: ["Modules/DataSources/Sources/**"],
             dependencies: [
-                .target(name: "Domain"),
+                .target(name: "Quotas"),
                 .target(name: "Diagnostics"),
                 .external(name: "Mockable"),
                 .external(name: "SwiftTerm"),
@@ -90,9 +109,10 @@ let project = Project(
             sources: ["Modules/Providers/Sources/**"],
             resources: ["Modules/Providers/Resources/**"],
             dependencies: [
-                .target(name: "Domain"),
+                .target(name: "Quotas"),
                 .target(name: "DataSources"),
                 .target(name: "Diagnostics"),
+                .external(name: "Mockable"),
             ],
             settings: .settings(
                 base: [
@@ -110,7 +130,7 @@ let project = Project(
             sources: ["Modules/DataSources/Tests/**"],
             dependencies: [
                 .target(name: "DataSources"),
-                .target(name: "Domain"),
+                .target(name: "Quotas"),
                 .external(name: "Mockable"),
             ],
             settings: .settings(
@@ -130,7 +150,7 @@ let project = Project(
             dependencies: [
                 .target(name: "Providers"),
                 .target(name: "DataSources"),
-                .target(name: "Domain"),
+                .target(name: "Quotas"),
                 .external(name: "Mockable"),
             ],
             settings: .settings(

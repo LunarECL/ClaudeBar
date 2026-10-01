@@ -1,4 +1,4 @@
-import Domain
+import Quotas
 import Foundation
 import Observation
 
@@ -8,16 +8,16 @@ import Observation
 @MainActor
 @Observable
 public final class GuestPasses {
-    public private(set) var pass: ClaudePass?
+    public private(set) var pass: GuestPass?
     public private(set) var isFetching = false
     /// Separate from the provider's `lastError`: a failed pass fetch never
     /// marks usage unavailable.
     public private(set) var error: Error?
 
-    private let probe: any ClaudePassProbing
+    private let source: any GuestPassSource
 
-    public init(probe: any ClaudePassProbing) {
-        self.probe = probe
+    public init(source: any GuestPassSource) {
+        self.source = source
     }
 
     /// Offered only to a plan that can issue passes (#243).
@@ -26,11 +26,11 @@ public final class GuestPasses {
     }
 
     @discardableResult
-    public func fetch() async throws -> ClaudePass {
+    public func fetch() async throws -> GuestPass {
         isFetching = true
         defer { isFetching = false }
         do {
-            let pass = try await probe.probe()
+            let pass = try await source.fetch()
             self.pass = pass
             error = nil
             return pass

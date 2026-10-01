@@ -98,7 +98,7 @@ struct ActionBarSpec {
         func `Claude offers guest passes only when it has a pass probe`() throws {
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
             let withoutPasses = try Providers.make("claude", settings: settings)
-            let withPasses = try Providers.make("claude", settings: settings, guestPasses: GuestPasses(probe: MockClaudePassProbing()))
+            let withPasses = try Providers.make("claude", settings: settings, guestPasses: GuestPasses(source: MockGuestPassSource()))
 
             #expect(withoutPasses.guestPasses == nil)
             #expect(withPasses.guestPasses != nil)
@@ -106,7 +106,7 @@ struct ActionBarSpec {
 
         @Test
         func `Max account sees the Share button`() {
-            let passes = GuestPasses(probe: MockClaudePassProbing())
+            let passes = GuestPasses(source: MockGuestPassSource())
 
             #expect(passes.isOffered(for: Self.usage(.claudeMax)))
         }
@@ -114,16 +114,16 @@ struct ActionBarSpec {
         @Test
         func `Pro account does not see the Share button`() {
             // Issue #243: Anthropic issues invitation links to Max plans only.
-            let passes = GuestPasses(probe: MockClaudePassProbing())
+            let passes = GuestPasses(source: MockGuestPassSource())
 
             #expect(passes.isOffered(for: Self.usage(.claudePro)) == false)
         }
 
         @Test
         func `failed pass fetch is reported instead of failing silently`() async {
-            let passProbe = MockClaudePassProbing()
-            given(passProbe).probe().willThrow(ProbeError.parseFailed("Could not find referral URL"))
-            let passes = GuestPasses(probe: passProbe)
+            let passSource = MockGuestPassSource()
+            given(passSource).fetch().willThrow(UsageError.parseFailed("Could not find referral URL"))
+            let passes = GuestPasses(source: passSource)
 
             do {
                 _ = try await passes.fetch()

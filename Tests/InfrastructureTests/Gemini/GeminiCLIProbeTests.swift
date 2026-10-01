@@ -20,7 +20,7 @@ struct GeminiCLIProbeBehaviorTests {
         let probe = GeminiCLIProbe(timeout: 30, cliExecutor: mockExecutor)
 
         // When/Then
-        await #expect(throws: ProbeError.cliNotFound("gemini")) {
+        await #expect(throws: UsageError.cliNotFound("gemini")) {
             try await probe.probe()
         }
     }
@@ -70,7 +70,7 @@ struct GeminiCLIProbeBehaviorTests {
         let probe = GeminiCLIProbe(timeout: 30, cliExecutor: mockExecutor)
 
         // When/Then
-        await #expect(throws: ProbeError.timeout) {
+        await #expect(throws: UsageError.timeout) {
             try await probe.probe()
         }
     }
@@ -92,7 +92,7 @@ struct GeminiCLIProbeBehaviorTests {
         let probe = GeminiCLIProbe(timeout: 30, cliExecutor: mockExecutor)
 
         // When/Then
-        await #expect(throws: ProbeError.executionFailed("Permission denied")) {
+        await #expect(throws: UsageError.executionFailed("Permission denied")) {
             try await probe.probe()
         }
     }
@@ -114,7 +114,7 @@ struct GeminiCLIProbeBehaviorTests {
         let probe = GeminiCLIProbe(timeout: 30, cliExecutor: mockExecutor)
 
         // When/Then
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -136,7 +136,7 @@ struct GeminiCLIProbeBehaviorTests {
         let probe = GeminiCLIProbe(timeout: 30, cliExecutor: mockExecutor)
 
         // When/Then
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -290,7 +290,7 @@ struct GeminiCLIProbeParsingTests {
     @Test
     func `throws authenticationRequired when login prompt detected`() {
         // When/Then
-        #expect(throws: ProbeError.authenticationRequired) {
+        #expect(throws: UsageError.authenticationRequired) {
             try GeminiCLIProbe.parse(Self.loginRequiredOutput)
         }
     }
@@ -298,7 +298,7 @@ struct GeminiCLIProbeParsingTests {
     @Test
     func `throws authenticationRequired when API key prompt detected`() {
         // When/Then
-        #expect(throws: ProbeError.authenticationRequired) {
+        #expect(throws: UsageError.authenticationRequired) {
             try GeminiCLIProbe.parse(Self.apiKeyOutput)
         }
     }
@@ -306,7 +306,7 @@ struct GeminiCLIProbeParsingTests {
     @Test
     func `throws authenticationRequired when waiting for auth detected`() {
         // When/Then
-        #expect(throws: ProbeError.authenticationRequired) {
+        #expect(throws: UsageError.authenticationRequired) {
             try GeminiCLIProbe.parse(Self.waitingForAuthOutput)
         }
     }
@@ -319,7 +319,7 @@ struct GeminiCLIProbeParsingTests {
         let emptyOutput = "Some random text with no usage data"
 
         // When/Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try GeminiCLIProbe.parse(emptyOutput)
         }
     }
@@ -327,7 +327,7 @@ struct GeminiCLIProbeParsingTests {
     @Test
     func `throws parseFailed for completely empty output`() {
         // When/Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try GeminiCLIProbe.parse("")
         }
     }

@@ -15,7 +15,7 @@ public struct DefaultCLIExecutor: CLIExecutor {
 
     /// Rule that tells the PTY run when the screen has settled. Without one, any
     /// idle gap ends the capture, truncating TUIs that fill in asynchronously
-    /// (issue #271). Readable from tests so a probe can be checked for pairing
+    /// (issue #271). Readable from tests so a fetch can be checked for pairing
     /// each command with the rule its own screen needs (#317).
     public let completionRule: CLICompletionRule?
 
@@ -49,7 +49,7 @@ public struct DefaultCLIExecutor: CLIExecutor {
     ) async throws -> CLIResult {
         let runner = InteractiveRunner()
         // Built here, on the task, so the `qualityOfService` default argument
-        // reads the ambient `ProbeExecutionContext` task local before we hop
+        // reads the ambient `FetchContext` task local before we hop
         // off the cooperative pool below (task locals do not cross that hop).
         let options = InteractiveRunner.Options(
             timeout: timeout,

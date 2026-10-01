@@ -1,5 +1,5 @@
 import Diagnostics
-import Domain
+import Quotas
 import Foundation
 
 /// OAuth 2's refresh-token grant (RFC 6749 §6): trades `refreshToken` for a
@@ -26,7 +26,7 @@ struct OAuth2Refresher: CredentialRefreshing {
 
     func refresh(_ credential: Credential) async throws -> Credential {
         guard let refreshToken = credential["refreshToken"], let url = URL(string: refresh.tokenURL) else {
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         var request = URLRequest(url: url)
@@ -49,21 +49,21 @@ struct OAuth2Refresher: CredentialRefreshing {
 
         let (data, response) = try await network.request(request)
         guard let http = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response from token refresh")
+            throw UsageError.executionFailed("Invalid response from token refresh")
         }
 
         if http.statusCode == 400 || http.statusCode == 401 {
             let code = Self.errorCode(in: data)
             AppLog.probes.error("Token refresh refused (HTTP \(http.statusCode), \(code ?? "no code"))")
-            throw ProbeError.sessionExpired(hint: refresh.hint)
+            throw UsageError.sessionExpired(hint: refresh.hint)
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw ProbeError.executionFailed("Token refresh failed: HTTP \(http.statusCode)")
+            throw UsageError.executionFailed("Token refresh failed: HTTP \(http.statusCode)")
         }
 
         guard let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let token = body["access_token"] as? String, !token.isEmpty else {
-            throw ProbeError.executionFailed("No access token in refresh response")
+            throw UsageError.executionFailed("No access token in refresh response")
         }
 
         var renewed = credential

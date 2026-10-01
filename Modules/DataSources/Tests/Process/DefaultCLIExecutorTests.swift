@@ -1,4 +1,4 @@
-import Domain
+import Quotas
 import Foundation
 import Testing
 
@@ -88,10 +88,10 @@ struct DefaultCLIExecutorTests {
     @Test("Forwards environment additions to the spawned process")
     func forwardsEnvironmentAdditions() async throws {
         let result = try await DefaultCLIExecutor(
-            environmentAdditions: [HookConstants.probeEnvironmentKey: "1"]
+            environmentAdditions: ["CLAUDEBAR_PROBE": "1"]
         ).execute(
             binary: "/bin/sh",
-            args: ["-c", "test \"$\(HookConstants.probeEnvironmentKey)\" = 1 && echo marked"],
+            args: ["-c", "test \"$CLAUDEBAR_PROBE\" = 1 && echo marked"],
             input: "",
             timeout: 20,
             workingDirectory: nil,

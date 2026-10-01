@@ -60,12 +60,12 @@ public struct CopilotUsageProbe: UsageProbe {
     public func probe() async throws -> UsageSnapshot {
         guard let token = getToken(), !token.isEmpty else {
             AppLog.probes.error("Copilot: No GitHub token configured (check token field or env var)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         guard let username = settingsRepository.getGithubUsername(), !username.isEmpty else {
             AppLog.probes.error("Copilot: No GitHub username configured")
-            throw ProbeError.executionFailed("GitHub username not configured")
+            throw UsageError.executionFailed("GitHub username not configured")
         }
 
         AppLog.probes.debug("Copilot: Fetching billing usage for \(username)")
@@ -84,7 +84,7 @@ public struct CopilotUsageProbe: UsageProbe {
         let urlString = "\(Self.apiBaseURL)/users/\(username)/settings/billing/premium_request/usage"
 
         guard let url = URL(string: urlString) else {
-            throw ProbeError.executionFailed("Invalid URL")
+            throw UsageError.executionFailed("Invalid URL")
         }
 
         var request = URLRequest(url: url)
@@ -97,7 +97,7 @@ public struct CopilotUsageProbe: UsageProbe {
         let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         AppLog.probes.debug("Copilot API response status: \(httpResponse.statusCode)")
@@ -107,16 +107,16 @@ public struct CopilotUsageProbe: UsageProbe {
             break
         case 401:
             AppLog.probes.error("Copilot: Authentication failed (401)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         case 403:
             AppLog.probes.error("Copilot: Forbidden - check token permissions (403)")
-            throw ProbeError.executionFailed("Forbidden - ensure PAT has 'Plan: read' permission")
+            throw UsageError.executionFailed("Forbidden - ensure PAT has 'Plan: read' permission")
         case 404:
             AppLog.probes.error("Copilot: User not found or no billing access (404)")
-            throw ProbeError.executionFailed("User not found or no billing access")
+            throw UsageError.executionFailed("User not found or no billing access")
         default:
             AppLog.probes.error("Copilot: HTTP error \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("HTTP error: \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("HTTP error: \(httpResponse.statusCode)")
         }
 
         // Log raw response for debugging
@@ -128,7 +128,7 @@ public struct CopilotUsageProbe: UsageProbe {
             return try JSONDecoder().decode(PremiumRequestUsageResponse.self, from: data)
         } catch {
             AppLog.probes.error("Copilot: Failed to parse response - \(error.localizedDescription)")
-            throw ProbeError.parseFailed("Failed to parse billing response: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Failed to parse billing response: \(error.localizedDescription)")
         }
     }
 
@@ -224,7 +224,7 @@ public struct CopilotUsageProbe: UsageProbe {
         } else if manualOverrideEnabled && apiReturnedEmpty {
             // Manual override enabled but no value set, and API returned no data
             AppLog.probes.warning("Copilot: Manual override enabled but no value set")
-            throw ProbeError.executionFailed("Manual usage override enabled but no value entered. Please enter your current usage from GitHub settings.")
+            throw UsageError.executionFailed("Manual usage override enabled but no value entered. Please enter your current usage from GitHub settings.")
         } else {
             // Use API data (or zero if no API data but manual override not enabled)
             used = totalGrossQuantity

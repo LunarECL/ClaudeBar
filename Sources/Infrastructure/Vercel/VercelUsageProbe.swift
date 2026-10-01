@@ -67,7 +67,7 @@ public struct VercelUsageProbe: UsageProbe {
     public func probe() async throws -> UsageSnapshot {
         guard let apiKey = getApiKey(), !apiKey.isEmpty else {
             AppLog.probes.error("Vercel: No API key configured (check env var or settings)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         AppLog.probes.info("Starting Vercel AI Gateway probe...")
@@ -81,15 +81,15 @@ public struct VercelUsageProbe: UsageProbe {
         let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         guard httpResponse.statusCode == 200 else {
             AppLog.probes.error("Vercel API returned HTTP \(httpResponse.statusCode)")
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                throw ProbeError.authenticationRequired
+                throw UsageError.authenticationRequired
             }
-            throw ProbeError.executionFailed("Vercel API returned HTTP \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("Vercel API returned HTTP \(httpResponse.statusCode)")
         }
 
         AppLog.probes.debug("Vercel API response received (\(data.count) bytes)")
@@ -124,12 +124,12 @@ public struct VercelUsageProbe: UsageProbe {
             response = try decoder.decode(CreditsResponse.self, from: data)
         } catch {
             AppLog.probes.error("Vercel parse failed: Invalid JSON - \(error.localizedDescription)")
-            throw ProbeError.parseFailed("Invalid JSON: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Invalid JSON: \(error.localizedDescription)")
         }
 
         guard let balance = response.balance?.value else {
             AppLog.probes.error("Vercel: Invalid or missing balance in response")
-            throw ProbeError.parseFailed("Invalid or missing balance")
+            throw UsageError.parseFailed("Invalid or missing balance")
         }
 
         let quota = UsageQuota(

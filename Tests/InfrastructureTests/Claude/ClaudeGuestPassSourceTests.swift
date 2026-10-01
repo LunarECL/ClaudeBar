@@ -18,7 +18,7 @@ final class MockClipboardReader: ClipboardReader, @unchecked Sendable {
 }
 
 @Suite
-struct ClaudePassProbeTests {
+struct ClaudeGuestPassSourceTests {
 
     // MARK: - Parsing Tests (for legacy format with URL in output)
 
@@ -38,7 +38,7 @@ struct ClaudePassProbeTests {
         """
 
         // When
-        let pass = try ClaudePassProbe.parse(output)
+        let pass = try ClaudeGuestPassSource.parse(output)
 
         // Then
         #expect(pass.passesRemaining == 3)
@@ -59,7 +59,7 @@ struct ClaudePassProbeTests {
           Share a free week of Claude Code with friends.
         """
 
-        let pass = try ClaudePassProbe.parse(output)
+        let pass = try ClaudeGuestPassSource.parse(output)
 
         #expect(pass.passesRemaining == 1)
         #expect(pass.referralURL.absoluteString == "https://claude.ai/referral/ABC123")
@@ -75,7 +75,7 @@ struct ClaudePassProbeTests {
           Share a free week of Claude Code with friends.
         """
 
-        let pass = try ClaudePassProbe.parse(output)
+        let pass = try ClaudeGuestPassSource.parse(output)
 
         #expect(pass.passesRemaining == 0)
         #expect(pass.referralURL.absoluteString == "https://claude.ai/referral/XYZ789")
@@ -90,7 +90,7 @@ struct ClaudePassProbeTests {
         Share a free week of Claude Code with friends.
         """
 
-        let pass = try ClaudePassProbe.parse(output)
+        let pass = try ClaudeGuestPassSource.parse(output)
 
         #expect(pass.passesRemaining == nil)
         #expect(pass.referralURL.absoluteString == "https://claude.ai/referral/ABC123")
@@ -104,8 +104,8 @@ struct ClaudePassProbeTests {
           Share a free week of Claude Code with friends.
         """
 
-        #expect(throws: ProbeError.self) {
-            _ = try ClaudePassProbe.parse(output)
+        #expect(throws: UsageError.self) {
+            _ = try ClaudeGuestPassSource.parse(output)
         }
     }
 
@@ -114,7 +114,7 @@ struct ClaudePassProbeTests {
         // Output with ANSI color codes
         let output = "\u{001B}[1mGuest passes\u{001B}[0m · \u{001B}[32m3 left\u{001B}[0m\n\nhttps://claude.ai/referral/ABC123"
 
-        let pass = try ClaudePassProbe.parse(output)
+        let pass = try ClaudeGuestPassSource.parse(output)
 
         #expect(pass.passesRemaining == 3)
         #expect(pass.referralURL.absoluteString == "https://claude.ai/referral/ABC123")
@@ -123,7 +123,7 @@ struct ClaudePassProbeTests {
     // MARK: - Probe Behavior Tests (with URL in output)
 
     @Test
-    func `probe returns ClaudePass with URL from output`() async throws {
+    func `probe returns GuestPass with URL from output`() async throws {
         // Given
         let mockExecutor = MockCLIExecutor()
         let passOutput = """
@@ -144,10 +144,10 @@ struct ClaudePassProbeTests {
             autoResponses: .any
         ).willReturn(CLIResult(output: passOutput, exitCode: 0))
 
-        let probe = ClaudePassProbe(cliExecutor: mockExecutor)
+        let probe = ClaudeGuestPassSource(cliExecutor: mockExecutor)
 
         // When
-        let pass = try await probe.probe()
+        let pass = try await probe.fetch()
 
         // Then
         #expect(pass.passesRemaining == 2)
@@ -178,10 +178,10 @@ struct ClaudePassProbeTests {
             autoResponses: .any
         ).willReturn(CLIResult(output: passOutput, exitCode: 0))
 
-        let probe = ClaudePassProbe(cliExecutor: mockExecutor, clipboardReader: mockClipboard)
+        let probe = ClaudeGuestPassSource(cliExecutor: mockExecutor, clipboardReader: mockClipboard)
 
         // When
-        let pass = try await probe.probe()
+        let pass = try await probe.fetch()
 
         // Then
         #expect(pass.passesRemaining == nil)  // Count not available in this format
@@ -208,10 +208,10 @@ struct ClaudePassProbeTests {
             autoResponses: .any
         ).willReturn(CLIResult(output: passOutput, exitCode: 0))
 
-        let probe = ClaudePassProbe(cliExecutor: mockExecutor, clipboardReader: mockClipboard)
+        let probe = ClaudeGuestPassSource(cliExecutor: mockExecutor, clipboardReader: mockClipboard)
 
-        await #expect(throws: ProbeError.self) {
-            _ = try await probe.probe()
+        await #expect(throws: UsageError.self) {
+            _ = try await probe.fetch()
         }
     }
 
@@ -220,7 +220,7 @@ struct ClaudePassProbeTests {
         let mockExecutor = MockCLIExecutor()
         given(mockExecutor).locate(.any).willReturn("/usr/local/bin/claude")
 
-        let probe = ClaudePassProbe(cliExecutor: mockExecutor)
+        let probe = ClaudeGuestPassSource(cliExecutor: mockExecutor)
 
         #expect(await probe.isAvailable() == true)
     }
@@ -230,7 +230,7 @@ struct ClaudePassProbeTests {
         let mockExecutor = MockCLIExecutor()
         given(mockExecutor).locate(.any).willReturn(nil)
 
-        let probe = ClaudePassProbe(cliExecutor: mockExecutor)
+        let probe = ClaudeGuestPassSource(cliExecutor: mockExecutor)
 
         #expect(await probe.isAvailable() == false)
     }
@@ -246,12 +246,12 @@ struct ClaudePassProbeTests {
             timeout: .any,
             workingDirectory: .any,
             autoResponses: .any
-        ).willThrow(ProbeError.executionFailed("CLI error"))
+        ).willThrow(UsageError.executionFailed("CLI error"))
 
-        let probe = ClaudePassProbe(cliExecutor: mockExecutor)
+        let probe = ClaudeGuestPassSource(cliExecutor: mockExecutor)
 
-        await #expect(throws: ProbeError.self) {
-            _ = try await probe.probe()
+        await #expect(throws: UsageError.self) {
+            _ = try await probe.fetch()
         }
     }
 }

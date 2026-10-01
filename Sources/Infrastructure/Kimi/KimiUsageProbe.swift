@@ -64,12 +64,12 @@ public struct KimiUsageProbe: UsageProbe {
         do {
             token = try resolveTokenProvider().resolveToken()
         } catch {
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         // Step 2: Build request
         guard let usageURL = URL(string: region.usageURL) else {
-            throw ProbeError.executionFailed("Invalid Kimi API URL")
+            throw UsageError.executionFailed("Invalid Kimi API URL")
         }
         var request = URLRequest(url: usageURL)
         request.httpMethod = "POST"
@@ -85,11 +85,11 @@ public struct KimiUsageProbe: UsageProbe {
             (data, response) = try await networkClient.request(request)
         } catch {
             AppLog.probes.error("Kimi probe failed: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Kimi API request failed: \(error.localizedDescription)")
+            throw UsageError.executionFailed("Kimi API request failed: \(error.localizedDescription)")
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid HTTP response")
+            throw UsageError.executionFailed("Invalid HTTP response")
         }
 
         AppLog.probes.debug("Kimi API response status: \(httpResponse.statusCode)")
@@ -99,11 +99,11 @@ public struct KimiUsageProbe: UsageProbe {
             break
         case 401, 403:
             AppLog.probes.error("Kimi probe failed: authentication error (\(httpResponse.statusCode))")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         default:
             let body = String(data: data, encoding: .utf8) ?? "<binary>"
             AppLog.probes.error("Kimi probe failed: HTTP \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("Kimi API returned HTTP \(httpResponse.statusCode): \(body)")
+            throw UsageError.executionFailed("Kimi API returned HTTP \(httpResponse.statusCode): \(body)")
         }
 
         // Step 4: Log raw response for debugging
@@ -135,11 +135,11 @@ public struct KimiUsageProbe: UsageProbe {
         do {
             decoded = try JSONDecoder().decode(KimiUsageResponse.self, from: data)
         } catch {
-            throw ProbeError.parseFailed("Failed to decode Kimi response: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Failed to decode Kimi response: \(error.localizedDescription)")
         }
 
         guard let coding = decoded.usages.first(where: { $0.scope == "FEATURE_CODING" }) else {
-            throw ProbeError.parseFailed("Missing FEATURE_CODING scope in response")
+            throw UsageError.parseFailed("Missing FEATURE_CODING scope in response")
         }
 
         // Parse weekly quota from detail

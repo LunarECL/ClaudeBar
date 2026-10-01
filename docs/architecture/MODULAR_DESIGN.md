@@ -63,7 +63,7 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 
 | Module | Context ([model §7](CANONICAL_MODEL.md#7--the-contexts-and-the-modules-that-implement-them)) | Public (the domain) | `Internal/` (the implementation) |
 |---|---|---|---|
-| `Quotas` | Quota · shared kernel | `UsageSnapshot`, `UsageQuota`, `QuotaType`, `QuotaStatus`, `UsagePace`, `CostUsage`, `BudgetStatus`, `AccountTier`, `ProbeError` | — none: pure values, no I/O |
+| `Quotas` | Quota · shared kernel | `UsageSnapshot`, `UsageQuota`, `QuotaType`, `QuotaStatus`, `UsagePace`, `CostUsage`, `BudgetStatus`, `AccountTier`, `UsageError` — today's shapes; the final kernel is the model's `Usage`, `Quota`, `Left`, `Window`, `Status`, `Pace`, `Cost`, `Budget`, `Plan` (§9) | — none: pure values, no I/O |
 | `DataSources` | Data Sources | `DataSource`, `DataSourceDefinition`, `Response`, `DataSourceError`, the closed sums `CredentialLookup` · `Fetch` · `Mapping`, `ConfigField`; the ports `CLIExecutor`, `NetworkClient`, `RPCTransport`, `CloudWatchClient`; the factory `DataSources.make(_:settings:vault:cloudWatch:)` | the workers — `Lookup/`, `Fetch/`, `Mapping/` — and the implementations of its own ports — `Process/`, `Network/` (§5) |
 | `AWSClients` | Data Sources (SDK-backed) | `AWSClients.makeCloudWatch()` → `any CloudWatchClient` | the AWS SDK client and Bedrock pricing; the only module that links AWS |
 | `Providers` | Providers · core | `Provider`, `AIProvider` (until it folds in), `ProviderDefinition`, `ProviderCatalog`, `ProviderAccount`, `ProviderSettingsRepository`, `CredentialRepository` | definition-file reading, `ExtensionDirectoryScanner`, `AIProviders` |
@@ -237,11 +237,23 @@ files move. When an old target is empty it is deleted.
 
 | Step | Moves | Visible change |
 |---|---|---|
-| **M0** | `Diagnostics` and `Quotas` carved; `Domain` re-exports `Quotas` | none |
+| **M0** ✅ | `Diagnostics` and `Quotas` carved; `Domain` re-exports `Quotas`, `DataSources` and `Providers`, which no longer import `Domain` | none |
 | **M1** | `DataSources` — the ports and their implementations move in; `DataSource`, the closed sums and the workers Codex needs are written test-first | none |
 | **M2** | `Providers` — `Provider`, the definition, the catalog; `codex.json` with golden tests; the App builds Codex from it; `CodexProvider` and every `Codex*` type in `Infrastructure/Codex` deleted. **Slice 1 of the target architecture** | none |
 | M3… | one group of providers per PR (target §8); then `Monitoring`, `Alerting`, `Activity`, `UsageHistory`, `Storage` | none |
 | last | `Domain` and `Infrastructure` are empty and removed from `Project.swift` | none |
+
+**M0 moved the kernel as it is.** `Quotas` holds today's types unchanged —
+and, because `UsageSnapshot` carries them, a few that belong elsewhere:
+`DailyUsageReport`/`Stat` (→ `UsageHistory`), `UsageDisplayMode` (→ the App),
+`ExtensionMetric` and `BedrockModels` (→ out of the kernel). `RefreshKind` and
+`DailyUsageAnalyzing` sit in `Providers` until `Monitoring` and `UsageHistory`
+exist. Each type carries a `- Note: Interim` naming its final shape; reshaping
+the kernel follows [CANONICAL_MODEL §8](CANONICAL_MODEL.md#8--build-truth-node-by-node)'s
+order of work, one step per PR, because it touches every provider and view:
+**`Left` and `Window` first** (the two kernel laws), **then the words**
+(`UsageSnapshot` → `Usage`, `AccountTier` → `Plan`, `CostUsage` → `Cost`), and
+the non-kernel types leave as their modules are carved.
 
 The order is forced by the imports: `Provider` needs `UsageSnapshot`
 (Quotas), and the workers need the port implementations

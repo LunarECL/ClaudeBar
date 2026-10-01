@@ -63,7 +63,7 @@ public struct KimiCLIUsageProbe: UsageProbe {
 
     public func probe() async throws -> UsageSnapshot {
         guard cliExecutor.locate(kimiBinary) != nil else {
-            throw ProbeError.cliNotFound(kimiBinary)
+            throw UsageError.cliNotFound(kimiBinary)
         }
 
         AppLog.probes.info("Starting Kimi CLI probe with /usage command...")
@@ -92,7 +92,7 @@ public struct KimiCLIUsageProbe: UsageProbe {
             )
         } catch {
             AppLog.probes.error("Kimi CLI probe failed: \(error.localizedDescription)")
-            throw ProbeError.executionFailed(error.localizedDescription)
+            throw UsageError.executionFailed(error.localizedDescription)
         }
 
         AppLog.probes.info("Kimi CLI /usage output:\n\(result.output)")
@@ -194,7 +194,7 @@ public struct KimiCLIUsageProbe: UsageProbe {
         }
 
         guard !quotas.isEmpty else {
-            throw ProbeError.parseFailed("No quota data found in Kimi CLI output")
+            throw UsageError.parseFailed("No quota data found in Kimi CLI output")
         }
 
         return UsageSnapshot(

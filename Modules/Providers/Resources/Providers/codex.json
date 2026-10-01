@@ -23,7 +23,7 @@
             "never",
             "app-server"
           ],
-          "workingDirectory": "probe",
+          "workingDirectory": "dedicated",
           "handshake": [
             {
               "request": "initialize",
@@ -290,7 +290,7 @@
           ],
           "input": "/status\n",
           "timeout": 20,
-          "workingDirectory": "probe",
+          "workingDirectory": "dedicated",
           "autoResponses": {
             "Do you trust the contents of this directory?": "1"
           }
@@ -382,7 +382,7 @@
               "cli_auth_credentials_store=\"file\"",
               "app-server"
             ],
-            "workingDirectory": "probe",
+            "workingDirectory": "dedicated",
             "handshake": [
               {
                 "request": "initialize",

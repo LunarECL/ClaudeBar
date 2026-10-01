@@ -1,4 +1,5 @@
 import Foundation
+import Quotas
 
 /// Represents a named account within an AI provider.
 ///

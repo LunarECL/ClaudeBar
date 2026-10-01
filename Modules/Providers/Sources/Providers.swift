@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 
 /// The module's factory: definition → `Provider`, its data sources made live

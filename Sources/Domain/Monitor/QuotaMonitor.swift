@@ -1,3 +1,6 @@
+import Quotas
+import DataSources
+import Providers
 import Foundation
 import Observation
 
@@ -514,7 +517,7 @@ public final class QuotaMonitor {
                     // bind a low (`.utility`) QoS so any CLI subprocess spawned
                     // during the refresh runs on efficiency cores / throttled —
                     // both keep idle energy use low (issue #204).
-                    await ProbeExecutionContext.$qualityOfService.withValue(.utility) {
+                    await FetchContext.$qualityOfService.withValue(.utility) {
                         if let providerIds {
                             await self.refresh(providerIds: providerIds, kind: .background)
                         } else {

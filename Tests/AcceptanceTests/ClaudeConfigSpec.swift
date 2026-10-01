@@ -175,7 +175,7 @@ struct ClaudeConfigSpec {
 
             // Then — nothing is available, and a refresh reports the API's failure
             #expect(await claude.isAvailable() == false)
-            await #expect(throws: ProbeError.authenticationRequired) { try await claude.refresh() }
+            await #expect(throws: UsageError.authenticationRequired) { try await claude.refresh() }
             #expect(claude.snapshot == nil)
         }
 

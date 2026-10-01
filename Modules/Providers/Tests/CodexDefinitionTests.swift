@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 import Mockable
 import Providers
@@ -137,13 +137,13 @@ struct CodexDefinitionTests {
         given(stub.transport).close().willReturn(())
         given(stub.transport).receive().willProduce { @Sendable in Data(answers[received.next() - 1].utf8) }
         given(stub.cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
-            .willThrow(ProbeError.executionFailed("TTY not available"))
+            .willThrow(UsageError.executionFailed("TTY not available"))
         let codex = try stub.make("codex")
         let first = try await codex.refresh()
 
-        await #expect(throws: ProbeError.self) { try await codex.refresh() }
+        await #expect(throws: UsageError.self) { try await codex.refresh() }
 
-        #expect(codex.lastError as? ProbeError == .executionFailed("RPC error: Authentication required"))
+        #expect(codex.lastError as? UsageError == .executionFailed("RPC error: Authentication required"))
         #expect(codex.lastFailedStep == .fetch)
         #expect(codex.snapshot == first)
     }
@@ -157,7 +157,7 @@ struct CodexDefinitionTests {
         stub.answerTerminal("Error: Not logged in. Please log in with `codex login`.")
         let codex = try stub.make("codex")
 
-        await #expect(throws: ProbeError.authenticationRequired) { try await codex.refresh() }
+        await #expect(throws: UsageError.authenticationRequired) { try await codex.refresh() }
         #expect(codex.lastFailedStep == .mapping)
     }
 
@@ -241,7 +241,7 @@ struct CodexDefinitionTests {
         let codex = try stub.make("codex")
 
         #expect(await codex.isAvailable() == false)
-        await #expect(throws: ProbeError.authenticationRequired) { try await codex.refresh() }
+        await #expect(throws: UsageError.authenticationRequired) { try await codex.refresh() }
         #expect(codex.lastFailedStep == .lookup)
     }
 
@@ -253,7 +253,7 @@ struct CodexDefinitionTests {
         stub.answerHTTP("", status: 401)
         let codex = try stub.make("codex")
 
-        await #expect(throws: ProbeError.sessionExpired()) { try await codex.refresh() }
+        await #expect(throws: UsageError.sessionExpired()) { try await codex.refresh() }
     }
 
     @Test
@@ -286,7 +286,7 @@ struct CodexDefinitionTests {
         stub.answerHTTP(#"{"error":{"code":"refresh_token_expired"}}"#, status: 400)
         let codex = try stub.make("codex")
 
-        await #expect(throws: ProbeError.sessionExpired()) { try await codex.refresh() }
+        await #expect(throws: UsageError.sessionExpired()) { try await codex.refresh() }
         #expect(codex.lastFailedStep == .lookup)
     }
 }

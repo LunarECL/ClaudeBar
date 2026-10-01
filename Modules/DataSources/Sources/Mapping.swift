@@ -1,4 +1,4 @@
-import Domain
+import Quotas
 import Foundation
 
 /// WHAT THE BYTES SAY — *Map fields*. A closed sum: a JSON response is read by
@@ -169,7 +169,7 @@ public struct NameRule: Sendable, Equatable, Codable {
     }
 }
 
-/// The failure a rule reports, as one of today's `ProbeError`s.
+/// The failure a rule reports, as one of today's `UsageError`s.
 public enum ErrorRef: Sendable, Equatable, Codable {
     case authenticationRequired
     case updateRequired
@@ -180,7 +180,7 @@ public enum ErrorRef: Sendable, Equatable, Codable {
     case sessionExpired(String?)
     case executionFailed(String)
 
-    public var probeError: ProbeError {
+    public var usageError: UsageError {
         switch self {
         case .authenticationRequired: .authenticationRequired
         case .updateRequired: .updateRequired

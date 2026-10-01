@@ -1,4 +1,5 @@
 import Foundation
+import Quotas
 
 /// Settings repository extension for multi-account provider configuration.
 ///

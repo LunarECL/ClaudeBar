@@ -20,7 +20,7 @@
           "args": ["/usage", "--allowed-tools", ""],
           "input": "",
           "timeout": 20,
-          "workingDirectory": "probe",
+          "workingDirectory": "dedicated",
           "environment": { "unset": ["CLAUDE_CODE_OAUTH_TOKEN"], "set": { "CLAUDEBAR_PROBE": "1" } },
           "readyWhen": [{ "row": "Current session" }, "% used", "% left", "rate limited", "Error:", "/usage is only available"],
           "screen": "rendered",
@@ -46,7 +46,7 @@
         "folderTrustRequired": {
           "patchJSONFile": {
             "path": "${CLAUDE_CONFIG_DIR:-~}/.claude.json",
-            "keys": ["projects", "{{probeDirectory}}", "hasTrustDialogAccepted"],
+            "keys": ["projects", "{{cliDirectory}}", "hasTrustDialogAccepted"],
             "value": true
           }
         }
@@ -64,7 +64,7 @@
           "args": ["/cost", "--allowed-tools", ""],
           "input": "",
           "timeout": 20,
-          "workingDirectory": "probe",
+          "workingDirectory": "dedicated",
           "environment": { "unset": ["CLAUDE_CODE_OAUTH_TOKEN"], "set": { "CLAUDEBAR_PROBE": "1" } },
           "screen": "rendered",
           "autoResponses": {

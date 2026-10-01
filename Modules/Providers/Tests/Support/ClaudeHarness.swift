@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 import Mockable
 import Providers
@@ -77,7 +77,7 @@ struct ClaudeHarness {
     // MARK: - Reading screens and responses
 
     /// The `/usage` screen through `claude-usage-screen.js`. Throws the
-    /// `ProbeError` the screen means, as the old probe did.
+    /// `UsageError` the screen means, as the old probe did.
     func readUsageScreen(_ screen: String) throws -> UsageSnapshot {
         try unwrapped { try dataSource("cli").read(Response(text: screen)) }
     }
@@ -94,7 +94,7 @@ struct ClaudeHarness {
     }
 
     /// A usage API body through `claude-usage-api.js`, with the plan the
-    /// credential would carry. Throws the `ProbeError` the old probe threw.
+    /// credential would carry. Throws the `UsageError` the old probe threw.
     func readAPIResponse(_ json: String, subscriptionType: String? = nil) async throws -> UsageSnapshot {
         try writeCredentials(subscriptionType: subscriptionType)
         let network = MockNetworkClient()
@@ -115,7 +115,7 @@ struct ClaudeHarness {
         return try await fetchUsage(source)
     }
 
-    /// `fetchUsage()`, throwing the `ProbeError` inside a `DataSourceError`.
+    /// `fetchUsage()`, throwing the `UsageError` inside a `DataSourceError`.
     func fetchUsage(_ source: DataSource) async throws -> UsageSnapshot {
         do {
             return try await source.fetchUsage()

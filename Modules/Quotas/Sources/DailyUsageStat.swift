@@ -2,6 +2,9 @@ import Foundation
 
 /// A single day's aggregated usage statistics from Claude Code session logs.
 /// Rich domain model with formatting behavior.
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — leaves the kernel for `UsageHistory` (§7) with `DailyUsageReport`.
 public struct DailyUsageStat: Sendable, Equatable {
     /// The date this stat represents (day granularity)
     public let date: Date

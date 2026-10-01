@@ -2,7 +2,7 @@ import Testing
 import Foundation
 import Mockable
 @testable import DataSources
-@testable import Domain
+import Quotas
 
 @Suite("LoginShellEnvironment Tests")
 struct LoginShellEnvironmentTests {
@@ -79,7 +79,7 @@ struct LoginShellEnvironmentTests {
             timeout: .any,
             workingDirectory: .any,
             autoResponses: .any
-        ).willThrow(ProbeError.executionFailed("shell failed"))
+        ).willThrow(UsageError.executionFailed("shell failed"))
         let shell = LoginShellEnvironment(cliExecutor: mock)
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == nil)
     }

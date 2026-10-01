@@ -81,7 +81,7 @@ public struct ZaiUsageProbe: UsageProbe {
         if settingsKey == nil {
             guard cliExecutor.locate("claude") != nil else {
                 AppLog.probes.error("Zai probe failed: Claude CLI not found")
-                throw ProbeError.cliNotFound("Claude")
+                throw UsageError.cliNotFound("Claude")
             }
         }
 
@@ -94,12 +94,12 @@ public struct ZaiUsageProbe: UsageProbe {
                 return try await probe(platform: .zai, apiKey: settingsKey)
             }
             AppLog.probes.error("Zai probe failed: Could not read Claude config: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Could not read Claude config")
+            throw UsageError.executionFailed("Could not read Claude config")
         }
 
         guard let platform = Self.detectPlatform(from: config) ?? (settingsKey != nil ? .zai : nil) else {
             AppLog.probes.error("Zai probe failed: No z.ai endpoint found in Claude config (path: \(configPath))")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         let apiKey = try await extractAPIKeyWithFallback(from: config, configPath: configPath)
@@ -113,7 +113,7 @@ public struct ZaiUsageProbe: UsageProbe {
         let baseURL = platform.rawValue
         guard let url = URL(string: "\(baseURL)/api/monitor/usage/quota/limit") else {
             AppLog.probes.error("Zai probe failed: Invalid API URL")
-            throw ProbeError.executionFailed("Invalid API URL")
+            throw UsageError.executionFailed("Invalid API URL")
         }
 
         var request = URLRequest(url: url)
@@ -127,7 +127,7 @@ public struct ZaiUsageProbe: UsageProbe {
 
         guard let httpResponse = response as? HTTPURLResponse else {
             AppLog.probes.error("Zai probe failed: Invalid HTTP response")
-            throw ProbeError.executionFailed("Invalid HTTP response")
+            throw UsageError.executionFailed("Invalid HTTP response")
         }
 
         switch httpResponse.statusCode {
@@ -135,10 +135,10 @@ public struct ZaiUsageProbe: UsageProbe {
             break
         case 401, 403:
             AppLog.probes.error("Zai probe failed: Authentication failed (HTTP \(httpResponse.statusCode))")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         default:
             AppLog.probes.error("Zai probe failed: API returned HTTP \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("API returned HTTP \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("API returned HTTP \(httpResponse.statusCode)")
         }
 
         // Log raw response at debug level
@@ -203,7 +203,7 @@ public struct ZaiUsageProbe: UsageProbe {
         let envVarName = settingsRepository.glmAuthEnvVar()
         guard !envVarName.isEmpty else {
             AppLog.probes.error("Zai probe failed: No API key found (config file: \(configPath), env var: not set)")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         if let envValue = ProcessInfo.processInfo.environment[envVarName], !envValue.isEmpty {
@@ -217,7 +217,7 @@ public struct ZaiUsageProbe: UsageProbe {
         }
 
         AppLog.probes.error("Zai probe failed: No API key found (config file: \(configPath), env var: \(envVarName) not set)")
-        throw ProbeError.authenticationRequired
+        throw UsageError.authenticationRequired
     }
 
     // MARK: - Static Parsing Helpers
@@ -328,12 +328,12 @@ public struct ZaiUsageProbe: UsageProbe {
             if let rawString = String(data: data, encoding: .utf8) {
                 AppLog.probes.debug("Zai raw response: \(rawString.prefix(500))")
             }
-            throw ProbeError.parseFailed("Invalid JSON: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Invalid JSON: \(error.localizedDescription)")
         }
 
         guard let limits = response.data?.limits, !limits.isEmpty else {
             AppLog.probes.error("Zai parse failed: No quota limits found in response")
-            throw ProbeError.parseFailed("No quota limits found")
+            throw UsageError.parseFailed("No quota limits found")
         }
 
         var quotas: [UsageQuota] = []
@@ -390,7 +390,7 @@ public struct ZaiUsageProbe: UsageProbe {
 
         guard !quotas.isEmpty else {
             AppLog.probes.error("Zai parse failed: No recognized quota types found")
-            throw ProbeError.parseFailed("No recognized quota types found")
+            throw UsageError.parseFailed("No recognized quota types found")
         }
 
         return UsageSnapshot(

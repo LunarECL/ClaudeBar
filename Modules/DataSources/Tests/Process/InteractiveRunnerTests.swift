@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-import Domain
+import Quotas
 @testable import DataSources
 
 @Suite
@@ -91,10 +91,10 @@ struct InteractiveRunnerTests {
         let result = try runner.run(
             binary: "/usr/bin/env",
             input: "",
-            options: .init(environmentAdditions: [HookConstants.probeEnvironmentKey: "1"])
+            options: .init(environmentAdditions: ["CLAUDEBAR_PROBE": "1"])
         )
 
-        #expect(result.output.contains("\(HookConstants.probeEnvironmentKey)=1"))
+        #expect(result.output.contains("\("CLAUDEBAR_PROBE")=1"))
     }
 
     // MARK: - Completion Rule (issue #271)

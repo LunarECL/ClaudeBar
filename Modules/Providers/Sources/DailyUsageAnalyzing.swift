@@ -1,4 +1,5 @@
 import Foundation
+import Quotas
 import Mockable
 
 /// Protocol for analyzing daily usage from Claude Code session logs.

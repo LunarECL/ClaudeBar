@@ -2,6 +2,10 @@ import Foundation
 
 /// Represents the account tier for any AI provider.
 /// Supports both well-known tiers (Claude Max/Pro/API) and custom tiers from other providers.
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md): Becomes `Plan`: a name and a badge. The Claude cases are vendor words that
+///   don't belong in the kernel; whether a plan can issue guest passes is a fact
+///   the definition states (§6).
 public enum AccountTier: Sendable, Equatable, Hashable {
     /// Claude Max subscription with session/weekly quotas + optional extra usage cost tracking
     case claudeMax

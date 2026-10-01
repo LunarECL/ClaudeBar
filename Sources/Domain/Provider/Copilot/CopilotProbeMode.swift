@@ -1,3 +1,6 @@
+import Quotas
+import DataSources
+import Providers
 import Foundation
 
 /// The mode used by CopilotProvider to fetch usage data.

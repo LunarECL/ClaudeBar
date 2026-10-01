@@ -18,7 +18,7 @@ public final class SystemClipboardReader: ClipboardReader, @unchecked Sendable {
 
 /// Probes the Claude CLI to fetch guest pass information.
 /// Executes `claude /passes` which copies the referral link to clipboard.
-public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
+public final class ClaudeGuestPassSource: GuestPassSource, @unchecked Sendable {
     private let claudeBinary: String
     private let timeout: TimeInterval
     private let cliExecutor: CLIExecutor
@@ -59,8 +59,8 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
 
     /// Probes the CLI for guest pass information.
     /// The /passes command copies the referral URL to clipboard.
-    public func probe() async throws -> ClaudePass {
-        let workingDir = ProbeWorkingDirectory.resolve()
+    public func fetch() async throws -> GuestPass {
+        let workingDir = CLIWorkingDirectory.resolve()
         AppLog.probes.info("Starting Claude probe with /passes command...")
 
         let result: CLIResult
@@ -80,7 +80,7 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
             )
         } catch {
             AppLog.probes.error("Claude /passes probe failed: \(error.localizedDescription)")
-            throw ProbeError.executionFailed(error.localizedDescription)
+            throw UsageError.executionFailed(error.localizedDescription)
         }
 
         let clean = Self.stripANSICodes(result.output)
@@ -90,7 +90,7 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
         guard clean.lowercased().contains("copied to clipboard") ||
               clean.lowercased().contains("referral") else {
             AppLog.probes.error("Claude /passes failed: unexpected output")
-            throw ProbeError.parseFailed("Command did not indicate success")
+            throw UsageError.parseFailed("Command did not indicate success")
         }
 
         // Try to get URL from output first, then fall back to clipboard
@@ -110,13 +110,13 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
 
         guard let url = referralURL else {
             AppLog.probes.error("Claude /passes failed: could not find referral URL")
-            throw ProbeError.parseFailed("Could not find referral URL")
+            throw UsageError.parseFailed("Could not find referral URL")
         }
 
         // Try to extract pass count if available (may not be shown)
         let passCount = Self.extractPassesCount(clean)
 
-        let pass = ClaudePass(passesRemaining: passCount, referralURL: url)
+        let pass = GuestPass(passesRemaining: passCount, referralURL: url)
         if let count = passCount {
             AppLog.probes.info("Claude passes probe success: \(count) passes remaining")
         } else {
@@ -128,22 +128,22 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
 
     // MARK: - Parsing
 
-    /// Parses Claude CLI /passes output into a ClaudePass (for testing)
+    /// Parses Claude CLI /passes output into a GuestPass (for testing)
     /// This handles both the old format (with visible URL) and new format (clipboard only)
-    public static func parse(_ text: String) throws -> ClaudePass {
+    public static func parse(_ text: String) throws -> GuestPass {
         let clean = stripANSICodes(text)
 
         // Try to extract referral URL from the text
         guard let referralURL = extractReferralURL(clean) else {
             // If no URL in output, it might be clipboard-only mode
             AppLog.probes.debug("No referral URL in output, may need clipboard")
-            throw ProbeError.parseFailed("Could not find referral URL in output")
+            throw UsageError.parseFailed("Could not find referral URL in output")
         }
 
         // Try to extract pass count (optional)
         let passesCount = extractPassesCount(clean)
 
-        return ClaudePass(passesRemaining: passesCount, referralURL: referralURL)
+        return GuestPass(passesRemaining: passesCount, referralURL: referralURL)
     }
 
     // MARK: - Parsing Helpers

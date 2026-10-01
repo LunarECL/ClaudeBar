@@ -47,7 +47,7 @@ public struct BedrockUsageProbe: UsageProbe {
         let regions = settingsRepository.bedrockRegions()
         guard !regions.isEmpty else {
             AppLog.probes.error("Bedrock probe failed: no regions configured")
-            throw ProbeError.executionFailed("No AWS regions configured for Bedrock monitoring")
+            throw UsageError.executionFailed("No AWS regions configured for Bedrock monitoring")
         }
 
         // Use "today" as the default time period

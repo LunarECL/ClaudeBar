@@ -1,3 +1,6 @@
+import Quotas
+import DataSources
+import Providers
 import Foundation
 
 /// Turns quota readings into the tile and gauge ClaudeBar publishes to Notify!.

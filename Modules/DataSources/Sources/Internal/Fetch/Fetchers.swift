@@ -1,5 +1,5 @@
 import Diagnostics
-import Domain
+import Quotas
 import Foundation
 
 /// Fills `{{name}}` from a credential. `nil` when a placeholder has no value,
@@ -21,7 +21,7 @@ enum Template {
 }
 
 /// `http` — one HTTP request. 2xx answers with the response; anything else
-/// becomes the `ProbeError` today's probes report, keeping its status so a
+/// becomes the `UsageError` a provider reports, keeping its status so a
 /// refresh-and-retry can be tried.
 struct HTTPFetcher: Fetching {
     let request: HTTPRequest
@@ -34,7 +34,7 @@ struct HTTPFetcher: Fetching {
 
     func fetch(with credential: Credential?) async throws -> Response {
         guard let urlText = Template.fill(request.url, with: credential), let url = URL(string: urlText) else {
-            throw ProbeError.executionFailed("Invalid URL")
+            throw UsageError.executionFailed("Invalid URL")
         }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method
@@ -54,10 +54,10 @@ struct HTTPFetcher: Fetching {
             (data, response) = try await network.request(urlRequest)
         } catch {
             AppLog.probes.error("HTTP fetch failed: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Network error: \(error.localizedDescription)")
+            throw UsageError.executionFailed("Network error: \(error.localizedDescription)")
         }
         guard let http = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         var headers: [String: String] = [:]
@@ -109,7 +109,7 @@ struct JSONRPCFetcher: Fetching {
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        let directory = call.workingDirectory == .probe ? ProbeWorkingDirectory.resolve() : nil
+        let directory = call.workingDirectory == .dedicated ? CLIWorkingDirectory.resolve() : nil
         let transport = try makeTransport(call.cli, call.args, Self.environment(call.environment), directory)
         defer { transport.close() }
 
@@ -161,7 +161,7 @@ final class RPCSession: @unchecked Sendable {
                 continue
             }
             if let error = message["error"] as? [String: Any], let text = error["message"] as? String {
-                throw ProbeError.executionFailed("RPC error: \(text)")
+                throw UsageError.executionFailed("RPC error: \(text)")
             }
             return message
         }
@@ -190,7 +190,7 @@ struct CLIFetcher: Fetching {
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        let directory = call.workingDirectory == .probe ? ProbeWorkingDirectory.resolve() : nil
+        let directory = call.workingDirectory == .dedicated ? CLIWorkingDirectory.resolve() : nil
         let result: CLIResult
         do {
             result = try await makeExecutor(call).execute(
@@ -201,10 +201,10 @@ struct CLIFetcher: Fetching {
                 workingDirectory: directory,
                 autoResponses: call.autoResponses
             )
-        } catch let error as ProbeError {
+        } catch let error as UsageError {
             throw error
         } catch {
-            throw ProbeError.executionFailed(error.localizedDescription)
+            throw UsageError.executionFailed(error.localizedDescription)
         }
         AppLog.probes.debug("\(call.cli) screen captured (\(result.output.count) chars)")
         switch call.screen {

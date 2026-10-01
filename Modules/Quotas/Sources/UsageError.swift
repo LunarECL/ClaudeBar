@@ -1,7 +1,12 @@
 import Foundation
 
 /// Errors that can occur when probing a CLI
-public enum ProbeError: Error, Sendable, LocalizedError {
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — why there is no usage — the reason a `DataSourceError` carries with the
+///   step that failed. Kept as one closed sum; its cases are what `fallbackOn`
+///   and `recover` name.
+public enum UsageError: Error, Sendable, LocalizedError {
     /// The CLI binary was not found on the system
     case cliNotFound(String)
 
@@ -15,7 +20,7 @@ public enum ProbeError: Error, Sendable, LocalizedError {
     /// The CLI output could not be parsed
     case parseFailed(String)
 
-    /// The probe timed out waiting for a response
+    /// The fetch timed out waiting for a response
     case timeout
 
     /// No quota data was available
@@ -80,8 +85,8 @@ public enum ProbeError: Error, Sendable, LocalizedError {
 
 // MARK: - Equatable (hint ignored for sessionExpired)
 
-extension ProbeError: Equatable {
-    public static func == (lhs: ProbeError, rhs: ProbeError) -> Bool {
+extension UsageError: Equatable {
+    public static func == (lhs: UsageError, rhs: UsageError) -> Bool {
         switch (lhs, rhs) {
         case (.cliNotFound(let a), .cliNotFound(let b)):
             return a == b

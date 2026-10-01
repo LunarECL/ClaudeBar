@@ -109,7 +109,7 @@ struct ClaudeBarApp: App {
                 dailyUsage: ClaudeDailyUsageAnalyzer(
                     isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
                 ),
-                guestPasses: GuestPasses(probe: ClaudePassProbe())
+                guestPasses: GuestPasses(source: ClaudeGuestPassSource())
             ),
             // Codex is data: Modules/Providers/Resources/Providers/codex.json.
             Self.builtIn("codex", settings: settingsRepository),

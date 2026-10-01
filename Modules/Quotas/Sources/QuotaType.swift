@@ -2,6 +2,11 @@ import Foundation
 
 /// Represents the type of usage quota being tracked.
 /// Rich domain model with behavior - knows its own display name and duration.
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — splits into `Quota.name` and `Quota.window: Window?`. A window's length
+///   is the provider's word, never guessed from the name — Codex's primary
+///   window can be the weekly one (§5).
 public enum QuotaType: Sendable, Equatable, Hashable {
     /// Rolling 5-hour session limit
     case session

@@ -29,7 +29,7 @@ public protocol CLIExecutor: Sendable {
     ///   - workingDirectory: Directory to run in (nil = inherited)
     ///   - autoResponses: Automatic responses to prompts (prompt text → response to send)
     ///
-    /// Implementations must not block the calling task: CLI probes can take
+    /// Implementations must not block the calling task: a CLI can take
     /// tens of seconds, and blocking here starves the Swift cooperative pool
     /// that every other provider's refresh runs on.
     func execute(

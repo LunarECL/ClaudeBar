@@ -152,7 +152,7 @@ struct CopilotProviderTests {
     func `copilot provider clears error on successful refresh`() async throws {
         // Use two separate probes to simulate the behavior
         let failingProbe = MockUsageProbe()
-        given(failingProbe).probe().willThrow(ProbeError.timeout)
+        given(failingProbe).probe().willThrow(UsageError.timeout)
         let copilotWithFailingProbe = makeProvider(probe: failingProbe)
 
         do {
@@ -178,7 +178,7 @@ struct CopilotProviderTests {
     @Test
     func `copilot provider stores error on refresh failure`() async {
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.authenticationRequired)
+        given(mockProbe).probe().willThrow(UsageError.authenticationRequired)
         let copilot = makeProvider(probe: mockProbe)
 
         #expect(copilot.lastError == nil)
@@ -195,10 +195,10 @@ struct CopilotProviderTests {
     @Test
     func `copilot provider rethrows probe errors`() async {
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.authenticationRequired)
+        given(mockProbe).probe().willThrow(UsageError.authenticationRequired)
         let copilot = makeProvider(probe: mockProbe)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await copilot.refresh()
         }
     }
@@ -225,7 +225,7 @@ struct CopilotProviderTests {
     @Test
     func `copilot provider resets isSyncing after refresh fails`() async {
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.timeout)
+        given(mockProbe).probe().willThrow(UsageError.timeout)
         let copilot = makeProvider(probe: mockProbe)
 
         do {

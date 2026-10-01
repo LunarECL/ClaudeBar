@@ -82,7 +82,7 @@ struct RefreshSpec {
 
             let codexProbe = MockUsageProbe()
             given(codexProbe).isAvailable().willReturn(true)
-            given(codexProbe).probe().willThrow(ProbeError.timeout)
+            given(codexProbe).probe().willThrow(UsageError.timeout)
 
             let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
             let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)

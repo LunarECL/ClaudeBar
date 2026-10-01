@@ -163,8 +163,8 @@ struct JSONFilePatch: Recovering {
         let url = URL(fileURLWithPath: Paths.expand(path, homeDirectory: homeDirectory, environment: environment))
         guard let data = try? Data(contentsOf: url),
               let document = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return false }
-        let probeDirectory = ProbeWorkingDirectory.resolve().path
-        let keys = keys.map { $0.replacingOccurrences(of: "{{probeDirectory}}", with: probeDirectory) }
+        let cliDirectory = CLIWorkingDirectory.resolve().path
+        let keys = keys.map { $0.replacingOccurrences(of: "{{cliDirectory}}", with: cliDirectory) }
         guard let patched = Self.set(value.foundationObject, at: keys[...], in: document) else { return false }
         do {
             let output = try JSONSerialization.data(withJSONObject: patched, options: [.prettyPrinted, .sortedKeys])

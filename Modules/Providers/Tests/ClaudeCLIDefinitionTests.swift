@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 import Mockable
 import Providers
@@ -17,7 +17,7 @@ struct ClaudeCLIDefinitionTests {
         let definition = try Providers.builtIn("claude")
         guard case .cli(let call)? = definition.dataSource(kind)?.fetch else {
             Issue.record("\(kind) is not a CLI data source")
-            throw ProbeError.noData
+            throw UsageError.noData
         }
         return call
     }
@@ -57,8 +57,8 @@ struct ClaudeCLIDefinitionTests {
 
     @Test
     func `probe marks its claude sessions with the probe environment marker`() throws {
-        #expect(try call("cli").environment.set[HookConstants.probeEnvironmentKey] == "1")
-        #expect(try call("cliCost").environment.set[HookConstants.probeEnvironmentKey] == "1")
+        #expect(try call("cli").environment.set["CLAUDEBAR_PROBE"] == "1")
+        #expect(try call("cliCost").environment.set["CLAUDEBAR_PROBE"] == "1")
     }
 
     // MARK: - Setup Token Environment Exclusion
@@ -100,13 +100,13 @@ struct ClaudeCLIDefinitionTests {
 
     @Test
     func `both commands run in the probe directory`() throws {
-        #expect(try call("cli").workingDirectory == .probe)
-        #expect(try call("cliCost").workingDirectory == .probe)
+        #expect(try call("cli").workingDirectory == .dedicated)
+        #expect(try call("cliCost").workingDirectory == .dedicated)
     }
 
     @Test
     func `the probe directory is created under ClaudeBar's application support`() {
-        let url = ProbeWorkingDirectory.resolve()
+        let url = CLIWorkingDirectory.resolve()
 
         #expect(url.path.contains("ClaudeBar/Probe"))
         #expect(FileManager.default.fileExists(atPath: url.path))
@@ -276,7 +276,7 @@ struct ClaudeCLIDefinitionTests {
         answerScreens(claude, usage: Self.apiBillingPanel)
         let provider = try claude.provider()
 
-        await #expect(throws: ProbeError.executionFailed(Self.subscriptionMisread)) {
+        await #expect(throws: UsageError.executionFailed(Self.subscriptionMisread)) {
             try await provider.refresh()
         }
         #expect(provider.snapshot == nil)
@@ -328,7 +328,7 @@ struct ClaudeCLIDefinitionTests {
 
     private func trust(in config: [String: Any]) -> Any? {
         let projects = config["projects"] as? [String: Any]
-        let entry = projects?[ProbeWorkingDirectory.resolve().path] as? [String: Any]
+        let entry = projects?[CLIWorkingDirectory.resolve().path] as? [String: Any]
         return entry?["hasTrustDialogAccepted"]
     }
 
@@ -369,7 +369,7 @@ struct ClaudeCLIDefinitionTests {
         defer { claude.cleanUp() }
         answerTrustPromptOnce(claude)
 
-        await #expect(throws: ProbeError.folderTrustRequired) {
+        await #expect(throws: UsageError.folderTrustRequired) {
             try await claude.fetchUsage(claude.dataSource("cli"))
         }
         #expect(FileManager.default.fileExists(atPath: claude.home.appendingPathComponent(".claude.json").path) == false)
@@ -379,11 +379,11 @@ struct ClaudeCLIDefinitionTests {
     func `a trust prompt for a directory already trusted is reported, not retried forever`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        try claude.writeClaudeConfig(extra: ["projects": [ProbeWorkingDirectory.resolve().path: ["hasTrustDialogAccepted": true]]])
+        try claude.writeClaudeConfig(extra: ["projects": [CLIWorkingDirectory.resolve().path: ["hasTrustDialogAccepted": true]]])
         given(claude.cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
             .willReturn(CLIResult(output: Self.trustPrompt, exitCode: 0))
 
-        await #expect(throws: ProbeError.folderTrustRequired) {
+        await #expect(throws: UsageError.folderTrustRequired) {
             try await claude.fetchUsage(claude.dataSource("cli"))
         }
     }
@@ -395,7 +395,7 @@ struct ClaudeCLIDefinitionTests {
         try claude.writeClaudeConfig(extra: ["projects": "unexpected"])
         answerTrustPromptOnce(claude)
 
-        await #expect(throws: ProbeError.folderTrustRequired) {
+        await #expect(throws: UsageError.folderTrustRequired) {
             try await claude.fetchUsage(claude.dataSource("cli"))
         }
         #expect(try claude.readClaudeConfig()["projects"] as? String == "unexpected")

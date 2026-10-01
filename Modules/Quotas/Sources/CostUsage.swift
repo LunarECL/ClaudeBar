@@ -2,6 +2,10 @@ import Foundation
 
 /// Represents cost-based usage data for Claude accounts.
 /// Used for API accounts (pay-per-use) and Pro accounts with Extra usage enabled.
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — becomes `Cost`, of a kind `api` · `extraUsage`: money gone over a period,
+///   judged by a `Budget`, never shown as a quota (§0.1, §5).
 public struct CostUsage: Sendable, Equatable, Hashable {
     public enum Kind: Sendable, Equatable, Hashable {
         case apiCost

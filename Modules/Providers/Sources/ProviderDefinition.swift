@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 
 /// A provider as data — what ships in `Resources/Providers/<id>.json` for a

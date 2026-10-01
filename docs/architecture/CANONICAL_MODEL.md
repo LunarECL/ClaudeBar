@@ -318,7 +318,7 @@ enforces it. Across a fence the same word may mean something else, as long as
 
 | Context | Subdomain | Owns the question | Module |
 |---|---|---|---|
-| **Quota** | **shared kernel** | *how much is left, when does it refill, and is that OK?* | `Modules/Quota` |
+| **Quota** | **shared kernel** | *how much is left, when does it refill, and is that OK?* | `Modules/Quotas` |
 | **Providers** | **core** | *who do I pay, under which accounts, and what did they last say?* | `Modules/Providers` |
 | **Data Sources** | supporting | *how do we find out?* — DataSource, DataSourceDefinition, CredentialLookup, Fetch, Mapping, Setting, DataSourceError, and every worker | `Modules/DataSources` |
 | **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* | `Modules/Monitoring` |

@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 import Mockable
 import Testing
@@ -19,12 +19,12 @@ struct ClaudeAPITests {
         return try await claude.readAPIResponse(json, subscriptionType: subscriptionType)
     }
 
-    /// The `ProbeError` a fetch threw, or `nil` when it succeeded.
-    private func failure(of source: DataSource, in claude: ClaudeHarness) async -> ProbeError? {
+    /// The `UsageError` a fetch threw, or `nil` when it succeeded.
+    private func failure(of source: DataSource, in claude: ClaudeHarness) async -> UsageError? {
         do {
             _ = try await claude.fetchUsage(source)
             return nil
-        } catch let error as ProbeError {
+        } catch let error as UsageError {
             return error
         } catch {
             Issue.record("Unexpected error \(error)")
@@ -724,7 +724,7 @@ struct ClaudeAPITokenRefreshTests {
         do {
             _ = try await claude.fetchUsage(try claude.dataSource("api"))
             Issue.record("Expected sessionExpired")
-        } catch let error as ProbeError {
+        } catch let error as UsageError {
             #expect(error == .sessionExpired())
         }
     }
@@ -763,7 +763,7 @@ struct ClaudeAPITokenRefreshTests {
         do {
             _ = try await claude.fetchUsage(source)
             Issue.record("Expected sessionExpired")
-        } catch let error as ProbeError {
+        } catch let error as UsageError {
             #expect(error == .sessionExpired())
         }
 
@@ -888,7 +888,7 @@ struct ClaudeAPISetupTokenTests {
         do {
             _ = try await claude.fetchUsage(try claude.dataSource("api"))
             Issue.record("Expected authenticationRequired")
-        } catch let error as ProbeError {
+        } catch let error as UsageError {
             #expect(error == .authenticationRequired)
         }
     }

@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 import Testing
 
@@ -264,7 +264,7 @@ struct ClaudeUsageScreenTests {
 
     @Test
     func `a subscription billing type vetoes the cost fallback`() {
-        #expect(throws: ProbeError.executionFailed(Self.subscriptionMisread)) {
+        #expect(throws: UsageError.executionFailed(Self.subscriptionMisread)) {
             try read(Self.apiBillingCostPanelOutput, config: """
             {
                 "oauthAccount": {
@@ -281,7 +281,7 @@ struct ClaudeUsageScreenTests {
         // The billing type decides whether a `/usage` cost panel means "this is
         // an API account" or "the CLI could not see the subscription" (#271),
         // so it is read on its own.
-        #expect(throws: ProbeError.executionFailed(Self.subscriptionMisread)) {
+        #expect(throws: UsageError.executionFailed(Self.subscriptionMisread)) {
             try read(Self.apiBillingCostPanelOutput, config: """
             {
                 "oauthAccount": {
@@ -295,7 +295,7 @@ struct ClaudeUsageScreenTests {
 
     @Test
     func `an account without a billing type is not vetoed`() {
-        #expect(throws: ProbeError.subscriptionRequired) {
+        #expect(throws: UsageError.subscriptionRequired) {
             try read(Self.apiBillingCostPanelOutput, config: """
             {
                 "oauthAccount": {
@@ -337,21 +337,21 @@ struct ClaudeUsageScreenTests {
 
     @Test
     func `detects folder trust prompt and throws error`() {
-        #expect(throws: ProbeError.folderTrustRequired) {
+        #expect(throws: UsageError.folderTrustRequired) {
             try read(Self.trustPromptOutput)
         }
     }
 
     @Test
     func `detects new folder trust prompt format and throws error`() {
-        #expect(throws: ProbeError.folderTrustRequired) {
+        #expect(throws: UsageError.folderTrustRequired) {
             try read(Self.newTrustPromptOutput)
         }
     }
 
     @Test
     func `detects authentication error and throws error`() {
-        #expect(throws: ProbeError.authenticationRequired) {
+        #expect(throws: UsageError.authenticationRequired) {
             try read(Self.authErrorOutput)
         }
     }
@@ -805,7 +805,7 @@ struct ClaudeUsageScreenTests {
 
     @Test
     func `the subscription-only message is subscriptionRequired`() {
-        #expect(throws: ProbeError.subscriptionRequired) {
+        #expect(throws: UsageError.subscriptionRequired) {
             try read("/usage is only available for subscription plans.")
         }
     }
@@ -837,7 +837,7 @@ struct ClaudeUsageScreenTests {
 
     @Test
     func `detects subscription required error for API billing accounts`() {
-        #expect(throws: ProbeError.subscriptionRequired) {
+        #expect(throws: UsageError.subscriptionRequired) {
             try read(Self.apiUsageBillingOutput)
         }
     }
@@ -1005,7 +1005,7 @@ struct ClaudeUsageScreenTests {
 
     @Test
     func `still-loading output reports that usage data never arrived`() {
-        #expect(throws: ProbeError.executionFailed(
+        #expect(throws: UsageError.executionFailed(
             "Claude usage data did not finish loading — the usage endpoint may be rate limited. Try again in a moment."
         )) {
             try read(Self.stillLoadingOutput)
@@ -1014,7 +1014,7 @@ struct ClaudeUsageScreenTests {
 
     @Test
     func `API billing cost panel routes to the cost fallback instead of a parse error`() {
-        #expect(throws: ProbeError.subscriptionRequired) {
+        #expect(throws: UsageError.subscriptionRequired) {
             try read(Self.apiBillingCostPanelOutput)
         }
     }
@@ -1030,7 +1030,7 @@ struct ClaudeUsageScreenTests {
         defer { claude.cleanUp() }
         try claude.writeClaudeConfig(email: "user@example.com", billingType: "apple_subscription")
 
-        #expect(throws: ProbeError.executionFailed(Self.subscriptionMisread)) {
+        #expect(throws: UsageError.executionFailed(Self.subscriptionMisread)) {
             try claude.readRawUsageScreen(Self.apiBillingCostPanelOutput)
         }
     }
@@ -1041,7 +1041,7 @@ struct ClaudeUsageScreenTests {
         defer { claude.cleanUp() }
         try claude.writeClaudeConfig(email: "user@example.com", billingType: "api")
 
-        #expect(throws: ProbeError.subscriptionRequired) {
+        #expect(throws: UsageError.subscriptionRequired) {
             try claude.readRawUsageScreen(Self.apiBillingCostPanelOutput)
         }
     }
@@ -1072,7 +1072,7 @@ struct ClaudeUsageScreenTests {
         defer { claude.cleanUp() }
         try claude.writeClaudeConfig(email: "user@example.com", billingType: "apple_subscription")
 
-        #expect(throws: ProbeError.executionFailed(Self.subscriptionMisread)) {
+        #expect(throws: UsageError.executionFailed(Self.subscriptionMisread)) {
             try claude.readRawUsageScreen(Self.subscriptionOnlyMessageOutput)
         }
     }
@@ -1083,7 +1083,7 @@ struct ClaudeUsageScreenTests {
         defer { claude.cleanUp() }
         try claude.writeClaudeConfig(email: "user@example.com", billingType: "api")
 
-        #expect(throws: ProbeError.subscriptionRequired) {
+        #expect(throws: UsageError.subscriptionRequired) {
             try claude.readRawUsageScreen(Self.subscriptionOnlyMessageOutput)
         }
     }

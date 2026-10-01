@@ -69,11 +69,11 @@ struct OmpProviderTests {
     @Test
     func `refresh records error and rethrows on failure`() async {
         let probe = MockUsageProbe()
-        given(probe).probe().willThrow(ProbeError.cliNotFound("omp"))
+        given(probe).probe().willThrow(UsageError.cliNotFound("omp"))
 
         let provider = OmpProvider(probe: probe, settingsRepository: makeSettingsRepository())
 
-        await #expect(throws: ProbeError.cliNotFound("omp")) {
+        await #expect(throws: UsageError.cliNotFound("omp")) {
             try await provider.refresh()
         }
         #expect(provider.lastError != nil)

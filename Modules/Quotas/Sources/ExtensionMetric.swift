@@ -2,6 +2,10 @@ import Foundation
 
 /// A generic metric value displayed by extension sections.
 /// Used for custom data that doesn't fit the standard quota/cost/daily models.
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — leaves the kernel: an extension's metrics become a mapping in
+///   `DataSources` and a definition in `Providers` (MODULAR_DESIGN §8).
 public struct ExtensionMetric: Sendable, Equatable, Codable {
     public let label: String
     public let value: String

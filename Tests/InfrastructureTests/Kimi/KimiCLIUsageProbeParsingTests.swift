@@ -346,14 +346,14 @@ struct KimiCLIUsageProbeParsingTests {
 
     @Test
     func `parse throws parseFailed for empty output`() {
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try KimiCLIUsageProbe.parse("")
         }
     }
 
     @Test
     func `parse throws parseFailed for malformed output`() {
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try KimiCLIUsageProbe.parse("This is not a valid usage output")
         }
     }
@@ -366,7 +366,7 @@ struct KimiCLIUsageProbeParsingTests {
         ╰──────────────────╯
         """
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try KimiCLIUsageProbe.parse(noPercent)
         }
     }

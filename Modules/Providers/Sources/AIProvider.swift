@@ -1,4 +1,5 @@
 import Foundation
+import Quotas
 
 /// Distinguishes how much work a refresh should do and whether it counts as
 /// explicit user intent.
@@ -105,17 +106,4 @@ public extension AIProvider {
 
     /// Default: no provider-imposed background cadence floor.
     var backgroundRefreshFloor: Duration? { nil }
-}
-
-import Mockable
-
-/// Protocol defining how to probe for usage data.
-/// This is an internal implementation detail - callers use AIProvider.refresh() instead.
-@Mockable
-public protocol UsageProbe: Sendable {
-    /// Fetches the current usage snapshot
-    func probe() async throws -> UsageSnapshot
-
-    /// Checks if the probe is available (CLI installed, credentials present, etc.)
-    func isAvailable() async -> Bool
 }

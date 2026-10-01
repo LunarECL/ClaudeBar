@@ -36,6 +36,10 @@ private enum BedrockFormatters {
 
 /// Represents an AWS Bedrock model with its pricing information.
 /// Model IDs follow AWS format: provider.model-name-version
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — leaves the kernel: a vendor's type. Bedrock's per-model spend becomes a
+///   `Cost` with lines, its SDK code `AWSClients` (§6).
 public struct BedrockModel: Sendable, Equatable, Hashable, Identifiable {
     /// The AWS model ID (e.g., "anthropic.claude-opus-4-5-20251101-v1:0")
     public let id: String

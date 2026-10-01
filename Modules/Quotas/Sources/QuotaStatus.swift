@@ -2,6 +2,10 @@ import Foundation
 
 /// Represents the health status of a usage quota.
 /// Rich domain model - status is determined by business rules, not UI logic.
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — becomes `Status`, derived from `Quota.left` under a `StatusPolicy`:
+///   depleted at 0 and critical under 20 whatever the policy (§5).
 public enum QuotaStatus: Sendable, Equatable, Hashable, Comparable {
     /// Quota has remaining capacity (>50%)
     case healthy

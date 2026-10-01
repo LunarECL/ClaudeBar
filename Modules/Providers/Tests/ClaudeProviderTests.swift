@@ -1,5 +1,5 @@
 import DataSources
-import Domain
+import Quotas
 import Foundation
 import Mockable
 import Providers
@@ -31,7 +31,7 @@ struct ClaudeProviderTests {
             .willReturn(CLIResult(output: screen))
     }
 
-    private func failCLI(_ claude: ClaudeHarness, _ error: ProbeError = .executionFailed("claude is not running")) {
+    private func failCLI(_ claude: ClaudeHarness, _ error: UsageError = .executionFailed("claude is not running")) {
         given(claude.cli).locate(.any).willReturn("/usr/local/bin/claude")
         given(claude.cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
             .willThrow(error)
@@ -107,8 +107,8 @@ struct ClaudeProviderTests {
         try answerAPI(claude, "", status: 500)
         let provider = try claude.provider()
 
-        await #expect(throws: ProbeError.executionFailed("claude is not running")) { try await provider.refresh() }
-        #expect(provider.lastError as? ProbeError == .executionFailed("claude is not running"))
+        await #expect(throws: UsageError.executionFailed("claude is not running")) { try await provider.refresh() }
+        #expect(provider.lastError as? UsageError == .executionFailed("claude is not running"))
     }
 
     @Test
@@ -147,7 +147,7 @@ struct ClaudeProviderTests {
         #expect(await withFallback.isAvailable())
         #expect(await withoutFallback.isAvailable() == false)
         #expect(try await withFallback.refresh().sessionQuota?.percentRemaining == 65)
-        await #expect(throws: ProbeError.authenticationRequired) { try await withoutFallback.refresh() }
+        await #expect(throws: UsageError.authenticationRequired) { try await withoutFallback.refresh() }
     }
 
     @Test
@@ -158,9 +158,9 @@ struct ClaudeProviderTests {
         try answerAPI(claude, "", status: 429, headers: ["Retry-After": "120"])
         let provider = try claude.provider(settings: InMemoryProviderSettings(dataSourceKinds: ["claude": "api"]))
 
-        await #expect(throws: ProbeError.self) { try await provider.refresh() }
+        await #expect(throws: UsageError.self) { try await provider.refresh() }
 
-        guard case .rateLimited? = provider.lastError as? ProbeError else {
+        guard case .rateLimited? = provider.lastError as? UsageError else {
             Issue.record("expected rateLimited, got \(String(describing: provider.lastError))")
             return
         }
@@ -175,7 +175,7 @@ struct ClaudeProviderTests {
         try answerAPI(claude, "", status: 500)
         let provider = try claude.provider(settings: InMemoryProviderSettings(dataSourceKinds: ["claude": "api"]))
 
-        await #expect(throws: ProbeError.executionFailed("HTTP error: 500")) { try await provider.refresh() }
+        await #expect(throws: UsageError.executionFailed("HTTP error: 500")) { try await provider.refresh() }
     }
 
     @Test
@@ -246,7 +246,7 @@ struct ClaudeProviderTests {
     func `guest passes are offered to max and not to pro or before a refresh`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        let passes = GuestPasses(probe: MockClaudePassProbing())
+        let passes = GuestPasses(source: MockGuestPassSource())
 
         #expect(passes.isOffered(for: nil) == false)
         #expect(passes.isOffered(for: UsageSnapshot(providerId: "claude", quotas: [], capturedAt: Date(), accountTier: .claudeMax)))
@@ -256,10 +256,10 @@ struct ClaudeProviderTests {
 
     @Test
     func `a fetched pass is kept`() async throws {
-        let probe = MockClaudePassProbing()
-        let pass = ClaudePass(passesRemaining: 3, referralURL: URL(string: "https://claude.ai/referral/abc")!)
-        given(probe).probe().willReturn(pass)
-        let passes = GuestPasses(probe: probe)
+        let source = MockGuestPassSource()
+        let pass = GuestPass(passesRemaining: 3, referralURL: URL(string: "https://claude.ai/referral/abc")!)
+        given(source).fetch().willReturn(pass)
+        let passes = GuestPasses(source: source)
 
         try await passes.fetch()
 
@@ -273,13 +273,13 @@ struct ClaudeProviderTests {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         answerCLI(claude, Self.usageScreen)
-        let probe = MockClaudePassProbing()
-        given(probe).probe().willThrow(ProbeError.parseFailed("Could not find referral URL"))
-        let passes = GuestPasses(probe: probe)
+        let source = MockGuestPassSource()
+        given(source).fetch().willThrow(UsageError.parseFailed("Could not find referral URL"))
+        let passes = GuestPasses(source: source)
         let provider = try claude.provider(guestPasses: passes)
         try await provider.refresh()
 
-        await #expect(throws: ProbeError.self) { try await passes.fetch() }
+        await #expect(throws: UsageError.self) { try await passes.fetch() }
 
         #expect(passes.error != nil)
         #expect(provider.lastError == nil)

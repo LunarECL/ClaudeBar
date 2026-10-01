@@ -1,4 +1,5 @@
-import Domain
+import Providers
+import Quotas
 import Foundation
 
 /// A settings repository that keeps everything in memory — the real behaviour

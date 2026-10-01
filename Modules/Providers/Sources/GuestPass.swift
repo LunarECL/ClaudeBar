@@ -1,8 +1,9 @@
 import Foundation
+import Quotas
 
 /// Represents Claude guest passes that can be shared with friends.
 /// Each pass gives the recipient a free week of Claude Code.
-public struct ClaudePass: Sendable, Equatable {
+public struct GuestPass: Sendable, Equatable {
     /// The number of guest passes remaining (nil if unknown)
     public let passesRemaining: Int?
 

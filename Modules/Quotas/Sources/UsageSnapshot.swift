@@ -2,6 +2,11 @@ import Foundation
 
 /// Represents a point-in-time snapshot of usage quotas for an AI provider.
 /// This is an aggregate root that collects all quota information for a provider.
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — becomes `Usage`: quotas, a cost, a plan, the data source that answered,
+///   and when (§1). `bedrockUsage`, `extensionMetrics` and `dailyUsageReport`
+///   move to their own contexts (§8).
 public struct UsageSnapshot: Sendable, Equatable {
     /// The provider ID this snapshot belongs to (e.g., "claude", "codex", "gemini")
     public let providerId: String
@@ -29,7 +34,7 @@ public struct UsageSnapshot: Sendable, Equatable {
     /// Daily usage report from local session JSONL analysis (e.g., Claude Code)
     public let dailyUsageReport: DailyUsageReport?
 
-    /// Generic metrics from extension probes
+    /// Generic metrics from extensions
     public let extensionMetrics: [ExtensionMetric]?
 
     // MARK: - Initialization

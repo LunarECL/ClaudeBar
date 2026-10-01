@@ -171,7 +171,7 @@ struct AntigravityCloudCodeFallbackTests {
         let executor = makeExecutor(process: Self.noProcessOutput, keychain: CLIResult(output: "not found", exitCode: 44))
         let probe = AntigravityUsageProbe(cliExecutor: executor, remoteNetworkClient: MockNetworkClient())
 
-        await #expect(throws: ProbeError.cliNotFound("Antigravity")) {
+        await #expect(throws: UsageError.cliNotFound("Antigravity")) {
             try await probe.probe()
         }
     }
@@ -184,7 +184,7 @@ struct AntigravityCloudCodeFallbackTests {
         )
         let probe = AntigravityUsageProbe(cliExecutor: executor, remoteNetworkClient: MockNetworkClient())
 
-        await #expect(throws: ProbeError.sessionExpired(hint: "Sign in to Antigravity or run `agy` again.")) {
+        await #expect(throws: UsageError.sessionExpired(hint: "Sign in to Antigravity or run `agy` again.")) {
             try await probe.probe()
         }
     }
@@ -199,7 +199,7 @@ struct AntigravityCloudCodeFallbackTests {
 
         let probe = AntigravityUsageProbe(cliExecutor: executor, remoteNetworkClient: remote)
 
-        await #expect(throws: ProbeError.sessionExpired(hint: "Sign in to Antigravity or run `agy` again.")) {
+        await #expect(throws: UsageError.sessionExpired(hint: "Sign in to Antigravity or run `agy` again.")) {
             try await probe.probe()
         }
     }
@@ -214,7 +214,7 @@ struct AntigravityCloudCodeFallbackTests {
 
         let probe = AntigravityUsageProbe(cliExecutor: executor, remoteNetworkClient: remote)
 
-        await #expect(throws: ProbeError.executionFailed("Could not reach the Antigravity quota API")) {
+        await #expect(throws: UsageError.executionFailed("Could not reach the Antigravity quota API")) {
             try await probe.probe()
         }
     }

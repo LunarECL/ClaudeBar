@@ -38,7 +38,7 @@ public struct KiroUsageProbe: UsageProbe {
 
     public func probe() async throws -> UsageSnapshot {
         guard cliExecutor.locate(kiroBinary) != nil else {
-            throw ProbeError.cliNotFound(kiroBinary)
+            throw UsageError.cliNotFound(kiroBinary)
         }
 
         AppLog.probes.info("Starting Kiro CLI probe with /usage command...")
@@ -55,7 +55,7 @@ public struct KiroUsageProbe: UsageProbe {
             )
         } catch {
             AppLog.probes.error("Kiro CLI probe failed: \(error.localizedDescription)")
-            throw ProbeError.executionFailed(error.localizedDescription)
+            throw UsageError.executionFailed(error.localizedDescription)
         }
 
         AppLog.probes.debug("Kiro CLI /usage output:\n\(result.output)")
@@ -147,7 +147,7 @@ public struct KiroUsageProbe: UsageProbe {
         }
 
         guard !quotas.isEmpty else {
-            throw ProbeError.parseFailed("No quota data found in Kiro CLI output")
+            throw UsageError.parseFailed("No quota data found in Kiro CLI output")
         }
 
         return UsageSnapshot(

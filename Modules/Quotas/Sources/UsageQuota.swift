@@ -2,6 +2,11 @@ import Foundation
 
 /// Represents a single usage quota measurement for an AI provider.
 /// This is a rich domain model that encapsulates quota-related behavior.
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — becomes `Quota` with `left: Left` — a share OR money, never both. A balance
+///   with no ceiling has no percentage; writing `percentRemaining: 100` for one is
+///   the lie §5 forbids. `menuBarTitle` and `compactTitle` are the page's (§6).
 public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
     /// The percentage of quota remaining (can be negative when over quota, capped at 100)
     public let percentRemaining: Double
@@ -47,7 +52,7 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
     public let compactTitle: String?
 
     /// Menu-bar window title used when this quota renders as one of two
-    /// joined/stacked windows (e.g. "Claude 7d · jkjk987…"). Probes set it
+    /// joined/stacked windows (e.g. "Claude 7d · jkjk987…"). Mappings set it
     /// when the full label is too wide for the menu bar — typically a long
     /// account discriminator. The menu bar falls back to
     /// `quotaType.shortLabel` when nil. The full label stays in `quotaType`

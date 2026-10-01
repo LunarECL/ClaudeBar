@@ -132,7 +132,7 @@ public struct Cache: Sendable, Equatable, Codable {
 /// A fix tried once when the mapping reports a failure.
 public enum Recovery: Sendable, Equatable, Codable {
     /// Sets one value deep inside a JSON file that already exists — e.g. a
-    /// CLI's "trusted folder" flag. `keys` may hold `{{probeDirectory}}`.
+    /// CLI's "trusted folder" flag. `keys` may hold `{{cliDirectory}}`.
     case patchJSONFile(path: String, keys: [String], value: JSONValue)
 
     private enum Keys: String, CodingKey { case patchJSONFile }

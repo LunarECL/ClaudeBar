@@ -6,6 +6,10 @@ import Foundation
 /// - `.ahead`: Consuming faster than expected (warning: may run out early)
 /// - `.behind`: Consuming slower than expected (room to spare)
 /// - `.unknown`: Cannot determine pace (no reset time available)
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — becomes `Pace`: exists only inside a `Window` with a reset, `unknown`
+///   otherwise, never `onPace` (§5).
 public enum UsagePace: Sendable, Equatable {
     case onPace
     case ahead

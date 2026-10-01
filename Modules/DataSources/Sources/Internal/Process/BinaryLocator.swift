@@ -124,7 +124,7 @@ public struct BinaryLocator: Sendable {
     private static func resolve(_ tool: String) -> String? {
         // An explicit path needs no lookup — and would never survive one, since
         // the shell-injection guard in `Shell.whichArguments` rejects `/`.
-        // Callers legitimately pass already-resolved paths (a probe that located
+        // Callers legitimately pass already-resolved paths (a fetch that located
         // its binary once, then executes it), which `InteractiveRunner` has
         // always accepted; accept them here too so both executors agree.
         if tool.contains("/"), FileManager.default.isExecutableFile(atPath: tool) {
@@ -228,7 +228,7 @@ public struct BinaryLocator: Sendable {
     /// Gets the user's PATH from their login shell.
     ///
     /// Cached: this runs inside `InteractiveRunner`'s environment setup, so an
-    /// uncached call spawns a login shell for every probe of every provider.
+    /// uncached call spawns a login shell for every fetch of every provider.
     ///
     /// - Returns: The full PATH string from the user's shell, or system PATH as fallback
     public static func shellPath() -> String {

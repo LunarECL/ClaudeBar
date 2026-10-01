@@ -77,13 +77,13 @@ struct CommandCodeProviderTests {
     @Test
     func `refresh records error on failure`() async {
         let probe = MockUsageProbe()
-        given(probe).probe().willThrow(ProbeError.authenticationRequired)
+        given(probe).probe().willThrow(UsageError.authenticationRequired)
         let provider = makeProvider(probe: probe)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await provider.refresh()
         }
         #expect(provider.snapshot == nil)
-        #expect(provider.lastError as? ProbeError == .authenticationRequired)
+        #expect(provider.lastError as? UsageError == .authenticationRequired)
     }
 }

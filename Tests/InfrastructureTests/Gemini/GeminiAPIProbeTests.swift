@@ -46,7 +46,7 @@ struct GeminiAPIProbeTests {
             maxRetries: 1
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -368,7 +368,7 @@ struct GeminiAPIProbeTests {
             maxRetries: 1
         )
 
-        await #expect(throws: ProbeError.executionFailed("HTTP 500")) {
+        await #expect(throws: UsageError.executionFailed("HTTP 500")) {
             try await probe.probe()
         }
     }
@@ -476,7 +476,7 @@ struct GeminiAPIProbeTests {
             clock: TestClock()
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -523,7 +523,7 @@ struct GeminiAPIProbeTests {
             clock: TestClock()
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -573,7 +573,7 @@ struct GeminiAPIProbeTests {
             clock: TestClock()
         )
 
-        await #expect(throws: ProbeError.executionFailed("HTTP 500")) {
+        await #expect(throws: UsageError.executionFailed("HTTP 500")) {
             try await probe.probe()
         }
     }

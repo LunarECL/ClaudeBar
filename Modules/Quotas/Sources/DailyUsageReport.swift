@@ -2,6 +2,10 @@ import Foundation
 
 /// Compares today's usage against a previous day.
 /// Rich domain model providing delta calculations and formatted comparisons.
+///
+/// - Note: Interim — today's shape, moved unchanged into the kernel.
+///   Final version (docs/architecture/CANONICAL_MODEL.md) — leaves the kernel for `UsageHistory` (§7); here only because `UsageSnapshot`
+///   carries it.
 public struct DailyUsageReport: Sendable, Equatable {
     /// Today's usage stats
     public let today: DailyUsageStat

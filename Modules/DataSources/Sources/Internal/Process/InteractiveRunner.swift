@@ -1,6 +1,6 @@
 import Diagnostics
 import Darwin
-import Domain
+import Quotas
 import Foundation
 
 /// Runs CLI commands in an interactive terminal session.
@@ -42,7 +42,7 @@ public struct InteractiveRunner: Sendable {
         public var environmentExclusions: [String]
         /// Environment variables to set on the subprocess, on top of the
         /// inherited environment. Applied after exclusions and after the
-        /// terminal defaults, so additions always win. Probes mark their
+        /// terminal defaults, so additions always win. Fetches mark their
         /// sessions with `CLAUDEBAR_PROBE=1` so ClaudeBar's installed hook
         /// command can recognize and skip them (issue #222).
         public var environmentAdditions: [String: String]
@@ -53,12 +53,12 @@ public struct InteractiveRunner: Sendable {
         /// How long to wait after launch before sending `input`.
         ///
         /// TUIs that redraw their input box during startup can swallow text
-        /// typed while the first paint is still in flight. Probes that type into
+        /// typed while the first paint is still in flight. CLIs that are typed into
         /// a TUI raise this so the command lands on a settled screen.
         public var inputDelay: TimeInterval
         /// Quality of service for the spawned process tree.
         ///
-        /// Defaults to the ambient `ProbeExecutionContext` value. Because default
+        /// Defaults to the ambient `FetchContext` value. Because default
         /// arguments are evaluated at the call site, constructing `Options` inside
         /// the monitor's `.utility` scope captures `.utility` — `run()` itself may
         /// then execute on a plain thread without losing the task local (issue #204).
@@ -73,7 +73,7 @@ public struct InteractiveRunner: Sendable {
             environmentAdditions: [String: String] = [:],
             completionRule: CLICompletionRule? = nil,
             inputDelay: TimeInterval = 0.4,
-            qualityOfService: QualityOfService = ProbeExecutionContext.qualityOfService
+            qualityOfService: QualityOfService = FetchContext.qualityOfService
         ) {
             self.timeout = timeout
             self.workingDirectory = workingDirectory
@@ -249,7 +249,7 @@ public struct InteractiveRunner: Sendable {
             excluding: options.environmentExclusions,
             adding: options.environmentAdditions
         )
-        // Carry the probe QoS captured when `Options` was built: the background
+        // Carry the fetch QoS captured when `Options` was built: the background
         // monitoring loop binds `.utility` so the spawned CLI tree runs on
         // efficiency cores / throttled, cutting idle heat (issue #204).
         // Interactive runs stay `.default`.

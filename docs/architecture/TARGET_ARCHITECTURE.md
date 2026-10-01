@@ -222,7 +222,7 @@ public struct Response: Sendable, Equatable {
 public struct DataSourceError: Error, Sendable {
     public enum Step: Sendable { case lookup, fetch, mapping }
     public let step: Step
-    public let reason: ProbeError          // today's cases; never a secret or a body
+    public let reason: UsageError          // today's cases (was ProbeError); never a secret or a body
 }
 
 // DataSources — ONE type that fetches for every provider

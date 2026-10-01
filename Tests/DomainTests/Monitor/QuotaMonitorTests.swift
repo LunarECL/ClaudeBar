@@ -659,7 +659,7 @@ struct QuotaMonitorTests {
 
         let codexProbe = MockUsageProbe()
         given(codexProbe).isAvailable().willReturn(true)
-        given(codexProbe).probe().willThrow(ProbeError.timeout)
+        given(codexProbe).probe().willThrow(UsageError.timeout)
 
         let claudeProvider = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
         let codexProvider = StubCodexProvider(probe: codexProbe, settingsRepository: settings)

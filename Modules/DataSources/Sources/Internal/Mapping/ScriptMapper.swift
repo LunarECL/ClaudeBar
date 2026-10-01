@@ -1,5 +1,5 @@
 import Diagnostics
-import Domain
+import Quotas
 import Foundation
 import JavaScriptCore
 
@@ -24,10 +24,10 @@ struct ScriptMapper: Reading {
 
     func read(_ response: Response, facts: MappingFacts, providerId: String) throws -> UsageSnapshot {
         guard let source else {
-            throw ProbeError.parseFailed("Mapping script '\(file)' is missing")
+            throw UsageError.parseFailed("Mapping script '\(file)' is missing")
         }
         guard let context = JSContext() else {
-            throw ProbeError.executionFailed("JavaScriptCore is unavailable")
+            throw UsageError.executionFailed("JavaScriptCore is unavailable")
         }
 
         var exception: String?
@@ -44,23 +44,23 @@ struct ScriptMapper: Reading {
 
         context.evaluateScript(source)
         if let exception {
-            throw ProbeError.parseFailed("Mapping script '\(file)' failed to load: \(exception)")
+            throw UsageError.parseFailed("Mapping script '\(file)' failed to load: \(exception)")
         }
 
         let output = context.evaluateScript("JSON.stringify(read(JSON.parse(__input).response, JSON.parse(__input).context))")
         if let exception {
             AppLog.probes.error("\(providerId) mapping script '\(file)' threw: \(exception)")
-            throw ProbeError.parseFailed(exception)
+            throw UsageError.parseFailed(exception)
         }
         guard let text = output?.toString(), let data = text.data(using: .utf8), text != "undefined" else {
-            throw ProbeError.parseFailed("Mapping script '\(file)' returned nothing")
+            throw UsageError.parseFailed("Mapping script '\(file)' returned nothing")
         }
 
         let result: ScriptOutput
         do {
             result = try JSONDecoder().decode(ScriptOutput.self, from: data)
         } catch {
-            throw ProbeError.parseFailed("Mapping script '\(file)' returned an unexpected shape: \(error.localizedDescription)")
+            throw UsageError.parseFailed("Mapping script '\(file)' returned an unexpected shape: \(error.localizedDescription)")
         }
         return try result.snapshot(providerId: providerId, capturedAt: now())
     }
@@ -142,7 +142,7 @@ struct ScriptOutput: Decodable {
     let error: ErrorRef?
 
     func snapshot(providerId: String, capturedAt: Date) throws -> UsageSnapshot {
-        if let error { throw error.probeError }
+        if let error { throw error.usageError }
         let quotas = (quotas ?? []).compactMap { quota -> UsageQuota? in
             guard let type = JSONMapper.quotaType(quota.type, name: quota.name) else { return nil }
             return UsageQuota(
