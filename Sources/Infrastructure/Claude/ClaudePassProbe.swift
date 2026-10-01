@@ -32,7 +32,11 @@ public final class ClaudePassProbe: ClaudePassProbing, @unchecked Sendable {
     ) {
         self.claudeBinary = claudeBinary
         self.timeout = timeout
-        self.cliExecutor = cliExecutor ?? DefaultCLIExecutor()
+        self.cliExecutor = cliExecutor ?? DefaultCLIExecutor(
+            // Same loopback risk as the usage probe: /passes spawns a full
+            // claude session whose hooks would fire. Mark it (issue #222).
+            environmentAdditions: ClaudeUsageProbe.probeEnvironment
+        )
         self.clipboardReader = clipboardReader ?? SystemClipboardReader()
     }
 
