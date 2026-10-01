@@ -16,7 +16,10 @@ public struct MenuBarPercentageDisplay: Sendable, Equatable {
         burnRateThreshold: Double = 1.5
     ) {
         self.quota = quota
-        self.text = "\(Int(quota.displayPercent(mode: mode)))%"
+        // A balance has no percentage: the menu bar shows its money.
+        self.text = quota.isBalance
+            ? (quota.formattedDollarRemaining ?? "—")
+            : "\(Int(quota.displayPercent(mode: mode)))%"
         self.status = burnRateWarningEnabled
             ? quota.paceAwareStatus(burnRateThreshold: burnRateThreshold)
             : quota.status

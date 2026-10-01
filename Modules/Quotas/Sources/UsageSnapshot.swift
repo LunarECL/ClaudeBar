@@ -153,7 +153,10 @@ public struct UsageSnapshot: Sendable, Equatable {
     /// The quota with the lowest remaining percentage.
     /// Useful for determining which limit to highlight.
     public var lowestQuota: UsageQuota? {
-        quotas.min(by: { $0.percentRemaining < $1.percentRemaining })
+        // A balance has no percentage to compare; it is the lowest only when
+        // nothing else is.
+        quotas.filter { $0.percentLeft != nil }.min(by: { $0.percentRemaining < $1.percentRemaining })
+            ?? quotas.min(by: { $0.percentRemaining < $1.percentRemaining })
     }
 
     // MARK: - Freshness
@@ -209,7 +212,10 @@ public struct QuotaGroup: Sendable, Equatable, Identifiable {
 
     /// The quota with the least headroom — summarized while collapsed.
     public var lowestQuota: UsageQuota? {
-        quotas.min(by: { $0.percentRemaining < $1.percentRemaining })
+        // A balance has no percentage to compare; it is the lowest only when
+        // nothing else is.
+        quotas.filter { $0.percentLeft != nil }.min(by: { $0.percentRemaining < $1.percentRemaining })
+            ?? quotas.min(by: { $0.percentRemaining < $1.percentRemaining })
     }
 
     /// Where a group's note renders. Note-only sections have no cards

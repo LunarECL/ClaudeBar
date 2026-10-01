@@ -135,7 +135,8 @@ public struct CopilotInternalAPIProbe: UsageProbe {
                 quotaType: .timeLimit("Monthly"),
                 providerId: "copilot",
                 resetsAt: MonthlyResetDate.nextMonthlyResetDate(),
-                resetText: "No AI credits quota"
+                resetText: "No AI credits quota",
+                windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
             )
             return UsageSnapshot(
                 providerId: "copilot",
@@ -153,7 +154,8 @@ public struct CopilotInternalAPIProbe: UsageProbe {
                 quotaType: .timeLimit("Monthly"),
                 providerId: "copilot",
                 resetsAt: MonthlyResetDate.nextMonthlyResetDate(),
-                resetText: "Unlimited AI credits"
+                resetText: "Unlimited AI credits",
+                windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
             )
             return UsageSnapshot(
                 providerId: "copilot",
@@ -179,7 +181,8 @@ public struct CopilotInternalAPIProbe: UsageProbe {
             quotaType: .timeLimit("Monthly"),
             providerId: "copilot",
             resetsAt: MonthlyResetDate.nextMonthlyResetDate(),
-            resetText: resetText
+            resetText: resetText,
+            windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
         )
 
         return UsageSnapshot(

@@ -281,7 +281,8 @@ public struct AlibabaUsageProbe: UsageProbe {
                 quotaType: .session,
                 providerId: providerId,
                 resetsAt: resetDate,
-                resetText: "\(used) / \(total) used"
+                resetText: "\(used) / \(total) used",
+                windowDuration: QuotaType.session.conventionalWindow.seconds
             ))
         }
 
@@ -296,7 +297,8 @@ public struct AlibabaUsageProbe: UsageProbe {
                 quotaType: .weekly,
                 providerId: providerId,
                 resetsAt: resetDate,
-                resetText: "\(used) / \(total) used"
+                resetText: "\(used) / \(total) used",
+                windowDuration: QuotaType.weekly.conventionalWindow.seconds
             ))
         }
 
@@ -311,7 +313,8 @@ public struct AlibabaUsageProbe: UsageProbe {
                 quotaType: .timeLimit("Monthly"),
                 providerId: providerId,
                 resetsAt: resetDate,
-                resetText: "\(used) / \(total) used"
+                resetText: "\(used) / \(total) used",
+                windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
             ))
         }
 

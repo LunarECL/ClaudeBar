@@ -25,7 +25,7 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
 
     /// The actual duration of this quota's window in seconds, when the data
     /// source reports it (e.g. Oh My Pi's `window.durationMs`). Pace math
-    /// falls back to `quotaType.duration` when nil.
+    /// is unknown when nil — never guessed from the quota's name.
     public let windowDuration: TimeInterval?
 
     /// Dollar balance remaining for credit-based quotas with no cap (e.g., "$50 remaining").
@@ -64,6 +64,10 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
     /// the display symbol; ignored for percentage-based quotas.
     public let currency: String?
 
+    /// HOW MUCH IS LEFT — a share, or money. The readers that compare quotas
+    /// (status, pace, the lowest, the menu bar) follow this, not `percentRemaining`.
+    public let left: Left
+
     // MARK: - Initialization
 
     public init(
@@ -94,6 +98,70 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         self.compactTitle = compactTitle
         self.menuBarTitle = menuBarTitle
         self.currency = currency
+        // The legacy shape: a balance with no ceiling was written as 100%.
+        if let dollarRemaining, dollarCap == nil, percentRemaining == 100 {
+            self.left = .money(Money(dollarRemaining, currency: currency ?? "USD"), of: nil)
+        } else if let dollarRemaining, let dollarCap {
+            let code = currency ?? "USD"
+            self.left = .money(Money(dollarRemaining, currency: code), of: Money(dollarCap, currency: code))
+        } else {
+            self.left = .share(min(100, percentRemaining))
+        }
+    }
+
+    /// A quota in the model's shape: what is left, and the window it refills in.
+    public init(
+        left: Left,
+        quotaType: QuotaType,
+        providerId: String,
+        resetsAt: Date? = nil,
+        resetText: String? = nil,
+        windowDuration: TimeInterval? = nil,
+        group: String? = nil,
+        compactTitle: String? = nil,
+        menuBarTitle: String? = nil
+    ) {
+        switch left {
+        case .share(let percent):
+            self.init(percentRemaining: percent, quotaType: quotaType, providerId: providerId,
+                      resetsAt: resetsAt, resetText: resetText, windowDuration: windowDuration,
+                      group: group, compactTitle: compactTitle, menuBarTitle: menuBarTitle)
+        case .money(let remaining, let ceiling):
+            let share = ceiling.flatMap { Self.share(of: remaining, in: $0) }
+            self.init(percentRemaining: share ?? 100, quotaType: quotaType, providerId: providerId,
+                      resetsAt: resetsAt, resetText: resetText, windowDuration: windowDuration,
+                      dollarRemaining: remaining.amount,
+                      dollarUsed: ceiling.map { $0.amount - remaining.amount },
+                      dollarCap: ceiling?.amount,
+                      group: group, compactTitle: compactTitle, menuBarTitle: menuBarTitle,
+                      currency: remaining.currency)
+        }
+    }
+
+    private static func share(of remaining: Money, in ceiling: Money) -> Double? {
+        guard ceiling.currency == remaining.currency, ceiling.amount > 0 else { return nil }
+        return NSDecimalNumber(decimal: remaining.amount / ceiling.amount * 100).doubleValue
+    }
+
+    /// The percentage left — `nil` for a balance with no ceiling, which has none.
+    public var percentLeft: Double? {
+        switch left {
+        case .share(let percent): percent
+        case .money(_, nil): nil
+        case .money(let remaining, let ceiling?): Self.share(of: remaining, in: ceiling) ?? percentRemaining
+        }
+    }
+
+    /// Whether this is a balance with no ceiling.
+    public var isBalance: Bool {
+        if case .money(_, nil) = left { return true }
+        return false
+    }
+
+    /// WHEN IT REFILLS, as the data source stated it.
+    public var window: Window? {
+        guard windowDuration != nil || resetsAt != nil else { return nil }
+        return Window(length: windowDuration, resetsAt: resetsAt)
     }
 
     // MARK: - Domain Behavior
@@ -101,7 +169,10 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
     /// The current health status based on percentage remaining.
     /// This is a domain rule: status is determined by business thresholds.
     public var status: QuotaStatus {
-        QuotaStatus.from(percentRemaining: percentRemaining)
+        if case .money(let remaining, nil) = left {
+            return remaining.amount <= 0 ? .depleted : .healthy
+        }
+        return QuotaStatus.from(percentRemaining: percentRemaining)
     }
 
     /// The percentage that has been used (0-100)
@@ -240,9 +311,9 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
     ///
     /// Calculated as: `(totalDuration - timeUntilReset) / totalDuration * 100`
     public var percentTimeElapsed: Double? {
-        guard let timeUntilReset else { return nil }
-        let totalDuration = windowDuration ?? quotaType.duration.seconds
-        guard totalDuration > 0 else { return nil }
+        // A balance has no window to be on pace in; a window's length is the
+        // data source's word, never guessed from the quota's name.
+        guard !isBalance, let timeUntilReset, let totalDuration = windowDuration, totalDuration > 0 else { return nil }
         let elapsed = totalDuration - timeUntilReset
         return min(100, max(0, elapsed / totalDuration * 100))
     }

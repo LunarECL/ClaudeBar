@@ -159,7 +159,8 @@ public struct BedrockUsageProbe: UsageProbe {
                 percentRemaining: percentRemaining,
                 quotaType: .modelSpecific("Daily Budget"),
                 providerId: "bedrock",
-                resetsAt: tomorrow
+                resetsAt: tomorrow,
+                windowDuration: 24 * 3600  // a daily budget refills at midnight
             )
             quotas.append(quota)
         }

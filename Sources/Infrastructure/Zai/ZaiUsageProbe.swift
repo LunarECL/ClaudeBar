@@ -384,7 +384,8 @@ public struct ZaiUsageProbe: UsageProbe {
                 percentRemaining: percentRemaining,
                 quotaType: quotaType,
                 providerId: providerId,
-                resetsAt: resetsAt
+                resetsAt: resetsAt,
+                windowDuration: quotaType.conventionalWindow.seconds
             ))
         }
 

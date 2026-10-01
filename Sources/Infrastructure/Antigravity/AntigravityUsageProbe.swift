@@ -440,7 +440,8 @@ public struct AntigravityUsageProbe: UsageProbe {
                 percentRemaining: remainingFraction * 100,
                 quotaType: .modelSpecific(config.label),
                 providerId: providerId,
-                resetsAt: resetsAt
+                resetsAt: resetsAt,
+                windowDuration: QuotaType.modelSpecific(config.label).conventionalWindow.seconds
             )
         }
 
@@ -488,7 +489,8 @@ public struct AntigravityUsageProbe: UsageProbe {
                 percentRemaining: remainingFraction * 100,
                 quotaType: .modelSpecific(config.label),
                 providerId: providerId,
-                resetsAt: resetsAt
+                resetsAt: resetsAt,
+                windowDuration: QuotaType.modelSpecific(config.label).conventionalWindow.seconds
             )
         }
 
@@ -524,7 +526,8 @@ public struct AntigravityUsageProbe: UsageProbe {
                     percentRemaining: (quotaInfo.remainingFraction ?? 0.0) * 100,
                     quotaType: .modelSpecific(label),
                     providerId: providerId,
-                    resetsAt: quotaInfo.resetTime.flatMap { parseResetTime($0) }
+                    resetsAt: quotaInfo.resetTime.flatMap { parseResetTime($0) },
+                    windowDuration: QuotaType.modelSpecific(label).conventionalWindow.seconds
                 )
             }
     }

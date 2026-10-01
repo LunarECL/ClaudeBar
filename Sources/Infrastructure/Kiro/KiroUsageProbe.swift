@@ -100,7 +100,8 @@ public struct KiroUsageProbe: UsageProbe {
                         quotaType: .weekly,
                         providerId: "kiro",
                         resetsAt: resetsAt,
-                        resetText: resetText
+                        resetText: resetText,
+                        windowDuration: QuotaType.weekly.conventionalWindow.seconds
                     ))
                 }
             }
@@ -140,7 +141,8 @@ public struct KiroUsageProbe: UsageProbe {
                         quotaType: .timeLimit("Monthly"),
                         providerId: "kiro",
                         resetsAt: resetsAt,
-                        resetText: resetText
+                        resetText: resetText,
+                        windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
                     ))
                 }
             }

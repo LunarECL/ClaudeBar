@@ -160,7 +160,8 @@ public struct KimiUsageProbe: UsageProbe {
             quotaType: .weekly,
             providerId: providerId,
             resetsAt: weeklyResetDate,
-            resetText: "\(weekly.used)/\(weekly.limit) requests"
+            resetText: "\(weekly.used)/\(weekly.limit) requests",
+            windowDuration: QuotaType.weekly.conventionalWindow.seconds
         ))
 
         // Parse 5-hour rate limit from limits array
@@ -185,7 +186,8 @@ public struct KimiUsageProbe: UsageProbe {
                 quotaType: .session,
                 providerId: providerId,
                 resetsAt: rateResetDate,
-                resetText: "\(rate.used)/\(rate.limit) requests (5h)"
+                resetText: "\(rate.used)/\(rate.limit) requests (5h)",
+                windowDuration: QuotaType.session.conventionalWindow.seconds
             ))
         }
 

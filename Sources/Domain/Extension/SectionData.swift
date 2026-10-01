@@ -107,6 +107,7 @@ private struct RawQuota: Codable {
             providerId: providerId,
             resetsAt: resetsAt,
             resetText: resetText,
+            windowDuration: quotaType.conventionalWindow.seconds,
             dollarRemaining: dollarRemaining.map { Decimal($0) }
         )
     }

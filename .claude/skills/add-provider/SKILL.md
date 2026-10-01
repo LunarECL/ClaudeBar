@@ -91,7 +91,10 @@ read), `recover.patchJSONFile`, `requiresFiles`, `identity`,
       "resetsAt": { "iso8601": "resets_at" } },               // or epochSeconds / secondsFromNow
     { "kind": "model", "each": "$.limits", "where": { "path": "kind", "equals": "weekly" },
       "name": { "firstOf": ["model.name"], "firstWord": true, "lowercase": true },
-      "usedPercent": "percent", "unique": true, "overLimit": true, "countdown": "hours" }
+      "usedPercent": "percent", "unique": true, "overLimit": true, "countdown": "hours",
+      "window": [{ "seconds": "window_seconds" }, { "days": 7 }] },   // the response's word, else the provider's
+    { "kind": "time", "name": "Credits",                             // money, not a percentage:
+      "left": { "money": "$.data.remaining", "of": "$.data.limit", "currency": "USD" } }  // no "of" = a balance
   ],
   "cost": [                                                    // the first shape that answers
     { "kind": "extraUsage", "when": { "path": "$.spend.enabled", "equals": true },

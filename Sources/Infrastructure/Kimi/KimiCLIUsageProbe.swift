@@ -189,7 +189,8 @@ public struct KimiCLIUsageProbe: UsageProbe {
                 quotaType: quotaType,
                 providerId: "kimi",
                 resetsAt: resetsAt,
-                resetText: resetText
+                resetText: resetText,
+                windowDuration: quotaType.conventionalWindow.seconds
             ))
         }
 

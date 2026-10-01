@@ -247,7 +247,8 @@ public struct CopilotUsageProbe: UsageProbe {
             quotaType: .timeLimit("Monthly"),
             providerId: "copilot",
             resetsAt: MonthlyResetDate.nextMonthlyResetDate(),
-            resetText: resetText
+            resetText: resetText,
+            windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
         )
 
         return UsageSnapshot(

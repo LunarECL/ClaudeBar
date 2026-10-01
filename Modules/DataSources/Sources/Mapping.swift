@@ -103,16 +103,26 @@ public enum ResetRef: Sendable, Equatable, Codable {
     }
 }
 
-/// A window's length, in the unit the provider reports it in.
+/// A window's length — read from the response in the unit the provider
+/// reports it in, or a fixed length the provider is known for:
+/// `{ "seconds": "limit_window_seconds" }` · `{ "minutes": "windowDurationMins" }` ·
+/// `{ "hours": 5 }` · `{ "days": 7 }`. The kernel never guesses one.
 public enum DurationRef: Sendable, Equatable, Codable {
     case seconds(String)
     case minutes(String)
+    /// A fixed length, in seconds.
+    case fixed(TimeInterval)
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
-        let tag = try container.singleTag(of: ["seconds", "minutes"], in: "window")
-        let path = try container.decode(String.self, forKey: TagKey(tag))
-        self = tag == "seconds" ? .seconds(path) : .minutes(path)
+        let tag = try container.singleTag(of: ["seconds", "minutes", "hours", "days"], in: "window")
+        let scale: TimeInterval = ["seconds": 1, "minutes": 60, "hours": 3600, "days": 86400][tag] ?? 1
+        if let length = try? container.decode(Double.self, forKey: TagKey(tag)) {
+            self = .fixed(length * scale)
+        } else {
+            let path = try container.decode(String.self, forKey: TagKey(tag))
+            self = tag == "minutes" ? .minutes(path) : .seconds(path)
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -120,6 +130,7 @@ public enum DurationRef: Sendable, Equatable, Codable {
         switch self {
         case .seconds(let path): try container.encode(path, forKey: TagKey("seconds"))
         case .minutes(let path): try container.encode(path, forKey: TagKey("minutes"))
+        case .fixed(let seconds): try container.encode(seconds, forKey: TagKey("seconds"))
         }
     }
 }
@@ -334,7 +345,9 @@ public struct QuotaRule: Sendable, Equatable, Codable {
     public let usedPercent: [ValueRef]
     public let leftPercent: [ValueRef]
     public let resetsAt: [ResetRef]
-    public let window: DurationRef?
+    /// The first that answers — what the response states, then a length the
+    /// provider is known for.
+    public let window: [DurationRef]
     /// Fixed text in place of the reset countdown ("Free plan").
     public let resetText: String?
     /// With `each`: only the elements where this holds.
@@ -347,6 +360,23 @@ public struct QuotaRule: Sendable, Equatable, Codable {
     /// Skip a quota whose kind and name an earlier rule already produced —
     /// the first one wins.
     public let unique: Bool
+    /// Money in place of a percentage — "$12.40 remaining", "of $50.00".
+    /// Without `of` it is a balance: no percentage at all.
+    public let left: MoneyLeft?
+
+    /// `{ "money": "$.remaining", "of": "$.limit", "currency": "USD" }`.
+    public struct MoneyLeft: Sendable, Equatable, Codable {
+        public let money: Amount
+        public let of: Amount?
+        /// ISO 4217; USD when absent.
+        public let currency: String?
+
+        public init(money: Amount, of ceiling: Amount? = nil, currency: String? = nil) {
+            self.money = money
+            self.of = ceiling
+            self.currency = currency
+        }
+    }
 
     /// `days` — "Resets in 2d 5h 30m"; `hours` — "Resets in 53h 30m".
     public enum Countdown: String, Sendable, Equatable, Codable {
@@ -356,7 +386,7 @@ public struct QuotaRule: Sendable, Equatable, Codable {
 
     enum CodingKeys: String, CodingKey {
         case kind, name, at, each, skipKeys, windows, usedPercent, leftPercent, resetsAt, window, resetText
-        case `where`, overLimit, countdown, unique
+        case `where`, overLimit, countdown, unique, left
     }
 
     public init(
@@ -369,12 +399,13 @@ public struct QuotaRule: Sendable, Equatable, Codable {
         usedPercent: [ValueRef] = [],
         leftPercent: [ValueRef] = [],
         resetsAt: [ResetRef] = [],
-        window: DurationRef? = nil,
+        window: [DurationRef] = [],
         resetText: String? = nil,
         where condition: Match? = nil,
         overLimit: Bool = false,
         countdown: Countdown = .days,
-        unique: Bool = false
+        unique: Bool = false,
+        left: MoneyLeft? = nil
     ) {
         self.kind = kind
         self.name = name
@@ -391,6 +422,7 @@ public struct QuotaRule: Sendable, Equatable, Codable {
         self.overLimit = overLimit
         self.countdown = countdown
         self.unique = unique
+        self.left = left
     }
 
     public init(from decoder: Decoder) throws {
@@ -404,12 +436,13 @@ public struct QuotaRule: Sendable, Equatable, Codable {
         usedPercent = try Self.decodeList(ValueRef.self, container, .usedPercent)
         leftPercent = try Self.decodeList(ValueRef.self, container, .leftPercent)
         resetsAt = try Self.decodeList(ResetRef.self, container, .resetsAt)
-        window = try container.decodeIfPresent(DurationRef.self, forKey: .window)
+        window = try Self.decodeList(DurationRef.self, container, .window)
         resetText = try container.decodeIfPresent(String.self, forKey: .resetText)
         self.where = try container.decodeIfPresent(Match.self, forKey: .where)
         overLimit = try container.decodeIfPresent(Bool.self, forKey: .overLimit) ?? false
         countdown = try container.decodeIfPresent(Countdown.self, forKey: .countdown) ?? .days
         unique = try container.decodeIfPresent(Bool.self, forKey: .unique) ?? false
+        left = try container.decodeIfPresent(MoneyLeft.self, forKey: .left)
     }
 
     /// One value or a list of them — `"used_percent"` or `["$header.x", "used_percent"]`.

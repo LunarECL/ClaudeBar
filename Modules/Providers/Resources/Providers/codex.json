@@ -68,9 +68,14 @@
               "resetsAt": {
                 "epochSeconds": "resetsAt"
               },
-              "window": {
-                "minutes": "windowDurationMins"
-              }
+              "window": [
+                {
+                  "minutes": "windowDurationMins"
+                },
+                {
+                  "hours": 5
+                }
+              ]
             },
             {
               "kind": "weekly",
@@ -79,9 +84,14 @@
               "resetsAt": {
                 "epochSeconds": "resetsAt"
               },
-              "window": {
-                "minutes": "windowDurationMins"
-              }
+              "window": [
+                {
+                  "minutes": "windowDurationMins"
+                },
+                {
+                  "days": 7
+                }
+              ]
             },
             {
               "kind": "time",
@@ -112,9 +122,14 @@
               "resetsAt": {
                 "epochSeconds": "resetsAt"
               },
-              "window": {
-                "minutes": "windowDurationMins"
-              }
+              "window": [
+                {
+                  "minutes": "windowDurationMins"
+                },
+                {
+                  "days": 7
+                }
+              ]
             }
           ],
           "whenEmpty": {
@@ -192,6 +207,14 @@
                 {
                   "secondsFromNow": "reset_after_seconds"
                 }
+              ],
+              "window": [
+                {
+                  "seconds": "limit_window_seconds"
+                },
+                {
+                  "hours": 5
+                }
               ]
             },
             {
@@ -204,6 +227,14 @@
                 },
                 {
                   "secondsFromNow": "reset_after_seconds"
+                }
+              ],
+              "window": [
+                {
+                  "seconds": "limit_window_seconds"
+                },
+                {
+                  "days": 7
                 }
               ]
             },
@@ -240,9 +271,14 @@
                   "secondsFromNow": "reset_after_seconds"
                 }
               ],
-              "window": {
-                "seconds": "limit_window_seconds"
-              }
+              "window": [
+                {
+                  "seconds": "limit_window_seconds"
+                },
+                {
+                  "days": 7
+                }
+              ]
             }
           ],
           "cost": {

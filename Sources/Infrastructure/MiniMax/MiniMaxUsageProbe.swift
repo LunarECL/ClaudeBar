@@ -156,7 +156,8 @@ public struct MiniMaxUsageProbe: UsageProbe {
                 quotaType: .modelSpecific(model.modelName),
                 providerId: providerId,
                 resetsAt: resetsAt,
-                resetText: resetText
+                resetText: resetText,
+                windowDuration: QuotaType.modelSpecific(model.modelName).conventionalWindow.seconds
             )
         }
 

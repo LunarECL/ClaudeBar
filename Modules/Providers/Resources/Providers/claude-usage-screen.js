@@ -158,8 +158,13 @@ function cleanResetText(text) {
   return /^reset/i.test(trimmed) ? trimmed : "Resets " + trimmed;
 }
 
+// Claude's windows, as its plans state them: a 5-hour session, weekly limits.
+var SESSION_SECONDS = 5 * 3600;
+var WEEK_SECONDS = 7 * 24 * 3600;
+
 function quota(type, name, percentLeft, reset) {
   var q = { type: type, percentRemaining: percentLeft };
+  q.windowSeconds = type === "session" ? SESSION_SECONDS : WEEK_SECONDS;
   if (name) q.name = name;
   var cleaned = cleanResetText(reset);
   if (cleaned !== null) q.resetText = cleaned;

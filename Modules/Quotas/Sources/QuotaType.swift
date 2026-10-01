@@ -82,8 +82,10 @@ public enum QuotaType: Sendable, Equatable, Hashable {
         }
     }
 
-    /// The duration of the quota window
-    public var duration: QuotaDuration {
+    /// The window a quota of this name USUALLY has — a convention a data
+    /// source may state as its own word. The kernel never assumes it: pace
+    /// uses only a window the data source stated (CANONICAL_MODEL §5).
+    public var conventionalWindow: QuotaDuration {
         switch self {
         case .session:
             .hours(5)

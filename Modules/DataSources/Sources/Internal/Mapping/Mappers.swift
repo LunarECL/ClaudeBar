@@ -81,6 +81,9 @@ struct JSONMapper: Reading {
     }
 
     private func quota(for rule: QuotaRule, named name: String?, in scope: JSONScope, providerId: String) -> UsageQuota? {
+        if let money = rule.left {
+            return moneyQuota(money, for: rule, named: name, in: scope, providerId: providerId)
+        }
         let left: Double
         if let used = first(rule.usedPercent, in: scope) {
             left = rule.overLimit ? 100 - used : max(0, 100 - used)
@@ -91,11 +94,7 @@ struct JSONMapper: Reading {
         }
 
         let resetsAt = rule.resetsAt.lazy.compactMap { self.date($0, in: scope) }.first
-        let windowDuration: TimeInterval? = switch rule.window {
-        case .seconds(let path)?: scope.number(path)
-        case .minutes(let path)?: scope.number(path).map { $0 * 60 }
-        case nil: nil
-        }
+        let windowDuration = windowLength(rule, in: scope)
 
         guard let type = Self.quotaType(rule.kind, name: name) else { return nil }
         return UsageQuota(
@@ -113,6 +112,37 @@ struct JSONMapper: Reading {
         case .days: Countdown.text(until: date, now: now())
         case .hours: Countdown.hoursText(until: date, now: now())
         }
+    }
+
+    /// Money left — of a ceiling, or a balance with no percentage at all.
+    private func moneyQuota(_ rule: QuotaRule.MoneyLeft, for quotaRule: QuotaRule, named name: String?, in scope: JSONScope, providerId: String) -> UsageQuota? {
+        guard let type = Self.quotaType(quotaRule.kind, name: name),
+              let remaining = money(rule.money, in: scope) else { return nil }
+        let currency = rule.currency ?? "USD"
+        var ceiling: Money?
+        if let of = rule.of, isPresent(of, in: scope) {
+            guard let amount = money(of, in: scope) else { return nil }
+            ceiling = Money(amount, currency: currency)
+        }
+        let resetsAt = quotaRule.resetsAt.lazy.compactMap { self.date($0, in: scope) }.first
+        return UsageQuota(
+            left: .money(Money(remaining, currency: currency), of: ceiling),
+            quotaType: type,
+            providerId: providerId,
+            resetsAt: resetsAt,
+            resetText: quotaRule.resetText ?? resetsAt.flatMap { countdown(quotaRule.countdown, until: $0) },
+            windowDuration: windowLength(quotaRule, in: scope)
+        )
+    }
+
+    private func windowLength(_ rule: QuotaRule, in scope: JSONScope) -> TimeInterval? {
+        rule.window.lazy.compactMap { ref -> TimeInterval? in
+            switch ref {
+            case .seconds(let path): scope.number(path)
+            case .minutes(let path): scope.number(path).map { $0 * 60 }
+            case .fixed(let seconds): seconds
+            }
+        }.first
     }
 
     static func quotaType(_ kind: QuotaKind, name: String?) -> QuotaType? {
@@ -232,7 +262,19 @@ struct JSONMapper: Reading {
     private func money(_ amount: Amount, in scope: JSONScope) -> Decimal? {
         switch amount {
         case .value(let refs):
-            return first(refs, in: scope).map { Decimal($0) }
+            // Read a path's number from its own text, so 12.4 stays 12.4.
+            for ref in refs {
+                switch ref {
+                case .constant(let value):
+                    return Decimal(string: String(value), locale: Locale(identifier: "en_US_POSIX"))
+                case .path(let path):
+                    if let number = scope.value(path) as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
+                        return Decimal(string: number.stringValue, locale: Locale(identifier: "en_US_POSIX"))
+                    }
+                    if let value = scope.number(path) { return Decimal(value) }
+                }
+            }
+            return nil
         case .minorUnits(let path, let decimals):
             guard let number = scope.value(path) as? NSNumber,
                   CFGetTypeID(number) != CFBooleanGetTypeID(),

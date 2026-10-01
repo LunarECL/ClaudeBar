@@ -228,7 +228,7 @@ struct KimiCLIUsageProbeParsingTests {
         let snapshot = try KimiCLIUsageProbe.parse(Self.cli2xOutput)
         let monthly = snapshot.quota(for: .timeLimit("Monthly"))
 
-        #expect(monthly?.quotaType.duration == .days(30))
+        #expect(monthly?.quotaType.conventionalWindow == .days(30))
     }
 
     // MARK: - Reset Time Parsing

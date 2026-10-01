@@ -80,19 +80,22 @@ public struct OpenCodeUsageProbe: UsageProbe {
                 percentRemaining: fiveHourRemaining,
                 quotaType: .session,
                 providerId: "opencode-go",
-                resetsAt: Self.fiveHourResetDate(from: primary.fiveHourOldestMs, fallback: now)
+                resetsAt: Self.fiveHourResetDate(from: primary.fiveHourOldestMs, fallback: now),
+                windowDuration: QuotaType.session.conventionalWindow.seconds
             ),
             UsageQuota(
                 percentRemaining: weeklyRemaining,
                 quotaType: .weekly,
                 providerId: "opencode-go",
-                resetsAt: weekEnd
+                resetsAt: weekEnd,
+                windowDuration: QuotaType.weekly.conventionalWindow.seconds
             ),
             UsageQuota(
                 percentRemaining: monthlyRemaining,
                 quotaType: .timeLimit("Monthly"),
                 providerId: "opencode-go",
-                resetsAt: monthEnd
+                resetsAt: monthEnd,
+                windowDuration: QuotaType.timeLimit("Monthly").conventionalWindow.seconds
             ),
         ]
 

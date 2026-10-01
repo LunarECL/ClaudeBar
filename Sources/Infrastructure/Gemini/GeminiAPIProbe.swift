@@ -197,7 +197,8 @@ internal struct GeminiAPIProbe {
                     quotaType: .modelSpecific(entry.displayLabel),
                     providerId: "gemini",
                     resetsAt: resetsAt,
-                    resetText: formatResetText(resetsAt)
+                    resetText: formatResetText(resetsAt),
+                    windowDuration: QuotaType.modelSpecific(entry.displayLabel).conventionalWindow.seconds
                 )
             }
 

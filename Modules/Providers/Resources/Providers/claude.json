@@ -207,7 +207,10 @@
                 "iso8601": "resets_at"
               },
               "overLimit": true,
-              "countdown": "hours"
+              "countdown": "hours",
+              "window": {
+                "hours": 5
+              }
             },
             {
               "kind": "weekly",
@@ -217,7 +220,10 @@
                 "iso8601": "resets_at"
               },
               "overLimit": true,
-              "countdown": "hours"
+              "countdown": "hours",
+              "window": {
+                "days": 7
+              }
             },
             {
               "kind": "model",
@@ -228,7 +234,10 @@
                 "iso8601": "resets_at"
               },
               "overLimit": true,
-              "countdown": "hours"
+              "countdown": "hours",
+              "window": {
+                "days": 7
+              }
             },
             {
               "kind": "model",
@@ -239,7 +248,10 @@
                 "iso8601": "resets_at"
               },
               "overLimit": true,
-              "countdown": "hours"
+              "countdown": "hours",
+              "window": {
+                "days": 7
+              }
             },
             {
               "kind": "model",
@@ -259,7 +271,10 @@
               },
               "overLimit": true,
               "countdown": "hours",
-              "unique": true
+              "unique": true,
+              "window": {
+                "days": 7
+              }
             }
           ],
           "cost": [
