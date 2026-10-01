@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import Mockable
+import os
 @testable import Infrastructure
 @testable import Domain
 
@@ -478,5 +479,154 @@ struct ClaudeUsageProbeTests {
         let costRule = (probe.costExecutor as? DefaultCLIExecutor)?.completionRule
         #expect(usageRule == CLICompletionRule.claudeUsage)
         #expect(costRule == nil)
+    }
+
+    // MARK: - Shared probe session (issue #132)
+
+    /// A settled /usage screen with quota bars — the minimum the parser needs.
+    private static let settledUsageOutput = """
+    Opus 4.5 · Claude Max · user@example.com's Organization
+
+    Current session
+    ████████████████░░░░ 65% left
+    Resets in 2h 15m
+
+    Current week (all models)
+    ██████████░░░░░░░░░░ 35% left
+    Resets Dec 28
+    """
+
+    /// An API-billing /usage panel: no quota bars, routes the probe to /cost (#271).
+    private static let apiBillingUsageOutput = """
+    Opus 5 (1M context) · API Usage Billing
+
+      Session
+        Total cost:            $0.0000
+        Total duration (API):  0s
+        Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+    """
+
+    private static func sessionFlagValue(in args: [String], flag: String) -> String? {
+        guard let index = args.firstIndex(of: flag), index + 1 < args.count else { return nil }
+        return args[index + 1]
+    }
+
+    /// Records every execute() call so tests can assert the args the probe
+    /// actually sent (Chicago school: resulting state, no verify()).
+    private final class RecordingCLIExecutor: CLIExecutor, @unchecked Sendable {
+        struct Call: Equatable {
+            let binary: String
+            let args: [String]
+            let input: String?
+        }
+
+        private let calls = OSAllocatedUnfairLock(initialState: [Call]())
+        private let respond: @Sendable (Call) -> CLIResult
+
+        init(respond: @escaping @Sendable (Call) -> CLIResult) {
+            self.respond = respond
+        }
+
+        func locate(_ binary: String) -> String? {
+            "/usr/bin/claude"
+        }
+
+        func execute(
+            binary: String,
+            args: [String],
+            input: String?,
+            timeout: TimeInterval,
+            workingDirectory: URL?,
+            autoResponses: [String: String]
+        ) async throws -> CLIResult {
+            let call = Call(binary: binary, args: args, input: input)
+            calls.withLock { $0.append(call) }
+            return respond(call)
+        }
+
+        var recordedCalls: [Call] {
+            calls.withLock { $0 }
+        }
+    }
+
+    @Test
+    func `the usage command creates the shared probe session on first run`() async throws {
+        // Given — no stored session yet, so this run must create it under a
+        // stable id and the "ClaudeBar Probe" display name (#132).
+        let executor = RecordingCLIExecutor { _ in
+            CLIResult(output: Self.settledUsageOutput, exitCode: 0)
+        }
+        let probe = ClaudeUsageProbe(cliExecutor: executor)
+
+        // When
+        _ = try await probe.probe()
+
+        // Then
+        let first = try #require(executor.recordedCalls.first)
+        #expect(first.args.contains("--session-id"), "expected the /usage args \(first.args) to create a session with a stable id")
+        let createdID = Self.sessionFlagValue(in: first.args, flag: "--session-id")
+        #expect(createdID != nil && UUID(uuidString: createdID!) != nil)
+        #expect(Self.sessionFlagValue(in: first.args, flag: "--name") == "ClaudeBar Probe")
+    }
+
+    @Test
+    func `the cost fallback reuses the same shared probe session`() async throws {
+        // Given — an API-billed account routes the probe through /cost; both
+        // commands must bind to the same shared session (#132).
+        let executor = RecordingCLIExecutor { call in
+            if call.args.first == "/cost" {
+                CLIResult(
+                    output: """
+                    Total cost:            $1.25
+                    Total duration (API):  6m 19.7s
+                    Total duration (wall): 1h 2m
+                    """,
+                    exitCode: 0
+                )
+            } else {
+                CLIResult(output: Self.apiBillingUsageOutput, exitCode: 0)
+            }
+        }
+        let resolver = MockAccountInfoResolving()
+        given(resolver).resolve().willReturn(AccountInfo(email: "user@example.com", billingType: "api"))
+        let probe = ClaudeUsageProbe(cliExecutor: executor, accountInfoResolver: resolver)
+
+        // When
+        _ = try await probe.probe()
+
+        // Then
+        let usageCall = try #require(executor.recordedCalls.first { $0.args.first == "/usage" })
+        let costCall = try #require(executor.recordedCalls.first { $0.args.first == "/cost" })
+        let usageID = Self.sessionFlagValue(in: usageCall.args, flag: "--session-id")
+            ?? Self.sessionFlagValue(in: usageCall.args, flag: "--resume")
+        let costID = Self.sessionFlagValue(in: costCall.args, flag: "--session-id")
+            ?? Self.sessionFlagValue(in: costCall.args, flag: "--resume")
+        #expect(usageID != nil, "expected the /usage args \(usageCall.args) to carry a session id")
+        #expect(costID != nil, "expected the /cost args \(costCall.args) to carry a session id")
+        #expect(usageID == costID, "usage and cost must run in the same shared session")
+    }
+
+    @Test
+    func `an older CLI without session flags still probes like today`() async throws {
+        // Given — a CLI too old for the session flags rejects them; the probe
+        // must fall back to today's plain invocation and still parse (#132).
+        let executor = RecordingCLIExecutor { call in
+            if call.args.contains("--session-id") || call.args.contains("--resume") {
+                return CLIResult(output: "error: unknown option '--session-id'", exitCode: 1)
+            }
+            return CLIResult(output: Self.settledUsageOutput, exitCode: 0)
+        }
+        let probe = ClaudeUsageProbe(cliExecutor: executor)
+
+        // When
+        let snapshot = try await probe.probe()
+
+        // Then — the shared session was tried first, today's args second, and
+        // the parse still succeeds.
+        #expect(snapshot.quotas.count >= 1)
+        let first = try #require(executor.recordedCalls.first)
+        #expect(first.args.contains("--session-id"), "expected the probe to try the shared session first, got \(first.args)")
+        let last = try #require(executor.recordedCalls.last)
+        #expect(last.args == ["/usage", "--allowed-tools", ""], "expected the fallback to match today's args, got \(last.args)")
     }
 }
