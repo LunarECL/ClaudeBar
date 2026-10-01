@@ -6,6 +6,8 @@ description: The architecture that implements the canonical model — a provider
 
 > [CANONICAL_MODEL.md](CANONICAL_MODEL.md) says WHAT the domain is.
 > [MODULAR_DESIGN.md](MODULAR_DESIGN.md) says which module each file lives in.
+> [USER_JOURNEYS.md](USER_JOURNEYS.md) walks the screens first; the flows in §4.2
+> are its moments, seen from inside.
 > **This document says how a provider runs**: from a JSON file, through one
 > `DataSource`, to the popover — and in what order today's code gets there.
 >
@@ -211,11 +213,27 @@ public enum Mapping: Sendable, Equatable, Codable {
     case json(JSONMappingRules), text(TextMappingRules)
 }
 
+// DataSources — what came back, before anyone read it ("Response" on the Map fields step)
+public struct Response: Sendable, Equatable {
+    public let status: Int?, headers: [String: String], body: Data
+}
+
+// DataSources — a failure names its step ("Couldn't read your key · connect · find the numbers")
+public struct DataSourceError: Error, Sendable {
+    public enum Step: Sendable { case lookup, fetch, mapping }
+    public let step: Step
+    public let reason: ProbeError          // today's cases; never a secret or a body
+}
+
 // DataSources — ONE type that fetches for every provider
 public struct DataSource: Sendable {
     public let definition: DataSourceDefinition
-    public func fetchUsage() async throws -> UsageSnapshot   // look up → fetch → map
+    public func fetchResponse() async throws(DataSourceError) -> Response      // Test Connection
+    public func fetchUsage() async throws(DataSourceError) -> UsageSnapshot    // mapping.read(fetchResponse())
     public func isReady() async -> Bool
+}
+extension Mapping {
+    public func read(_ response: Response, kind: String) throws(DataSourceError) -> UsageSnapshot  // Map fields' live card
 }
 
 // DataSources — the factory: the only place a case meets its connection
@@ -251,7 +269,7 @@ everything.
 `AIProvider` stays the protocol the Monitor and views consume while the other
 providers move; `Provider` conforms. When the last `XxxProvider` is gone it
 folds into `Provider`. `UsageSnapshot` keeps its name until the renames of
-slice 7 (`Usage`).
+slice 7 (`Usage`), and gains `source: kind` — *via RPC* — in slice 1.
 
 ### 4.2 · Flows
 
@@ -276,8 +294,23 @@ and fetches once more. An `expiredCodes` match becomes
 **Switching data source.** The card writes `<id>.probeMode`, or calls
 `provider.use(kind)`; both land on the same key, read on the next refresh.
 
-**Test Connection.** Build a throw-away `Provider` from the unsaved
-definition, refresh once, show the usage or the error, write nothing.
+**Add Provider** (moments 5–9). *Start from* makes an unsaved
+`ProviderDefinition` — `blank(fetch: .http | .cli | .file)` or `copy()` of an
+existing one with a new id. *Connect* edits its `fetch` and `credential`;
+**Test Connection** builds a throw-away `DataSource` and calls
+`fetchResponse()` — no mapping, nothing written — and the sheet shows the
+`Response`. *Map fields* edits the `mapping` by pointing at values in that
+`Response`, and the preview card is `mapping.read(response)` on every change,
+with no second fetch. *Save* validates the definition (§3's laws, plus: at
+least one quota or a cost read from the last `Response`), writes
+`~/.claudebar/providers/<id>.json`, stores secrets in the vault, and hands the
+new `Provider` to the Monitor — no restart.
+
+**Export · Import** (moments 10–11). `definition.exported()` writes the JSON
+with every secret setting reduced to its name and lookup order.
+`catalog.import(file)` decodes it as a **custom** provider with a fresh id when
+the id is taken, shows the URL a key will be sent to and any CLI command it
+will run, and lists `missingSettings` (*Key needed*) before *Add*.
 
 ## 5 · Settings and secrets
 
@@ -312,7 +345,7 @@ other field), because the CLI that owns that file must keep working.
 |---|---|---|
 | each worker | its protocol or format, alone | `@testable`, built with a mocked connection (`NetworkClient`, `CLIExecutor`, `RPCTransport`); Chicago: assert on the payload / snapshot |
 | `JSONMapper` · `TextMapper` | every mapping feature | small JSON/text fixtures, one feature per test |
-| `DataSource` | look up → fetch → map, 401-refresh-retry, errors | built with mocked connections |
+| `DataSource` | look up → fetch → map, `fetchResponse` stops before mapping, 401-refresh-retry, each error's step | built with mocked connections |
 | `Provider` | lifecycle: keeps usage on failure, fallback, `use`, enabled persists | data sources over mocked connections |
 | each definition | **golden test**: today's recorded responses (`Tests/…/Fixtures/codex/`) through the definition produce exactly the snapshot today's probe produced | the fixtures are captured from the current probe tests before the probe is deleted |
 | the catalog | every bundled definition decodes | one test over `Resources/Providers/*.json` |
@@ -331,7 +364,7 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | 3 | the look and the settings form move into the JSON; the `switch id` tables and the simple config cards go | adding a provider edits no Swift |
 | 4 | the kernel laws: `Left` (no fake 100%), `Window` (no guessed length) | balance definitions map money only |
 | 5 | the CLI and cookie providers (Gemini, Kiro, Cursor, AmpCode, Antigravity, Alibaba, …): `CLIFetcher`, `BrowserCookieReader`, …; Bedrock via `Fetch.cloudWatch` and the `AWSClients` module; extensions read as definitions; *PROBE MODE* → *DATA SOURCE* | no `XxxUsageProbe` is left |
-| 6 | *Add Provider*: the sheet, Test Connection, Save | a user adds a provider without a restart |
+| 6 | *Add Provider*, *Export*, *Import* — the screens of [USER_JOURNEYS.md](USER_JOURNEYS.md) moments 5–11, outer loop from its §5 scenarios | a person adds, shares and imports a provider without a restart, and no exported file contains a key |
 | 7 | Claude (PTY CLI, multi-account, guest passes, budget); the renames (`Usage`, `Plan`, `Cost`, `DataSourceError`) | `AIProvider` folds into `Provider` |
 
 ## 9 · Open

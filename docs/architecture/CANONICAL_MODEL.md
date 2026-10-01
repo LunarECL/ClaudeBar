@@ -19,7 +19,8 @@ description: THE normative tree ClaudeBar binds to — every node from the Monit
 > | *What is the tree, node by node, and who owns which law?* | **this one** |
 > | *Which module, which file, which order?* | [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) |
 > | *How are the layers and data flow wired today?* | [ARCHITECTURE.md](ARCHITECTURE.md) |
-> | *What does a user DO with the app?* | [USER_BEHAVIORS.md](USER_BEHAVIORS.md) |
+> | *Who uses it, and what do the new screens say?* | [USER_JOURNEYS.md](USER_JOURNEYS.md) — the outside-in walk this tree was revised against |
+> | *What does a user DO with the app today?* | [USER_BEHAVIORS.md](USER_BEHAVIORS.md) |
 > | *How does one provider fetch its data?* | `docs/providers/<id>/design.md` |
 
 ---
@@ -41,7 +42,12 @@ the industry's is taken. The screen prints *Providers*, *All Providers*,
 *Low quota*, *each quota window resets*, *% left*, *remaining*, *Resets in 2h 5m*,
 *Balance*, *Credits*, *API COST*, *EXTRA USAGE*, *Daily Budget*, *Claude Max
 plans*, *HEALTHY · WARNING*, *On track · Running hot · Room to spare*, *TODAY'S
-USAGE*. Those are the words below.
+USAGE*. The screens the redesign adds — walked first in
+[USER_JOURNEYS.md](USER_JOURNEYS.md) — print *Add Provider*, *Start from: API ·
+CLI · File · Copy a provider*, *Key lookup order*, *Test Connection*,
+*Response*, *Map fields: Used · Remaining · Limit · Resets*, *Built in ·
+Custom · Extension*, *Export*, *Import*, *Couldn't read your key · Couldn't
+connect · Couldn't find the numbers*, *via API*. Those are the words below.
 
 ### 0.1 · Words the code uses, and ours
 
@@ -102,9 +108,11 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │                       json(paths, each, used|left, resets) · text(patterns)
 │       │       │   └── fallback: kind?     the data source to try when this one fails — Codex's
 │       │       │                           RPC falls back to its terminal
-│       │       ├── fetchUsage() → Usage    "Fetching usage data…" — looks up the key, fetches, maps
+│       │       ├── fetchResponse() → Response   "Test Connection" — looks up the key and fetches;
+│       │       │                           stops BEFORE mapping, so a person with nothing mapped
+│       │       │                           yet can see what came back
+│       │       ├── fetchUsage() → Usage    "Fetching usage data…" — mapping.read(fetchResponse())
 │       │       ├── isReady                 DERIVED — the key answers and the CLI exists ("Configured")
-│       │       └── test() → Usage          "Save & Test Connection" — fetch, map, show; save nothing
 │       ├── accounts: [Account]  ◆          NEVER EMPTY. One account is the "default" account
 │       │   └── Account  ◆
 │       │       ├── id · label · email · organization
@@ -112,7 +120,10 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       └── usage: Usage?  ◇        WHAT WE LAST SAW — survives a failed refresh
 │       ├── active: Account.ID              whose usage the popover shows
 │       └── sync: SyncState  ◇              isSyncing · lastError: DataSourceError — THE PROVIDER'S,
-│                                           not the usage's: a failure never erases what we saw
+│                                           not the usage's: a failure never erases what we saw.
+│                                           The error names its STEP — lookup · fetch · mapping —
+│                                           "Couldn't read your key · Couldn't connect · Couldn't
+│                                           find the numbers" — because each sends you somewhere else
 │
 ├── selection: ProviderID                   which provider the popover opens on
 ├── statusPolicy: StatusPolicy  ◇           HOW STRICT TO BE — absolute thresholds, or pace-aware
@@ -123,6 +134,8 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 
 Usage  ◇                                    "Fetching usage data…" — WHAT THE PROVIDER SAYS, AS OF A MOMENT
 ├── updatedAt                               "Updated 3m ago"; stale after 5 minutes
+├── source: kind                            "via RPC" · "via Terminal" — which data source answered,
+│                                           so a fallback is never silent
 ├── quotas: [Quota]
 │   └── Quota  ◇                            ONE LIMIT THE VENDOR SET
 │       ├── name                            Session · Weekly · Opus · Monthly · Balance · Credits
@@ -138,6 +151,9 @@ Usage  ◇                                    "Fetching usage data…" — WHAT 
 ├── cost: Cost?  ◇                          MONEY GONE — "API COST" or "EXTRA USAGE", over a period.
 │                                           Judged by a Budget, never by a Quota
 └── account facts                           email · organization · plan, when the data source learns them
+
+Response  ◇                                 "Response" — WHAT CAME BACK, before anyone read it:
+                                            status · headers · body. The Map fields step shows it
 
     DELIBERATELY OUTSIDE THE MONITOR
 Activity  ◆                                 Claude Code sessions seen through hooks — the notch
@@ -193,11 +209,11 @@ technology or the scheme (`Fetch.cloudWatch`, a signature case named for its
 algorithm), taking its parameters from the JSON. There is never a type that
 does all five jobs for one vendor.
 
-| Kind of provider | Definition lives in | Made by |
+| Origin — the badge the screen prints | Definition lives in | Made by |
 |---|---|---|
-| **Built-in** | `Resources/Providers/<id>.json`, shipped in the app | us |
-| **Declared** | `~/.claudebar/providers/<id>.json` | the user, in *Add Provider* |
-| **Scripted** (today's extensions) | `~/.claudebar/extensions/<id>/manifest.json` — a `script` fetch | the user, by hand |
+| **Built in** | `Resources/Providers/<id>.json`, shipped in the app | us |
+| **Custom** | `~/.claudebar/providers/<id>.json` | the person, in *Add Provider*, *Copy a provider* or *Import* |
+| **Extension** | `~/.claudebar/extensions/<id>/manifest.json` — a `script` fetch | the person, by hand |
 
 The three differ only in *where the file is*. Codex, DeepSeek and a provider
 someone made five minutes ago run on the same `DataSource` and the same lifecycle.
@@ -213,9 +229,13 @@ someone made five minutes ago run on the same `DataSource` and the same lifecycl
 | *Add Account* · remove · switch | `provider.add(account:)` · `remove` · `activate` | never removes the last one |
 | clicks a provider pill | `monitor.select(_:)` | |
 | refreshes | `monitor.refresh(_:kind:)` → `provider.refresh(kind)` | interactive or background |
-| *Add Provider* → Test | `ProviderDefinition.trial()` → a `Usage` or a `DataSourceError` | nothing is saved until Save |
-| *Add Provider* → Save | `catalog.add(definition)` → `monitor.lineup.append` | no restart |
-| deletes a custom provider | `catalog.remove(id)` · `monitor.lineup.remove(id)` | built-ins can only be disabled |
+| *Add Provider* → *Start from* | `ProviderDefinition.blank(fetch:)` · `definition.copy()` | the picker is `http` · `cli` · `file`; a copy gets a new id and the origin **custom** |
+| *Connect* → *Test Connection* | `dataSource.fetchResponse()` → a `Response` or a `DataSourceError` | nothing is mapped yet, nothing is saved |
+| *Map fields* — clicks a value | `mapping.quotas.append(…)` / `mapping.cost = …` with *Used · Remaining · Limit · Resets* | the card previews live from the same `Response` |
+| *Save* | `catalog.add(definition)` → `monitor.lineup.append` | no restart |
+| *Edit* · *Delete* a custom provider | `catalog.replace(definition)` · `catalog.remove(id)` | built-ins can only be disabled |
+| *Export…* | `definition.exported()` → a `.json` file | carries the lookup order and the setting names — never a key |
+| *Import provider* | `catalog.import(file)` → `definition.missingSettings` | says where a key will be sent, and shows a CLI command, BEFORE asking |
 | sets a Daily Budget | `monitor.budgets.set(_:for:)` | |
 | chooses status colours / pace-aware | `monitor.statusPolicy = …` | colours are the page's; the thresholds are the policy's |
 
@@ -233,14 +253,16 @@ quota.status(under: StatusPolicy)    → Status
 quota.pace                           → Pace         unknown without a window
 quota.window?.timeUntilReset         → Duration?    "Resets in 2h 5m"
 cost.judged(by: Budget)              → BudgetStatus ON TRACK · NEAR LIMIT · OVER BUDGET
-definition.trial()                   → Usage        the Add Provider sheet's Test
+dataSource.fetchResponse()           → Response     Test Connection: what came back, unmapped
+mapping.read(response)               → Usage        Map fields: the live card
+definition.missingSettings           → [Setting]    Import: "Key needed"
 ```
 
 ## 5 · The laws, on the node that owns them
 
 | Law | Owner |
 |---|---|
-| a provider's id is stable forever; settings, the menu-bar choice and the lineup are keyed by it. A declared provider's id is minted once and never derived from its name | `ProviderProfile` |
+| a provider's id is stable forever; settings, the menu-bar choice and the lineup are keyed by it. A custom provider's id is minted once and never derived from its name | `ProviderProfile` |
 | a provider's face is DATA — its symbol and colours ride on the profile, so adding one never edits a `switch id` | `ProviderLook` |
 | a provider has at least one account; a single-account provider's only account is `default`, and its compound id equals the provider id | `Provider.accounts` |
 | what the popover shows is the ACTIVE account's usage; aggregate status is the worst across accounts | `Provider` |
@@ -263,7 +285,11 @@ definition.trial()                   → Usage        the Add Provider sheet's T
 | a credential is looked up in the order the definition gives; the first that answers wins, and a refreshed token is written back where it was found | `CredentialLookup` |
 | when the active data source fails, its `fallback` is tried once; what the popover shows says which one answered | `Provider` |
 | a definition is valid before it is saved: a fetch, a mapping that produced at least one quota or a cost on Test, and every required setting filled | `ProviderDefinition` |
-| a built-in provider can be disabled but not deleted; a declared one can be both | `ProviderCatalog` |
+| a built-in provider can be disabled but not deleted; a custom one can be both; an extension is removed by removing its folder | `ProviderCatalog` |
+| **an exported definition carries no secret** — the lookup order and each setting's name, never its value | `ProviderDefinition` |
+| an import says where a key will be sent, and shows any CLI command it will run, before it asks for a key or saves | `ProviderCatalog.import` |
+| an error names the step that failed — lookup, fetch or mapping — and never carries the secret or the response body | `DataSourceError` |
+| a usage says which data source produced it; a fallback is never silent | `Usage.source` |
 
 ## 6 · What is deliberately NOT in the tree
 
@@ -374,10 +400,12 @@ Each step ships green and changes no behaviour a user can see, until the last.
   escape hatch. Which features, is found provider by provider.
 - **Cost lines.** Bedrock reports cost per model, and an extension can report
   metrics. Is that one `Cost` with lines, or a third kind of `Left`?
-- **A declared provider with accounts.** One definition plus N secrets — is
+- **A custom provider with accounts.** One definition plus N secrets — is
   the account list the form's (one API key each), or the provider's?
-- **`command` fetches from the UI.** A user-typed command runs with the user's
-  rights, as an extension script does today. Is a confirmation enough, or are
-  declared providers HTTP and file only?
+- ~~**`command` fetches from the UI.**~~ — **answered by the journey**
+  ([USER_JOURNEYS F10](USER_JOURNEYS.md#3--what-the-journeys-changed)): the
+  picker offers *CLI*, because a person typing their own command runs it with
+  their own rights, as an extension does; a CLI provider that arrives by
+  *Import* shows its command and asks before anything is saved or run.
 - **Status in the kernel or the policy.** Is `Quota.status` a read that takes
   the policy, or does the Monitor apply it? §4 assumes the first.

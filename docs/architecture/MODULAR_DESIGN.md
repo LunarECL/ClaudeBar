@@ -64,7 +64,7 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 | Module | Context ([model §7](CANONICAL_MODEL.md#7--the-contexts-and-the-modules-that-implement-them)) | Public (the domain) | `Internal/` (the implementation) |
 |---|---|---|---|
 | `Quotas` | Quota · shared kernel | `UsageSnapshot`, `UsageQuota`, `QuotaType`, `QuotaStatus`, `UsagePace`, `CostUsage`, `BudgetStatus`, `AccountTier`, `ProbeError` | — none: pure values, no I/O |
-| `DataSources` | Data Sources | `DataSource`, `DataSourceDefinition`, the closed sums `CredentialLookup` · `Fetch` · `Mapping`, `ConfigField`; the ports `CLIExecutor`, `NetworkClient`, `RPCTransport`, `CloudWatchClient`; the factory `DataSources.make(_:settings:vault:cloudWatch:)` | the workers — `Lookup/`, `Fetch/`, `Mapping/` — and the implementations of its own ports — `Process/`, `Network/` (§5) |
+| `DataSources` | Data Sources | `DataSource`, `DataSourceDefinition`, `Response`, `DataSourceError`, the closed sums `CredentialLookup` · `Fetch` · `Mapping`, `ConfigField`; the ports `CLIExecutor`, `NetworkClient`, `RPCTransport`, `CloudWatchClient`; the factory `DataSources.make(_:settings:vault:cloudWatch:)` | the workers — `Lookup/`, `Fetch/`, `Mapping/` — and the implementations of its own ports — `Process/`, `Network/` (§5) |
 | `AWSClients` | Data Sources (SDK-backed) | `AWSClients.makeCloudWatch()` → `any CloudWatchClient` | the AWS SDK client and Bedrock pricing; the only module that links AWS |
 | `Providers` | Providers · core | `Provider`, `AIProvider` (until it folds in), `ProviderDefinition`, `ProviderCatalog`, `ProviderAccount`, `ProviderSettingsRepository`, `CredentialRepository` | definition-file reading, `ExtensionDirectoryScanner`, `AIProviders` |
 | `Providers/Resources/Providers/` | — | **the built-in definitions**: `codex.json`, `deepseek.json`, … | |
@@ -124,7 +124,9 @@ has no such dependency in `Project.swift`.
 ```text
 Modules/DataSources/
 ├── Sources/
-│   ├── DataSource.swift              ◆ fetchUsage() · isReady — one type for every provider
+│   ├── DataSource.swift              ◆ fetchResponse() · fetchUsage() · isReady — one type for every provider
+│   ├── Response.swift                ◇ status · headers · body — what Test Connection shows
+│   ├── DataSourceError.swift         step: lookup · fetch · mapping
 │   ├── DataSourceDefinition.swift    ◇ kind · credential · fetch · mapping · fallback — Codable
 │   ├── CredentialLookup.swift        ◇ enum: environment · setting · jsonFile · keychain ·
 │   │                                   browserCookie · refreshing(_, oauth2)
@@ -156,7 +158,7 @@ Modules/Providers/
 ├── Sources/
 │   ├── Provider.swift                  ◆ the lifecycle, and the fallback between data sources
 │   ├── ProviderDefinition.swift        ◇ the definition and its laws
-│   ├── ProviderCatalog.swift           built-in · declared · scripted
+│   ├── ProviderCatalog.swift           built in · custom · extension; add · import · export
 │   ├── ProviderSettingsRepository.swift  port, @Mockable
 │   ├── CredentialRepository.swift      port, @Mockable
 │   ├── Providers.swift                 the factory: makeCatalog(settings:vault:cloudWatch:)
