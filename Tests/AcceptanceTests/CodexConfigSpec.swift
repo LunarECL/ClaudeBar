@@ -33,11 +33,12 @@ struct CodexConfigSpec {
         home: URL,
         network: MockNetworkClient = MockNetworkClient(),
         transport: MockRPCTransport = MockRPCTransport()
-    ) throws -> Provider {
+    ) throws -> Account {
         let definition = try Providers.builtIn("codex")
         return Provider(
             definition: definition,
-            dataSources: definition.dataSources.map {
+            settings: settings,
+            makeDataSource: {
                 DataSources.make(
                     $0,
                     providerId: "codex",
@@ -48,9 +49,8 @@ struct CodexConfigSpec {
                     homeDirectory: home,
                     now: { Date() }
                 )
-            },
-            settings: settings
-        )
+            }
+        ).defaultAccount
     }
 
     private static func makeHome() throws -> URL {
@@ -101,15 +101,15 @@ struct CodexConfigSpec {
             let codex = try CodexConfigSpec.makeCodex(settings: settings, home: home, network: network, transport: transport)
 
             // Default is RPC mode
-            #expect(codex.activeKind == "rpc")
+            #expect(codex.provider.activeKind == "rpc")
 
             // When — user switches to API mode
-            codex.use("api")
+            codex.provider.use("api")
             let monitor = QuotaMonitor(providers: AIProviders(providers: [codex]), clock: CodexConfigSpec.TestClock())
             await monitor.refresh(providerId: "codex")
 
             // Then — the API's answer (45% left) is shown, not RPC's (80%)
-            #expect(codex.activeKind == "api")
+            #expect(codex.provider.activeKind == "api")
             #expect(codex.snapshot?.quotas.first?.percentRemaining == 45)
         }
 
@@ -127,7 +127,7 @@ struct CodexConfigSpec {
 
             // Then — persisted, and the provider follows it
             #expect(settings.codexProbeMode() == .api)
-            #expect(codex.activeKind == "api")
+            #expect(codex.provider.activeKind == "api")
         }
     }
 

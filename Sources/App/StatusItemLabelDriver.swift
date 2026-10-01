@@ -213,7 +213,7 @@ final class StatusItemLabelDriver {
             .contains { !CountdownColon.ranges(in: $0.text).isEmpty }
         let primaryProvider = monitor.enabledProviders.first { $0.id == settings.menuBarPercentageProviderId }
         let showsQuota = settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled
-        let primaryProviderName = !showsQuota || (additionalLabels.isEmpty && (primaryProvider as? Provider)?.isNamedByAccount != true)
+        let primaryProviderName = !showsQuota || (additionalLabels.isEmpty && (primaryProvider as? Account)?.isNamedByAccount != true)
             ? nil : primaryProvider?.name
 
         return LabelContent(

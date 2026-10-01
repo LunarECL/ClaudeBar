@@ -226,7 +226,7 @@ private struct ProviderDetailView: View {
     /// The provider-specific config card, when one exists.
     @ViewBuilder
     private var configCard: some View {
-        switch (provider as? Provider)?.definition.id ?? provider.id {
+        switch (provider as? Account)?.provider.id ?? provider.id {
         case "claude":
             ClaudeConfigCard(monitor: monitor)
         case "codex":

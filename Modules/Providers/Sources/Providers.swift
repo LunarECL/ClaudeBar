@@ -18,12 +18,6 @@ public enum Providers {
         return try Data(contentsOf: url)
     }
 
-    /// A `{{account.…}}` the account's saved values did not fill.
-    private static func hasUnfilledValue(_ source: DataSourceDefinition) -> Bool {
-        guard let data = try? JSONEncoder().encode(source) else { return true }
-        return String(decoding: data, as: UTF8.self).contains("{{account.")
-    }
-
     /// A mapping script shipped beside the built-in definitions.
     public static let builtInScripts: DataSources.ScriptSource = { file in
         let name = (file as NSString).deletingPathExtension
@@ -32,44 +26,23 @@ public enum Providers {
         return try? String(contentsOf: url, encoding: .utf8)
     }
 
-    /// A provider on the real network, CLI, Keychain and file system.
+    /// A provider on the real network, CLI, Keychain and file system, with
+    /// its default login and every login in `accounts`.
     @MainActor
     public static func make(
         _ definition: ProviderDefinition,
         settings: any ProviderSettingsRepository,
+        accounts: [ProviderAccountConfig] = [],
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
     ) -> Provider {
         Provider(
             definition: definition,
-            dataSources: definition.dataSources.map {
-                DataSources.make($0, providerId: definition.id, scripts: builtInScripts)
-            },
             settings: settings,
+            accounts: accounts,
+            makeDataSource: { DataSources.make($0, providerId: definition.id, scripts: builtInScripts) },
             dailyUsage: dailyUsage,
             guestPasses: guestPasses
-        )
-    }
-
-    /// An added account of a built-in provider: the definition's
-    /// `accounts.dataSources`, filled from the account's saved values. `nil`
-    /// when the provider has no accounts or the saved values are incomplete.
-    @MainActor
-    public static func make(
-        _ id: String,
-        account: ProviderAccountConfig,
-        settings: any ProviderSettingsRepository
-    ) throws -> Provider? {
-        guard account.accountId != ProviderAccount.defaultAccountId,
-              let definition = try ProviderDefinition.parse(try builtInData(id), account: account.probeConfig),
-              !definition.dataSources.contains(where: { Self.hasUnfilledValue($0) }) else { return nil }
-        return Provider(
-            definition: definition,
-            dataSources: definition.dataSources.map {
-                DataSources.make($0, providerId: definition.id, scripts: builtInScripts)
-            },
-            settings: settings,
-            account: account.toProviderAccount(providerId: id)
         )
     }
 
@@ -78,9 +51,10 @@ public enum Providers {
     public static func make(
         _ id: String,
         settings: any ProviderSettingsRepository,
+        accounts: [ProviderAccountConfig] = [],
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
     ) throws -> Provider {
-        make(try builtIn(id), settings: settings, dailyUsage: dailyUsage, guestPasses: guestPasses)
+        make(try builtIn(id), settings: settings, accounts: accounts, dailyUsage: dailyUsage, guestPasses: guestPasses)
     }
 }

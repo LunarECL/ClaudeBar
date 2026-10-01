@@ -144,7 +144,7 @@ struct CodexAccountsTests {
         let account = try stub.make("codex", account: config("a", folder: folder, accountId: "work"))
 
         let viaRPC = try await account.refresh()
-        account.use("api")
+        account.provider.use("api")
         let viaAPI = try await account.refresh()
 
         #expect(viaRPC.accountEmail == "signed-in@example.com")
@@ -234,7 +234,7 @@ struct CodexAccountsTests {
     }
 
     @Test
-    func `saved accounts come back as separate providers`() throws {
+    func `saved accounts come back as logins of one Codex provider`() throws {
         let root = try temporaryRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let a = try writeLogin(in: root, "a", email: "a@example.com", accountId: "a")
@@ -243,13 +243,104 @@ struct CodexAccountsTests {
         let second = try add(b, to: [first], root: root)
         let settings = InMemoryProviderSettings()
 
-        let providers = [first, second].compactMap { AddedAccounts.provider("codex", configuration: $0, settings: settings) }
-        providers[0].isEnabled = false
+        let codex = try Providers.make("codex", settings: settings, accounts: [first, second])
+        let added = Array(codex.accounts.dropFirst())
+        added[0].isEnabled = false
 
-        #expect(providers.map(\.name) == ["a@example.com", "b@example.com"])
-        #expect(Set(providers.map(\.id)).count == 2)
-        #expect(providers[1].isEnabled)
-        #expect(settings.isEnabled(forProvider: providers[0].id) == false)
+        #expect(codex.accounts.count == 3)
+        #expect(codex.defaultAccount.id == "codex")
+        #expect(added.map(\.name) == ["a@example.com", "b@example.com"])
+        #expect(Set(codex.accounts.map(\.id)).count == 3)
+        #expect(added[1].isEnabled)
+        #expect(settings.isEnabled(forProvider: added[0].id) == false)
+    }
+
+    // MARK: - One provider, many logins
+
+    @Test
+    func `every login runs the one definition, patched for added logins`() throws {
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let folder = try writeLogin(in: stub.home, "work", email: "work@example.com", accountId: "work")
+        let codex = try stub.makeProvider("codex", accounts: [config("a", folder: folder, accountId: "work")])
+
+        let defaultKinds = codex.dataSources(for: codex.defaultAccount).map(\.kind)
+        let addedSources = codex.dataSources(for: codex.accounts[1])
+
+        #expect(defaultKinds == ["rpc", "api", "tty"])
+        #expect(addedSources.map(\.kind) == ["rpc", "api"])
+        #expect(addedSources.first?.definition.fallback == nil)
+        #expect(addedSources.first?.definition.requiresFiles == ["\(folder.path)/auth.json"])
+        #expect(addedSources.first?.definition.identity?.equals == "work")
+    }
+
+    @Test
+    func `the data source choice covers every login`() throws {
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let folder = try writeLogin(in: stub.home, "work", email: "work@example.com", accountId: "work")
+        let codex = try stub.makeProvider("codex", accounts: [config("a", folder: folder, accountId: "work")])
+
+        codex.use("api")
+
+        #expect(codex.activeKind == "api")
+        #expect(stub.settings.dataSourceKind(forProvider: "codex") == "api")
+    }
+
+    @Test
+    func `a login whose saved values are incomplete is not added`() throws {
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let codex = try stub.makeProvider("codex")
+
+        let added = codex.add(ProviderAccountConfig(accountId: "a", label: "", probeConfig: ["codexHome": "/tmp/x"]))
+
+        #expect(added == nil)
+        #expect(codex.accounts.count == 1)
+    }
+
+    @Test
+    func `a login is listed once, and the default can't be removed`() throws {
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let folder = try writeLogin(in: stub.home, "work", email: "work@example.com", accountId: "work")
+        let codex = try stub.makeProvider("codex")
+        let work = config("a", folder: folder, accountId: "work")
+
+        let first = try #require(codex.add(work))
+        let again = codex.add(work)
+        codex.remove(codex.defaultAccount)
+        codex.remove(first)
+
+        #expect(again == nil)
+        #expect(codex.accounts.map(\.id) == ["codex"])
+    }
+
+    @Test
+    func `status is the worst enabled login, and the best has the most left`() async throws {
+        let stub = try StubbedProvider(dataSourceKind: "api", providerId: "codex")
+        defer { stub.cleanUp() }
+        try stub.writeCodexAuth(accountId: "me")
+        let folder = try writeLogin(in: stub.home, "work", email: "work@example.com", accountId: "work")
+        let codex = try stub.makeProvider("codex", accounts: [config("a", folder: folder, accountId: "work")])
+        let me = codex.defaultAccount
+        let work = codex.accounts[1]
+        given(stub.network).request(.matching { @Sendable in $0.value(forHTTPHeaderField: "ChatGPT-Account-Id") == "me" })
+            .willReturn((Data(#"{"rate_limit":{"primary_window":{"used_percent":90}}}"#.utf8), StubbedProvider.response(200)))
+        given(stub.network).request(.matching { @Sendable in $0.value(forHTTPHeaderField: "ChatGPT-Account-Id") == "work" })
+            .willReturn((Data(#"{"rate_limit":{"primary_window":{"used_percent":10}}}"#.utf8), StubbedProvider.response(200)))
+
+        try await me.refresh()
+        try await work.refresh()
+
+        #expect(me.status == .critical)
+        #expect(work.status == .healthy)
+        #expect(codex.status == .critical)
+        #expect(codex.bestAccount === work)
+
+        me.isEnabled = false
+
+        #expect(codex.status == .healthy)
     }
 
     // MARK: - Helpers

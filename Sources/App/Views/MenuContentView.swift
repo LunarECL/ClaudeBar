@@ -483,7 +483,7 @@ struct MenuContentView: View {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
                     accountCard(displayName: displayName, snapshot: snapshot)
                 }
-                if (provider as? Provider)?.isNamedByAccount == true, provider.lastError != nil {
+                if (provider as? Account)?.isNamedByAccount == true, provider.lastError != nil {
                     compactErrorState(provider: provider)
                 }
                 statsGrid(snapshot: snapshot)
@@ -519,7 +519,7 @@ struct MenuContentView: View {
             providerSectionHeader(provider: provider)
 
             if let snapshot = provider.snapshot {
-                if (provider as? Provider)?.isNamedByAccount == true, provider.lastError != nil {
+                if (provider as? Account)?.isNamedByAccount == true, provider.lastError != nil {
                     compactErrorState(provider: provider)
                 }
                 statsGrid(snapshot: snapshot)
@@ -1003,7 +1003,7 @@ struct MenuContentView: View {
 
     /// The selected provider's guest passes, when it has any to offer.
     private var guestPasses: GuestPasses? {
-        (selectedProvider as? Provider)?.guestPasses
+        (selectedProvider as? Account)?.guestPasses
     }
 
     /// Fetch guest passes and show the share view

@@ -4,89 +4,107 @@ import Quotas
 import Foundation
 import Observation
 
-/// THE lifecycle — one class for every provider. Everything a provider used to
-/// re-implement (the enabled toggle, the syncing flag, the last usage, the last
-/// error, the probe mode, the fallback) lives here once; what a provider *is*
-/// lives in its definition, and how it fetches lives in its data sources.
+/// THE PRODUCT — Codex, Claude, a gateway someone added — and THE lifecycle,
+/// once for every login of it. What a provider *is* lives in its definition,
+/// how it fetches in its data sources; who is signed in, and what we last saw
+/// for them, lives in its `accounts`.
+///
+/// Every login runs the same definition: an added one with `accounts.patch`
+/// merged in and its values filling `{{account.x}}`, made live once and kept,
+/// so each login has its own cache and rate-limit memory.
 @MainActor
 @Observable
-public final class Provider: AIProvider {
+public final class Provider {
     public let definition: ProviderDefinition
 
-    // MARK: - Identity
+    /// The logins — never empty; the first is the default login.
+    public private(set) var accounts: [Account] = []
+    public var defaultAccount: Account { accounts[0] }
 
-    /// Which login this is — the default one, or one the person added.
-    public nonisolated let account: ProviderAccount
-    /// `codex` for the default login, `codex.<account>` for an added one.
-    public let id: String
-    public let cliCommand: String
-
-    /// The account's email when the definition names providers by it, else the product.
-    public var name: String {
-        guard definition.accounts?.nameFromEmail == true, let accountEmail else { return definition.name }
-        return accountEmail
-    }
-
-    public var accountEmail: String? { snapshot?.accountEmail ?? account.email }
-
-    /// Whether this provider is named by its account — what the menu bar and
-    /// the popover show beside its usage.
-    public var isNamedByAccount: Bool { definition.accounts?.nameFromEmail == true }
-    /// The dashboard for the plan the last usage reported (#328: an API
-    /// account's is Console billing, a subscription's claude.ai usage).
-    public var dashboardURL: URL? { definition.links.dashboard(for: snapshot?.accountTier) }
-    public var statusPageURL: URL? { definition.links.status }
-
-    public var isEnabled: Bool {
-        didSet { settings.setEnabled(isEnabled, forProvider: id) }
-    }
-
-    // MARK: - State
-
-    public private(set) var isSyncing = false
-    public private(set) var snapshot: UsageSnapshot?
-    /// Today's `UsageError`, so every screen that reads one keeps reading one.
-    public private(set) var lastError: Error?
-    /// Which step failed last — lookup, fetch or mapping. `nil` after a success.
-    public private(set) var lastFailedStep: DataSourceError.Step?
-    /// The kind of the data source that produced `snapshot` — *via RPC*.
-    public private(set) var answeredBy: String?
-
-    // MARK: - Data sources
-
-    public let dataSources: [DataSource]
     /// Today's and yesterday's usage, read on an interactive refresh only —
     /// a background poll stays cheap (#204).
     public let dailyUsage: (any DailyUsageAnalyzing)?
     /// *Share Claude Code*, for a provider whose plan can issue guest passes.
     public let guestPasses: GuestPasses?
-    private let settings: any ProviderSettingsRepository
-    @ObservationIgnored private var refreshTask: Task<UsageSnapshot, Error>?
 
+    let settings: any ProviderSettingsRepository
+    private let makeDataSource: (DataSourceDefinition) -> DataSource
+    @ObservationIgnored private var bound: [String: [DataSource]] = [:]
+    @ObservationIgnored private var refreshTasks: [String: Task<UsageSnapshot, Error>] = [:]
+
+    /// - Parameter makeDataSource: makes a definition live — the real
+    ///   connections in the app, stubbed ones in tests.
     public init(
         definition: ProviderDefinition,
-        dataSources: [DataSource],
         settings: any ProviderSettingsRepository,
-        account: ProviderAccount? = nil,
+        accounts: [ProviderAccountConfig] = [],
+        makeDataSource: @escaping (DataSourceDefinition) -> DataSource,
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
     ) {
-        let account = account ?? ProviderAccount(providerId: definition.id, label: "")
         self.definition = definition
-        self.account = account
-        self.id = account.id
-        self.cliCommand = definition.cli ?? ""
-        self.dataSources = dataSources
+        self.settings = settings
+        self.makeDataSource = makeDataSource
         self.dailyUsage = dailyUsage
         self.guestPasses = guestPasses
-        self.settings = settings
-        self.isEnabled = settings.isEnabled(forProvider: account.id, defaultValue: definition.enabledByDefault)
+        self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: ""), values: [:])]
+        bound[definition.id] = definition.dataSources.map(makeDataSource)
+        for config in accounts {
+            add(config)
+        }
     }
 
+    public var id: String { definition.id }
+    public var name: String { definition.name }
+
+    // MARK: - Accounts
+
+    /// *Add Account* — a login beside the default one. `nil` when the
+    /// definition has no added accounts, the login is already listed, or its
+    /// saved values don't fill what the definition needs.
+    @discardableResult
+    public func add(_ config: ProviderAccountConfig) -> Account? {
+        let login = config.toProviderAccount(providerId: definition.id)
+        guard definition.accounts != nil, !login.isDefault, !accounts.contains(where: { $0.id == login.id }) else {
+            return nil
+        }
+        do {
+            bound[login.id] = try definition.dataSources(forAccount: config.probeConfig).map(makeDataSource)
+        } catch {
+            AppLog.providers.error("\(definition.id): can't run account \(login.id): \(error.localizedDescription)")
+            return nil
+        }
+        let account = Account(provider: self, login: login, values: config.probeConfig)
+        accounts.append(account)
+        return account
+    }
+
+    /// *Remove* — forgets the login here; its CLI's files are never touched.
+    /// The default login can't be removed.
+    public func remove(_ account: Account) {
+        guard !account.isDefault else { return }
+        accounts.removeAll { $0.id == account.id }
+        bound[account.id] = nil
+        refreshTasks[account.id] = nil
+    }
+
+    /// The enabled login with the most left — *switch to work*.
+    public var bestAccount: Account? {
+        accounts.filter(\.isEnabled).max {
+            ($0.snapshot?.lowestQuota?.percentRemaining ?? -.infinity) < ($1.snapshot?.lowestQuota?.percentRemaining ?? -.infinity)
+        }
+    }
+
+    /// The worst quota health across the enabled logins.
+    public var status: QuotaStatus {
+        accounts.filter(\.isEnabled).map(\.status).max() ?? .healthy
+    }
+
+    // MARK: - Data sources — one choice for every login
+
     /// The data source in use: the one the person picked, else the default.
-    /// One choice covers every account of the provider.
     public var activeKind: String {
-        if let chosen = settings.dataSourceKind(forProvider: definition.id), dataSource(chosen) != nil {
+        if let chosen = settings.dataSourceKind(forProvider: definition.id), definition.dataSource(chosen) != nil {
             return chosen
         }
         return definition.defaultDataSource
@@ -95,61 +113,61 @@ public final class Provider: AIProvider {
     /// Switches the data source. `false` when the provider has no such one.
     @discardableResult
     public func use(_ kind: String) -> Bool {
-        guard dataSource(kind) != nil else { return false }
+        guard definition.dataSource(kind) != nil else { return false }
         settings.setDataSourceKind(kind, forProvider: definition.id)
         return true
     }
 
-    /// Whether a data source's key lookup finds a key — what a config card
-    /// shows as *credentials found*. `false` when there is no such data source.
-    public func hasKey(for kind: String) -> Bool {
-        dataSource(kind)?.hasKey ?? false
+    /// Whether a data source's key lookup finds a key for a login — what a
+    /// config card shows as *credentials found*. The default login unless named.
+    public func hasKey(for kind: String, account: Account? = nil) -> Bool {
+        dataSource(kind, for: account ?? defaultAccount)?.hasKey ?? false
     }
 
-    // MARK: - AIProvider
-
-    /// Ready when the active data source is — or, failing that, the fallback
-    /// it would hand over to.
-    public func isAvailable() async -> Bool {
-        guard let active = dataSource(activeKind) else { return false }
-        if await active.isReady() { return true }
-        guard let fallback = enabledFallback(of: active) else { return false }
-        return await fallback.isReady()
+    /// The live data sources a login runs.
+    public func dataSources(for account: Account) -> [DataSource] {
+        bound[account.id] ?? []
     }
 
     /// A data source that serves cached usage sets how often the background
     /// may ask (Claude's API: 15 minutes, #204).
     public var backgroundRefreshFloor: Duration? {
-        dataSource(activeKind)?.cacheTTL.map { .seconds($0) }
+        definition.dataSource(activeKind)?.cache.map { .seconds($0.ttl) }
     }
 
-    @discardableResult
-    public func refresh() async throws -> UsageSnapshot {
-        try await refresh(.interactive)
+    // MARK: - Refresh — one login at a time
+
+    /// Ready when the active data source is — or, failing that, the fallback
+    /// it would hand over to.
+    public func isAvailable(_ account: Account) async -> Bool {
+        guard let active = dataSource(activeKind, for: account) else { return false }
+        if await active.isReady() { return true }
+        guard let fallback = enabledFallback(of: active, for: account) else { return false }
+        return await fallback.isReady()
     }
 
-    /// Fetches with the active data source and follows its hand-offs and
-    /// fallback until one answers. A failure keeps the last usage on screen
-    /// and reports the first real failure — not a hand-off, and not a
-    /// fallback's, which would send the person chasing the wrong problem.
+    /// Fetches a login's usage with the active data source and follows its
+    /// hand-offs and fallback until one answers. A failure keeps the last
+    /// usage on screen and reports the first real failure — not a hand-off,
+    /// and not a fallback's, which would send the person chasing the wrong problem.
     @discardableResult
-    public func refresh(_ kind: RefreshKind) async throws -> UsageSnapshot {
-        guard let active = dataSource(activeKind) else {
+    public func refresh(_ account: Account, _ kind: RefreshKind = .interactive) async throws -> UsageSnapshot {
+        guard let active = dataSource(activeKind, for: account) else {
             throw UsageError.noData
         }
         // Held back until one explicit refresh succeeded (#216): a CLI that
         // was never signed in may open a browser login on its own.
-        if kind != .interactive, active.definition.verifyBeforeBackground, !isVerified {
-            if let snapshot { return snapshot }
+        if kind != .interactive, active.definition.verifyBeforeBackground, !isVerified(account) {
+            if let snapshot = account.snapshot { return snapshot }
             let error = UsageError.executionFailed(active.definition.unverifiedMessage ?? "Not checked yet. Click Refresh.")
-            lastError = error
+            account.lastError = error
             throw error
         }
-        // Overlapping refreshes share one result.
-        if let refreshTask { return try await refreshTask.value }
-        let task = Task { try await run(from: active, kind) }
-        refreshTask = task
-        defer { refreshTask = nil }
+        // Overlapping refreshes of one login share one result.
+        if let running = refreshTasks[account.id] { return try await running.value }
+        let task = Task { try await run(account, from: active, kind) }
+        refreshTasks[account.id] = task
+        defer { refreshTasks[account.id] = nil }
         let usage = try await task.value
         if kind == .interactive, active.definition.verifyBeforeBackground {
             markVerified()
@@ -159,17 +177,21 @@ public final class Provider: AIProvider {
 
     // MARK: - Private
 
-    private func run(from start: DataSource, _ kind: RefreshKind) async throws -> UsageSnapshot {
+    private func dataSource(_ kind: String, for account: Account) -> DataSource? {
+        dataSources(for: account).first { $0.kind == kind }
+    }
+
+    private func run(_ account: Account, from start: DataSource, _ kind: RefreshKind) async throws -> UsageSnapshot {
         var current = start
-        isSyncing = true
-        defer { isSyncing = false }
+        account.isSyncing = true
+        defer { account.isSyncing = false }
 
         var tried: Set = [current.kind]
         var reported: Error?
         while true {
             do {
                 let usage = try await current.fetchUsage()
-                return succeed(identified(await withDailyUsage(usage, kind)), from: current.kind)
+                return account.succeed(identified(await withDailyUsage(usage, kind), for: account), from: current.kind)
             } catch {
                 let reason = Self.reason(of: error)
                 if case .rateLimited? = reason {
@@ -178,15 +200,15 @@ public final class Provider: AIProvider {
                     break
                 }
                 if let tag = reason?.tag, let next = current.definition.fallbackOn[tag],
-                   !tried.contains(next), let handOff = dataSource(next) {
-                    AppLog.probes.info("\(id) \(current.kind) handed off to \(next) (\(tag))")
+                   !tried.contains(next), let handOff = dataSource(next, for: account) {
+                    AppLog.probes.info("\(account.id) \(current.kind) handed off to \(next) (\(tag))")
                     tried.insert(next)
                     current = handOff
                     continue
                 }
                 reported = reported ?? error
-                if let fallback = enabledFallback(of: current), !tried.contains(fallback.kind) {
-                    AppLog.probes.warning("\(id) \(current.kind) failed (\(error.localizedDescription)), trying \(fallback.kind)")
+                if let fallback = enabledFallback(of: current, for: account), !tried.contains(fallback.kind) {
+                    AppLog.probes.warning("\(account.id) \(current.kind) failed (\(error.localizedDescription)), trying \(fallback.kind)")
                     tried.insert(fallback.kind)
                     current = fallback
                     continue
@@ -195,32 +217,32 @@ public final class Provider: AIProvider {
             }
         }
         if let reported, tried.count > 1 {
-            AppLog.probes.info("\(id): every data source failed; reporting \(reported.localizedDescription)")
+            AppLog.probes.info("\(account.id): every data source failed; reporting \(reported.localizedDescription)")
         }
-        fail(reported ?? UsageError.noData)
-        throw lastError ?? UsageError.noData
+        account.fail(reported ?? UsageError.noData)
+        throw account.lastError ?? UsageError.noData
     }
 
-    /// An added account is checked by being added; the default login once
-    /// an explicit refresh succeeds, remembered as `<id>.verifiedAtLeastOnce`.
-    private var isVerified: Bool {
+    /// An added login is checked by being added; the default login once an
+    /// explicit refresh succeeds, remembered as `<id>.verifiedAtLeastOnce`.
+    private func isVerified(_ account: Account) -> Bool {
         !account.isDefault || settings.isOn("verifiedAtLeastOnce", forProvider: definition.id) == true
     }
 
     private func markVerified() {
-        guard !isVerified else { return }
+        guard settings.isOn("verifiedAtLeastOnce", forProvider: definition.id) != true else { return }
         settings.setOn(true, "verifiedAtLeastOnce", forProvider: definition.id)
     }
 
-    /// The usage as this account's: its id on every quota, its saved email
-    /// when the source named none.
-    private func identified(_ usage: UsageSnapshot) -> UsageSnapshot {
-        guard usage.providerId != id || (usage.accountEmail == nil && account.email != nil) else { return usage }
+    /// The usage as this login's: its id on every quota, its saved email when
+    /// the source named none.
+    private func identified(_ usage: UsageSnapshot, for account: Account) -> UsageSnapshot {
+        guard usage.providerId != account.id || (usage.accountEmail == nil && account.email != nil) else { return usage }
         return UsageSnapshot(
-            providerId: id,
+            providerId: account.id,
             quotas: usage.quotas.map { quota in
                 UsageQuota(
-                    percentRemaining: quota.percentRemaining, quotaType: quota.quotaType, providerId: id,
+                    percentRemaining: quota.percentRemaining, quotaType: quota.quotaType, providerId: account.id,
                     resetsAt: quota.resetsAt, resetText: quota.resetText, windowDuration: quota.windowDuration,
                     dollarRemaining: quota.dollarRemaining, dollarUsed: quota.dollarUsed, dollarCap: quota.dollarCap,
                     group: quota.group, compactTitle: quota.compactTitle, menuBarTitle: quota.menuBarTitle,
@@ -239,17 +261,13 @@ public final class Provider: AIProvider {
         )
     }
 
-    private func dataSource(_ kind: String) -> DataSource? {
-        dataSources.first { $0.kind == kind }
-    }
-
     /// The fallback a data source names, unless a provider setting turns it off.
-    private func enabledFallback(of source: DataSource) -> DataSource? {
+    private func enabledFallback(of source: DataSource, for account: Account) -> DataSource? {
         guard let fallback = source.definition.fallback else { return nil }
         if let setting = fallback.enabledBySetting, settings.isOn(setting, forProvider: definition.id) == false {
             return nil
         }
-        return dataSource(fallback.to)
+        return dataSource(fallback.to, for: account)
     }
 
     private func withDailyUsage(_ usage: UsageSnapshot, _ kind: RefreshKind) async -> UsageSnapshot {
@@ -274,31 +292,7 @@ public final class Provider: AIProvider {
         )
     }
 
-    private func succeed(_ usage: UsageSnapshot, from kind: String) -> UsageSnapshot {
-        snapshot = usage
-        lastError = nil
-        lastFailedStep = nil
-        answeredBy = kind
-        return usage
-    }
-
-    private func fail(_ error: Error) {
-        if let failure = error as? DataSourceError {
-            lastError = failure.reason
-            lastFailedStep = failure.step
-        } else {
-            lastError = error
-            lastFailedStep = nil
-        }
-        // An added account that is signed out shows nothing rather than its
-        // last usage, which would read as still current.
-        if !account.isDefault, let tag = (lastError as? UsageError)?.tag,
-           tag == "authenticationRequired" || tag == "sessionExpired" {
-            snapshot = nil
-        }
-    }
-
-    private static func reason(of error: Error) -> UsageError? {
+    static func reason(of error: Error) -> UsageError? {
         (error as? DataSourceError)?.reason ?? (error as? UsageError)
     }
 }

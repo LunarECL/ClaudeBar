@@ -24,11 +24,12 @@ struct ClaudeBarApp: App {
     private static func builtIn(
         _ id: String,
         settings: any ProviderSettingsRepository,
+        accounts: [ProviderAccountConfig] = [],
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
-    ) -> any AIProvider {
+    ) -> Provider {
         do {
-            return try Providers.make(id, settings: settings, dailyUsage: dailyUsage, guestPasses: guestPasses)
+            return try Providers.make(id, settings: settings, accounts: accounts, dailyUsage: dailyUsage, guestPasses: guestPasses)
         } catch {
             preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
         }
@@ -95,24 +96,28 @@ struct ClaudeBarApp: App {
         // - HookSettingsRepository
         let settingsRepository = JSONSettingsRepository.shared
 
-        // Create all providers with their probes (rich domain models)
-        // Each provider manages its own isEnabled state (persisted via ProviderSettingsRepository)
-        // Each probe checks isAvailable() for credentials/prerequisites
-        let repository = AIProviders(providers: [
-            // Claude is data: Modules/Providers/Resources/Providers/claude.json
-            // and the mapping scripts beside it. What isn't usage rides along:
-            // today's usage from local session logs (#190 keeps loopback
-            // inference free) and guest passes.
-            Self.builtIn(
-                "claude",
-                settings: settingsRepository,
-                dailyUsage: ClaudeDailyUsageAnalyzer(
-                    isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
-                ),
-                guestPasses: GuestPasses(source: ClaudeGuestPassSource())
+        // Claude is data: Modules/Providers/Resources/Providers/claude.json
+        // and the mapping scripts beside it. What isn't usage rides along:
+        // today's usage from local session logs (#190 keeps loopback
+        // inference free) and guest passes.
+        let claude = Self.builtIn(
+            "claude",
+            settings: settingsRepository,
+            dailyUsage: ClaudeDailyUsageAnalyzer(
+                isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
             ),
-            // Codex is data: Modules/Providers/Resources/Providers/codex.json.
-            Self.builtIn("codex", settings: settingsRepository),
+            guestPasses: GuestPasses(source: ClaudeGuestPassSource())
+        )
+        // Codex is data: Modules/Providers/Resources/Providers/codex.json — the
+        // product once, with the logins added beside the default one (#326).
+        let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
+
+        // The lineup: each login is its own pill. Legacy providers are their
+        // own single login until they become definitions.
+        // Each provider manages its own isEnabled state (persisted via ProviderSettingsRepository)
+        let repository = AIProviders(providers: [
+            claude.defaultAccount,
+            codex.defaultAccount,
             GeminiProvider(probe: GeminiUsageProbe(), settingsRepository: settingsRepository),
             AntigravityProvider(probe: AntigravityUsageProbe(), settingsRepository: settingsRepository),
             ZaiProvider(
@@ -173,12 +178,9 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
         ])
-        // Codex accounts added beside the default login (#326): codex.json's
-        // `accounts` data sources, filled from each account's saved folder.
-        for config in settingsRepository.accounts(forProvider: "codex") {
-            if let provider = AddedAccounts.provider("codex", configuration: config, settings: settingsRepository) {
-                repository.add(provider)
-            }
+        // Added Codex logins follow the built-in lineup, as they always have.
+        for account in codex.accounts.dropFirst() {
+            repository.add(account)
         }
         AppLog.providers.info("Created \(repository.all.count) providers")
 

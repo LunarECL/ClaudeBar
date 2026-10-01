@@ -362,7 +362,7 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | # | Slice | Done when |
 |---|---|---|
 | **1** | **Codex** — the definition types, `CredentialLookup` · `Fetch` · `Mapping`, `DataSource`, `Provider`; workers `JSONFileReader`, `OAuth2Refresher`, `HTTPFetcher`, `JSONRPCFetcher`, `TerminalFetcher`, `JSONMapper`, `TextMapper`; `codex.json`; golden tests | `CodexProvider`, `CodexUsageProbe`, `CodexAPIUsageProbe`, `DefaultCodexRPCClient`, `CodexCredentialLoader` are deleted; both modes and the fallback work; `codex.probeMode` is read as before |
-| 1a | **Accounts under one Provider** — `Provider` owns `[Account]`; `{{account.x}}` filled at fetch time; `codex.json`'s `accounts.dataSources` deleted; `AddedAccounts` → `provider.add(account:)` | same ids, pills, pins and settings keys; no visible change |
+| 1a ✅ | **Accounts under one Provider** — `Provider` owns `[Account]`; `{{account.x}}` filled at fetch time; `codex.json`'s `accounts.dataSources` deleted; `AddedAccounts` → `provider.add(account:)` | same ids, pills, pins and settings keys; no visible change |
 | 2 | the HTTP + API-key providers (DeepSeek, MiniMax, Z.ai, Kimi API, Vercel, …): `EnvironmentReader`, `SettingReader` | their probes and provider classes are deleted |
 | 3 | the look and the settings form move into the JSON; the `switch id` tables and the simple config cards go | adding a provider edits no Swift |
 | 4 | the kernel laws: `Left` (no fake 100%), `Window` (no guessed length) | balance definitions map money only |
@@ -402,6 +402,6 @@ vendor type:
   account-scope setting in the form later); the provider owns `[Account]`;
   one definition serves every account, the account's values filled when the
   fetch runs. Accounts are simultaneous — each is a pill. Claude (slice 7)
-  follows the same shape. **Not built yet**: today each Codex login is its own
-  `Provider` with a copy of the data sources (CANONICAL_MODEL §8, ticket in #350).
+  follows the same shape. **Built** for Codex (#356): `accounts.patch` and
+  `{{account.x}}`, one `Provider` owning its `Account`s.
 - **A `command` fetch from the UI** — see [CANONICAL_MODEL §9](CANONICAL_MODEL.md#9--open).

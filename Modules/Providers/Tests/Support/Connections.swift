@@ -32,38 +32,43 @@ struct StubbedProvider {
         }
     }
 
-    /// The default login, or — with `account` — an added one.
-    func make(_ id: String, account: ProviderAccountConfig? = nil) throws -> Provider {
-        let definition: ProviderDefinition
-        if let account {
-            definition = try #require(try ProviderDefinition.parse(Providers.builtInData(id), account: account.probeConfig))
-        } else {
-            definition = try Providers.builtIn(id)
-        }
+    /// The provider with its default login and every login in `accounts`,
+    /// its data sources on the stubbed connections.
+    func makeProvider(_ id: String, accounts: [ProviderAccountConfig] = []) throws -> Provider {
         let transport = self.transport
         let launches = self.launches
         let environment = self.environment
-        let sources = definition.dataSources.map {
-            DataSources.make(
-                $0,
-                providerId: definition.id,
-                cliExecutor: cli,
-                network: network,
-                makeTransport: { _, arguments, environment, _ in
-                    launches.record(arguments, environment)
-                    return transport
-                },
-                environment: { environment[$0] },
-                homeDirectory: home,
-                now: { Date() }
-            )
-        }
+        let cli = self.cli
+        let network = self.network
+        let home = self.home
+        let definition = try Providers.builtIn(id)
         return Provider(
             definition: definition,
-            dataSources: sources,
             settings: settings,
-            account: account?.toProviderAccount(providerId: id)
+            accounts: accounts,
+            makeDataSource: {
+                DataSources.make(
+                    $0,
+                    providerId: definition.id,
+                    cliExecutor: cli,
+                    network: network,
+                    makeTransport: { _, arguments, environment, _ in
+                        launches.record(arguments, environment)
+                        return transport
+                    },
+                    environment: { environment[$0] },
+                    homeDirectory: home,
+                    now: { Date() }
+                )
+            }
         )
+    }
+
+    /// The default login, or — with `account` — that added one.
+    func make(_ id: String, account: ProviderAccountConfig? = nil) throws -> Account {
+        let provider = try makeProvider(id, accounts: account.map { [$0] } ?? [])
+        guard let account else { return provider.defaultAccount }
+        return try #require(provider.accounts.first { $0.accountId == account.accountId })
     }
 
     func cleanUp() {

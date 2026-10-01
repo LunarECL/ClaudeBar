@@ -33,7 +33,7 @@ public protocol ProviderVisualIdentity {
 /// A provider built from a definition takes its look from the id tables
 /// below — the same values its hand-written class used — until the look moves
 /// into the definition itself (docs/architecture/TARGET_ARCHITECTURE.md §8, slice 3).
-extension Provider: ProviderVisualIdentity {
+extension Account: ProviderVisualIdentity {
     public var symbolIcon: String { ProviderVisualIdentityLookup.symbolIcon(for: id) }
 
     public var iconAssetName: String { ProviderVisualIdentityLookup.iconAssetName(for: id) }

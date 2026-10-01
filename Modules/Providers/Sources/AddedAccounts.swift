@@ -2,9 +2,10 @@ import DataSources
 import Quotas
 import Foundation
 
-/// *Add Account…*: a second login of a provider, added by choosing the folder
-/// it lives in (`accounts.folder` in the definition). Only the folder and the
-/// login's account id are saved; the credentials stay where the CLI keeps them.
+/// *Add Account…*: checks a folder a second login lives in
+/// (`accounts.folder` in the definition) and returns what to save — the folder
+/// and the login's account id; the credentials stay where the CLI keeps them.
+/// `provider.add(_:)` then runs it.
 public enum AddedAccounts {
     /// Checks a chosen folder and returns the account to save: the folder
     /// holds a login, it is not the default login, and it is not listed yet.
@@ -41,17 +42,6 @@ public enum AddedAccounts {
         )
     }
 
-    /// The provider an added account runs as — `nil` for the default login
-    /// or saved values the definition can't run with.
-    @MainActor
-    public static func provider(
-        _ providerId: String,
-        configuration: ProviderAccountConfig,
-        settings: any ProviderSettingsRepository
-    ) -> Provider? {
-        try? Providers.make(providerId, account: configuration, settings: settings)
-    }
-
     // MARK: - Private
 
     /// What the account's data sources would read in `folder` — the non-secret
@@ -62,8 +52,10 @@ public enum AddedAccounts {
         rule: ProviderDefinition.Accounts.Folder
     ) throws -> [String: String] {
         let values = [rule.savedAs: folder, rule.accountId.savedAs: ""]
-        guard let definition = try ProviderDefinition.parse(try Providers.builtInData(providerId), account: values),
-              let source = definition.dataSources.first(where: { $0.credential != nil }) else { return [:] }
+        let definition = try Providers.builtIn(providerId)
+        guard let source = try definition.dataSources(forAccount: values).first(where: { $0.credential != nil }) else {
+            return [:]
+        }
         return DataSources.make(source, providerId: providerId).credentialFacts()
     }
 

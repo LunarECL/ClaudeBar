@@ -52,12 +52,15 @@ struct ClaudeConfigSpec {
         deinit { try? FileManager.default.removeItem(at: home) }
 
         @MainActor
-        func claude() throws -> Provider {
+        func claude() throws -> Account {
             let definition = try Providers.builtIn("claude")
             let home = self.home
+            let cli = self.cli
+            let network = self.network
             return Provider(
                 definition: definition,
-                dataSources: definition.dataSources.map {
+                settings: settings,
+                makeDataSource: {
                     DataSources.make(
                         $0,
                         providerId: "claude",
@@ -69,9 +72,8 @@ struct ClaudeConfigSpec {
                         homeDirectory: home,
                         now: { Date() }
                     )
-                },
-                settings: settings
-            )
+                }
+            ).defaultAccount
         }
 
         func cliAnswers(_ screen: String) {
@@ -124,7 +126,7 @@ struct ClaudeConfigSpec {
             world.apiAnswers(ClaudeConfigSpec.apiUsage)
             try world.loggedIn()
             let claude = try world.claude()
-            #expect(claude.activeKind == "cli")
+            #expect(claude.provider.activeKind == "cli")
 
             // When — the Claude card saves API mode
             world.settings.setClaudeProbeMode(.api)
@@ -132,7 +134,7 @@ struct ClaudeConfigSpec {
             await monitor.refresh(providerId: "claude")
 
             // Then — the API's answer is shown
-            #expect(claude.activeKind == "api")
+            #expect(claude.provider.activeKind == "api")
             #expect(claude.snapshot?.quotas.first?.percentRemaining == 45)
         }
 

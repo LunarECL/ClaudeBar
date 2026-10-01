@@ -173,7 +173,7 @@ struct ClaudeConfigCard: View {
             }
 
             if claudeProbeMode == .api {
-                let hasCredentials = (monitor.provider(for: "claude") as? Provider)?.hasKey(for: "api") ?? false
+                let hasCredentials = (monitor.provider(for: "claude") as? Account)?.hasKey(for: "api") ?? false
 
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "clock.arrow.circlepath")

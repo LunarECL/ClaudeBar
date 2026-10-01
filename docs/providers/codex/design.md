@@ -206,16 +206,14 @@ This plan covered the API probe. What was learned afterwards, mostly about the R
 
 Additional accounts reuse `ProviderAccountConfig` and `MultiAccountSettingsRepository`.
 `codex.json`'s `accounts` says how one is added (`folder`: saved as `codexHome`,
-its login's `account` claim saved as `chatgptAccountId`) and that each is named by
-its email. Today each becomes a separate generic `Provider` in `QuotaMonitor`
-(`AddedAccounts.provider`), with compound ID `codex.<local UUID>`; the default keeps
-`codex`. Each login is its own pill, enable toggle and menu-bar choice — users pin
-two accounts at once instead of selecting one active account within Codex.
-
-**Where this is going** ([CANONICAL_MODEL](../../architecture/CANONICAL_MODEL.md#1--the-tree)):
-one Codex `Provider` (the product) owning `[Account]` (the logins), one definition
-for all of them with the account's values filled when a fetch runs — so the
-duplicate `accounts.dataSources` block goes. Ids, pills and settings keys stay.
+its login's `account` claim saved as `chatgptAccountId`), that each is named by its
+email, and what an added login changes: `accounts.patch`, an RFC 7396 merge patch
+per data source kind (`"tty": null` leaves the terminal out). One Codex `Provider`
+(the product) owns its `Account`s (the logins, [CANONICAL_MODEL](../../architecture/CANONICAL_MODEL.md#1--the-tree));
+`AddedAccounts` checks a folder and `provider.add(_:)` runs it, compound ID
+`codex.<local UUID>`, the default keeping `codex`. Each login is its own pill,
+enable toggle and menu-bar choice — users pin two accounts at once instead of
+selecting one active account within Codex.
 
 Settings contain the email, canonical Codex directory and expected ChatGPT account
 ID, never tokens. Setup rejects duplicate directories (including symlinks), the

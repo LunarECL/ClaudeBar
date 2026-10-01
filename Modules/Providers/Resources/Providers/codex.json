@@ -357,11 +357,8 @@
       },
       "notSignedIn": "No ChatGPT account found in this folder. Sign in with Codex using file credential storage, then choose the folder again."
     },
-    "dataSources": [
-      {
-        "kind": "rpc",
-        "label": "RPC",
-        "summary": "Uses codex app-server RPC",
+    "patch": {
+      "rpc": {
         "credential": {
           "jsonFile": {
             "path": "{{account.codexHome}}/auth.json",
@@ -372,7 +369,6 @@
         },
         "fetch": {
           "jsonRpc": {
-            "cli": "codex",
             "args": [
               "-s",
               "read-only",
@@ -381,31 +377,6 @@
               "-c",
               "cli_auth_credentials_store=\"file\"",
               "app-server"
-            ],
-            "workingDirectory": "dedicated",
-            "handshake": [
-              {
-                "request": "initialize",
-                "params": {
-                  "clientInfo": {
-                    "name": "claudebar",
-                    "version": "1.0.0"
-                  }
-                }
-              },
-              {
-                "notify": "initialized"
-              }
-            ],
-            "call": "account/rateLimits/read",
-            "then": [
-              {
-                "request": "account/read",
-                "params": {
-                  "refreshToken": false
-                },
-                "as": "account"
-              }
             ],
             "environment": {
               "set": {
@@ -423,83 +394,6 @@
         },
         "mapping": {
           "json": {
-            "quotas": [
-              {
-                "kind": "session",
-                "at": "$.result.rateLimits.primary",
-                "usedPercent": "usedPercent",
-                "resetsAt": {
-                  "epochSeconds": "resetsAt"
-                },
-                "window": {
-                  "minutes": "windowDurationMins"
-                }
-              },
-              {
-                "kind": "weekly",
-                "at": "$.result.rateLimits.secondary",
-                "usedPercent": "usedPercent",
-                "resetsAt": {
-                  "epochSeconds": "resetsAt"
-                },
-                "window": {
-                  "minutes": "windowDurationMins"
-                }
-              },
-              {
-                "kind": "time",
-                "each": "$.result.rateLimitsByLimitId",
-                "skipKeys": [
-                  "codex"
-                ],
-                "name": {
-                  "firstOf": [
-                    "limitName",
-                    "limitId",
-                    "$key"
-                  ],
-                  "dropPrefixes": [
-                    {
-                      "prefix": "codex_",
-                      "capitalize": true
-                    },
-                    {
-                      "prefix": "codex "
-                    }
-                  ]
-                },
-                "windows": [
-                  {
-                    "at": "primary"
-                  },
-                  {
-                    "at": "secondary",
-                    "suffix": " 7d"
-                  }
-                ],
-                "usedPercent": "usedPercent",
-                "resetsAt": {
-                  "epochSeconds": "resetsAt"
-                },
-                "window": {
-                  "minutes": "windowDurationMins"
-                }
-              }
-            ],
-            "whenEmpty": {
-              "if": {
-                "path": "$.result.rateLimits.planType",
-                "equals": "free"
-              },
-              "quotas": [
-                {
-                  "kind": "session",
-                  "usedPercent": 0,
-                  "resetText": "Free plan"
-                }
-              ],
-              "otherwise": "No rate limits available yet - make some API calls first"
-            },
             "email": [
               "$.account.result.account.email",
               "$credential.email"
@@ -513,139 +407,15 @@
           "field": "account",
           "equals": "{{account.chatgptAccountId}}",
           "hint": "Sign in to the original account in this Codex folder, or remove it and add the new account in Settings."
-        }
+        },
+        "verifyBeforeBackground": null,
+        "unverifiedMessage": null,
+        "fallback": null
       },
-      {
-        "kind": "api",
-        "label": "API",
-        "summary": "Calls ChatGPT API directly",
+      "api": {
         "credential": {
           "jsonFile": {
-            "path": "{{account.codexHome}}/auth.json",
-            "token": "$.tokens.access_token",
-            "refreshToken": "$.tokens.refresh_token",
-            "account": "$.tokens.account_id",
-            "idToken": "$.tokens.id_token",
-            "refreshedAt": "$.last_refresh",
-            "email": "$.tokens.id_token#jwt.email"
-          },
-          "refresh": {
-            "oauth2": {
-              "tokenURL": "https://auth.openai.com/oauth/token",
-              "clientId": "app_EMoamEEZ73f0CkXaXp7hrann",
-              "every": 691200,
-              "onStatus": [
-                401,
-                403
-              ],
-              "expiredCodes": [
-                "refresh_token_expired",
-                "refresh_token_reused",
-                "refresh_token_invalidated"
-              ],
-              "hint": "Run `codex` in terminal to log in again."
-            }
-          }
-        },
-        "fetch": {
-          "http": {
-            "url": "https://chatgpt.com/backend-api/wham/usage",
-            "headers": {
-              "Authorization": "Bearer {{token}}",
-              "ChatGPT-Account-Id": "{{account}}",
-              "Accept": "application/json",
-              "User-Agent": "OpenUsage"
-            },
-            "timeout": 15
-          }
-        },
-        "mapping": {
-          "json": {
-            "plan": "$.plan_type",
-            "quotas": [
-              {
-                "kind": "session",
-                "at": "$.rate_limit.primary_window",
-                "usedPercent": [
-                  "$header.x-codex-primary-used-percent",
-                  "used_percent"
-                ],
-                "resetsAt": [
-                  {
-                    "epochSeconds": "reset_at"
-                  },
-                  {
-                    "secondsFromNow": "reset_after_seconds"
-                  }
-                ]
-              },
-              {
-                "kind": "weekly",
-                "at": "$.rate_limit.secondary_window",
-                "usedPercent": [
-                  "$header.x-codex-secondary-used-percent",
-                  "used_percent"
-                ],
-                "resetsAt": [
-                  {
-                    "epochSeconds": "reset_at"
-                  },
-                  {
-                    "secondsFromNow": "reset_after_seconds"
-                  }
-                ]
-              },
-              {
-                "kind": "time",
-                "each": "$.additional_rate_limits",
-                "name": {
-                  "firstOf": [
-                    "limit_name",
-                    "metered_feature"
-                  ],
-                  "dropPrefixes": [
-                    {
-                      "prefix": "codex_",
-                      "capitalize": true
-                    },
-                    {
-                      "prefix": "codex "
-                    }
-                  ]
-                },
-                "windows": [
-                  {
-                    "at": "rate_limit.primary_window"
-                  },
-                  {
-                    "at": "rate_limit.secondary_window",
-                    "suffix": " 7d"
-                  }
-                ],
-                "usedPercent": "used_percent",
-                "resetsAt": [
-                  {
-                    "epochSeconds": "reset_at"
-                  },
-                  {
-                    "secondsFromNow": "reset_after_seconds"
-                  }
-                ],
-                "window": {
-                  "seconds": "limit_window_seconds"
-                }
-              }
-            ],
-            "cost": {
-              "remaining": [
-                "$header.x-codex-credits-balance",
-                "$.credits.balance"
-              ],
-              "limit": 1000
-            },
-            "email": [
-              "$credential.email"
-            ]
+            "path": "{{account.codexHome}}/auth.json"
           }
         },
         "identity": {
@@ -653,7 +423,8 @@
           "equals": "{{account.chatgptAccountId}}",
           "hint": "Sign in to the original account in this Codex folder, or remove it and add the new account in Settings."
         }
-      }
-    ]
+      },
+      "tty": null
+    }
   }
 }

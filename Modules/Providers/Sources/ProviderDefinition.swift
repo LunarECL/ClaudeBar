@@ -55,21 +55,23 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     public let enabledByDefault: Bool
     public let dataSources: [DataSourceDefinition]
     public let defaultDataSource: String
-    /// More than one login for this provider: what an added account runs.
+    /// Logins added beside the default one, and how they differ.
     public let accounts: Accounts?
 
-    /// Accounts the person adds beside the default login (Codex, #326).
-    /// Their data sources may name the account's saved values as
-    /// `{{account.<name>}}` — filled in when the account's provider is made.
+    /// Logins a person adds beside the default one (Codex, #326). An added
+    /// login runs the SAME data sources with `patch` merged in (RFC 7396) and
+    /// its saved values filling `{{account.<name>}}` — one definition, never
+    /// a copy per login.
     public struct Accounts: Sendable, Equatable, Codable {
-        /// The account's email is the provider's name — two logins of one
-        /// product are told apart by who they are.
+        /// The login's email names it — two logins of one product are told
+        /// apart by who they are.
         public let nameFromEmail: Bool
         /// How a person adds one: by choosing the folder its login lives in.
         public let folder: Folder?
-        /// What an added account runs in place of `dataSources`, with the
-        /// same kinds, so one Data source choice covers every account.
-        public let dataSources: [DataSourceDefinition]
+        /// By data source kind, what an added login changes — its own folder,
+        /// its identity check, no fallback to the shared terminal. `null`
+        /// leaves that data source out for added logins.
+        public let patch: [String: JSONValue]
 
         /// `{ "savedAs": "codexHome", "default": "${CODEX_HOME:-~/.codex}",
         /// "accountId": { "fact": "account", "savedAs": "chatgptAccountId" } }`
@@ -101,17 +103,17 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             }
         }
 
-        public init(nameFromEmail: Bool = false, folder: Folder? = nil, dataSources: [DataSourceDefinition] = []) {
+        public init(nameFromEmail: Bool = false, folder: Folder? = nil, patch: [String: JSONValue] = [:]) {
             self.nameFromEmail = nameFromEmail
             self.folder = folder
-            self.dataSources = dataSources
+            self.patch = patch
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             nameFromEmail = try container.decodeIfPresent(Bool.self, forKey: .nameFromEmail) ?? false
             folder = try container.decodeIfPresent(Folder.self, forKey: .folder)
-            dataSources = try container.decodeIfPresent([DataSourceDefinition].self, forKey: .dataSources) ?? []
+            patch = try container.decodeIfPresent([String: JSONValue].self, forKey: .patch) ?? [:]
         }
     }
 
@@ -155,24 +157,23 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         return definition
     }
 
-    /// The definition as an added account runs it: its `accounts.dataSources`
-    /// in place of the default ones, with `{{account.<name>}}` filled from the
-    /// account's saved values (JSON-escaped). `nil` for a definition without accounts.
-    public static func parse(_ data: Data, account values: [String: String]) throws -> ProviderDefinition? {
-        var text = String(decoding: data, as: UTF8.self)
-        for (name, value) in values {
-            let encoded = String(decoding: try JSONEncoder().encode(value), as: UTF8.self)
-            text = text.replacingOccurrences(of: "{{account.\(name)}}", with: String(encoded.dropFirst().dropLast()))
+    /// The data sources an added login runs: each one with `accounts.patch`
+    /// merged in and `{{account.<name>}}` filled from the login's `values`.
+    /// Throws when a value the definition needs is missing.
+    public func dataSources(forAccount values: [String: String]) throws -> [DataSourceDefinition] {
+        let patch = accounts?.patch ?? [:]
+        return try dataSources.compactMap { source -> DataSourceDefinition? in
+            var adapted = source
+            if let change = patch[source.kind] {
+                if case .null = change { return nil }
+                adapted = try source.patched(with: change)
+            }
+            adapted = try adapted.filled(values, scope: "account")
+            if let missing = adapted.unfilled(scope: "account").first {
+                throw DefinitionError.missingAccountValue(id, missing)
+            }
+            return adapted
         }
-        let base = try parse(Data(text.utf8))
-        guard let accounts = base.accounts, !accounts.dataSources.isEmpty else { return nil }
-        let definition = ProviderDefinition(
-            id: base.id, name: base.name, cli: base.cli, links: base.links,
-            enabledByDefault: base.enabledByDefault, dataSources: accounts.dataSources,
-            defaultDataSource: base.defaultDataSource, accounts: accounts
-        )
-        try definition.validate()
-        return definition
     }
 
     public func validate() throws {
@@ -202,6 +203,7 @@ public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {
     case duplicateKind(String, String)
     case unknownDataSource(String, String)
     case missingFile(String)
+    case missingAccountValue(String, String)
 
     public var errorDescription: String? {
         switch self {
@@ -209,6 +211,7 @@ public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {
         case .duplicateKind(let id, let kind): "Provider '\(id)' lists data source '\(kind)' twice"
         case .unknownDataSource(let id, let kind): "Provider '\(id)' names data source '\(kind)', which it doesn't have"
         case .missingFile(let name): "No provider definition named '\(name)'"
+        case .missingAccountValue(let id, let name): "A '\(id)' account has no saved '\(name)'"
         }
     }
 }

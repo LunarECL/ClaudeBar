@@ -97,8 +97,8 @@ struct ActionBarSpec {
         @Test
         func `Claude offers guest passes only when it has a pass probe`() throws {
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
-            let withoutPasses = try Providers.make("claude", settings: settings)
-            let withPasses = try Providers.make("claude", settings: settings, guestPasses: GuestPasses(source: MockGuestPassSource()))
+            let withoutPasses = try Providers.make("claude", settings: settings).defaultAccount
+            let withPasses = try Providers.make("claude", settings: settings, guestPasses: GuestPasses(source: MockGuestPassSource())).defaultAccount
 
             #expect(withoutPasses.guestPasses == nil)
             #expect(withPasses.guestPasses != nil)

@@ -14,7 +14,7 @@ struct ClaudeDashboardTests {
     static let consoleBillingURL = URL(string: "https://console.anthropic.com/settings/billing")
 
     /// `screen` is what `/usage` shows; `/cost`, when `/usage` hands off to it, shows `cost`.
-    private func claude(afterReading screen: String, cost: String = "") async throws -> Provider {
+    private func claude(afterReading screen: String, cost: String = "") async throws -> Account {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         given(claude.cli).locate(.any).willReturn("/usr/local/bin/claude")
