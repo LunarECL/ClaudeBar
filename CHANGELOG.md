@@ -8,7 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Claude: the CLI binary is configurable (Settings → Providers → Claude → Claude Configuration → CLI Binary) for installs where `claude` lives under another name or path. Shell aliases can't be exec'd by an app — point it at the real binary. [#210](https://github.com/tddworks/ClaudeBar/issues/210)
+- Claude: the CLI binary is configurable (Settings → Providers → Claude → CLI Binary) for installs where `claude` lives under another name or path. Shell aliases can't be exec'd by an app — point it at the real binary. [#210](https://github.com/tddworks/ClaudeBar/issues/210)
+- Share a provider you made: Export… saves it as a file without your keys; Import… shows where it sends a key and any command it runs before you add it, then asks for your own key. ([#355](https://github.com/tddworks/ClaudeBar/issues/355))
+- Add Provider: track a service ClaudeBar doesn't ship. Settings → Providers → Add Provider… starts from an API, a command, a file or a copy; test it, click the numbers to map them, name it. Keys stay in your Keychain. ([#354](https://github.com/tddworks/ClaudeBar/issues/354))
+- Claude and Codex: the popover says which data source answered ("via RPC", or "via Terminal" after a fallback) and, when a refresh fails, which step went wrong ("Couldn't read your key"), keeping the last usage dimmed. ([#351](https://github.com/tddworks/ClaudeBar/issues/351))
+
+### Fixed
+- A prepaid balance (Vercel, Copilot, Cursor, Grok, Command Code, Amp) shows its money in the menu bar instead of "100%", and no longer claims a pace. Pace only uses a provider's real window, never one guessed from a quota's name. ([#329](https://github.com/tddworks/ClaudeBar/pull/329))
+- Notifications, provider pills, the Touch Bar, the status export and Notify! now follow the burn-rate warning setting like the menu bar does, so a quota that's on pace no longer sends a warning while the menu bar says healthy. ([#357](https://github.com/tddworks/ClaudeBar/issues/357))
+
+### Changed
+- Claude and Codex settings: one Data source section replaces Probe Mode. It shows where ClaudeBar looks for your key, says what happens if a source fails, and has a Test Connection button. Your choices carry over. ([#352](https://github.com/tddworks/ClaudeBar/issues/352))
+- Claude and Codex now run from built-in provider definitions instead of their own code: a first step toward adding providers from Settings. Usage, settings, accounts and the menu bar stay the same; please report anything that reads differently. ([#329](https://github.com/tddworks/ClaudeBar/pull/329))
 
 ---
 

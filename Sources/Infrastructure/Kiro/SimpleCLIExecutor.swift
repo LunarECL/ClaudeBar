@@ -23,7 +23,7 @@ public struct SimpleCLIExecutor: CLIExecutor {
         autoResponses: [String: String]
     ) async throws -> CLIResult {
         guard let binaryPath = locate(binary) else {
-            throw ProbeError.cliNotFound(binary)
+            throw UsageError.cliNotFound(binary)
         }
         
         let result: SubprocessSupport.Output
@@ -42,11 +42,11 @@ public struct SimpleCLIExecutor: CLIExecutor {
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(timeout))
-                    throw ProbeError.executionFailed("Command timed out after \(timeout) seconds")
+                    throw UsageError.executionFailed("Command timed out after \(timeout) seconds")
                 }
 
                 guard let first = try await group.next() else {
-                    throw ProbeError.executionFailed("Command produced no result")
+                    throw UsageError.executionFailed("Command produced no result")
                 }
                 // Whichever task lost the race is cancelled here. If that is the
                 // subprocess, cancellation drives Subprocess's teardown sequence
@@ -55,10 +55,10 @@ public struct SimpleCLIExecutor: CLIExecutor {
                 group.cancelAll()
                 return first
             }
-        } catch let error as ProbeError {
+        } catch let error as UsageError {
             throw error
         } catch {
-            throw ProbeError.executionFailed("Failed to run \(binary): \(error.localizedDescription)")
+            throw UsageError.executionFailed("Failed to run \(binary): \(error.localizedDescription)")
         }
 
         // Combine stdout and stderr, as before: Kiro reports errors on stderr and

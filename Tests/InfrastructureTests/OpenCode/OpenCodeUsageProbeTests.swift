@@ -107,7 +107,7 @@ struct OpenCodeUsageProbeTests {
         given(mockExecutor).locate(.value("opencode")).willReturn(nil)
 
         let probe = OpenCodeUsageProbe(cliExecutor: mockExecutor)
-        await #expect(throws: ProbeError.cliNotFound("opencode")) {
+        await #expect(throws: UsageError.cliNotFound("opencode")) {
             try await probe.probe()
         }
     }
@@ -121,7 +121,7 @@ struct OpenCodeUsageProbeTests {
             .willReturn(CLIResult(output: "", exitCode: 1))
 
         let probe = OpenCodeUsageProbe(cliExecutor: mockExecutor)
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

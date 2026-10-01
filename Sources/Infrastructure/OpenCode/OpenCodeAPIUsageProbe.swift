@@ -58,7 +58,7 @@ public struct OpenCodeAPIUsageProbe: UsageProbe, @unchecked Sendable {
                 return try await fallback.probe()
             }
             AppLog.probes.error("OpenCode: No API key found")
-            throw ProbeError.authenticationRequired
+            throw UsageError.authenticationRequired
         }
 
         let data = try await fetchUsage(apiKey: apiKey)
@@ -87,11 +87,11 @@ public struct OpenCodeAPIUsageProbe: UsageProbe, @unchecked Sendable {
             (data, response) = try await networkClient.request(request)
         } catch {
             AppLog.probes.error("OpenCode: Network error: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Network error: \(error.localizedDescription)")
+            throw UsageError.executionFailed("Network error: \(error.localizedDescription)")
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ProbeError.executionFailed("Invalid response")
+            throw UsageError.executionFailed("Invalid response")
         }
 
         switch httpResponse.statusCode {
@@ -99,13 +99,13 @@ public struct OpenCodeAPIUsageProbe: UsageProbe, @unchecked Sendable {
             return data
         case 401:
             AppLog.probes.error("OpenCode: API key rejected (HTTP 401)")
-            throw ProbeError.sessionExpired(hint: Self.reloginHint)
+            throw UsageError.sessionExpired(hint: Self.reloginHint)
         case 403:
             AppLog.probes.error("OpenCode: No Go subscription for this key (HTTP 403)")
-            throw ProbeError.subscriptionRequired
+            throw UsageError.subscriptionRequired
         default:
             AppLog.probes.error("OpenCode: HTTP error \(httpResponse.statusCode)")
-            throw ProbeError.executionFailed("HTTP error: \(httpResponse.statusCode)")
+            throw UsageError.executionFailed("HTTP error: \(httpResponse.statusCode)")
         }
     }
 
@@ -125,10 +125,10 @@ public struct OpenCodeAPIUsageProbe: UsageProbe, @unchecked Sendable {
 
     static func parseResponse(_ data: Data, now: Date = Date()) throws -> UsageSnapshot {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ProbeError.parseFailed("Failed to parse usage response as JSON")
+            throw UsageError.parseFailed("Failed to parse usage response as JSON")
         }
         guard let usage = root["usage"] as? [String: Any] else {
-            throw ProbeError.parseFailed("Missing 'usage' in response")
+            throw UsageError.parseFailed("Missing 'usage' in response")
         }
 
         var quotas: [UsageQuota] = []
@@ -150,7 +150,7 @@ public struct OpenCodeAPIUsageProbe: UsageProbe, @unchecked Sendable {
         }
 
         guard !quotas.isEmpty else {
-            throw ProbeError.parseFailed("No usage windows in response")
+            throw UsageError.parseFailed("No usage windows in response")
         }
 
         return UsageSnapshot(providerId: providerId, quotas: quotas, capturedAt: now)

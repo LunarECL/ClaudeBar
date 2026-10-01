@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import Domain
 import Infrastructure
+import Providers
 
 /// Email identifies the login; users never need to invent an account name.
 struct CodexAccountsCard: View {
@@ -9,8 +10,13 @@ struct CodexAccountsCard: View {
     @Environment(\.appTheme) private var theme
     @State private var showingSetup = false
 
-    private var accounts: [CodexProvider] {
-        monitor.allProviders.compactMap { $0 as? CodexProvider }
+    /// The Codex product — one provider, its logins as accounts.
+    private var codex: Provider? {
+        (monitor.provider(for: "codex") as? Account)?.provider
+    }
+
+    private var accounts: [Account] {
+        codex?.accounts ?? []
     }
 
     var body: some View {
@@ -27,12 +33,12 @@ struct CodexAccountsCard: View {
                             .font(.body)
                             .foregroundStyle(theme.textPrimary)
                             .textSelection(.enabled)
-                        Text(provider.account.isDefault ? "Uses your default Codex login" : "Separate Codex login")
+                        Text(provider.isDefault ? "Uses your default Codex login" : "Separate Codex login")
                             .font(.caption)
                             .foregroundStyle(theme.textSecondary)
                     }
                     Spacer(minLength: 8)
-                    if !provider.account.isDefault {
+                    if !provider.isDefault {
                         Button("Remove") { remove(provider) }
                             .accessibilityLabel("Remove \(provider.name) from ClaudeBar")
                     }
@@ -54,8 +60,9 @@ struct CodexAccountsCard: View {
         }
     }
 
-    private func remove(_ provider: CodexProvider) {
-        JSONSettingsRepository.shared.removeAccount(accountId: provider.account.accountId, forProvider: "codex")
+    private func remove(_ provider: Account) {
+        codex?.remove(provider)
+        JSONSettingsRepository.shared.removeAccount(accountId: provider.accountId, forProvider: "codex")
         let settings = AppSettings.shared
         let remaining = settings.menuBarProviderIds.filter { $0 != provider.id }
         settings.setMenuBarProviderIds(remaining.isEmpty ? ["codex"] : remaining)
@@ -134,9 +141,10 @@ private struct CodexAccountSetupSheet: View {
             guard response == .OK, let url = panel.url else { return }
             do {
                 let settings = JSONSettingsRepository.shared
-                let config = try CodexAccountSetup.configuration(
-                    codexHome: url.path, existingAccounts: settings.accounts(forProvider: "codex"))
-                guard let provider = CodexAccountSetup.provider(configuration: config, settingsRepository: settings) else {
+                let config = try AddedAccounts.configuration(
+                    "codex", folder: url.path, existing: settings.accounts(forProvider: "codex"))
+                guard let codex = (monitor.provider(for: "codex") as? Account)?.provider,
+                      let provider = codex.add(config) else {
                     return
                 }
                 settings.addAccount(config, forProvider: "codex")

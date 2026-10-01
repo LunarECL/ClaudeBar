@@ -91,7 +91,7 @@ struct CopilotUsageProbeTests {
         let settings = makeSettingsRepository(username: "testuser", hasToken: false)
         let probe = CopilotUsageProbe(settingsRepository: settings)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -101,7 +101,7 @@ struct CopilotUsageProbeTests {
         let settings = makeSettingsRepository(username: "", hasToken: true)
         let probe = CopilotUsageProbe(settingsRepository: settings)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -660,7 +660,7 @@ struct CopilotUsageProbeTests {
         )
 
         // Should throw when manual override is on but value is nil
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -785,7 +785,7 @@ struct CopilotUsageProbeTests {
         )
 
         // Should throw because period changed (Dec 2025 → Jan 2026) and manual value was cleared
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
 
@@ -862,7 +862,7 @@ struct CopilotUsageProbeTests {
             settingsRepository: settings
         )
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -885,7 +885,7 @@ struct CopilotUsageProbeTests {
             settingsRepository: settings
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -909,7 +909,7 @@ struct CopilotUsageProbeTests {
             settingsRepository: settings
         )
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

@@ -36,7 +36,7 @@ public struct KimiCookieTokenProvider: KimiTokenProviding {
         }
 
         AppLog.probes.error("Kimi: No authentication token found")
-        throw ProbeError.authenticationRequired
+        throw UsageError.authenticationRequired
     }
 
     private func fetchFromBrowser() -> String? {

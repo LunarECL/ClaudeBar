@@ -299,7 +299,7 @@ struct VercelConfigCard: View {
             _ = try await provider.refresh()
             AppLog.credentials.info("Vercel connection test succeeded")
             vercelTestResult = "Success: Connection verified"
-        } catch ProbeError.authenticationRequired {
+        } catch UsageError.authenticationRequired {
             let message = "Vercel rejected the API key. New keys may take a moment to activate."
             AppLog.credentials.error("Vercel connection test failed: \(message)")
             vercelTestResult = "Failed: \(message)"
