@@ -39,17 +39,29 @@ public struct CodexCredentialResult: @unchecked Sendable {
 /// ```
 public struct CodexCredentialLoader: Sendable {
     private let homeDirectory: String
+    private let environment: [String: String]
 
     /// Refresh age threshold: 8 days (matching Codex JS reference)
     private static let refreshAgeMs: Double = 8 * 24 * 60 * 60 * 1000
 
-    public init(homeDirectory: String = NSHomeDirectory()) {
+    public init(
+        homeDirectory: String = NSHomeDirectory(),
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
         self.homeDirectory = homeDirectory
+        self.environment = environment
     }
 
     /// The path to the auth file.
+    ///
+    /// The `codex` CLI honors `CODEX_HOME` and keeps `auth.json` there, so the
+    /// loader must look in the same place — otherwise a `CODEX_HOME` user
+    /// looks permanently logged out (issue #216).
     public var authFilePath: String {
-        (homeDirectory as NSString).appendingPathComponent(".codex/auth.json")
+        if let codexHome = environment["CODEX_HOME"], !codexHome.isEmpty {
+            return (codexHome as NSString).appendingPathComponent("auth.json")
+        }
+        return (homeDirectory as NSString).appendingPathComponent(".codex/auth.json")
     }
 
     /// Loads credentials from `~/.codex/auth.json`.

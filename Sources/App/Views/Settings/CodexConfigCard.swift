@@ -4,8 +4,6 @@ import Infrastructure
 
 /// Codex provider configuration card for SettingsView.
 struct CodexConfigCard: View {
-    let monitor: QuotaMonitor
-
     @State private var settings = AppSettings.shared
     @Environment(\.appTheme) private var theme
 
@@ -98,10 +96,12 @@ struct CodexConfigCard: View {
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: codexProbeMode) { _, newValue in
+                    // Only persist the preference — no probe here. Selecting a
+                    // mode is not explicit intent to run it: the RPC probe
+                    // spawns `codex app-server`, which can open the ChatGPT
+                    // browser login for an unauthenticated CLI (issue #216).
+                    // The Refresh button / Connect action is the explicit path.
                     settings.codex.setCodexProbeMode(newValue)
-                    Task {
-                        await monitor.refresh(providerId: "codex")
-                    }
                 }
             }
 
@@ -117,7 +117,7 @@ struct CodexConfigCard: View {
                             .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
                             .foregroundStyle(codexProbeMode == .rpc ? theme.textPrimary : theme.textSecondary)
 
-                        Text("Uses codex app-server via JSON-RPC. Default, works with any auth.")
+                        Text("Uses codex app-server via JSON-RPC. Default, works with any auth. ClaudeBar never starts the Codex login itself.")
                             .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
                             .foregroundStyle(theme.textTertiary)
                     }

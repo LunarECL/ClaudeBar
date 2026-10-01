@@ -166,6 +166,26 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.codexProbeMode() == .api)
     }
 
+    @Test
+    func `codexVerifiedAtLeastOnce defaults to false`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.codexVerifiedAtLeastOnce() == false)
+    }
+
+    @Test
+    func `setCodexVerifiedAtLeastOnce persists value`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setCodexVerifiedAtLeastOnce(true)
+        #expect(repo.codexVerifiedAtLeastOnce() == true)
+
+        repo.setCodexVerifiedAtLeastOnce(false)
+        #expect(repo.codexVerifiedAtLeastOnce() == false)
+    }
+
     // MARK: - Kimi Settings
 
     @Test
