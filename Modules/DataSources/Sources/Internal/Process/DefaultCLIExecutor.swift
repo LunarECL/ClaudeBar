@@ -17,7 +17,7 @@ public struct DefaultCLIExecutor: CLIExecutor {
     /// idle gap ends the capture, truncating TUIs that fill in asynchronously
     /// (issue #271). Readable from tests so a probe can be checked for pairing
     /// each command with the rule its own screen needs (#317).
-    let completionRule: CLICompletionRule?
+    public let completionRule: CLICompletionRule?
 
     public init(
         environmentExclusions: [String] = [],

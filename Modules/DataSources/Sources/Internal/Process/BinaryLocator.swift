@@ -22,7 +22,7 @@ public struct BinaryLocator: Sendable {
     /// Common paths where CLI tools are installed on macOS.
     /// These are checked as fallback when the shell `which` doesn't work
     /// (e.g., in menu bar apps launched by launchd with limited PATH).
-    static var commonPaths: [String] {
+    public static var commonPaths: [String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return [
             // User-local installations

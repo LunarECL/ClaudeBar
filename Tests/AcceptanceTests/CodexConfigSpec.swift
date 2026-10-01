@@ -88,7 +88,7 @@ struct CodexConfigSpec {
             let received = ReceiveCounter()
             given(transport).send(.any).willReturn(())
             given(transport).close().willReturn(())
-            given(transport).receive().willProduce {
+            given(transport).receive().willProduce { @Sendable in
                 Data((received.next() == 1
                     ? #"{"id":1,"result":{}}"#
                     : #"{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":20}}}}"#).utf8)

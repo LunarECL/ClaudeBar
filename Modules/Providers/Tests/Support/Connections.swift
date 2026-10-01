@@ -48,26 +48,26 @@ struct StubbedProvider {
     // MARK: - Stubbing helpers
 
     /// Answers the JSON-RPC handshake's `initialize`, then `answer` for the call.
-    func answerRPC(_ answer: String) {
+    nonisolated func answerRPC(_ answer: String) {
         let received = Counter()
         given(transport).send(.any).willReturn(())
         given(transport).close().willReturn(())
-        given(transport).receive().willProduce {
+        given(transport).receive().willProduce { @Sendable in
             Data((received.next() == 1 ? #"{"id":1,"result":{}}"# : answer).utf8)
         }
     }
 
-    func answerHTTP(_ body: String, status: Int = 200, headers: [String: String] = [:]) {
+    nonisolated func answerHTTP(_ body: String, status: Int = 200, headers: [String: String] = [:]) {
         given(network).request(.any).willReturn((Data(body.utf8), Self.response(status, headers)))
     }
 
-    func answerTerminal(_ screen: String) {
+    nonisolated func answerTerminal(_ screen: String) {
         given(cli).locate(.any).willReturn("/usr/local/bin/codex")
         given(cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
             .willReturn(CLIResult(output: screen))
     }
 
-    static func response(_ status: Int, _ headers: [String: String] = [:]) -> HTTPURLResponse {
+    nonisolated static func response(_ status: Int, _ headers: [String: String] = [:]) -> HTTPURLResponse {
         HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: status, httpVersion: nil, headerFields: headers)!
     }
 

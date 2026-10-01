@@ -15,9 +15,9 @@ public final class Provider: AIProvider {
 
     // MARK: - Identity
 
-    public var id: String { definition.id }
-    public var name: String { definition.name }
-    public var cliCommand: String { definition.cli ?? "" }
+    public let id: String
+    public let name: String
+    public let cliCommand: String
     public var dashboardURL: URL? { definition.links.dashboard }
     public var statusPageURL: URL? { definition.links.status }
 
@@ -43,6 +43,9 @@ public final class Provider: AIProvider {
 
     public init(definition: ProviderDefinition, dataSources: [DataSource], settings: any ProviderSettingsRepository) {
         self.definition = definition
+        self.id = definition.id
+        self.name = definition.name
+        self.cliCommand = definition.cli ?? ""
         self.dataSources = dataSources
         self.settings = settings
         self.isEnabled = settings.isEnabled(forProvider: definition.id, defaultValue: definition.enabledByDefault)

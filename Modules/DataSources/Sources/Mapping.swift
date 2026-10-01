@@ -136,9 +136,11 @@ public struct NameRule: Sendable, Equatable, Codable {
             return
         }
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        text = try container.decodeIfPresent(String.self, forKey: .text)
-        firstOf = try container.decodeIfPresent([String].self, forKey: .firstOf) ?? []
-        dropPrefixes = try container.decodeIfPresent([Prefix].self, forKey: .dropPrefixes) ?? []
+        self.init(
+            text: try container.decodeIfPresent(String.self, forKey: .text),
+            firstOf: try container.decodeIfPresent([String].self, forKey: .firstOf) ?? [],
+            dropPrefixes: try container.decodeIfPresent([Prefix].self, forKey: .dropPrefixes) ?? []
+        )
     }
 }
 
@@ -270,6 +272,10 @@ public struct QuotaRule: Sendable, Equatable, Codable {
     /// Fixed text in place of the reset countdown ("Free plan").
     public let resetText: String?
 
+    enum CodingKeys: String, CodingKey {
+        case kind, name, at, each, skipKeys, windows, usedPercent, leftPercent, resetsAt, window, resetText
+    }
+
     public init(
         kind: QuotaKind,
         name: NameRule? = nil,
@@ -335,8 +341,10 @@ public struct PlanRule: Sendable, Equatable, Codable {
             return
         }
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        path = try container.decode(String.self, forKey: .path)
-        badges = try container.decodeIfPresent([String: String].self, forKey: .badges) ?? [:]
+        self.init(
+            path: try container.decode(String.self, forKey: .path),
+            badges: try container.decodeIfPresent([String: String].self, forKey: .badges) ?? [:]
+        )
     }
 }
 
@@ -352,6 +360,10 @@ public struct CostRule: Sendable, Equatable, Codable {
     public let remaining: [ValueRef]
     public let used: [ValueRef]
     public let limit: [ValueRef]
+
+    enum CodingKeys: String, CodingKey {
+        case kind, remaining, used, limit
+    }
 
     public init(kind: Kind = .apiCost, remaining: [ValueRef] = [], used: [ValueRef] = [], limit: [ValueRef] = []) {
         self.kind = kind

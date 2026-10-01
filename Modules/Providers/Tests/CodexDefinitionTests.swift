@@ -53,7 +53,7 @@ struct CodexDefinitionTests {
         #expect(usage.providerId == "codex")
         #expect(usage.quota(for: .session)?.percentRemaining == 70)
         #expect(usage.quota(for: .session)?.resetsAt == Date(timeIntervalSince1970: 1735000000))
-        #expect(usage.quota(for: .session)?.windowDuration == 300 * 60)
+        #expect(usage.quota(for: .session)?.windowDuration == TimeInterval(300 * 60))
         #expect(usage.quota(for: .weekly)?.percentRemaining == 50)
         #expect(codex.answeredBy == "rpc")
         #expect(codex.lastError == nil)
@@ -134,7 +134,7 @@ struct CodexDefinitionTests {
         let received = Counter()
         given(stub.transport).send(.any).willReturn(())
         given(stub.transport).close().willReturn(())
-        given(stub.transport).receive().willProduce { Data(answers[received.next() - 1].utf8) }
+        given(stub.transport).receive().willProduce { @Sendable in Data(answers[received.next() - 1].utf8) }
         given(stub.cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
             .willThrow(ProbeError.executionFailed("TTY not available"))
         let codex = try stub.make("codex")
@@ -260,7 +260,7 @@ struct CodexDefinitionTests {
         let stub = try StubbedProvider(dataSourceKind: "api", providerId: "codex")
         defer { stub.cleanUp() }
         try stub.writeCodexAuth(token: "old-token", accountId: "acct-1", lastRefresh: Date().addingTimeInterval(-9 * 86400))
-        given(stub.network).request(.any).willProduce { request in
+        given(stub.network).request(.any).willProduce { @Sendable request in
             if request.url?.absoluteString.contains("oauth/token") == true {
                 return (Data(#"{"access_token":"new-token","refresh_token":"new-refresh-token"}"#.utf8), StubbedProvider.response(200))
             }
