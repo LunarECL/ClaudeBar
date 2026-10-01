@@ -33,7 +33,7 @@ struct ClaudeSmokeTests {
     }
 
     @Test
-    func `the api script reads the usage response`() async throws {
+    func `the api mapping reads the usage response`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
 
