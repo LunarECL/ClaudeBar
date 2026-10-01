@@ -80,7 +80,7 @@ struct OpenCodeAPIUsageProbeTests {
     func `probe throws authenticationRequired when no key and no fallback`() async {
         let probe = OpenCodeAPIUsageProbe(credentialLoader: loader(apiKey: nil), networkClient: MockNetworkClient())
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: UsageError.authenticationRequired) {
             try await probe.probe()
         }
     }
@@ -112,7 +112,7 @@ struct OpenCodeAPIUsageProbeTests {
 
         let probe = OpenCodeAPIUsageProbe(credentialLoader: loader(apiKey: "stale"), networkClient: network)
 
-        await #expect(throws: ProbeError.sessionExpired()) {
+        await #expect(throws: UsageError.sessionExpired()) {
             try await probe.probe()
         }
     }
@@ -125,7 +125,7 @@ struct OpenCodeAPIUsageProbeTests {
 
         let probe = OpenCodeAPIUsageProbe(credentialLoader: loader(apiKey: "k"), networkClient: network)
 
-        await #expect(throws: ProbeError.subscriptionRequired) {
+        await #expect(throws: UsageError.subscriptionRequired) {
             try await probe.probe()
         }
     }
@@ -137,7 +137,7 @@ struct OpenCodeAPIUsageProbeTests {
 
         let probe = OpenCodeAPIUsageProbe(credentialLoader: loader(apiKey: "k"), networkClient: network)
 
-        await #expect(throws: ProbeError.executionFailed("HTTP error: 503")) {
+        await #expect(throws: UsageError.executionFailed("HTTP error: 503")) {
             try await probe.probe()
         }
     }
@@ -149,7 +149,7 @@ struct OpenCodeAPIUsageProbeTests {
 
         let probe = OpenCodeAPIUsageProbe(credentialLoader: loader(apiKey: "k"), networkClient: network)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

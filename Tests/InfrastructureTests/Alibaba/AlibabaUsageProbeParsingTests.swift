@@ -269,7 +269,7 @@ struct AlibabaUsageProbeParsingTests {
     func `throws parseFailed for invalid JSON`() throws {
         let data = Data("not json".utf8)
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
         }
     }
@@ -278,7 +278,7 @@ struct AlibabaUsageProbeParsingTests {
     func `throws parseFailed for empty response`() throws {
         let data = Data("{}".utf8)
 
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
         }
     }
@@ -293,7 +293,7 @@ struct AlibabaUsageProbeParsingTests {
         """
         let data = Data(response.utf8)
 
-        #expect(throws: ProbeError.sessionExpired()) {
+        #expect(throws: UsageError.sessionExpired()) {
             try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
         }
     }
@@ -308,7 +308,7 @@ struct AlibabaUsageProbeParsingTests {
         """
         let data = Data(response.utf8)
 
-        #expect(throws: ProbeError.authenticationRequired) {
+        #expect(throws: UsageError.authenticationRequired) {
             try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
         }
     }

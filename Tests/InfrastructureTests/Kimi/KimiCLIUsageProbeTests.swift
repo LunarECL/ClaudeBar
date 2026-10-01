@@ -70,7 +70,7 @@ struct KimiCLIUsageProbeTests {
 
         let probe = KimiCLIUsageProbe(cliExecutor: mockExecutor)
 
-        await #expect(throws: ProbeError.cliNotFound("kimi")) {
+        await #expect(throws: UsageError.cliNotFound("kimi")) {
             try await probe.probe()
         }
     }
@@ -91,7 +91,7 @@ struct KimiCLIUsageProbeTests {
 
         let probe = KimiCLIUsageProbe(cliExecutor: mockExecutor)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }
@@ -112,7 +112,7 @@ struct KimiCLIUsageProbeTests {
 
         let probe = KimiCLIUsageProbe(cliExecutor: mockExecutor)
 
-        await #expect(throws: ProbeError.self) {
+        await #expect(throws: UsageError.self) {
             try await probe.probe()
         }
     }

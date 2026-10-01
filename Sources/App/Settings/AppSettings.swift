@@ -326,6 +326,11 @@ public final class AppSettings {
     }
 
     /// Reading this inside a view body or a sync's `read` tracks both settings.
+    /// HOW STRICT TO BE — what every status on screen and every alert uses.
+    public var statusPolicy: StatusPolicy {
+        .from(burnRateWarningEnabled: burnRateWarningEnabled, burnRateThreshold: burnRateThreshold)
+    }
+
     public var statusColorPolicy: StatusColorPolicy {
         StatusColorPolicy(overrides: statusColorOverrides, highContrastEnabled: highContrastEnabled)
     }

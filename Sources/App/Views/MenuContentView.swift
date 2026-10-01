@@ -1,6 +1,7 @@
 import SwiftUI
 import Domain
 import Infrastructure
+import Providers
 #if ENABLE_SPARKLE
 import Sparkle
 #endif
@@ -105,8 +106,7 @@ struct MenuContentView: View {
             }
 
             // Share Pass Overlay
-            if showSharePass, let claudeProvider = selectedProvider as? ClaudeProvider,
-               let guestPass = claudeProvider.guestPass {
+            if showSharePass, let guestPass = guestPasses?.pass {
                 SharePassOverlay(pass: guestPass) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showSharePass = false
@@ -115,11 +115,10 @@ struct MenuContentView: View {
             }
 
             // Share Pass Error Overlay
-            if let claudeProvider = selectedProvider as? ClaudeProvider,
-               let passError = claudeProvider.passError {
+            if let guestPasses, let passError = guestPasses.error {
                 SharePassErrorOverlay(message: passError.localizedDescription) {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        claudeProvider.clearPassError()
+                        guestPasses.clearError()
                     }
                 }
             }
@@ -216,9 +215,9 @@ struct MenuContentView: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 showSharePass = false
             }
-        } else if let claudeProvider = selectedProvider as? ClaudeProvider, claudeProvider.passError != nil {
+        } else if let guestPasses, guestPasses.error != nil {
             withAnimation(.easeInOut(duration: 0.2)) {
-                claudeProvider.clearPassError()
+                guestPasses.clearError()
             }
         } else {
             onClose?()
@@ -336,11 +335,7 @@ struct MenuContentView: View {
 
     /// Status of the currently selected provider, nil when it has no snapshot.
     private var selectedProviderStatus: QuotaStatus? {
-        guard let snapshot = selectedProvider?.snapshot else { return nil }
-        if settings.burnRateWarningEnabled {
-            return snapshot.paceAwareOverallStatus(burnRateThreshold: settings.burnRateThreshold)
-        }
-        return snapshot.overallStatus
+        selectedProvider?.snapshot?.overallStatus(under: settings.statusPolicy)
     }
 
     /// What the header pill says. A provider that failed to probe reads as
@@ -480,14 +475,21 @@ struct MenuContentView: View {
                 overviewContent(providers: providers)
             }
         } else if let provider = selectedProvider, let snapshot = provider.snapshot {
+            let report = RefreshReport.of(provider)
             VStack(spacing: 12) {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
-                    accountCard(displayName: displayName, snapshot: snapshot)
+                    accountCard(
+                        displayName: displayName, snapshot: snapshot,
+                        freshness: report?.freshness ?? "Updated \(snapshot.ageDescription)"
+                    )
+                } else if let freshness = report?.freshness {
+                    freshnessLine(freshness)
                 }
-                if provider is CodexProvider, provider.lastError != nil {
-                    compactErrorState(provider: provider)
+                if let failure = report?.failure {
+                    failureNotice(failure)
                 }
                 statsGrid(snapshot: snapshot)
+                    .opacity(report?.isLastSeen == true ? 0.55 : 1)
             }
             .opacity(animateIn ? 1 : 0)
             .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
@@ -520,10 +522,12 @@ struct MenuContentView: View {
             providerSectionHeader(provider: provider)
 
             if let snapshot = provider.snapshot {
-                if provider is CodexProvider, provider.lastError != nil {
-                    compactErrorState(provider: provider)
+                let report = RefreshReport.of(provider)
+                if let failure = report?.failure {
+                    failureNotice(failure)
                 }
                 statsGrid(snapshot: snapshot)
+                    .opacity(report?.isLastSeen == true ? 0.55 : 1)
             } else if provider.isSyncing {
                 LoadingSpinnerView()
             } else {
@@ -543,11 +547,48 @@ struct MenuContentView: View {
 
             Spacer()
 
-            let status = provider.snapshot?.overallStatus ?? .healthy
+            let status = provider.snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy
             Text(provider.isSyncing ? "Syncing..." : status.badgeText)
                 .badge(theme.statusColor(for: status))
         }
         .padding(.horizontal, 4)
+    }
+
+    /// "Updated 2m ago · via RPC" when there is no account card to carry it.
+    private func freshnessLine(_ text: String) -> some View {
+        HStack {
+            Text(text)
+                .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                .foregroundStyle(theme.textTertiary)
+            Spacer()
+        }
+        .padding(.horizontal, 4)
+    }
+
+    /// A failed refresh over the last usage: the step that failed, then what to do.
+    private func failureNotice(_ failure: RefreshReport.Failure) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(theme.statusWarning)
+
+            VStack(alignment: .leading, spacing: 2) {
+                if let headline = failure.headline {
+                    Text(headline)
+                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textPrimary)
+                }
+                Text(failure.detail)
+                    .help(failure.detail)
+                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
     }
 
     private func compactErrorState(provider: any AIProvider) -> some View {
@@ -568,7 +609,7 @@ struct MenuContentView: View {
     }
 
 
-    private func accountCard(displayName: String, snapshot: UsageSnapshot) -> some View {
+    private func accountCard(displayName: String, snapshot: UsageSnapshot, freshness: String) -> some View {
         HStack(spacing: 10) {
             // Avatar circle
             ZStack {
@@ -602,7 +643,7 @@ struct MenuContentView: View {
                     }
                 }
 
-                Text("Updated \(snapshot.ageDescription)")
+                Text(freshness)
                     .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
@@ -825,12 +866,16 @@ struct MenuContentView: View {
                     .foregroundStyle(theme.statusWarning)
             }
 
-            Text("\(selectedProvider?.name ?? selectedProviderId) Unavailable")
+            // A provider that is data names the step that failed first.
+            let failure = selectedProvider.flatMap { RefreshReport.of($0)?.failure }
+            Text(failure?.headline ?? "\(selectedProvider?.name ?? selectedProviderId) Unavailable")
                 .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
 
             // Show actual error message if available, otherwise generic message
-            Text(selectedProvider?.lastError?.localizedDescription ?? "Install CLI or check configuration")
+            Text(failure?.headline != nil
+                 ? "\(selectedProvider?.name ?? selectedProviderId) Unavailable · \(failure?.detail ?? "")"
+                 : selectedProvider?.lastError?.localizedDescription ?? "Install CLI or check configuration")
                 .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textTertiary)
                 .multilineTextAlignment(.center)
@@ -884,9 +929,8 @@ struct MenuContentView: View {
             Spacer()
 
             // Share Button (Claude only) - icon only
-            if let claudeProvider = selectedProvider as? ClaudeProvider,
-               claudeProvider.supportsGuestPasses {
-                let isFetchingPasses = claudeProvider.isFetchingPasses
+            if let guestPasses, guestPasses.isOffered(for: selectedProvider?.snapshot) {
+                let isFetchingPasses = guestPasses.isFetching
                 Button {
                     Task { await fetchAndShowPasses() }
                 } label: {
@@ -1003,17 +1047,22 @@ struct MenuContentView: View {
         }
     }
 
+    /// The selected provider's guest passes, when it has any to offer.
+    private var guestPasses: GuestPasses? {
+        (selectedProvider as? Account)?.guestPasses
+    }
+
     /// Fetch guest passes and show the share view
     private func fetchAndShowPasses() async {
-        guard let claudeProvider = selectedProvider as? ClaudeProvider else {
+        guard let guestPasses else {
             return
         }
 
         // Prevent duplicate fetches
-        guard !claudeProvider.isFetchingPasses else { return }
+        guard !guestPasses.isFetching else { return }
 
         do {
-            _ = try await claudeProvider.fetchPasses()
+            _ = try await guestPasses.fetch()
             withAnimation(.easeInOut(duration: 0.2)) {
                 showSharePass = true
             }
@@ -1203,7 +1252,7 @@ struct WrappedStatCard: View {
     }
 
     private var statusColor: Color {
-        theme.statusColor(for: quota.status)
+        theme.statusColor(for: quota.status(under: settings.statusPolicy))
     }
 
     private var isCappedSpend: Bool {
@@ -1244,7 +1293,7 @@ struct WrappedStatCard: View {
                     Text(quota.pace.displayName.uppercased())
                         .badge(paceColor)
                 } else {
-                    Text(quota.status.badgeText)
+                    Text(quota.status(under: settings.statusPolicy).badgeText)
                         .badge(statusColor)
                 }
             }

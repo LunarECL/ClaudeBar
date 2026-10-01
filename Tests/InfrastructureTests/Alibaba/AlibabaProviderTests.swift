@@ -124,7 +124,7 @@ struct AlibabaProviderTests {
     @Test
     func `refresh stores error on failure`() async {
         let mockProbe = MockUsageProbe()
-        given(mockProbe).probe().willThrow(ProbeError.authenticationRequired)
+        given(mockProbe).probe().willThrow(UsageError.authenticationRequired)
 
         let repo = makeSettingsRepository()
         let provider = AlibabaProvider(probe: mockProbe, settingsRepository: repo)
@@ -144,7 +144,7 @@ struct AlibabaProviderTests {
 
         // Use two separate probes to simulate the behavior
         let failingProbe = MockUsageProbe()
-        given(failingProbe).probe().willThrow(ProbeError.authenticationRequired)
+        given(failingProbe).probe().willThrow(UsageError.authenticationRequired)
         let alibabWithFailingProbe = AlibabaProvider(probe: failingProbe, settingsRepository: repo)
 
         do {

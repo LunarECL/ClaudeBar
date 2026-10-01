@@ -189,7 +189,7 @@ struct ZaiUsageProbeParsingTests {
         let invalidData = Data("not json".utf8)
 
         // When/Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try ZaiUsageProbe.parseQuotaLimitResponse(invalidData, providerId: "zai")
         }
     }
@@ -200,7 +200,7 @@ struct ZaiUsageProbeParsingTests {
         let data = Data(Self.sampleQuotaLimitResponseEmpty.utf8)
 
         // When/Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try ZaiUsageProbe.parseQuotaLimitResponse(data, providerId: "zai")
         }
     }
@@ -216,7 +216,7 @@ struct ZaiUsageProbeParsingTests {
         let data = Data(responseWithoutData.utf8)
 
         // When/Then
-        #expect(throws: ProbeError.self) {
+        #expect(throws: UsageError.self) {
             try ZaiUsageProbe.parseQuotaLimitResponse(data, providerId: "zai")
         }
     }
