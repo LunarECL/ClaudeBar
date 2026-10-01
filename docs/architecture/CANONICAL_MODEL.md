@@ -139,16 +139,17 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │                           erases the usage. The error names its STEP — lookup · fetch ·
 │       │       │                           mapping — "Couldn't read your key · Couldn't connect ·
 │       │       │                           Couldn't find the numbers" — because each sends you somewhere else
+│       │       ├── budget: Budget?  ◇      THE USER'S OWN CEILING on this login's Cost — a Daily
+│       │       │                           Budget, the Claude API Budget. The vendor sets quotas;
+│       │       │                           the user sets budgets. Set in the provider's form
+│       │       │                           (account scope), since one login's API spend is not another's
 │       │       └── status                  DERIVED — QUOTA HEALTH: the worst quota in its usage.
 │       │                                   The pill's and the menu-bar entry's colour
 │       ├── status                          DERIVED — the worst across its enabled accounts
 │       └── bestAccount                     DERIVED — the enabled account with the most left: "switch to work"
 │
-├── statusPolicy: StatusPolicy  ◇           HOW STRICT TO BE — absolute thresholds, or pace-aware
-│                                           with the user's burn-rate threshold
-└── budgets: [Budget]  ◇                    THE USER'S OWN CEILINGS on a Cost — a Daily Budget,
-                                            the Claude API Budget. The vendor sets quotas;
-                                            the user sets budgets
+└── statusPolicy: StatusPolicy  ◇           HOW STRICT TO BE — absolute thresholds, or pace-aware
+                                            with the user's burn-rate threshold
 
 Usage  ◇                                    "Fetching usage data…" — WHAT THE PROVIDER SAYS, AS OF A MOMENT
 ├── updatedAt                               "Updated 3m ago"; stale after 5 minutes
@@ -256,7 +257,7 @@ someone made five minutes ago run on the same `DataSource` and the same lifecycl
 | *Edit* · *Delete* a custom provider | `catalog.replace(definition)` · `catalog.remove(id)` | built-ins can only be disabled |
 | *Export…* | `definition.exported()` → a `.json` file | carries the lookup order and the setting names — never a key |
 | *Import provider* | `catalog.import(file)` → `definition.missingSettings` | says where a key will be sent, and shows a CLI command, BEFORE asking |
-| sets a Daily Budget | `monitor.budgets.set(_:for:)` | |
+| sets a Daily Budget · the Claude API Budget | `account.budget = …` (an account-scope setting) | judges that login's cost only |
 | chooses status colours / pace-aware | `monitor.statusPolicy = …` | colours are the page's; the thresholds are the policy's |
 
 ## 4 · The reads — what the tree answers
@@ -275,7 +276,8 @@ usage.isStale                        → Bool         older than 5 minutes
 quota.status(under: StatusPolicy)    → Status
 quota.pace                           → Pace         unknown without a window
 quota.window?.timeUntilReset         → Duration?    "Resets in 2h 5m"
-cost.judged(by: Budget)              → BudgetStatus ON TRACK · NEAR LIMIT · OVER BUDGET
+account.budgetStatus                 → BudgetStatus? ON TRACK · NEAR LIMIT · OVER BUDGET —
+                                                    usage.cost judged by account.budget
 dataSource.fetchResponse(for:)       → Response     Test Connection: what came back, unmapped
 mapping.read(response)               → Usage        Map fields: the live card
 definition.missingSettings           → [Setting]    Import: "Key needed"
@@ -303,7 +305,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | **a window's length is the provider's word**, never guessed from a quota's name — the Codex RPC's primary window can be the weekly one | `Window` |
 | pace exists only inside a window with a reset; outside it is `unknown`, never `onPace` | `Quota.pace` |
 | depleted at 0, critical under 20 — ABSOLUTE, whatever the policy; pace-aware only softens WARNING | `StatusPolicy` |
-| a quota is the vendor's ceiling; a budget is the user's. A Cost is judged by a Budget, never shown as a Quota | `Cost` · `Budget` |
+| a quota is the vendor's ceiling; a budget is the user's. A Cost is judged by a Budget, never shown as a Quota. A budget judges ONE account's cost — two logins' spend is never summed against it | `Cost` · `Account.budget` |
 | usage is stale 5 minutes after it was updated | `Usage` |
 | a background refresh is never faster than the slowest provider's floor, and slower on battery | `Monitor` |
 | a data source's definition is DATA; the code behind it is one worker per case, with ONE job, named for a protocol or format — never a vendor | `DataSource` |
@@ -392,6 +394,7 @@ context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
 | `Window` | `QuotaType.duration` guesses from the name; `windowDuration` and `resetsAt` sit beside it | a value the data source states |
 | `Usage` | `UsageSnapshot` with `bedrockUsage`, `extensionMetrics`, `dailyUsageReport` | kernel fields only; the rest moves to their contexts |
 | `Plan` | `AccountTier` with Claude cases | a name and a badge |
+| `Account.budget` | two one-off settings: `app.claudeApiBudget` (+ `…Enabled`, edited in Claude's card) and `bedrock.dailyBudget`; Bedrock turns its budget into a fake `Daily Budget` quota | a `Budget` beside the account's `Cost`, judged as `BudgetStatus`, never a quota; the old keys read as the default account's budget |
 | page state | `MenuBarLabel`, `CountdownColon`, `PopoverContentHeight`, `MenuBarStackedSize` in `Domain/Provider`; `menuBarLabel(…)` on `QuotaMonitor` | the App |
 | `ProviderDefinition` · *Add Provider* | — (extensions are hand-written on disk) | Data Sources + Providers + a Settings sheet |
 
