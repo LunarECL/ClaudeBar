@@ -1,0 +1,383 @@
+---
+description: THE normative tree ClaudeBar binds to — every node from the Monitor down, the word the screen prints for it, its laws and their owners, the bounded contexts and the modules that implement them; read before adding or changing any domain type or provider.
+---
+
+# ClaudeBar — the canonical model
+
+> ONE tree. The menu bar, the popover, the Settings window, the notch, the
+> Touch Bar and Notify! all read it; none of them adds a rule to it. A node is
+> here because a user can point at it on screen, and a rule lives on **the node
+> that holds the data it needs** (tell, don't ask).
+>
+> **Status: PROPOSED — design, not build truth.** Written 2026-10-01 from the
+> code as it stands (`Sources/Domain`, 20 providers, the extension system) and
+> from the words the interface prints. Where the code and this tree disagree,
+> §8 says which way the code moves. Nothing here has been migrated yet.
+>
+> | Question | Document |
+> |---|---|
+> | *What is the tree, node by node, and who owns which law?* | **this one** |
+> | *Which module, which file, which order?* | [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) |
+> | *How are the layers and data flow wired today?* | [ARCHITECTURE.md](ARCHITECTURE.md) |
+> | *What does a user DO with the app?* | [USER_BEHAVIORS.md](USER_BEHAVIORS.md) |
+> | *How does one provider fetch its data?* | `docs/providers/<id>/design.md` |
+
+---
+
+## 0 · How to read it
+
+| Mark | Means |
+|---|---|
+| **◆** | a domain object with commands and laws — it can say no |
+| **◇** | a value — it answers, and cannot be told anything |
+| **DERIVED** | computed from other nodes, never stored |
+
+**The words are the ones the screen prints.** A name is harvested from the
+interface, never from backstage jargon; when the interface has no word yet,
+the industry's is taken. The screen prints *Providers*, *All Providers*,
+*Accounts*, *Add Account*, *PROBE MODE* (subtitled *Data fetching method*),
+*CLI Mode · API Mode · RPC Mode*, *Save & Test Connection*,
+*Fetching usage data…*, *No usage data*, *Updated 3m ago*, *Session · Weekly*,
+*Low quota*, *each quota window resets*, *% left*, *remaining*, *Resets in 2h 5m*,
+*Balance*, *Credits*, *API COST*, *EXTRA USAGE*, *Daily Budget*, *Claude Max
+plans*, *HEALTHY · WARNING*, *On track · Running hot · Room to spare*, *TODAY'S
+USAGE*. Those are the words below.
+
+### 0.1 · Words the code uses, and ours
+
+| The code's word | Ours | Why ours |
+|---|---|---|
+| `AIProvider` | **`Provider`** | the screen prints *Providers*. The `AI` prefix tells the reader nothing; every provider is one |
+| `UsageProbe`, and every `XxxUsageProbe` (find the credential, refresh it, fetch, fall back AND parse — in one vendor-named type) | **`DataSource`** — a **`DataSourceDefinition`** (`CredentialLookup` + `Fetch` + `Mapping`, plain data) made live with exactly the one connection its fetch needs; it fetches its own usage | the screen has to translate its own header: *PROBE MODE* is subtitled *Data fetching method*, and everywhere else it says *Fetching usage data…* and *Test Connection*. Settings screens that do this job — Grafana, Metabase, Retool — call it a **data source** and test it with *Save & test*. And it is two questions — *how do I get the bytes?* and *what do they say?* — which a user building a provider in the UI answers on two different steps; a third, *whose key?*, the screen already prints as *TOKEN LOOKUP ORDER* · *API KEY LOOKUP ORDER* · *COOKIE SOURCE*. *Probe* is the industry's word for checking something is alive (a Kubernetes liveness probe), which is our `healthCheck`, not this |
+| the *PROBE MODE* header | **DATA SOURCE**, choices *CLI · API · RPC* | the subtitle goes; it no longer translates anything. The saved setting key and the extension manifest's `"probe"` key and `probe.sh` stay — keys are match names, labels are display names |
+| `ProbeError` | **`DataSourceError`** | the failure of a data source — what *Save & Test Connection* reports when the connection is not verified |
+| `UsageSnapshot` | **`Usage`** | the screen prints *Fetching usage data…* · *No usage data* · *Updated 3m ago*, and the vendors' own command is `/usage` (we run `claude /usage`). It is the provider's usage, as of when it was updated. *Snapshot* is the code's word for any frozen value |
+| `capturedAt` | **`updatedAt`** | the screen prints *Updated 3m ago* |
+| `UsageQuota` | **`Quota`** | the product's own word — *"shows AI coding quotas"* |
+| `percentRemaining` + `dollarRemaining` + `dollarCap` (+ `percentRemaining: 100` as a placeholder) | **`Quota.left: Left`** — `share(Percent)` · `money(Money, of: Money?)` | the screen prints *% left* OR *$12.40 remaining*. Never both, and a balance with no ceiling has no percentage |
+| `QuotaType` (name **and** a guessed duration) | **`Quota.name`** + **`Quota.window: Window?`** | *Session* is what it's called; *5 hours, resets 11am* is when it refills. The code derives the second from the first |
+| `QuotaStatus` | **`Status`** | prints HEALTHY · WARNING · CRITICAL · DEPLETED |
+| `UsagePace` | **`Pace`** | prints On track · Running hot · Room to spare |
+| `CostUsage` | **`Cost`**, of a kind: `api` · `extraUsage` | the card prints *API COST* or *EXTRA USAGE* — two kinds of money gone, one shape |
+| `BudgetStatus` + the API budget setting | **`Budget`** | prints *Daily Budget*, *Claude API Budget* — and ON TRACK · NEAR LIMIT · OVER BUDGET |
+| `AccountTier` (`.claudeMax`, `.claudePro`, …) | **`Plan`** | the badge prints MAX · PRO · API; vendors call it a *plan* (Claude Max plan, Coding Plan). A vendor's name does not belong in the shared kernel |
+| `ConfigField` (extensions only) | **`Setting`**, in a **`SettingsForm`** | prints *API KEY*, *REGION*, *SETTINGS.JSON PATH*. Every provider's config card is one of these forms |
+| `ExtensionManifest` | **`ProviderDefinition`** | the same thing a user makes with *Add Provider*, read from disk instead of a form |
+
+> **One word, two fences.** *Session* means the 5-hour quota window inside
+> **Quota**, and a running Claude Code process inside **Activity**. Both are on
+> screen and both stay; the fence (§7) is what keeps them from meeting.
+
+## 1 · The tree
+
+```text
+Monitor  ◆                                  THE ROOT — what the menu bar is watching. One per app
+├── lineup: [Provider]                      the Providers pane's order. Enabled ones are shown
+│   │
+│   └── Provider  ◆                         ONE THING YOU PAY FOR — built in, or made by the user
+│       ├── profile: ProviderProfile  ◇     WHO IT IS — the only place an id becomes a face
+│       │   ├── id: ProviderID              stable forever; settings are keyed by it
+│       │   ├── name                        "DeepSeek"
+│       │   ├── look: ProviderLook          symbol · colour · gradient — data, never a switch on id
+│       │   └── links                       dashboard · status page · "Open DeepSeek API Keys"
+│       ├── isEnabled                       the pane's toggle
+│       ├── settingsForm: SettingsForm  ◇   WHAT IT NEEDS FROM YOU — [Setting]: API KEY, REGION, ENV
+│       │                                   VAR … each says its kind (text · secret · number ·
+│       │                                   toggle · choice · path) and its default. A SECRET
+│       │                                   is a reference into the vault, never a value
+│       ├── dataSources: [DataSource]  ◆    HOW WE FIND OUT — one or more; "DATA SOURCE" picks one
+│       │   └── DataSource  ◆               ONE TYPE FOR EVERY PROVIDER — its definition, made live by
+│       │       │                           the factory with only the connection its fetch needs
+│       │       ├── definition: DataSourceDefinition  ◇   THE JSON — no behaviour:
+│       │       │   ├── kind                CLI · API · RPC · Script · HTTP · File — the choices
+│       │       │   ├── credential: CredentialLookup?   WHOSE KEY — "TOKEN LOOKUP ORDER": the first
+│       │       │   │                       that answers of environment(var) · setting(field) ·
+│       │       │   │                       jsonFile(path, fields) · keychain(service) ·
+│       │       │   │                       browserCookie(domain) — and how it stays fresh:
+│       │       │   │                       refresh: oauth2(tokenURL, clientId, every, on 401)
+│       │       │   ├── fetch: Fetch        HOW TO GET THE BYTES — "Data fetching method". A closed sum:
+│       │       │   │                       http(request) · jsonRpc(cli, handshake, call) · cli(args) ·
+│       │       │   │                       terminal(cli, keys) · file(path) · script(path)
+│       │       │   ├── mapping: Mapping    WHAT THE BYTES SAY — a closed sum:
+│       │       │   │                       json(paths, each, used|left, resets) · text(patterns)
+│       │       │   └── fallback: kind?     the data source to try when this one fails — Codex's
+│       │       │                           RPC falls back to its terminal
+│       │       ├── fetchUsage() → Usage    "Fetching usage data…" — looks up the key, fetches, maps
+│       │       ├── isReady                 DERIVED — the key answers and the CLI exists ("Configured")
+│       │       └── test() → Usage          "Save & Test Connection" — fetch, map, show; save nothing
+│       ├── accounts: [Account]  ◆          NEVER EMPTY. One account is the "default" account
+│       │   └── Account  ◆
+│       │       ├── id · label · email · organization
+│       │       ├── plan: Plan?  ◇          MAX · PRO · API · Coding Plan — what the vendor sold
+│       │       └── usage: Usage?  ◇        WHAT WE LAST SAW — survives a failed refresh
+│       ├── active: Account.ID              whose usage the popover shows
+│       └── sync: SyncState  ◇              isSyncing · lastError: DataSourceError — THE PROVIDER'S,
+│                                           not the usage's: a failure never erases what we saw
+│
+├── selection: ProviderID                   which provider the popover opens on
+├── statusPolicy: StatusPolicy  ◇           HOW STRICT TO BE — absolute thresholds, or pace-aware
+│                                           with the user's burn-rate threshold
+└── budgets: [Budget]  ◇                    THE USER'S OWN CEILINGS on a Cost — a Daily Budget,
+                                            the Claude API Budget. The vendor sets quotas;
+                                            the user sets budgets
+
+Usage  ◇                                    "Fetching usage data…" — WHAT THE PROVIDER SAYS, AS OF A MOMENT
+├── updatedAt                               "Updated 3m ago"; stale after 5 minutes
+├── quotas: [Quota]
+│   └── Quota  ◇                            ONE LIMIT THE VENDOR SET
+│       ├── name                            Session · Weekly · Opus · Monthly · Balance · Credits
+│       ├── group?                          the card section, when one provider spans several
+│       │                                   upstream accounts ("Claude · work")
+│       ├── left: Left                      A CLOSED SUM OF TWO:
+│       │                                     share(Percent)            "62% left"
+│       │                                     money(Money, of: Money?)  "$12.40 remaining", "of $50"
+│       ├── window: Window?                 WHEN IT REFILLS — length + resetsAt. "Resets in 2h 5m".
+│       │                                   A prepaid balance has none
+│       ├── status                          DERIVED — Left × StatusPolicy (× Window, when pace-aware)
+│       └── pace                            DERIVED — needs a Window; otherwise unknown
+├── cost: Cost?  ◇                          MONEY GONE — "API COST" or "EXTRA USAGE", over a period.
+│                                           Judged by a Budget, never by a Quota
+└── account facts                           email · organization · plan, when the data source learns them
+
+    DELIBERATELY OUTSIDE THE MONITOR
+Activity  ◆                                 Claude Code sessions seen through hooks — the notch
+UsageHistory  ◆                             "TODAY'S USAGE" — read from local logs, not a meter
+Destinations                                notifications · Notify! · live activity · status export
+
+    NOT IN THE MODEL (the page's)
+MenuBarLabel · display mode (left/used) · countdown colon · popover height · theme ·
+provider pills · card titles shortened for width
+```
+
+## 2 · A provider is DATA; one DataSource type fetches for all of them
+
+The user's sentence is the design: *a provider only needs to know how to fetch
+the data and how to read the usage.* "Knows how" is a DEFINITION, not a class.
+Everything else a provider has today — the syncing flag, the last error, the
+enabled toggle, the account switch, the settings plumbing, the icon — is the
+same for all of them, so it is written once and a provider does not get a say.
+
+Take Codex. Its two probes do five jobs between them, and **not one of them is
+Codex logic**:
+
+| The job | What `CodexAPIUsageProbe` / `CodexUsageProbe` hard-code | What it really is |
+|---|---|---|
+| whose key | read `~/.codex/auth.json` → `tokens.access_token`, `tokens.account_id` | `credential: jsonFile(path, fields)` |
+| keep it fresh | refresh-token grant to `auth.openai.com/oauth/token` after 8 days or on 401, write it back | `refresh: oauth2(tokenURL, clientId, every: 8d, on: 401)` |
+| get the bytes | `GET chatgpt.com/backend-api/wham/usage` with three headers · or spawn `codex app-server`, JSON-RPC `initialize` → `initialized` → `account/rateLimits/read` | `fetch: http(…)` · `fetch: jsonRpc(…)` |
+| when that fails | scrape the terminal for `5h limit … 62% left` | `fallback` to a `terminal` fetch + `text` mapping |
+| what it says | `used_percent` → left, `reset_at` / `reset_after_seconds` → resets, `additional_rate_limits[]` → more quotas, `codex_` prefix dropped | `mapping: json(…)` |
+
+So every provider is ONE KIND OF THING — a definition — and ONE `DataSource`
+type does the fetching for all of them: `dataSource.fetchUsage()` looks up
+the key, fetches, maps. Behind it, each CASE of the three closed sums is
+carried out by one internal worker with one job, named for its protocol or
+format, never for a vendor:
+
+| Closed sum | Its cases' workers (`internal`) |
+|---|---|
+| `CredentialLookup` | `EnvironmentReader` · `SettingReader` · `JSONFileReader` · `KeychainReader` · `BrowserCookieReader` · `OAuth2Refresher` |
+| `Fetch` | `HTTPFetcher` · `JSONRPCFetcher` · `CLIFetcher` · `TerminalFetcher` · `FileFetcher` · `ScriptFetcher` |
+| `Mapping` | `JSONMapper` · `TextMapper` |
+
+**Why closed sums.** The JSON decoder must know every tag, and the *Add
+Provider* sheet offers a fixed list. A new provider is a JSON file — open, no
+Swift. A new protocol (say gRPC) is a new case and one new worker: a
+deliberate change to a closed list, which is honest, because a new picker
+option, decoder tag and form come with it anyway.
+
+**When a vendor really is different** — Bedrock reads AWS CloudWatch through
+the AWS SDK; another signs its requests with its own scheme — the difference
+is still ONE job, so it is still one case with one worker named for the
+technology or the scheme (`Fetch.cloudWatch`, a signature case named for its
+algorithm), taking its parameters from the JSON. There is never a type that
+does all five jobs for one vendor.
+
+| Kind of provider | Definition lives in | Made by |
+|---|---|---|
+| **Built-in** | `Resources/Providers/<id>.json`, shipped in the app | us |
+| **Declared** | `~/.claudebar/providers/<id>.json` | the user, in *Add Provider* |
+| **Scripted** (today's extensions) | `~/.claudebar/extensions/<id>/manifest.json` — a `script` fetch | the user, by hand |
+
+The three differ only in *where the file is*. Codex, DeepSeek and a provider
+someone made five minutes ago run on the same `DataSource` and the same lifecycle.
+
+## 3 · The commands, and the node each lands on
+
+| The user does | The node is told | Notes |
+|---|---|---|
+| toggles a provider in Providers | `provider.enable()` · `disable()` | the lineup keeps its place |
+| drags the pane's order | `monitor.lineup.move(_:to:)` | |
+| picks DATA SOURCE | `provider.use(_ kind:)` | one data source active at a time |
+| fills API KEY, REGION … | `provider.settings.set(_:to:)` | a secret goes to the vault; the form keeps the reference |
+| *Add Account* · remove · switch | `provider.add(account:)` · `remove` · `activate` | never removes the last one |
+| clicks a provider pill | `monitor.select(_:)` | |
+| refreshes | `monitor.refresh(_:kind:)` → `provider.refresh(kind)` | interactive or background |
+| *Add Provider* → Test | `ProviderDefinition.trial()` → a `Usage` or a `DataSourceError` | nothing is saved until Save |
+| *Add Provider* → Save | `catalog.add(definition)` → `monitor.lineup.append` | no restart |
+| deletes a custom provider | `catalog.remove(id)` · `monitor.lineup.remove(id)` | built-ins can only be disabled |
+| sets a Daily Budget | `monitor.budgets.set(_:for:)` | |
+| chooses status colours / pace-aware | `monitor.statusPolicy = …` | colours are the page's; the thresholds are the policy's |
+
+## 4 · The reads — what the tree answers
+
+```text
+monitor.overallStatus                → Status       the menu bar's colour: the worst enabled
+monitor.lowestQuota                  → Quota?       across the enabled lineup
+provider.usage                       → Usage?       the ACTIVE account's latest
+provider.status                      → Status       the worst quota in that usage
+provider.bestAccount                 → Account?     the most left — "switch to work"
+usage.quota(named:)                  → Quota?
+usage.isStale                        → Bool         older than 5 minutes
+quota.status(under: StatusPolicy)    → Status
+quota.pace                           → Pace         unknown without a window
+quota.window?.timeUntilReset         → Duration?    "Resets in 2h 5m"
+cost.judged(by: Budget)              → BudgetStatus ON TRACK · NEAR LIMIT · OVER BUDGET
+definition.trial()                   → Usage        the Add Provider sheet's Test
+```
+
+## 5 · The laws, on the node that owns them
+
+| Law | Owner |
+|---|---|
+| a provider's id is stable forever; settings, the menu-bar choice and the lineup are keyed by it. A declared provider's id is minted once and never derived from its name | `ProviderProfile` |
+| a provider's face is DATA — its symbol and colours ride on the profile, so adding one never edits a `switch id` | `ProviderLook` |
+| a provider has at least one account; a single-account provider's only account is `default`, and its compound id equals the provider id | `Provider.accounts` |
+| what the popover shows is the ACTIVE account's usage; aggregate status is the worst across accounts | `Provider` |
+| a failed refresh keeps the last usage and records the error beside it — what we saw is never erased by failing to look again | `Provider.sync` |
+| at most one refresh per provider is in flight | `Provider` |
+| exactly one data source is active per provider; switching never loses settings the other one needs | `Provider.dataSources` |
+| a data source reads settings only through its form; it never writes settings and never reads another provider's | `DataSource` · `SettingsForm` |
+| a secret never appears in `settings.json`, a log line, an error message or a test fixture — the form holds a reference, the vault the value, and the vault falls back when the Keychain refuses an ad-hoc build | `Setting` · `SecretVault` |
+| **`left` is ONE OF TWO**: a share, or money. A balance with no ceiling has NO percentage — writing 100% is a lie the status then believes | `Quota.left` |
+| money keeps its currency; two currencies are never added or compared | `Money` |
+| **a window's length is the provider's word**, never guessed from a quota's name — the Codex RPC's primary window can be the weekly one | `Window` |
+| pace exists only inside a window with a reset; outside it is `unknown`, never `onPace` | `Quota.pace` |
+| depleted at 0, critical under 20 — ABSOLUTE, whatever the policy; pace-aware only softens WARNING | `StatusPolicy` |
+| a quota is the vendor's ceiling; a budget is the user's. A Cost is judged by a Budget, never shown as a Quota | `Cost` · `Budget` |
+| usage is stale 5 minutes after it was updated | `Usage` |
+| a background refresh is never faster than the slowest provider's floor, and slower on battery | `Monitor` |
+| a data source's definition is DATA; the code behind it is one worker per case, with ONE job, named for a protocol or format — never a vendor | `DataSource` |
+| a data source is handed only the connection its fetch needs — an HTTP fetch never holds a CLI | `DataSources` (the factory) |
+| a new provider is never a code change; a new protocol or format is one new case and one worker | `Fetch` · `Mapping` · `CredentialLookup` |
+| a credential is looked up in the order the definition gives; the first that answers wins, and a refreshed token is written back where it was found | `CredentialLookup` |
+| when the active data source fails, its `fallback` is tried once; what the popover shows says which one answered | `Provider` |
+| a definition is valid before it is saved: a fetch, a mapping that produced at least one quota or a cost on Test, and every required setting filled | `ProviderDefinition` |
+| a built-in provider can be disabled but not deleted; a declared one can be both | `ProviderCatalog` |
+
+## 6 · What is deliberately NOT in the tree
+
+| Absent | Why |
+|---|---|
+| `UsageProbe`, and every `XxxUsageProbe` | one vendor-named type doing five jobs — the SRP violation this model exists to remove. Its jobs are three closed sums in a definition, and one `DataSource` that carries them out |
+| a module, folder or type per vendor | a vendor is a JSON file. Vendor knowledge is DATA: URLs, paths, field names, client ids |
+| a `XxxProvider` class per vendor | the lifecycle is identical in all twenty; only the fetch and mapping differ. Claude's CLI and API modes are two data sources, not a subclass |
+| a `XxxSettingsRepository` protocol per vendor | a vendor's settings are a `SettingsForm`; storage is one repository keyed by provider and setting id. ISP is kept by handing each data source ONLY its own form |
+| `bedrockUsage` on the usage | a vendor's type in the shared kernel. Bedrock's per-model cost is a `Cost` with lines, or a group of quotas |
+| `.claudeMax` · `.claudePro` on `Plan` | a vendor's words in the kernel. A plan is a badge and a name; whether it can issue guest passes is a fact the definition states about that plan |
+| `menuBarTitle` · `compactTitle` · `formattedDollar…` · `paceTickHelp` on `Quota` | the page's. A quota does not know how wide the menu bar is |
+| `menuBarLabel(…)` on the `Monitor` | the page's. The monitor answers *what is true*; the menu bar decides how to print it |
+| `percentRemaining: 100` as "no percentage" | see the law on `Quota.left` |
+| `QuotaType.duration` guessing 7 days for a model quota or 30 for "Monthly" | see the law on `Window` |
+| a ViewModel or AppState | unchanged: views read the tree |
+| Claude Code sessions in the Monitor | a different question with a different *Session* — Activity's |
+
+## 7 · The contexts, and the modules that implement them
+
+Each is a **fence**: inside it every word has one meaning and one model
+enforces it. Across a fence the same word may mean something else, as long as
+**no type crosses** — a reference does.
+
+| Context | Subdomain | Owns the question | Module |
+|---|---|---|---|
+| **Quota** | **shared kernel** | *how much is left, when does it refill, and is that OK?* | `Modules/Quota` |
+| **Providers** | **core** | *who do I pay, under which accounts, and what did they last say?* | `Modules/Providers` |
+| **Data Sources** | supporting | *how do we find out?* — DataSource, DataSourceDefinition, CredentialLookup, Fetch, Mapping, Setting, DataSourceError, and every worker | `Modules/DataSources` |
+| **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* | `Modules/Monitoring` |
+| **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export | `Modules/Alerting` |
+| **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch | `Modules/Activity` |
+| **Usage History** | supporting | *what did I use today, against yesterday?* | `Modules/UsageHistory` |
+| **Vault & Settings** | generic | *where is it kept?* — `settings.json`, secrets | `Modules/Storage` |
+| SDK clients | — (anti-corruption layers) | *what does this SDK say?* — a client that needs a heavy SDK gets its own module, behind a port, so only it links the SDK | `Modules/AWSClients` |
+
+```text
+                      Quota                    the shared kernel — knows nobody
+                    ▲   ▲   ▲
+          ┌─────────┘   │   └──────────┐
+    DataSources     UsageHistory    Alerting ◀──┐
+          ▲                                     │
+          │                                     │
+          │◀── AWSClients (the SDK)               │
+          │                                     │
+    Providers ◀──────────── Monitoring ─────────┘        Activity
+          ▲                      ▲                      (on its own:
+          │                      │                       no Quota, no Provider)
+          └──────── App ─────────┘
+          the composition root: hands the SDK clients in,
+          loads the definitions (built-in JSON ships here), draws the tree
+```
+
+Arrows point at the **supplier**. Nothing points back: the kernel cannot name a
+provider, Data Sources cannot name the Monitor, no module names a vendor, and
+the AWS SDK links into `AWSClients` and nowhere else.
+
+**Packaging.** One Tuist framework target per context under `Modules/`, each
+with `Sources/` and `Tests/`. The `**` globs keep working per module; a context's tests link only that
+context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
+
+## 8 · Build truth, node by node
+
+| Node | Today | Moves to |
+|---|---|---|
+| `Provider` lifecycle | copied into 20 `XxxProvider` classes (`isSyncing`, `snapshot`, `lastError`, `isEnabled`, `refresh`) | one `Provider` in `Providers`; built-ins become JSON definitions |
+| `ExtensionProvider` | a generic provider over scripted sections | the same `Provider`, with `script` fetches — the proof that one lifecycle fits |
+| `ProviderProfile.look` | four `switch id` tables: `ProviderVisualIdentity`, `Theme`, `ProviderIcons`, `NotificationAlerter` | data on the profile |
+| `SettingsForm` | 11 settings sub-protocols in `ProviderSettingsRepository.swift`, mirrored in two repositories and 11 config cards; extensions already use `ConfigField` | `ConfigField` generalised; one form renderer; custom cards only where a form cannot say it (Claude's account management) |
+| `DataSource` (+ `DataSourceDefinition` = `CredentialLookup` + `Fetch` + `Mapping`) | ~30 vendor-named probes, clients and credential loaders, each doing several jobs | one definition per data source in JSON, one `DataSource` type and ~15 internal workers; every `XxxUsageProbe` is deleted |
+| `Quota.left` | `percentRemaining` always set; **at least 8 probes write `100`** for a balance (Vercel, Copilot, Cursor, Claude API, Grok, Command Code, AmpCode, DeepSeek) | the closed sum |
+| `Window` | `QuotaType.duration` guesses from the name; `windowDuration` and `resetsAt` sit beside it | a value the data source states |
+| `Usage` | `UsageSnapshot` with `bedrockUsage`, `extensionMetrics`, `dailyUsageReport` | kernel fields only; the rest moves to their contexts |
+| `Plan` | `AccountTier` with Claude cases | a name and a badge |
+| page state | `MenuBarLabel`, `CountdownColon`, `PopoverContentHeight`, `MenuBarStackedSize` in `Domain/Provider`; `menuBarLabel(…)` on `QuotaMonitor` | the App |
+| `ProviderDefinition` · *Add Provider* | — (extensions are hand-written on disk) | Data Sources + Providers + a Settings sheet |
+
+### The order of the work
+
+Each step ships green and changes no behaviour a user can see, until the last.
+
+1. **Carve the modules** — move files into `Modules/<Context>` with no
+   renames; page state leaves the domain. Typealiases keep call sites
+   compiling.
+2. **One `Provider` and one `DataSource`** — the generic lifecycle, and the
+   workers Codex needs; Codex becomes `codex.json` first, because its five
+   jobs exercise the most workers with the least account logic.
+3. **Profile and form as data** — remove the `switch id` tables and the
+   per-vendor settings protocols.
+4. **`Left` and `Window`** — the two kernel laws; the eight balance definitions
+   map money only.
+5. **Every other provider becomes JSON** — each one may add a case and a worker,
+   never a vendor type; extensions become definitions with a `script` fetch; *PROBE
+   MODE* becomes *DATA SOURCE*.
+6. **Add Provider** — the sheet, Test, Save.
+7. **The words** — `Usage` (`updatedAt`), `Plan`, `Cost`, and remove the
+   typealiases. The popover's *No quota data* · *Waiting for quota data* become
+   *usage data*: a balance-only provider has no quota, but it has usage.
+
+## 9 · Open
+
+- **Usage History on the usage.** Claude attaches *TODAY'S USAGE* to its
+  snapshot today, and the background poll skips it (issue #204). Is it a
+  second read the popover asks for, or does `Usage` carry it?
+- **The mapping's reach.** When a vendor's response needs a rule the JSON
+  mapping cannot say (Codex's free plan with no limits; Claude's PTY screen),
+  the answer is a mapping FEATURE every provider gets — never a vendor
+  escape hatch. Which features, is found provider by provider.
+- **Cost lines.** Bedrock reports cost per model, and an extension can report
+  metrics. Is that one `Cost` with lines, or a third kind of `Left`?
+- **A declared provider with accounts.** One definition plus N secrets — is
+  the account list the form's (one API key each), or the provider's?
+- **`command` fetches from the UI.** A user-typed command runs with the user's
+  rights, as an extension script does today. Is a confirmation enough, or are
+  declared providers HTTP and file only?
+- **Status in the kernel or the policy.** Is `Quota.status` a read that takes
+  the policy, or does the Monitor apply it? §4 assumes the first.
