@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Popover keyboard shortcuts: Escape closes the popover (or an open share overlay first), and ⌘1–⌘9 switch between the provider pills. Tooltips on the pills and action buttons now show each shortcut (⌘D, ⌘R, ⌘S, ⌘, and ⌘Q already worked).
 - Kimi: API mode has a Region picker (Settings → Providers → Kimi → Kimi Configuration): China (kimi.com) or International (kimi.ai), matching the platform your account is signed in to. The console link follows the region. https://github.com/tddworks/ClaudeBar/issues/new
 
+### Changed
+- Claude: the Dashboard button (⌘D) now opens your usage page on claude.ai when you're on a subscription (Max, Pro, Team). It used to open the Console billing page, which is only useful for pay-as-you-go API accounts; those still go there.
+
 ### Fixed
 - Kimi: CLI mode failed with "No quota data found" because the CLI's one-time "Trust this folder?" prompt swallowed the typed `/usage`. The probe now runs in its own folder (trusted once), reads the CLI 2.x "Monthly limit" layout, and types `/usage` after the startup paint settles. https://github.com/tddworks/ClaudeBar/issues/new
 - ClaudeBar no longer grows in memory the longer it runs. It could reach several GB after a day or two and then peg the CPU and freeze the menu bar panel. [#313](https://github.com/tddworks/ClaudeBar/issues/313)

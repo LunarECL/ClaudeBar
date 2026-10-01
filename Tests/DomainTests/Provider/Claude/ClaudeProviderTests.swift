@@ -39,11 +39,11 @@ struct ClaudeProviderTests {
     }
 
     @Test
-    func `claude provider has dashboard URL pointing to anthropic`() {
+    func `claude provider has dashboard URL pointing to claude.ai`() {
         let settings = makeSettingsRepository()
         let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         #expect(claude.dashboardURL != nil)
-        #expect(claude.dashboardURL?.host?.contains("anthropic") == true)
+        #expect(claude.dashboardURL?.host == "claude.ai")
     }
 
     @Test

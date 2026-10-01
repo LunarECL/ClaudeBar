@@ -28,9 +28,36 @@ struct ActionBarSpec {
             return mock
         }
 
+        private static func makeUsageProbe(tier: AccountTier?) -> MockUsageProbe {
+            let probe = MockUsageProbe()
+            given(probe).probe().willReturn(
+                UsageSnapshot(providerId: "claude", quotas: [], capturedAt: Date(), accountTier: tier)
+            )
+            given(probe).isAvailable().willReturn(true)
+            return probe
+        }
+
         @Test
-        func `Claude dashboard URL is Anthropic billing`() {
+        func `Claude dashboard URL is claude.ai usage on a subscription`() async throws {
+            let claude = ClaudeProvider(probe: Self.makeUsageProbe(tier: .claudeMax), settingsRepository: Self.makeSettings())
+
+            try await claude.refresh()
+
+            #expect(claude.dashboardURL?.absoluteString == "https://claude.ai/new#settings/usage")
+        }
+
+        @Test
+        func `Claude dashboard URL is claude.ai usage before the tier is known`() {
             let claude = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
+            #expect(claude.dashboardURL?.absoluteString == "https://claude.ai/new#settings/usage")
+        }
+
+        @Test
+        func `Claude dashboard URL is Anthropic billing on an API account`() async throws {
+            let claude = ClaudeProvider(probe: Self.makeUsageProbe(tier: .claudeApi), settingsRepository: Self.makeSettings())
+
+            try await claude.refresh()
+
             #expect(claude.dashboardURL?.absoluteString == "https://console.anthropic.com/settings/billing")
         }
 
