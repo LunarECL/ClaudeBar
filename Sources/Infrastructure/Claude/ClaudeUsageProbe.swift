@@ -32,6 +32,21 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     /// user's hooks as a "Claude Code Started/Finished" pair (#222).
     public static let probeEnvironment = [HookConstants.probeEnvironmentKey: "1"]
 
+    /// Display name given to the probe's shared Claude session, so it reads as
+    /// "ClaudeBar Probe" in the `/resume` picker and session tools instead of
+    /// an anonymous probe (#132).
+    public static let probeSessionName = "ClaudeBar Probe"
+
+    /// Prompts the probe answers itself in every PTY run — folder trust and
+    /// onboarding, shared by the `/usage` and `/cost` executors.
+    static let probeAutoResponses = [
+        "Esc to cancel": "\r",  // Trust prompt - press Enter to confirm
+        "Ready to code here?": "\r",
+        "Press Enter to continue": "\r",
+        "ctrl+t to disable": "\r",  // Onboarding complete
+        "Yes, I trust this folder": "\r",  // New trust prompt format
+    ]
+
     /// Reported when `claude /usage` shows the API-billing cost panel — or says
     /// `/usage` is "only available for subscription plans" — for an account the
     /// config file says is a subscription. Surfaced only if the usage API cannot
@@ -43,11 +58,20 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     /// Resolves account info from `~/.claude.json`
     private let accountInfoResolver: any AccountInfoResolving
 
+    /// Persists the shared probe session's id between polls (#132).
+    let sessionStore: any ProbeSessionStore
+
+    /// Cleared for the lifetime of this probe once the installed CLI proves
+    /// it does not support the session flags, so later runs go straight to
+    /// today's plain invocation instead of paying a failing run first (#132).
+    private var sessionFlagsSupported = true
+
     public init(
         claudeBinary: String = "claude",
         timeout: TimeInterval = 20.0,
         cliExecutor: CLIExecutor? = nil,
-        accountInfoResolver: any AccountInfoResolving = ClaudeAccountInfoResolver()
+        accountInfoResolver: any AccountInfoResolving = ClaudeAccountInfoResolver(),
+        sessionStore: any ProbeSessionStore = FileProbeSessionStore()
     ) {
         self.claudeBinary = claudeBinary
         self.timeout = timeout
@@ -68,6 +92,7 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         )
         self.terminalRenderer = TerminalRenderer(cols: 160, rows: 50)
         self.accountInfoResolver = accountInfoResolver
+        self.sessionStore = sessionStore
     }
 
     public func isAvailable() async -> Bool {
@@ -94,19 +119,11 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         let usageResult: CLIResult
         let cliStart = CFAbsoluteTimeGetCurrent()
         do {
-            usageResult = try await cliExecutor.execute(
-                binary: claudeBinary,
-                args: ["/usage", "--allowed-tools", ""],
-                input: "",
-                timeout: timeout,
+            usageResult = try await executeProbeCommand(
+                "/usage",
+                executor: cliExecutor,
                 workingDirectory: workingDir,
-                autoResponses: [
-                    "Esc to cancel": "\r",  // Trust prompt - press Enter to confirm
-                    "Ready to code here?": "\r",
-                    "Press Enter to continue": "\r",
-                    "ctrl+t to disable": "\r",  // Onboarding complete
-                    "Yes, I trust this folder": "\r",  // New trust prompt format
-                ]
+                autoResponses: Self.probeAutoResponses
             )
         } catch {
             AppLog.probes.error("Claude /usage probe failed: \(error.localizedDescription)")
@@ -189,19 +206,11 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
 
         let costResult: CLIResult
         do {
-            costResult = try await costExecutor.execute(
-                binary: claudeBinary,
-                args: ["/cost", "--allowed-tools", ""],
-                input: "",
-                timeout: timeout,
+            costResult = try await executeProbeCommand(
+                "/cost",
+                executor: costExecutor,
                 workingDirectory: workingDir,
-                autoResponses: [
-                    "Esc to cancel": "\r",
-                    "Ready to code here?": "\r",
-                    "Press Enter to continue": "\r",
-                    "ctrl+t to disable": "\r",
-                    "Yes, I trust this folder": "\r",  // New trust prompt format
-                ]
+                autoResponses: Self.probeAutoResponses
             )
         } catch {
             AppLog.probes.error("Claude /cost probe failed: \(error.localizedDescription)")
@@ -215,6 +224,149 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         AppLog.probes.info("Claude /cost probe success: cost=\(snapshot.costUsage?.formattedCost ?? "N/A")")
 
         return snapshot
+    }
+
+    // MARK: - Shared probe session (#132)
+
+    /// Builds the args for one probe command under a session plan (#132).
+    /// Session flags are appended after today's base args, so a plan of
+    /// `.none` reproduces the exact invocation the probe has always made.
+    func sessionArgs(for plan: ProbeSessionPlan, command: String) -> [String] {
+        switch plan {
+        case .create(let sessionID):
+            // `--name` gives the session its "ClaudeBar Probe" display name in
+            // the `/resume` picker and session tools; it is set once at creation.
+            return [command, "--allowed-tools", "", "--session-id", sessionID, "--name", Self.probeSessionName]
+        case .resume(let sessionID):
+            return [command, "--allowed-tools", "", "--resume", sessionID]
+        case .none:
+            return [command, "--allowed-tools", ""]
+        }
+    }
+
+    /// Runs one probe command bound to the shared probe session (#132).
+    ///
+    /// Every run joins **one** session instead of creating a fresh one per
+    /// poll: the first run creates it under a stable, persisted id
+    /// (`--session-id <uuid> --name "ClaudeBar Probe"`), later runs resume it
+    /// (`--resume <uuid>`). Two ways to fall out, both graceful:
+    ///
+    /// - The stored session is gone (e.g. `~/.claude` was cleared): the id is
+    ///   dropped and the session is recreated under a fresh one.
+    /// - The installed CLI is too old for the session flags (commander's
+    ///   "unknown option" error): the run falls back to today's plain
+    ///   invocation and stays there for this probe's lifetime. Parsing is
+    ///   untouched either way.
+    private func executeProbeCommand(
+        _ command: String,
+        executor: any CLIExecutor,
+        workingDirectory: URL,
+        autoResponses: [String: String]
+    ) async throws -> CLIResult {
+        guard sessionFlagsSupported else {
+            return try await runProbeCommand(
+                command, plan: .none, executor: executor,
+                workingDirectory: workingDirectory, autoResponses: autoResponses
+            )
+        }
+        if let stored = sessionStore.loadSessionID() {
+            AppLog.probes.debug("Claude probe resuming the shared probe session")
+            let result = try await runProbeCommand(
+                command, plan: .resume(sessionID: stored), executor: executor,
+                workingDirectory: workingDirectory, autoResponses: autoResponses
+            )
+            if Self.isUnsupportedFlagError(result.output) {
+                return try await fallbackToPlainSession(
+                    command, executor: executor,
+                    workingDirectory: workingDirectory, autoResponses: autoResponses
+                )
+            }
+            if Self.isSessionNotFoundError(result.output) {
+                AppLog.probes.info("Claude probe session is gone, recreating it")
+                sessionStore.clearSessionID()
+                return try await createProbeSession(
+                    command, executor: executor,
+                    workingDirectory: workingDirectory, autoResponses: autoResponses
+                )
+            }
+            return result
+        }
+        return try await createProbeSession(
+            command, executor: executor,
+            workingDirectory: workingDirectory, autoResponses: autoResponses
+        )
+    }
+
+    /// Creates the shared session under a fresh id and remembers it (#132).
+    private func createProbeSession(
+        _ command: String,
+        executor: any CLIExecutor,
+        workingDirectory: URL,
+        autoResponses: [String: String]
+    ) async throws -> CLIResult {
+        let freshID = UUID().uuidString.lowercased()
+        let result = try await runProbeCommand(
+            command, plan: .create(sessionID: freshID), executor: executor,
+            workingDirectory: workingDirectory, autoResponses: autoResponses
+        )
+        if Self.isUnsupportedFlagError(result.output) {
+            return try await fallbackToPlainSession(
+                command, executor: executor,
+                workingDirectory: workingDirectory, autoResponses: autoResponses
+            )
+        }
+        // The session exists the moment the CLI boots, so it is safe to
+        // remember the id even if this run's screen goes on to fail parsing.
+        sessionStore.saveSessionID(freshID)
+        return result
+    }
+
+    /// Gives up on the session flags for this probe's lifetime and runs the
+    /// command the way the probe always has (#132).
+    private func fallbackToPlainSession(
+        _ command: String,
+        executor: any CLIExecutor,
+        workingDirectory: URL,
+        autoResponses: [String: String]
+    ) async throws -> CLIResult {
+        AppLog.probes.info("Claude CLI does not support the session flags, continuing without session reuse")
+        sessionFlagsSupported = false
+        return try await runProbeCommand(
+            command, plan: .none, executor: executor,
+            workingDirectory: workingDirectory, autoResponses: autoResponses
+        )
+    }
+
+    private func runProbeCommand(
+        _ command: String,
+        plan: ProbeSessionPlan,
+        executor: any CLIExecutor,
+        workingDirectory: URL,
+        autoResponses: [String: String]
+    ) async throws -> CLIResult {
+        try await executor.execute(
+            binary: claudeBinary,
+            args: sessionArgs(for: plan, command: command),
+            input: "",
+            timeout: timeout,
+            workingDirectory: workingDirectory,
+            autoResponses: autoResponses
+        )
+    }
+
+    /// True when the CLI rejected a session flag — a version too old for
+    /// `--session-id`/`--resume`/`--name` prints commander's "unknown option"
+    /// (or "unexpected argument") and exits (#132).
+    static func isUnsupportedFlagError(_ output: String) -> Bool {
+        let lower = output.lowercased()
+        return lower.contains("unknown option") || lower.contains("unexpected argument")
+    }
+
+    /// True when the CLI could not find the session a `--resume` named, e.g.
+    /// after the user cleared `~/.claude` (#132).
+    static func isSessionNotFoundError(_ output: String) -> Bool {
+        let lower = output.lowercased()
+        return lower.contains("no conversation found") || lower.contains("no session found")
     }
 
     // MARK: - Parsing

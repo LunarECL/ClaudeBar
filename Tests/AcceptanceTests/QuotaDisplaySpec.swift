@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import Mockable
+import os
 @testable import Domain
 @testable import Infrastructure
 
@@ -17,6 +18,24 @@ import Mockable
 /// - #14: Over-quota displays negative percentages
 @Suite("Feature: Quota Display")
 struct QuotaDisplaySpec {
+
+    /// In-memory session store so the spec never touches the real
+    /// `probe-session.json` in the probe working directory (#132).
+    private final class InMemorySessionStore: ProbeSessionStore, @unchecked Sendable {
+        private let lock = OSAllocatedUnfairLock(initialState: [String: String]())
+
+        func loadSessionID() -> String? {
+            lock.withLock { $0["id"] }
+        }
+
+        func saveSessionID(_ id: String) {
+            lock.withLock { $0["id"] = id }
+        }
+
+        func clearSessionID() {
+            lock.withLock { $0.removeValue(forKey: "id") }
+        }
+    }
 
     private struct TestClock: Clock {
         func sleep(for duration: Duration) async throws {}
@@ -64,7 +83,7 @@ struct QuotaDisplaySpec {
             let mockResolver = MockAccountInfoResolving()
             given(mockResolver).resolve().willReturn(Domain.AccountInfo(email: "user@example.com", organization: "Acme Corp"))
 
-            let probe = ClaudeUsageProbe(cliExecutor: mockExecutor, accountInfoResolver: mockResolver)
+            let probe = ClaudeUsageProbe(cliExecutor: mockExecutor, accountInfoResolver: mockResolver, sessionStore: InMemorySessionStore())
             let claude = ClaudeProvider(probe: probe, settingsRepository: Self.makeSettings())
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude]),
@@ -120,7 +139,7 @@ struct QuotaDisplaySpec {
                 Login method: Claude Max
                 """, exitCode: 0))
 
-            let probe = ClaudeUsageProbe(cliExecutor: mockExecutor)
+            let probe = ClaudeUsageProbe(cliExecutor: mockExecutor, sessionStore: InMemorySessionStore())
             let claude = ClaudeProvider(probe: probe, settingsRepository: Self.makeSettings())
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude]),
@@ -158,7 +177,7 @@ struct QuotaDisplaySpec {
                 Resets in 30m
                 """, exitCode: 0))
 
-            let probe = ClaudeUsageProbe(cliExecutor: mockExecutor)
+            let probe = ClaudeUsageProbe(cliExecutor: mockExecutor, sessionStore: InMemorySessionStore())
             let claude = ClaudeProvider(probe: probe, settingsRepository: Self.makeSettings())
             let monitor = QuotaMonitor(
                 providers: AIProviders(providers: [claude]),

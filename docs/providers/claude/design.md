@@ -6,7 +6,7 @@ Contributor notes for the Claude provider. For setup, see the [README](README.md
 
 | Probe | Source | Notes |
 |---|---|---|
-| CLI (default) | `claude /usage --allowed-tools ""` in a PTY, run from `~/Library/Application Support/ClaudeBar/Probe` | The screen is rendered with SwiftTerm and then scraped |
+| CLI (default) | `claude /usage --allowed-tools ""` in a PTY, run from `~/Library/Application Support/ClaudeBar/Probe`, inside one shared named session (see [One shared probe session](#one-shared-probe-session)) | The screen is rendered with SwiftTerm and then scraped |
 | CLI, pay-as-you-go | `claude /cost` | Used only when `/usage` says it's "only available for subscription plans", or shows the API-billing panel for an account that isn't a subscription |
 | API | `GET https://api.anthropic.com/api/oauth/usage`, header `anthropic-beta: oauth-2025-04-20` | Uses the Claude Code OAuth token |
 | Token refresh | `POST https://platform.claude.com/v1/oauth/token` with Claude Code's public `client_id` | Scopes: `user:profile user:inference user:sessions:claude_code` only. Asking for more scopes (e.g. `user:mcp_servers`) makes the refresh fail |
@@ -28,6 +28,13 @@ Contributor notes for the Claude provider. For setup, see the [README](README.md
 - Every probe run is a full Claude Code session, so the user's SessionStart/SessionEnd hooks fire for it too — a "Claude Code Started"/"Finished" pair on every quota poll (#222). Hooks live in the user-global `~/.claude/settings.json`, so running in the dedicated probe directory does not exempt a session from them. ClaudeBar owns both ends: the sessions it spawns itself (`/usage`, `/cost`, `/passes`) carry `CLAUDEBAR_PROBE=1` (`ClaudeUsageProbe.probeEnvironment`, carried by `DefaultCLIExecutor.environmentAdditions` → `InteractiveRunner.Options`), and the `__claudebar_hook` wrapper installed by `HookInstaller` returns before the curl POST when that variable is set.
 - The guarded wrapper reaches existing users because `install()` re-runs at launch when hooks are already installed (`ClaudeBarApp.init`), replacing only ClaudeBar's own matcher entries.
 - A second net in `SessionEvent.isClaudeBarProbe` drops events from the probe working directory (`…/ClaudeBar/Probe` suffix) and events with no attributable working directory at all. The empty-cwd case is deliberate: a payload without `cwd` is indistinguishable from probe noise (that was the leak in #222) and couldn't name a project anyway, so dropping it costs nothing real; a genuine session always carries its directory. The env marker above stays the primary defense — this filter covers senders ClaudeBar doesn't control.
+
+## One shared probe session
+
+- Every probe command (`/usage`, `/cost`) runs inside **one** Claude session instead of a fresh one per poll (#132). Before this, every quota poll left a new session JSONL under `~/.claude/projects/<probe-dir-slug>/` and showed up as an anonymous "Probe" session in tools like Claude Island or the `/resume` picker.
+- The first run creates the session under a stable id with a display name: `claude --session-id <uuid> --name "ClaudeBar Probe" /usage --allowed-tools ""`. Later runs reuse it: `claude --resume <uuid> /usage --allowed-tools ""`. The id is persisted in the probe working directory (`probe-session.json`, `FileProbeSessionStore`), so it survives app restarts.
+- If the CLI can no longer find the stored session (e.g. `~/.claude` was cleared — "No conversation found with session ID"), the probe drops the id, recreates the session under a fresh one, and saves that. If the installed CLI is too old for `--session-id`/`--resume`/`--name` (commander's "unknown option" error), the probe falls back to the plain invocation, keeps using it for the app's lifetime, and parsing is untouched either way. Both fallbacks are in `ClaudeUsageProbe.executeProbeCommand`.
+- Reuse changes nothing else: the `CLAUDEBAR_PROBE=1` marker still travels on every run (#222), `/usage` keeps the `.claudeUsage` completion rule while `/cost` keeps none (#317), and SessionStart/SessionEnd hooks still fire once per poll — resuming a session does not skip them.
 
 ## CLI screen parsing
 

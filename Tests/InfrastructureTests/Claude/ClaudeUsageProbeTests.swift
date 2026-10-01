@@ -549,6 +549,45 @@ struct ClaudeUsageProbeTests {
         }
     }
 
+    /// In-memory `ProbeSessionStore` so tests never touch the real
+    /// `probe-session.json` in the probe working directory.
+    private final class InMemorySessionStore: ProbeSessionStore, @unchecked Sendable {
+        private struct State {
+            var id: String?
+            var saves = 0
+            var clears = 0
+        }
+
+        private let state = OSAllocatedUnfairLock(initialState: State())
+
+        func loadSessionID() -> String? {
+            state.withLock { current in current.id }
+        }
+
+        func saveSessionID(_ id: String) {
+            state.withLock { current in
+                current.id = id
+                current.saves += 1
+            }
+        }
+
+        func clearSessionID() {
+            state.withLock { current in
+                current.id = nil
+                current.clears += 1
+            }
+        }
+
+        /// Pre-loads a stored id, as if an earlier poll had created it.
+        func seed(_ id: String) {
+            state.withLock { current in current.id = id }
+        }
+
+        var saveCount: Int {
+            state.withLock { current in current.saves }
+        }
+    }
+
     @Test
     func `the usage command creates the shared probe session on first run`() async throws {
         // Given — no stored session yet, so this run must create it under a
@@ -556,7 +595,7 @@ struct ClaudeUsageProbeTests {
         let executor = RecordingCLIExecutor { _ in
             CLIResult(output: Self.settledUsageOutput, exitCode: 0)
         }
-        let probe = ClaudeUsageProbe(cliExecutor: executor)
+        let probe = ClaudeUsageProbe(cliExecutor: executor, sessionStore: InMemorySessionStore())
 
         // When
         _ = try await probe.probe()
@@ -589,7 +628,7 @@ struct ClaudeUsageProbeTests {
         }
         let resolver = MockAccountInfoResolving()
         given(resolver).resolve().willReturn(AccountInfo(email: "user@example.com", billingType: "api"))
-        let probe = ClaudeUsageProbe(cliExecutor: executor, accountInfoResolver: resolver)
+        let probe = ClaudeUsageProbe(cliExecutor: executor, accountInfoResolver: resolver, sessionStore: InMemorySessionStore())
 
         // When
         _ = try await probe.probe()
@@ -607,6 +646,90 @@ struct ClaudeUsageProbeTests {
     }
 
     @Test
+    func `consecutive probes resume the same shared session`() async throws {
+        // Given — two polls of one probe instance must reuse the session the
+        // first poll created (#132).
+        let executor = RecordingCLIExecutor { _ in
+            CLIResult(output: Self.settledUsageOutput, exitCode: 0)
+        }
+        let probe = ClaudeUsageProbe(cliExecutor: executor, sessionStore: InMemorySessionStore())
+
+        // When
+        _ = try await probe.probe()
+        _ = try await probe.probe()
+
+        // Then
+        let first = try #require(executor.recordedCalls.first)
+        let second = try #require(executor.recordedCalls.dropFirst().first)
+        let createdID = try #require(Self.sessionFlagValue(in: first.args, flag: "--session-id"))
+        let resumedID = try #require(Self.sessionFlagValue(in: second.args, flag: "--resume"), "expected the second poll to resume, got \(second.args)")
+        #expect(resumedID == createdID, "both polls must use the same session id")
+    }
+
+    @Test
+    func `the shared session id survives a fresh probe`() async throws {
+        // Given — the id lives in the probe working directory, so a brand-new
+        // probe instance (app restart) picks the session back up (#132).
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("claudebar-probe-session-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let firstExecutor = RecordingCLIExecutor { _ in
+            CLIResult(output: Self.settledUsageOutput, exitCode: 0)
+        }
+        let first = ClaudeUsageProbe(
+            cliExecutor: firstExecutor,
+            sessionStore: FileProbeSessionStore(directory: directory)
+        )
+        _ = try await first.probe()
+        let firstCall = try #require(firstExecutor.recordedCalls.first)
+        let createdID = try #require(Self.sessionFlagValue(in: firstCall.args, flag: "--session-id"))
+
+        // When — a fresh probe instance over the same directory
+        let secondExecutor = RecordingCLIExecutor { _ in
+            CLIResult(output: Self.settledUsageOutput, exitCode: 0)
+        }
+        let second = ClaudeUsageProbe(
+            cliExecutor: secondExecutor,
+            sessionStore: FileProbeSessionStore(directory: directory)
+        )
+        _ = try await second.probe()
+
+        // Then
+        let secondCall = try #require(secondExecutor.recordedCalls.first)
+        let resumedID = try #require(Self.sessionFlagValue(in: secondCall.args, flag: "--resume"), "expected the fresh probe to resume, got \(secondCall.args)")
+        #expect(resumedID == createdID)
+    }
+
+    @Test
+    func `a vanished shared session is recreated instead of failing the probe`() async throws {
+        // Given — the stored id no longer exists on the CLI side (user cleared
+        // ~/.claude): drop it, recreate the session, save the new id (#132).
+        let executor = RecordingCLIExecutor { call in
+            if call.args.contains("--resume") {
+                CLIResult(output: "No conversation found with session ID: dead-session-id", exitCode: 1)
+            } else {
+                CLIResult(output: Self.settledUsageOutput, exitCode: 0)
+            }
+        }
+        let store = InMemorySessionStore()
+        store.seed("dead-session-id")
+        let probe = ClaudeUsageProbe(cliExecutor: executor, sessionStore: store)
+
+        // When
+        let snapshot = try await probe.probe()
+
+        // Then
+        #expect(snapshot.quotas.count >= 1)
+        let resumed = try #require(executor.recordedCalls.first { $0.args.contains("--resume") })
+        #expect(resumed.args.contains("dead-session-id"))
+        let recreated = try #require(executor.recordedCalls.first { $0.args.contains("--session-id") })
+        #expect(Self.sessionFlagValue(in: recreated.args, flag: "--session-id") != "dead-session-id")
+        #expect(store.loadSessionID() == Self.sessionFlagValue(in: recreated.args, flag: "--session-id"))
+    }
+
+    @Test
     func `an older CLI without session flags still probes like today`() async throws {
         // Given — a CLI too old for the session flags rejects them; the probe
         // must fall back to today's plain invocation and still parse (#132).
@@ -616,7 +739,7 @@ struct ClaudeUsageProbeTests {
             }
             return CLIResult(output: Self.settledUsageOutput, exitCode: 0)
         }
-        let probe = ClaudeUsageProbe(cliExecutor: executor)
+        let probe = ClaudeUsageProbe(cliExecutor: executor, sessionStore: InMemorySessionStore())
 
         // When
         let snapshot = try await probe.probe()
@@ -628,5 +751,72 @@ struct ClaudeUsageProbeTests {
         #expect(first.args.contains("--session-id"), "expected the probe to try the shared session first, got \(first.args)")
         let last = try #require(executor.recordedCalls.last)
         #expect(last.args == ["/usage", "--allowed-tools", ""], "expected the fallback to match today's args, got \(last.args)")
+    }
+
+    @Test
+    func `an unsupported CLI skips the session flags on the next poll`() async throws {
+        // Given — after one unsupported-flag run, later polls must not pay for
+        // another failing attempt (#132).
+        let executor = RecordingCLIExecutor { call in
+            if call.args.contains("--session-id") || call.args.contains("--resume") {
+                return CLIResult(output: "error: unknown option '--session-id'", exitCode: 1)
+            }
+            return CLIResult(output: Self.settledUsageOutput, exitCode: 0)
+        }
+        let probe = ClaudeUsageProbe(cliExecutor: executor, sessionStore: InMemorySessionStore())
+
+        // When
+        _ = try await probe.probe()
+        let callsAfterFirstPoll = executor.recordedCalls.count
+        _ = try await probe.probe()
+
+        // Then
+        let secondPollCalls = Array(executor.recordedCalls.dropFirst(callsAfterFirstPoll))
+        #expect(secondPollCalls.count == 1)
+        #expect(secondPollCalls.first?.args == ["/usage", "--allowed-tools", ""])
+    }
+
+    @Test
+    func `session args fall back to today's invocation for plan none`() {
+        // The `.none` plan must reproduce the exact args the probe has always
+        // sent, so the fallback really is today's behavior (#132).
+        let probe = ClaudeUsageProbe(sessionStore: InMemorySessionStore())
+        #expect(probe.sessionArgs(for: .none, command: "/usage") == ["/usage", "--allowed-tools", ""])
+        #expect(probe.sessionArgs(for: .none, command: "/cost") == ["/cost", "--allowed-tools", ""])
+        #expect(
+            probe.sessionArgs(for: .create(sessionID: "abc"), command: "/usage")
+                == ["/usage", "--allowed-tools", "", "--session-id", "abc", "--name", ClaudeUsageProbe.probeSessionName]
+        )
+        #expect(
+            probe.sessionArgs(for: .resume(sessionID: "abc"), command: "/usage")
+                == ["/usage", "--allowed-tools", "", "--resume", "abc"]
+        )
+    }
+
+    @Test
+    func `session store roundtrips the id across fresh instances`() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("claudebar-probe-session-store-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = FileProbeSessionStore(directory: directory)
+        #expect(store.loadSessionID() == nil)
+
+        store.saveSessionID("abc-123")
+        #expect(FileProbeSessionStore(directory: directory).loadSessionID() == "abc-123")
+
+        store.clearSessionID()
+        #expect(FileProbeSessionStore(directory: directory).loadSessionID() == nil)
+    }
+
+    @Test
+    func `unsupported flag and missing session errors are recognized`() {
+        #expect(ClaudeUsageProbe.isUnsupportedFlagError("error: unknown option '--session-id'"))
+        #expect(ClaudeUsageProbe.isUnsupportedFlagError("error: unexpected argument '--name'"))
+        #expect(!ClaudeUsageProbe.isUnsupportedFlagError(Self.settledUsageOutput))
+        #expect(ClaudeUsageProbe.isSessionNotFoundError("No conversation found with session ID: abc"))
+        #expect(ClaudeUsageProbe.isSessionNotFoundError("No session found for name: abc"))
+        #expect(!ClaudeUsageProbe.isSessionNotFoundError(Self.settledUsageOutput))
     }
 }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Claude's CLI probe now reuses a single session named "ClaudeBar Probe" instead of creating a new empty session on every refresh, so `~/.claude/projects` and session pickers stay clean. ([#132](https://github.com/tddworks/ClaudeBar/issues/132))
+
 ---
 
 ## [0.4.94] - 2026-10-01
