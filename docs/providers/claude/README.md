@@ -23,7 +23,7 @@ Each mode falls back to the other when it fails. In API mode, **CLI fallback** (
 
 ## Custom Claude binary
 
-CLI mode and guest passes exec the Claude binary directly. If yours is not the `claude` on your PATH — a versioned install (`claude-work`), a different prefix, a wrapper script — set **Settings → Providers → Claude → Claude Configuration → CLI Binary** to the binary's full path, or to a name that can be found in PATH. Leave it empty to keep using `claude`.
+The CLI data source and guest passes exec the Claude binary directly. If yours is not the `claude` on your PATH — a versioned install (`claude-work`), a different prefix, a wrapper script — set **Settings → Providers → Claude → Claude CLI Binary** to the binary's full path, or to a name that can be found in PATH. Leave it empty to keep using `claude`. A change applies the next time ClaudeBar starts.
 
 A shell alias or function (`alias c=claude`, `claudel() { … }`) does **not** work here: ClaudeBar launches a process, not a shell, and a process can't run an alias. Point the setting at the real binary (or script) the alias calls — `which c` in a terminal shows where it leads.
 
