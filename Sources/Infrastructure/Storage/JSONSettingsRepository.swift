@@ -311,6 +311,18 @@ public final class JSONSettingsRepository:
         store.write(value: value, key: "providers.\(id).customCardURL")
     }
 
+    public func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
+        let stored: [String] = store.read(key: "providers.\(id).hiddenQuotaKeys") ?? []
+        return Set(stored)
+    }
+
+    public func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {
+        // Persist an empty set as a removal so the file stays free of empty
+        // arrays and a fresh install reads back as "nothing hidden".
+        let value: [String]? = keys.isEmpty ? nil : keys.sorted()
+        store.write(value: value, key: "providers.\(id).hiddenQuotaKeys")
+    }
+
     // MARK: - ClaudeSettingsRepository
 
     public func claudeProbeMode() -> ClaudeProbeMode {

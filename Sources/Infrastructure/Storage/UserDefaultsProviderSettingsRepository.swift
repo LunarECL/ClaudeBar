@@ -69,6 +69,19 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         }
     }
 
+    public func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
+        Set(userDefaults.stringArray(forKey: Self.hiddenQuotaKeysKey(forProvider: id)) ?? [])
+    }
+
+    public func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {
+        let key = Self.hiddenQuotaKeysKey(forProvider: id)
+        if keys.isEmpty {
+            userDefaults.removeObject(forKey: key)
+        } else {
+            userDefaults.set(keys.sorted(), forKey: key)
+        }
+    }
+
     // MARK: - ZaiSettingsRepository
 
     public func zaiConfigPath() -> String {
@@ -548,5 +561,10 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
     /// Generates the UserDefaults key for a provider's enabled state
     private static func enabledKey(forProvider id: String) -> String {
         "provider.\(id).isEnabled"
+    }
+
+    /// Generates the UserDefaults key for a provider's hidden quota keys
+    private static func hiddenQuotaKeysKey(forProvider id: String) -> String {
+        "provider.\(id).hiddenQuotaKeys"
     }
 }

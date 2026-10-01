@@ -1648,6 +1648,8 @@ private final class VerifiedCodexSettings: CodexSettingsRepository, @unchecked S
     func setEnabled(_ enabled: Bool, forProvider id: String) {}
     func customCardURL(forProvider id: String) -> String? { nil }
     func setCustomCardURL(_ url: String?, forProvider id: String) {}
+    func hiddenQuotaKeys(forProvider id: String) -> Set<String> { [] }
+    func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {}
     func codexProbeMode() -> CodexProbeMode { .rpc }
     func setCodexProbeMode(_ mode: CodexProbeMode) {}
     func codexVerifiedAtLeastOnce() -> Bool { true }

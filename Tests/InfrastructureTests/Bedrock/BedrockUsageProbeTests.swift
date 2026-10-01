@@ -25,6 +25,8 @@ struct BedrockUsageProbeTests {
         func setEnabled(_ enabled: Bool, forProvider id: String) { enabledState = enabled }
         func customCardURL(forProvider id: String) -> String? { nil }
         func setCustomCardURL(_ url: String?, forProvider id: String) {}
+        func hiddenQuotaKeys(forProvider id: String) -> Set<String> { [] }
+        func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {}
     }
 
     // MARK: - Mock CloudWatch Client

@@ -422,6 +422,8 @@ private final class FakeClaudeSettings: ClaudeSettingsRepository, @unchecked Sen
     func setEnabled(_ enabled: Bool, forProvider id: String) {}
     func customCardURL(forProvider id: String) -> String? { nil }
     func setCustomCardURL(_ url: String?, forProvider id: String) {}
+    func hiddenQuotaKeys(forProvider id: String) -> Set<String> { [] }
+    func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {}
     func claudeProbeMode() -> ClaudeProbeMode { probeMode }
     func setClaudeProbeMode(_ mode: ClaudeProbeMode) { probeMode = mode }
     func claudeCliFallbackEnabled() -> Bool { cliFallbackEnabled }

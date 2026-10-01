@@ -20,6 +20,14 @@ public protocol ProviderSettingsRepository: Sendable {
 
     /// Sets the custom card URL for a provider (empty string or nil to remove)
     func setCustomCardURL(_ url: String?, forProvider id: String)
+
+    /// Gets the quota keys hidden for a provider (issue #140), e.g. a
+    /// model-specific window the user never uses. Empty set = show all.
+    /// Keys the probe no longer reports are ignored at read time.
+    func hiddenQuotaKeys(forProvider id: String) -> Set<String>
+
+    /// Sets the quota keys hidden for a provider (empty set shows all)
+    func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String)
 }
 
 /// Z.ai-specific settings repository, extending base ProviderSettingsRepository.
