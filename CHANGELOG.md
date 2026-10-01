@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.4.94] - 2026-10-01
+
 ### Changed
 - Breaking: Claude's Dashboard button (⌘D) now opens your usage page on claude.ai on a subscription (Max, Pro, Team) instead of the Console billing page. Pay-as-you-go API accounts still get the Console; on a subscription, open console.anthropic.com yourself if you need it. ([#328](https://github.com/tddworks/ClaudeBar/pull/328))
 
@@ -1100,7 +1104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.93...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.94...HEAD
+[0.4.94]: https://github.com/tddworks/ClaudeBar/compare/v0.4.93...v0.4.94
 [0.4.93]: https://github.com/tddworks/ClaudeBar/compare/v0.4.92...v0.4.93
 [0.4.92]: https://github.com/tddworks/ClaudeBar/compare/v0.4.91...v0.4.92
 [0.4.91]: https://github.com/tddworks/ClaudeBar/compare/v0.4.90...v0.4.91
