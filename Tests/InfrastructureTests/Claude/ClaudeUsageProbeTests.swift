@@ -29,6 +29,13 @@ struct ClaudeUsageProbeTests {
         #expect(await probe.isAvailable() == false)
     }
 
+    // MARK: - Probe session marking (issue #222)
+
+    @Test
+    func `probe marks its claude sessions with the probe environment marker`() {
+        #expect(ClaudeUsageProbe.probeEnvironment[HookConstants.probeEnvironmentKey] == "1")
+    }
+
     // MARK: - Date Parsing Tests
 
     @Test
