@@ -206,6 +206,8 @@ struct RefreshSpec {
             func setClaudeProbeMode(_ mode: ClaudeProbeMode) {}
             func claudeCliFallbackEnabled() -> Bool { true }
             func setClaudeCliFallbackEnabled(_ enabled: Bool) {}
+            func claudeBinary() -> String { "" }
+            func setClaudeBinary(_ binary: String) {}
         }
 
         /// A probe that returns the next snapshot in a sequence on each call, so a
