@@ -156,8 +156,13 @@ struct CodexRPCAccountIdentityTests {
         ]
         given(transport).receive().willProduce { responses.removeFirst() }
         let client = DefaultCodexRPCClient(cliExecutor: MockCLIExecutor(), includeAccountIdentity: true)
-        client.transportFactory = { _, _ in transport }
-        let snapshot = try await CodexUsageProbe(client: client).probe()
+        client.transportFactory = { _, _, _ in transport }
+        // #216: the probe only spawns when an auth file exists.
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("codex-identity-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        try Data("{}".utf8).write(to: home.appendingPathComponent("auth.json"))
+        let snapshot = try await CodexUsageProbe(client: client, credentialLoader: CodexCredentialLoader(codexHome: home.path)).probe()
         #expect(snapshot.accountEmail == "keychain@example.com")
         #expect(snapshot.lowestQuota?.percentRemaining == 80)
     }
@@ -168,7 +173,7 @@ struct CodexRPCAccountIdentityTests {
                                 workingDirectory: .any, autoResponses: .any)
             .willReturn(CLIResult(output: "5h limit: 99% left"))
         let client = DefaultCodexRPCClient(cliExecutor: executor, codexHome: "/tmp/separate-codex")
-        client.transportFactory = { _, _ in throw ProbeError.timeout }
+        client.transportFactory = { _, _, _ in throw ProbeError.timeout }
         await #expect(throws: ProbeError.timeout) { try await client.fetchRateLimits() }
     }
 }

@@ -231,6 +231,23 @@ struct CodexProviderVerifiedSessionTests {
     }
 
     @Test
+    func `added account probes in the background without touching the default account's flag`() async throws {
+        // An added account only exists after the add-account flow probed it
+        // explicitly, so it is never gated; the persisted flag stays the
+        // default account's.
+        let settings = makeCodexSettings(verified: false)
+        let rpcProbe = CountingProbe(percent: 60)
+        let account = ProviderAccount(accountId: "work", providerId: "codex", label: "work@example.com")
+        let codex = CodexProvider(rpcProbe: rpcProbe, apiProbe: CountingProbe(), settingsRepository: settings, account: account)
+
+        let result = try await codex.refresh(.background)
+
+        #expect(result.sessionQuota?.percentRemaining == 60)
+        #expect(rpcProbe.calls == 1)
+        #expect(settings.verifiedAtLeastOnce == false)
+    }
+
+    @Test
     func `provider without a Codex settings repository stays passive in the background`() async {
         let settings = makeBaseSettingsRepository()
         let probe = CountingProbe()
