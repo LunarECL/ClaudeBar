@@ -9,8 +9,10 @@ import Observation
 public final class CodexProvider: AIProvider {
     // MARK: - Identity
 
-    public let id: String = "codex"
-    public let name: String = "Codex"
+    public nonisolated let account: ProviderAccount
+    public nonisolated var id: String { account.id }
+    public var accountEmail: String? { snapshot?.accountEmail ?? account.email }
+    public var name: String { accountEmail ?? "Codex" }
     public let cliCommand: String = "codex"
 
     public var dashboardURL: URL? {
@@ -54,6 +56,8 @@ public final class CodexProvider: AIProvider {
     // MARK: - Internal
 
     /// The RPC probe for fetching usage data via `codex app-server`
+    @ObservationIgnored private var refreshTask: Task<UsageSnapshot, Error>?
+
     private let rpcProbe: any UsageProbe
 
     /// The API probe for fetching usage data via HTTP API (optional)
@@ -101,12 +105,17 @@ public final class CodexProvider: AIProvider {
     /// - Parameters:
     ///   - probe: The RPC probe to use for fetching usage data
     ///   - settingsRepository: The repository for persisting settings
-    public init(probe: any UsageProbe, settingsRepository: any ProviderSettingsRepository) {
+    public init(probe: any UsageProbe, settingsRepository: any ProviderSettingsRepository,
+                account: ProviderAccount = ProviderAccount(providerId: "codex", label: "")) {
+        self.account = account
         self.rpcProbe = probe
         self.apiProbe = nil
         self.settingsRepository = settingsRepository
-        self.isEnabled = settingsRepository.isEnabled(forProvider: "codex")
-        self.hasVerifiedSession = (settingsRepository as? CodexSettingsRepository)?.codexVerifiedAtLeastOnce() ?? false
+        self.isEnabled = settingsRepository.isEnabled(forProvider: account.id)
+        self.hasVerifiedSession = Self.initialVerifiedSession(
+            account: account,
+            settingsRepository: settingsRepository as? CodexSettingsRepository
+        )
     }
 
     /// Creates a Codex provider with both RPC and API probes
@@ -117,13 +126,15 @@ public final class CodexProvider: AIProvider {
     public init(
         rpcProbe: any UsageProbe,
         apiProbe: any UsageProbe,
-        settingsRepository: any CodexSettingsRepository
+        settingsRepository: any CodexSettingsRepository,
+        account: ProviderAccount = ProviderAccount(providerId: "codex", label: "")
     ) {
+        self.account = account
         self.rpcProbe = rpcProbe
         self.apiProbe = apiProbe
         self.settingsRepository = settingsRepository
-        self.isEnabled = settingsRepository.isEnabled(forProvider: "codex")
-        self.hasVerifiedSession = settingsRepository.codexVerifiedAtLeastOnce()
+        self.isEnabled = settingsRepository.isEnabled(forProvider: account.id)
+        self.hasVerifiedSession = Self.initialVerifiedSession(account: account, settingsRepository: settingsRepository)
     }
 
     // MARK: - AIProvider Protocol
@@ -150,11 +161,11 @@ public final class CodexProvider: AIProvider {
     /// without spawning anything, or surface `notCheckedMessage` when there is
     /// nothing to show yet. A successful interactive refresh that ran the RPC
     /// probe persists the verified flag (issue #216).
+    ///
+    /// Concurrent refreshes of one account share a single probe, so
+    /// overlapping UI and background polls cannot rotate its refresh token twice.
     @discardableResult
     public func refresh(_ kind: RefreshKind) async throws -> UsageSnapshot {
-        isSyncing = true
-        defer { isSyncing = false }
-
         if kind != .interactive, backgroundProbeIsRPC, !hasVerifiedSession {
             if let snapshot {
                 return snapshot
@@ -164,8 +175,22 @@ public final class CodexProvider: AIProvider {
             throw error
         }
 
+        if let refreshTask { return try await refreshTask.value }
+        let probe = activeProbe
+        let account = account
+        let task = Task {
+            let value = try await probe.probe()
+            return Self.identify(value, account: account)
+        }
+        refreshTask = task
+        isSyncing = true
+        defer {
+            isSyncing = false
+            refreshTask = nil
+        }
+
         do {
-            let newSnapshot = try await activeProbe.probe()
+            let newSnapshot = try await task.value
             snapshot = newSnapshot
             lastError = nil
             if kind == .interactive, backgroundProbeIsRPC {
@@ -174,8 +199,41 @@ public final class CodexProvider: AIProvider {
             return newSnapshot
         } catch {
             lastError = error
+            if !account.isDefault, let error = error as? ProbeError,
+               error == .authenticationRequired || error == .sessionExpired(hint: nil) {
+                snapshot = nil
+            }
             throw error
         }
+    }
+
+    private static func identify(_ value: UsageSnapshot, account: ProviderAccount) -> UsageSnapshot {
+        UsageSnapshot(
+            providerId: account.id,
+            quotas: value.quotas.map { quota in
+                UsageQuota(percentRemaining: quota.percentRemaining, quotaType: quota.quotaType,
+                           providerId: account.id, resetsAt: quota.resetsAt, resetText: quota.resetText,
+                           windowDuration: quota.windowDuration, dollarRemaining: quota.dollarRemaining,
+                           dollarUsed: quota.dollarUsed, dollarCap: quota.dollarCap, group: quota.group,
+                           compactTitle: quota.compactTitle, menuBarTitle: quota.menuBarTitle, currency: quota.currency)
+            },
+            capturedAt: value.capturedAt, accountEmail: value.accountEmail ?? account.email,
+            accountOrganization: value.accountOrganization, loginMethod: value.loginMethod,
+            accountTier: value.accountTier, costUsage: value.costUsage,
+            bedrockUsage: value.bedrockUsage, dailyUsageReport: value.dailyUsageReport,
+            extensionMetrics: value.extensionMetrics
+        )
+    }
+
+    /// The default account reads the persisted flag. An added account was
+    /// probed by the explicit add-account flow before it could exist, and its
+    /// probe fails closed without credentials, so it starts verified.
+    private static func initialVerifiedSession(
+        account: ProviderAccount,
+        settingsRepository: (any CodexSettingsRepository)?
+    ) -> Bool {
+        guard account.isDefault else { return true }
+        return settingsRepository?.codexVerifiedAtLeastOnce() ?? false
     }
 
     /// Persists that the Codex CLI session was checked by an explicit user

@@ -72,7 +72,7 @@ struct CodexConfigCard: View {
                     .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
 
-                Text("Data fetching method")
+                Text("Data fetching method for all Codex accounts")
                     .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
@@ -142,24 +142,9 @@ struct CodexConfigCard: View {
             }
 
             if codexProbeMode == .api {
-                let credentialLoader = CodexCredentialLoader()
-                let hasCredentials = credentialLoader.loadCredentials() != nil
-
-                HStack(spacing: 6) {
-                    Image(systemName: hasCredentials ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(hasCredentials ? theme.statusHealthy : theme.statusWarning)
-
-                    Text(hasCredentials ? "OAuth credentials found" : "No OAuth credentials found")
-                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                        .foregroundStyle(hasCredentials ? theme.statusHealthy : theme.statusWarning)
-                }
-
-                if !hasCredentials {
-                    Text("Run `codex` in terminal to authenticate, then credentials will be available.")
-                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textTertiary)
-                }
+                Text("API mode needs file-based ChatGPT credentials in each account’s Codex folder.")
+                    .font(.callout)
+                    .foregroundStyle(theme.textSecondary)
             }
         }
     }

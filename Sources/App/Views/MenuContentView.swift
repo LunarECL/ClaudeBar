@@ -484,6 +484,9 @@ struct MenuContentView: View {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
                     accountCard(displayName: displayName, snapshot: snapshot)
                 }
+                if provider is CodexProvider, provider.lastError != nil {
+                    compactErrorState(provider: provider)
+                }
                 statsGrid(snapshot: snapshot)
             }
             .opacity(animateIn ? 1 : 0)
@@ -517,6 +520,9 @@ struct MenuContentView: View {
             providerSectionHeader(provider: provider)
 
             if let snapshot = provider.snapshot {
+                if provider is CodexProvider, provider.lastError != nil {
+                    compactErrorState(provider: provider)
+                }
                 statsGrid(snapshot: snapshot)
             } else if provider.isSyncing {
                 LoadingSpinnerView()
@@ -531,6 +537,7 @@ struct MenuContentView: View {
             ProviderIconView(providerId: provider.id, size: 20, showGlow: false)
 
             Text(provider.name)
+                .fixedSize(horizontal: false, vertical: true)
                 .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
 
@@ -550,6 +557,7 @@ struct MenuContentView: View {
                 .foregroundStyle(theme.statusWarning)
 
             Text(provider.lastError?.localizedDescription ?? "Unavailable")
+                .help(provider.lastError?.localizedDescription ?? "Unavailable")
                 .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                 .foregroundStyle(theme.textTertiary)
                 .lineLimit(1)
@@ -1035,6 +1043,7 @@ struct ProviderPill: View {
                     .font(.system(size: 10, weight: .semibold))
 
                 Text(providerName)
+                    .help(providerName)
                     .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                     .lineLimit(1)
                     .fixedSize()

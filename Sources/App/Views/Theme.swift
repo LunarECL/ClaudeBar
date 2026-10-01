@@ -605,7 +605,7 @@ extension View {
 extension AppTheme {
     /// Get provider theme color by ID
     static func providerColor(for providerId: String, scheme: ColorScheme) -> Color {
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude":
             return coralAccent(for: scheme)
         case "codex":
@@ -675,7 +675,7 @@ extension AppTheme {
         let primaryColor = providerColor(for: providerId, scheme: scheme)
         let secondaryColor: Color
 
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude":
             secondaryColor = pinkHot(for: scheme)
         case "codex":
@@ -751,7 +751,7 @@ extension AppTheme {
 
     /// Get provider icon asset name by ID
     static func providerIconAssetName(for providerId: String) -> String {
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude": return "ClaudeIcon"
         case "codex": return "CodexIcon"
         case "gemini": return "GeminiIcon"
@@ -773,7 +773,7 @@ extension AppTheme {
 
     /// Get provider display name by ID
     static func providerName(for providerId: String) -> String {
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude": return "Claude"
         case "codex": return "Codex"
         case "gemini": return "Gemini"
@@ -795,7 +795,7 @@ extension AppTheme {
 
     /// Get provider SF symbol icon by ID
     static func providerSymbolIcon(for providerId: String) -> String {
-        switch providerId {
+        switch providerId.hasPrefix("codex.") ? "codex" : providerId {
         case "claude": return "brain.fill"
         case "codex": return "chevron.left.forwardslash.chevron.right"
         case "gemini": return "sparkles"

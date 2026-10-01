@@ -39,17 +39,20 @@ public struct CodexRateLimitsResponse: Sendable, Equatable {
     /// Extra buckets beyond the main limits (e.g. Codex Spark), empty by
     /// default so existing callers keep their behavior.
     public let additional: [CodexAdditionalLimit]
+    public let accountEmail: String?
 
     public init(
         primary: CodexRateLimitWindow?,
         secondary: CodexRateLimitWindow?,
         planType: String? = nil,
-        additional: [CodexAdditionalLimit] = []
+        additional: [CodexAdditionalLimit] = [],
+        accountEmail: String? = nil
     ) {
         self.primary = primary
         self.secondary = secondary
         self.planType = planType
         self.additional = additional
+        self.accountEmail = accountEmail
     }
 }
 
@@ -171,7 +174,8 @@ public struct CodexUsageProbe: UsageProbe {
         return UsageSnapshot(
             providerId: "codex",
             quotas: quotas,
-            capturedAt: Date()
+            capturedAt: Date(),
+            accountEmail: limits.accountEmail
         )
     }
 
