@@ -14,7 +14,10 @@ import Testing
 struct ClaudeCLIDefinitionTests {
 
     private func call(_ kind: String) throws -> CLICall {
-        let definition = try Providers.builtIn("claude")
+        try call(kind, in: Providers.builtIn("claude"))
+    }
+
+    private func call(_ kind: String, in definition: ProviderDefinition) throws -> CLICall {
         guard case .cli(let call)? = definition.dataSource(kind)?.fetch else {
             Issue.record("\(kind) is not a CLI data source")
             throw UsageError.noData
@@ -399,5 +402,87 @@ struct ClaudeCLIDefinitionTests {
             try await claude.fetchUsage(claude.dataSource("cli"))
         }
         #expect(try claude.readClaudeConfig()["projects"] as? String == "unexpected")
+    }
+
+    // MARK: - A user-configured CLI binary (#210)
+
+    @Test
+    func `a configured binary runs in every claude command, with everything else untouched`() throws {
+        let definition = try Providers.builtIn("claude").runningCLI("/opt/tools/bin/claude-work")
+
+        #expect(try call("cli", in: definition).cli == "/opt/tools/bin/claude-work")
+        #expect(try call("cliCost", in: definition).cli == "/opt/tools/bin/claude-work")
+        #expect(try call("cli", in: definition).args == ["/usage", "--allowed-tools", ""])
+        #expect(try call("cliCost", in: definition).args == ["/cost", "--allowed-tools", ""])
+        #expect(try call("cli", in: definition).timeout == 20)
+        #expect(try call("cli", in: definition).screen == .rendered)
+        let prompts = try call("cli").autoResponses
+        #expect(try call("cli", in: definition).autoResponses == prompts)
+        try definition.validate()
+    }
+
+    @Test
+    func `the api data source never runs the binary`() throws {
+        let definition = try Providers.builtIn("claude").runningCLI("/opt/tools/bin/claude-work")
+        guard case .http(let request)? = definition.dataSource("api")?.fetch else {
+            Issue.record("api is not an HTTP data source")
+            throw UsageError.noData
+        }
+        #expect(request.url == "https://api.anthropic.com/api/oauth/usage")
+    }
+
+    @Test
+    func `an empty, blank or unchanged name is a no-op`() throws {
+        let claude = try Providers.builtIn("claude")
+        #expect(claude.runningCLI("") == claude)
+        #expect(claude.runningCLI("   \n ") == claude)
+        #expect(claude.runningCLI("claude") == claude)
+    }
+
+    @Test
+    func `a definition without a cli has nothing to re-point`() throws {
+        let definition = try ProviderDefinition.parse(Data("""
+        {
+          "profile": { "id": "gemini", "name": "Gemini" },
+          "enabledByDefault": true,
+          "defaultDataSource": "api",
+          "dataSources": [
+            {
+              "kind": "api",
+              "fetch": { "http": { "url": "https://example.com/usage" } },
+              "mapping": { "json": { "quotas": [] } }
+            }
+          ]
+        }
+        """.utf8))
+        #expect(definition.runningCLI("/opt/tools/bin/gemini-work") == definition)
+    }
+
+    @Test
+    func `an rpc data source runs the configured binary too`() throws {
+        let definition = try ProviderDefinition.parse(Data("""
+        {
+          "profile": { "id": "codex", "name": "Codex" },
+          "cli": "codex",
+          "enabledByDefault": true,
+          "defaultDataSource": "rpc",
+          "dataSources": [
+            {
+              "kind": "rpc",
+              "fetch": { "jsonRpc": { "cli": "codex", "args": ["app-server"], "call": "account/rateLimits/read" } },
+              "mapping": { "json": { "quotas": [] } }
+            }
+          ]
+        }
+        """.utf8))
+
+        let rePointed = definition.runningCLI("/opt/tools/bin/codex-work")
+        guard case .jsonRpc(let call)? = rePointed.dataSource("rpc")?.fetch else {
+            Issue.record("rpc is not a JSON-RPC data source")
+            throw UsageError.noData
+        }
+        #expect(call.cli == "/opt/tools/bin/codex-work")
+        #expect(call.args == ["app-server"])
+        #expect(call.call == "account/rateLimits/read")
     }
 }
