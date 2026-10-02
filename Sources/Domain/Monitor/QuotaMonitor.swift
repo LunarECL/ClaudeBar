@@ -449,14 +449,22 @@ public final class QuotaMonitor {
         }
     }
 
-    /// Selects the enabled provider in the given 1-based slot, counted the way
-    /// the popover lists them (⌘1 is the first pill) — in the persisted order
-    /// (issue #141), not the registration order. A slot with no provider
+    /// The popover's pills: one per product, its enabled logins inside —
+    /// the tabs follow the persisted order (issue #141), not the
+    /// registration order.
+    public var tabs: [ProductTab] { ProductTab.tabs(of: enabledProviders) }
+
+    /// The tab the selected login belongs to.
+    public var selectedTab: ProductTab? { tabs.first { $0.contains(selectedProviderId) } }
+
+    /// Selects the tab in the given 1-based slot, counted the way the popover
+    /// lists them (⌘1 is the first pill), opening on its first login — the
+    /// slots follow the persisted order (issue #141). A slot with no tab
     /// leaves the selection alone.
     public func selectProvider(atPosition position: Int) {
-        let enabled = enabledProviders
-        guard enabled.indices.contains(position - 1) else { return }
-        selectedProviderId = enabled[position - 1].id
+        let tabs = tabs
+        guard tabs.indices.contains(position - 1), let first = tabs[position - 1].accounts.first else { return }
+        selectedProviderId = first.id
     }
 
     /// Moves a provider up (negative offset) or down (positive offset) within

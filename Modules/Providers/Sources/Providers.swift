@@ -68,19 +68,20 @@ public enum Providers {
     @MainActor
     public static func make(
         _ definition: ProviderDefinition,
-        settings: any ProviderSettingsRepository,
+        settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
-        secrets: (any SecretStore)? = nil,
-        dailyUsage: (any DailyUsageAnalyzing)? = nil,
+        secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil
     ) -> Provider {
         Provider(
             definition: definition,
             settings: settings,
             accounts: accounts,
-            makeDataSource: { DataSources.make($0, providerId: definition.id, scripts: builtInScripts, secrets: secrets) },
-            dailyUsage: dailyUsage,
-            guestPasses: guestPasses
+            makeDataSource: { source, login in
+                DataSources.make(source, providerId: definition.id, scripts: builtInScripts, secrets: secrets?.scoped(to: login))
+            },
+            guestPasses: guestPasses,
+            vault: secrets
         )
     }
 
@@ -88,11 +89,10 @@ public enum Providers {
     @MainActor
     public static func make(
         _ id: String,
-        settings: any ProviderSettingsRepository,
+        settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
-        dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
     ) throws -> Provider {
-        make(try builtIn(id), settings: settings, accounts: accounts, dailyUsage: dailyUsage, guestPasses: guestPasses)
+        make(try builtIn(id), settings: settings, accounts: accounts, guestPasses: guestPasses)
     }
 }

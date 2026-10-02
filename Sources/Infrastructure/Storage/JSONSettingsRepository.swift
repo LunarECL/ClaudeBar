@@ -929,11 +929,6 @@ extension JSONSettingsRepository: MultiAccountSettingsRepository {
     public func removeAccount(accountId: String, forProvider id: String) {
         let remaining = accounts(forProvider: id).filter { $0.accountId != accountId }
         writeAccounts(remaining, forProvider: id)
-
-        // The active pointer must not outlive the account it points at.
-        if activeAccountId(forProvider: id) == accountId {
-            setActiveAccountId(nil, forProvider: id)
-        }
     }
 
     public func updateAccount(_ config: ProviderAccountConfig, forProvider id: String) {
@@ -943,18 +938,27 @@ extension JSONSettingsRepository: MultiAccountSettingsRepository {
         writeAccounts(configs, forProvider: id)
     }
 
-    public func activeAccountId(forProvider id: String) -> String? {
-        store.read(key: Self.activeAccountKey(id))
+    public func defaultAccountLabel(forProvider id: String) -> String? {
+        store.read(key: Self.defaultAccountLabelKey(id))
     }
 
-    public func setActiveAccountId(_ accountId: String?, forProvider id: String) {
-        store.write(value: accountId, key: Self.activeAccountKey(id))
+    public func setDefaultAccountLabel(_ label: String?, forProvider id: String) {
+        store.write(value: label, key: Self.defaultAccountLabelKey(id))
     }
 
     // MARK: Storage helpers
 
     private static func accountsKey(_ id: String) -> String { "providers.\(id).accounts" }
-    private static func activeAccountKey(_ id: String) -> String { "providers.\(id).activeAccountId" }
+    public func accountOrder(forProvider id: String) -> [String] {
+        store.read(key: Self.accountOrderKey(id)) ?? []
+    }
+
+    public func setAccountOrder(_ accountIds: [String], forProvider id: String) {
+        store.write(value: accountIds.isEmpty ? nil : accountIds, key: Self.accountOrderKey(id))
+    }
+
+    private static func defaultAccountLabelKey(_ id: String) -> String { "providers.\(id).defaultAccountLabel" }
+    private static func accountOrderKey(_ id: String) -> String { "providers.\(id).accountOrder" }
 
     private func writeAccounts(_ configs: [ProviderAccountConfig], forProvider id: String) {
         // Persist an empty list as a removal so the file stays free of empty arrays,

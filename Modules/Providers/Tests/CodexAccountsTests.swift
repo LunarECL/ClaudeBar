@@ -171,79 +171,87 @@ struct CodexAccountsTests {
 
     @Test
     func `two folders become two accounts with their own emails`() throws {
-        let root = try temporaryRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let a = try writeLogin(in: root, "account a", email: "a@example.com", accountId: "account-a")
-        let b = try writeLogin(in: root, "account b", email: "b@example.com", accountId: "account-b")
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let a = try writeLogin(in: stub.home, "account a", email: "a@example.com", accountId: "account-a")
+        let b = try writeLogin(in: stub.home, "account b", email: "b@example.com", accountId: "account-b")
+        let codex = try stub.makeProvider("codex")
 
-        let first = try add(a, to: [], root: root)
-        let second = try add(b, to: [first], root: root)
+        let first = try codex.addAccount(signedInAt: a)
+        let second = try codex.addAccount(signedInAt: b)
 
         #expect(first.email == "a@example.com")
         #expect(second.email == "b@example.com")
         #expect(first.accountId != second.accountId)
-        #expect(first.probeConfig["chatgptAccountId"] == "account-a")
-        #expect(first.probeConfig["codexHome"] == a.resolvingSymlinksInPath().path)
+        #expect(first.values["chatgptAccountId"] == "account-a")
+        #expect(first.values["codexHome"] == a.resolvingSymlinksInPath().path)
+        #expect(first.madeBy == .folder)
     }
 
     @Test
     func `one login is not added twice from another folder`() throws {
-        let root = try temporaryRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let a = try writeLogin(in: root, "a", email: "same@example.com", accountId: "same")
-        let b = try writeLogin(in: root, "b", email: "same@example.com", accountId: "same")
-        let first = try add(a, to: [], root: root)
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let a = try writeLogin(in: stub.home, "a", email: "same@example.com", accountId: "same")
+        let b = try writeLogin(in: stub.home, "b", email: "same@example.com", accountId: "same")
+        let codex = try stub.makeProvider("codex")
+        try codex.addAccount(signedInAt: a)
 
         #expect(throws: UsageError.executionFailed("This Codex account is already listed.")) {
-            try add(b, to: [first], root: root)
+            try codex.addAccount(signedInAt: b)
         }
     }
 
     @Test
     func `one email in two workspaces is two accounts`() throws {
-        let root = try temporaryRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let a = try writeLogin(in: root, "a", email: "same@example.com", accountId: "workspace-a")
-        let b = try writeLogin(in: root, "b", email: "same@example.com", accountId: "workspace-b")
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let a = try writeLogin(in: stub.home, "a", email: "same@example.com", accountId: "workspace-a")
+        let b = try writeLogin(in: stub.home, "b", email: "same@example.com", accountId: "workspace-b")
+        let codex = try stub.makeProvider("codex")
 
-        let first = try add(a, to: [], root: root)
-        let second = try add(b, to: [first], root: root)
+        let first = try codex.addAccount(signedInAt: a)
+        let second = try codex.addAccount(signedInAt: b)
 
-        #expect(first.probeConfig["chatgptAccountId"] != second.probeConfig["chatgptAccountId"])
+        #expect(first.values["chatgptAccountId"] != second.values["chatgptAccountId"])
     }
 
     @Test
     func `a folder without a login is refused`() throws {
-        let root = try temporaryRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let codex = try stub.makeProvider("codex")
 
         #expect(throws: UsageError.executionFailed("No ChatGPT account found in this folder. Sign in with Codex using file credential storage, then choose the folder again.")) {
-            try add(root.appendingPathComponent("missing"), to: [], root: root)
+            try codex.addAccount(signedInAt: stub.home.appendingPathComponent("missing"))
         }
+        #expect(codex.accounts.count == 1)
     }
 
     @Test
-    func `the default login's folder is refused`() throws {
-        let root = try temporaryRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let defaultFolder = try writeLogin(in: root, "default", email: "me@example.com", accountId: "me")
+    func `the default login is not added again from another folder`() throws {
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        try stub.writeCodexAuth(accountId: "me")
+        let copy = try writeLogin(in: stub.home, "copy", email: "me@example.com", accountId: "me")
+        let codex = try stub.makeProvider("codex")
 
-        #expect(throws: UsageError.executionFailed("This is the default Codex login, which is already listed.")) {
-            try add(defaultFolder, to: [], root: root)
+        #expect(throws: UsageError.executionFailed("This Codex account is already listed.")) {
+            try codex.addAccount(signedInAt: copy)
         }
     }
 
     @Test
     func `saved accounts come back as logins of one Codex provider`() throws {
-        let root = try temporaryRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let a = try writeLogin(in: root, "a", email: "a@example.com", accountId: "a")
-        let b = try writeLogin(in: root, "b", email: "b@example.com", accountId: "b")
-        let first = try add(a, to: [], root: root)
-        let second = try add(b, to: [first], root: root)
-        let settings = InMemoryProviderSettings()
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let a = try writeLogin(in: stub.home, "a", email: "a@example.com", accountId: "a")
+        let b = try writeLogin(in: stub.home, "b", email: "b@example.com", accountId: "b")
+        let before = try stub.makeProvider("codex")
+        try before.addAccount(signedInAt: a)
+        try before.addAccount(signedInAt: b)
 
-        let codex = try Providers.make("codex", settings: settings, accounts: [first, second])
+        let codex = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
         let added = Array(codex.accounts.dropFirst())
         added[0].isEnabled = false
 
@@ -252,7 +260,7 @@ struct CodexAccountsTests {
         #expect(added.map(\.name) == ["a@example.com", "b@example.com"])
         #expect(Set(codex.accounts.map(\.id)).count == 3)
         #expect(added[1].isEnabled)
-        #expect(settings.isEnabled(forProvider: added[0].id) == false)
+        #expect(stub.settings.isEnabled(forProvider: added[0].id) == false)
     }
 
     // MARK: - One provider, many logins
@@ -344,19 +352,6 @@ struct CodexAccountsTests {
     }
 
     // MARK: - Helpers
-
-    private func temporaryRoot() throws -> URL {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("codex-accounts-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        return root
-    }
-
-    private func add(_ folder: URL, to existing: [ProviderAccountConfig], root: URL) throws -> ProviderAccountConfig {
-        try AddedAccounts.configuration(
-            "codex", folder: folder.path, existing: existing,
-            defaultFolder: root.appendingPathComponent("default").path
-        )
-    }
 
     private func config(_ id: String, folder: URL, accountId: String, email: String? = nil) -> ProviderAccountConfig {
         ProviderAccountConfig(

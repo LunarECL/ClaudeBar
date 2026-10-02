@@ -206,11 +206,10 @@ This plan covered the API probe. What was learned afterwards, mostly about the R
 
 Additional accounts reuse `ProviderAccountConfig` and `MultiAccountSettingsRepository`.
 `codex.json`'s `accounts` says how one is added (`folder`: saved as `codexHome`,
-its login's `account` claim saved as `chatgptAccountId`), that each is named by its
-email, and what an added login changes: `accounts.patch`, an RFC 7396 merge patch
+its login's `account` claim saved as `chatgptAccountId`; `signIn`: `codex -c cli_auth_credentials_store="file" login` with `CODEX_HOME` set), and what an added login changes: `accounts.patch`, an RFC 7396 merge patch
 per data source kind (`"tty": null` leaves the terminal out). One Codex `Provider`
 (the product) owns its `Account`s (the logins, [CANONICAL_MODEL](../../architecture/CANONICAL_MODEL.md#1--the-tree));
-`AddedAccounts` checks a folder and `provider.add(_:)` runs it, compound ID
+`provider.addAccount(signedInAt:)` checks a folder and adds it (`provider.signIn()` runs `codex login` into a new one first), compound ID
 `codex.<local UUID>`, the default keeping `codex`. Each login is its own pill,
 enable toggle and menu-bar choice — users pin two accounts at once instead of
 selecting one active account within Codex.

@@ -42,12 +42,6 @@ struct ClaudeProviderTests {
         given(claude.network).request(.any).willReturn((Data(body.utf8), ClaudeHarness.response(status, headers)))
     }
 
-    private func report(today: Decimal, previous: Decimal) -> DailyUsageReport {
-        DailyUsageReport(
-            today: DailyUsageStat(date: Date(), totalCost: today, totalTokens: today > 0 ? 1000 : 0, workingTime: today > 0 ? 60 : 0, sessionCount: today > 0 ? 1 : 0),
-            previous: DailyUsageStat(date: Date().addingTimeInterval(-86400), totalCost: previous, totalTokens: previous > 0 ? 1000 : 0, workingTime: previous > 0 ? 60 : 0, sessionCount: previous > 0 ? 1 : 0)
-        )
-    }
 
     // MARK: - Identity
 
@@ -185,59 +179,6 @@ struct ClaudeProviderTests {
 
         #expect(try claude.provider(settings: InMemoryProviderSettings(dataSourceKinds: ["claude": "api"])).backgroundRefreshFloor == .seconds(900))
         #expect(try claude.provider().backgroundRefreshFloor == nil)
-    }
-
-    // MARK: - Today's usage
-
-    @Test
-    func `an interactive refresh attaches today's usage`() async throws {
-        let claude = try ClaudeHarness()
-        defer { claude.cleanUp() }
-        answerCLI(claude, Self.usageScreen)
-        let analyzer = MockDailyUsageAnalyzing()
-        given(analyzer).analyzeToday().willReturn(report(today: 14, previous: 41))
-        let provider = try claude.provider(dailyUsage: analyzer)
-
-        let usage = try await provider.refresh(.interactive)
-
-        #expect(usage.dailyUsageReport?.today.totalCost == 14)
-        #expect(usage.sessionQuota?.percentRemaining == 65)
-    }
-
-    @Test
-    func `a day with no usage on either side is not attached`() async throws {
-        let claude = try ClaudeHarness()
-        defer { claude.cleanUp() }
-        answerCLI(claude, Self.usageScreen)
-        let analyzer = MockDailyUsageAnalyzing()
-        given(analyzer).analyzeToday().willReturn(report(today: 0, previous: 0))
-        let provider = try claude.provider(dailyUsage: analyzer)
-
-        #expect(try await provider.refresh(.interactive).dailyUsageReport == nil)
-    }
-
-    @Test
-    func `only yesterday's usage is still attached`() async throws {
-        let claude = try ClaudeHarness()
-        defer { claude.cleanUp() }
-        answerCLI(claude, Self.usageScreen)
-        let analyzer = MockDailyUsageAnalyzing()
-        given(analyzer).analyzeToday().willReturn(report(today: 0, previous: 41))
-        let provider = try claude.provider(dailyUsage: analyzer)
-
-        #expect(try await provider.refresh(.interactive).dailyUsageReport?.previous.totalCost == 41)
-    }
-
-    @Test
-    func `a background refresh skips today's usage`() async throws {
-        let claude = try ClaudeHarness()
-        defer { claude.cleanUp() }
-        answerCLI(claude, Self.usageScreen)
-        let analyzer = MockDailyUsageAnalyzing()
-        given(analyzer).analyzeToday().willReturn(report(today: 14, previous: 41))
-        let provider = try claude.provider(dailyUsage: analyzer)
-
-        #expect(try await provider.refresh(.background).dailyUsageReport == nil)
     }
 
     // MARK: - Guest passes
