@@ -6,17 +6,16 @@ import Testing
 
 /// One session shared by every run of a CLI call (#132).
 ///
-/// The definition carries the session contract as data — where the id is kept,
-/// the args that create and resume the session, the output that says the stored
-/// session is gone, and the output that says this CLI build rejects the flags —
-/// and the fetcher runs the plan: create once, resume after, recreate when
-/// gone, fall back to the plain invocation when the flags are refused.
+/// The definition carries only the vendor's facts — the args that create and
+/// resume the session, the output that says it is gone, and the output that
+/// says this CLI build rejects the flags. Which session a worker is in is its
+/// own memory: create once, resume after, recreate when gone, fall back to the
+/// plain invocation when the flags are refused.
 @Suite("Session reuse on a CLI call (#132)")
 struct CLISessionTests {
 
     // MARK: - Helpers
 
-    private let home = FileManager.default.homeDirectoryForCurrentUser
 
     /// Thread-safe recorder of every `execute` run's args, in order.
     private final class Launches: @unchecked Sendable {
@@ -28,7 +27,7 @@ struct CLISessionTests {
 
     private func call(
         args: [String] = ["/usage", "--allowed-tools", ""],
-        session: SessionReuse,
+        session: CLICall.Session,
         workingDirectory: WorkingDirectory? = nil
     ) -> CLICall {
         CLICall(cli: "claude", args: args, timeout: 20, workingDirectory: workingDirectory, session: session)
@@ -54,21 +53,15 @@ struct CLISessionTests {
         executor: MockCLIExecutor,
         launches: Launches? = nil,
         ids: [String] = [],
-        fileURL: URL? = nil,
-        latch: SessionFlagLatch = SessionFlagLatch()
+        memory: SessionMemory = SessionMemory()
     ) -> CLISessionRunner {
         let queue = IDQueue(ids)
-        let url = fileURL ?? URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-tests-\(UUID().uuidString)")
-            .appendingPathComponent("probe-session.json")
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         return CLISessionRunner(
             call: call,
-            reuse: call.session ?? session(),
+            session: call.session ?? session(),
             directory: nil,
             makeExecutor: { _ in executor },
-            fileURL: url,
-            latch: latch,
+            memory: memory,
             nextID: { queue.next() }
         )
     }
@@ -89,9 +82,8 @@ struct CLISessionTests {
     Resets in 2h 15m
     """
 
-    private func session(file: String = "/probe-session.json") -> SessionReuse {
-        SessionReuse(
-            file: file,
+    private func session() -> CLICall.Session {
+        CLICall.Session(
             create: ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"],
             resume: ["--resume", "{{id}}"],
             recreateOn: ["no conversation found", "no session found"],
@@ -105,15 +97,13 @@ struct CLISessionTests {
     func `a session block decodes with its templates and tokens`() throws {
         let call = try JSONDecoder().decode(CLICall.self, from: Data("""
         {"cli":"claude","args":["/usage"],
-         "session":{"file":"probe-session.json",
-                    "create":["--session-id","{{id}}","--name","ClaudeBar Probe"],
+         "session":{"create":["--session-id","{{id}}","--name","ClaudeBar Probe"],
                     "resume":["--resume","{{id}}"],
                     "recreateOn":["no conversation found"],
                     "unsupportedOn":["unknown option '--session-id'"]}}
         """.utf8))
 
         let session = try #require(call.session)
-        #expect(session.file == "probe-session.json")
         #expect(session.create == ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"])
         #expect(session.resume == ["--resume", "{{id}}"])
         #expect(session.recreateOn == ["no conversation found"])
@@ -123,7 +113,7 @@ struct CLISessionTests {
     @Test
     func `the match lists default to empty`() throws {
         let call = try JSONDecoder().decode(CLICall.self, from: Data("""
-        {"cli":"claude","session":{"file":"probe-session.json","create":["--session-id","{{id}}"],"resume":["--resume","{{id}}"]}}
+        {"cli":"claude","session":{"create":["--session-id","{{id}}"],"resume":["--resume","{{id}}"]}}
         """.utf8))
         #expect(call.session?.recreateOn.isEmpty == true)
         #expect(call.session?.unsupportedOn.isEmpty == true)
@@ -153,13 +143,12 @@ struct CLISessionTests {
         let launches = Launches()
         let executor = MockCLIExecutor()
         screen(usageScreen, executor: executor, launches: launches)
-        let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)/probe-session.json")
+        let memory = SessionMemory()
         let runner = self.runner(
             call(session: session()),
             executor: executor,
             ids: ["11111111-2222-3333-4444-555555555555"],
-            fileURL: fileURL
+            memory: memory
         )
 
         let result = try await runner.run()
@@ -167,28 +156,27 @@ struct CLISessionTests {
         #expect(result.output == usageScreen)
         #expect(launches.recorded.count == 1)
         #expect(launches.recorded[0] == ["/usage", "--allowed-tools", "", "--session-id", "11111111-2222-3333-4444-555555555555", "--name", "ClaudeBar Probe"])
-        #expect(CLISessionFile(url: fileURL).load() == "11111111-2222-3333-4444-555555555555")
+        #expect(await memory.id == "11111111-2222-3333-4444-555555555555")
     }
 
     @Test
-    func `the next run resumes the stored session`() async throws {
+    func `the next run resumes the session it created`() async throws {
         let launches = Launches()
         let executor = MockCLIExecutor()
         screen(usageScreen, executor: executor, launches: launches)
-        let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)/probe-session.json")
-        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let store = CLISessionFile(url: fileURL)
-        store.save("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-        let runner = self.runner(call(session: session()), executor: executor, fileURL: fileURL)
+        let memory = SessionMemory()
+        let runner = self.runner(call(session: session()), executor: executor,
+                                 ids: ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"], memory: memory)
 
         _ = try await runner.run()
         _ = try await runner.run()
+        _ = try await runner.run()
 
-        #expect(launches.recorded.count == 2)
-        #expect(launches.recorded[0] == ["/usage", "--allowed-tools", "", "--resume", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"])
+        #expect(launches.recorded.count == 3)
+        #expect(launches.recorded[0].contains("--session-id"))
         #expect(launches.recorded[1] == ["/usage", "--allowed-tools", "", "--resume", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"])
-        #expect(store.load() == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        #expect(launches.recorded[2] == ["/usage", "--allowed-tools", "", "--resume", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"])
+        #expect(await memory.id == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
     }
 
     @Test
@@ -202,16 +190,13 @@ struct CLISessionTests {
             launches.record(args)
             return CLIResult(output: args.contains("--resume") ? gone : usageScreen, exitCode: 0)
         }
-        let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)/probe-session.json")
-        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let store = CLISessionFile(url: fileURL)
-        store.save("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        let memory = SessionMemory()
+        await memory.remember("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
         let runner = self.runner(
             call(session: session()),
             executor: executor,
             ids: ["11111111-2222-3333-4444-555555555555"],
-            fileURL: fileURL
+            memory: memory
         )
 
         let result = try await runner.run()
@@ -220,7 +205,7 @@ struct CLISessionTests {
         #expect(launches.recorded.count == 2)
         #expect(launches.recorded[0].contains("--resume"))
         #expect(launches.recorded[1] == ["/usage", "--allowed-tools", "", "--session-id", "11111111-2222-3333-4444-555555555555", "--name", "ClaudeBar Probe"])
-        #expect(store.load() == "11111111-2222-3333-4444-555555555555")
+        #expect(await memory.id == "11111111-2222-3333-4444-555555555555")
     }
 
     @Test
@@ -234,21 +219,21 @@ struct CLISessionTests {
             launches.record(args)
             return CLIResult(output: args.contains("--session-id") || args.contains("--resume") ? refused : usageScreen, exitCode: 1)
         }
-        let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)/probe-session.json")
-        let runner = self.runner(call(session: session()), executor: executor, ids: ["11111111-2222-3333-4444-555555555555"], fileURL: fileURL)
+        let memory = SessionMemory()
+        let runner = self.runner(call(session: session()), executor: executor, ids: ["11111111-2222-3333-4444-555555555555"], memory: memory)
 
         let first = try await runner.run()
         let second = try await runner.run()
 
         #expect(first.output == usageScreen)
         #expect(second.output == usageScreen)
-        // Create refused → plain retry; the latch keeps every later run plain.
+        // Create refused → plain retry; the memory keeps every later run plain.
         #expect(launches.recorded.count == 3)
         #expect(launches.recorded[0].contains("--session-id"))
         #expect(launches.recorded[1] == ["/usage", "--allowed-tools", ""])
         #expect(launches.recorded[2] == ["/usage", "--allowed-tools", ""])
-        #expect(CLISessionFile(url: fileURL).load() == nil)
+        #expect(await memory.id == nil)
+        #expect(await memory.isRefused)
     }
 
     @Test
@@ -262,19 +247,16 @@ struct CLISessionTests {
             launches.record(args)
             return CLIResult(output: args.contains("--resume") ? refused : usageScreen, exitCode: 1)
         }
-        let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)/probe-session.json")
-        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let store = CLISessionFile(url: fileURL)
-        store.save("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-        let runner = self.runner(call(session: session()), executor: executor, fileURL: fileURL)
+        let memory = SessionMemory()
+        await memory.remember("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        let runner = self.runner(call(session: session()), executor: executor, memory: memory)
 
         _ = try await runner.run()
 
         #expect(launches.recorded.count == 2)
         #expect(launches.recorded[0].contains("--resume"))
         #expect(launches.recorded[1] == ["/usage", "--allowed-tools", ""])
-        #expect(store.load() == nil)
+        #expect(await memory.id == nil)
     }
 
     @Test
@@ -288,20 +270,19 @@ struct CLISessionTests {
         \(usageScreen)
         """
         screen(chatty, executor: executor, launches: launches)
-        let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)/probe-session.json")
+        let memory = SessionMemory()
         let runner = self.runner(
             call(session: session()),
             executor: executor,
             ids: ["11111111-2222-3333-4444-555555555555"],
-            fileURL: fileURL
+            memory: memory
         )
 
         _ = try await runner.run()
 
         #expect(launches.recorded.count == 1)
         #expect(launches.recorded[0].contains("--session-id"))
-        #expect(CLISessionFile(url: fileURL).load() == "11111111-2222-3333-4444-555555555555")
+        #expect(await memory.id == "11111111-2222-3333-4444-555555555555")
     }
 
     // MARK: - The detection rules
@@ -330,120 +311,22 @@ struct CLISessionTests {
         #expect(CLISessionRunner.isGone("all good", tokens: []) == false)
     }
 
-    // MARK: - The file
+    // MARK: - The memory
 
     @Test
-    func `the id round-trips through the file`() throws {
-        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let store = CLISessionFile(url: directory.appendingPathComponent("probe-session.json"))
-
-        #expect(store.load() == nil)
-        store.save("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-        #expect(store.load() == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-        store.clear()
-        #expect(store.load() == nil)
-    }
-
-    @Test
-    func `an empty or corrupt file reads as no session`() throws {
-        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent("probe-session.json")
-
-        try Data("".utf8).write(to: url)
-        #expect(CLISessionFile(url: url).load() == nil)
-        try Data("not json".utf8).write(to: url)
-        #expect(CLISessionFile(url: url).load() == nil)
-        try Data(#"{"sessionID":"""#.utf8).write(to: url)
-        #expect(CLISessionFile(url: url).load() == nil)
-    }
-
-    @Test
-    func `a save or read over an unwritable path does not throw`() throws {
-        // The file exists but its directory refuses changes: every IO fails.
-        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent("probe-session.json")
-        try Data("{}".utf8).write(to: url)
-        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directory.path)
-        defer {
-            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)
-            try? FileManager.default.removeItem(at: directory)
-        }
-        let store = CLISessionFile(url: url)
-
-        store.save("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-        #expect(store.load() == nil)
-        store.clear()
-        #expect(FileManager.default.fileExists(atPath: url.path))
-    }
-
-    // MARK: - The flag latch
-
-    @Test
-    func `the latch starts supported and drops once under concurrency`() async {
-        let latch = SessionFlagLatch()
-        #expect(await latch.isSupported)
+    func `refusing the flags under concurrency forgets the session once and for good`() async {
+        let memory = SessionMemory()
+        await memory.remember("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        #expect(await memory.isRefused == false)
 
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<50 {
-                group.addTask { await latch.refuse() }
+                group.addTask { await memory.refuse() }
             }
         }
 
-        #expect(await latch.isSupported == false)
-        await latch.refuse()
-        #expect(await latch.isSupported == false)
-    }
-
-    // MARK: - Where the file lives
-
-    @Test
-    func `a relative file sits in the dedicated working directory`() {
-        let url = CLISessionRunner.fileURL(
-            "probe-session.json",
-            workingDirectory: .dedicated,
-            homeDirectory: home,
-            environment: { _ in nil }
-        )
-
-        #expect(url == CLIWorkingDirectory.resolve().appendingPathComponent("probe-session.json"))
-    }
-
-    @Test
-    func `a relative file without a dedicated directory sits in home`() {
-        let home = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fake-home")
-        let url = CLISessionRunner.fileURL(
-            "probe-session.json",
-            workingDirectory: nil,
-            homeDirectory: home,
-            environment: { _ in nil }
-        )
-
-        #expect(url == home.appendingPathComponent("probe-session.json"))
-    }
-
-    @Test
-    func `an absolute or expanded file wins over any directory`() {
-        let url = CLISessionRunner.fileURL(
-            "/tmp/probe-session.json",
-            workingDirectory: .dedicated,
-            homeDirectory: home,
-            environment: { _ in nil }
-        )
-        let tilde = CLISessionRunner.fileURL(
-            "~/probe-session.json",
-            workingDirectory: nil,
-            homeDirectory: home,
-            environment: { _ in nil }
-        )
-
-        #expect(url.path == "/tmp/probe-session.json")
-        #expect(tilde == home.appendingPathComponent("probe-session.json"))
+        #expect(await memory.isRefused)
+        #expect(await memory.id == nil)
     }
 
     // MARK: - The fetcher wiring
@@ -453,12 +336,8 @@ struct CLISessionTests {
         let launches = Launches()
         let executor = MockCLIExecutor()
         screen(usageScreen, executor: executor, launches: launches)
-        let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("clisession-\(UUID().uuidString)/probe-session.json")
-        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let fetcher = CLIFetcher(
-            call: call(session: SessionReuse(
-                file: fileURL.path,
+            call: call(session: CLICall.Session(
                 create: ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"],
                 resume: ["--resume", "{{id}}"],
                 recreateOn: [],
@@ -473,6 +352,23 @@ struct CLISessionTests {
         #expect(launches.recorded.count == 2)
         #expect(launches.recorded[0].contains("--session-id"))
         #expect(launches.recorded[1].contains("--resume"))
+    }
+
+    @Test
+    func `two workers — two logins — keep two sessions`() async throws {
+        let launches = Launches()
+        let executor = MockCLIExecutor()
+        screen(usageScreen, executor: executor, launches: launches)
+        let plan = CLICall.Session(create: ["--session-id", "{{id}}"], resume: ["--resume", "{{id}}"])
+        let mine = CLIFetcher(call: call(session: plan), makeExecutor: { _ in executor })
+        let work = CLIFetcher(call: call(session: plan), makeExecutor: { _ in executor })
+
+        _ = try await mine.fetch(with: nil)
+        _ = try await work.fetch(with: nil)
+
+        let created = launches.recorded.compactMap { args in args.firstIndex(of: "--session-id").map { args[$0 + 1] } }
+        #expect(created.count == 2)
+        #expect(Set(created).count == 2)
     }
 
     @Test

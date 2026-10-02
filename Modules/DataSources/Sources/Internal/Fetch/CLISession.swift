@@ -1,147 +1,98 @@
 import Diagnostics
 import Foundation
 
-/// Whether the installed CLI accepts a call's session flags (#132).
+/// What a CLI worker remembers about its session between runs (#132): the
+/// id of the session it runs in, and whether the installed CLI refused the
+/// session flags. Held in memory, like `UsageMemory` — one per worker, and
+/// the provider makes a worker per login, so each login keeps its own
+/// session. A restart starts one new session; nothing is written to disk.
 ///
-/// One per fetcher: the provider binds its data sources for its lifetime, and
-/// concurrent fetches of one data source consult and drop this from different
-/// tasks — so it is an actor, and the drop is seen by every later run.
-actor SessionFlagLatch {
-    private(set) var supported = true
+/// Concurrent fetches of one data source read and change this from
+/// different tasks, so it is an actor.
+actor SessionMemory {
+    private(set) var id: String?
+    private(set) var isRefused = false
 
-    /// Whether the flags are still trusted.
-    var isSupported: Bool { supported }
+    func remember(_ id: String) { self.id = id }
 
-    /// Gives up on the session flags for this fetcher's lifetime.
+    func forget() { id = nil }
+
+    /// Gives up on the session flags for this worker's lifetime.
     func refuse() {
-        supported = false
+        isRefused = true
+        id = nil
     }
 }
 
-/// The file that keeps the shared session's id between runs (#132).
+/// Runs one CLI call inside the worker's one session (#132).
 ///
-/// Every failure is logged and read as "no session": the next run simply
-/// creates a new one, so a broken file never breaks a fetch.
-struct CLISessionFile: Sendable {
-    let url: URL
-
-    private struct Payload: Codable {
-        let sessionID: String
-    }
-
-    /// The stored id, or `nil` when there is none — first run, empty, corrupt
-    /// or unreadable.
-    func load() -> String? {
-        do {
-            let data = try Data(contentsOf: url)
-            let payload = try JSONDecoder().decode(Payload.self, from: data)
-            let id = payload.sessionID.trimmingCharacters(in: .whitespacesAndNewlines)
-            return id.isEmpty ? nil : id
-        } catch CocoaError.fileReadNoSuchFile {
-            return nil
-        } catch {
-            AppLog.probes.error("Could not read the session id from \(url.lastPathComponent): \(error.localizedDescription)")
-            return nil
-        }
-    }
-
-    /// Remembers the id of a session the CLI just created. A failure is logged
-    /// and forgotten: the next run creates another session.
-    func save(_ id: String) {
-        do {
-            try JSONEncoder().encode(Payload(sessionID: id)).write(to: url, options: .atomic)
-        } catch {
-            AppLog.probes.error("Could not save the session id to \(url.lastPathComponent): \(error.localizedDescription)")
-        }
-    }
-
-    /// Forgets the id — the session is gone, or the CLI refused the flags.
-    func clear() {
-        do {
-            try FileManager.default.removeItem(at: url)
-        } catch CocoaError.fileNoSuchFile {
-            return
-        } catch {
-            AppLog.probes.error("Could not remove \(url.lastPathComponent): \(error.localizedDescription)")
-        }
-    }
-}
-
-/// Runs one CLI call inside a persisted, shared session (#132).
-///
-/// The plan: no stored id → create the session under a fresh id (the `create`
-/// template) and remember it; a stored id → resume it (`resume` template);
-/// the CLI says the session is gone → drop the id and create again; the run
-/// exited non-zero naming a refused flag → give up on the flags for this
-/// fetcher's lifetime and run the call's plain args from then on.
+/// The plan: no remembered id → create the session under a fresh id (the
+/// `create` template) and remember it; a remembered id → resume it (`resume`
+/// template); the CLI says the session is gone → forget it and create again;
+/// the run exited non-zero naming a refused flag → give up on the flags for
+/// this worker's lifetime and run the call's plain args from then on.
 struct CLISessionRunner: Sendable {
     let call: CLICall
-    let reuse: SessionReuse
+    let session: CLICall.Session
     /// The call's resolved working directory — `nil` to inherit.
     let directory: URL?
     let makeExecutor: CLIFetcher.MakeExecutor
-    let fileURL: URL
-    let latch: SessionFlagLatch
+    let memory: SessionMemory
     /// A fresh session id — a UUID in production.
     let nextID: @Sendable () -> String
 
     init(
         call: CLICall,
-        reuse: SessionReuse,
+        session: CLICall.Session,
         directory: URL?,
         makeExecutor: @escaping CLIFetcher.MakeExecutor,
-        fileURL: URL,
-        latch: SessionFlagLatch,
+        memory: SessionMemory,
         nextID: @escaping @Sendable () -> String = { UUID().uuidString.lowercased() }
     ) {
         self.call = call
-        self.reuse = reuse
+        self.session = session
         self.directory = directory
         self.makeExecutor = makeExecutor
-        self.fileURL = fileURL
-        self.latch = latch
+        self.memory = memory
         self.nextID = nextID
     }
 
     /// Runs the call under the session plan and answers what the screen showed.
     func run() async throws -> CLIResult {
-        guard await latch.isSupported else { return try await plain() }
-        let file = CLISessionFile(url: fileURL)
-        if let stored = file.load() {
-            let result = try await execute(reuse.resume, id: stored)
-            if Self.isRefused(result, tokens: reuse.unsupportedOn) {
-                return try await giveUp(file: file)
+        guard await !memory.isRefused else { return try await plain() }
+        if let remembered = await memory.id {
+            let result = try await execute(session.resume, id: remembered)
+            if Self.isRefused(result, tokens: session.unsupportedOn) {
+                return try await giveUp()
             }
-            if Self.isGone(result.output, tokens: reuse.recreateOn) {
-                AppLog.probes.info("\(call.cli): the stored session is gone, creating a new one")
-                file.clear()
-                return try await create(file: file)
+            if Self.isGone(result.output, tokens: session.recreateOn) {
+                AppLog.probes.info("\(call.cli): the session is gone, creating a new one")
+                await memory.forget()
+                return try await create()
             }
             return result
         }
-        return try await create(file: file)
+        return try await create()
     }
 
     /// Creates the session under a fresh id and remembers it. The session
     /// exists the moment the CLI boots, so the id is safe to keep even if the
     /// run's screen goes on to fail parsing.
-    private func create(file: CLISessionFile) async throws -> CLIResult {
+    private func create() async throws -> CLIResult {
         let id = nextID()
-        let result = try await execute(reuse.create, id: id)
-        if Self.isRefused(result, tokens: reuse.unsupportedOn) {
-            return try await giveUp(file: file)
+        let result = try await execute(session.create, id: id)
+        if Self.isRefused(result, tokens: session.unsupportedOn) {
+            return try await giveUp()
         }
-        file.save(id)
+        await memory.remember(id)
         return result
     }
 
-    /// Gives up on the flags for this fetcher's lifetime and runs the call the
-    /// way it always has. The stored id — useless without the flags — is
-    /// dropped so a downgrade never resumes into a refused session.
-    private func giveUp(file: CLISessionFile) async throws -> CLIResult {
-        AppLog.probes.info("\(call.cli) refused the session flags, continuing without session reuse")
-        await latch.refuse()
-        file.clear()
+    /// Gives up on the flags for this worker's lifetime and runs the call the
+    /// way it always has.
+    private func giveUp() async throws -> CLIResult {
+        AppLog.probes.info("\(call.cli) refused the session flags, continuing without one session")
+        await memory.refuse()
         return try await plain()
     }
 
@@ -177,24 +128,5 @@ struct CLISessionRunner: Sendable {
 
     private static func matches(_ output: String, tokens: [String]) -> Bool {
         !tokens.isEmpty && tokens.contains { output.localizedCaseInsensitiveContains($0) }
-    }
-
-    /// Where the session file lives: an absolute (or `~`, or `${VAR}`) path as
-    /// it stands; a relative path in the call's dedicated working directory,
-    /// or home when the call has none.
-    static func fileURL(
-        _ file: String,
-        workingDirectory: WorkingDirectory?,
-        homeDirectory: URL,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
-    ) -> URL {
-        let expanded = Paths.expand(file, homeDirectory: homeDirectory, environment: environment)
-        if expanded.hasPrefix("/") {
-            return URL(fileURLWithPath: expanded)
-        }
-        switch workingDirectory {
-        case .dedicated: return CLIWorkingDirectory.resolve().appendingPathComponent(expanded)
-        default: return homeDirectory.appendingPathComponent(expanded)
-        }
     }
 }

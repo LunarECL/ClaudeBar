@@ -108,16 +108,14 @@ struct ClaudeCLIDefinitionTests {
     // MARK: - One shared probe session (issue #132)
 
     @Test
-    func `both commands run inside the same named probe session`() throws {
+    func `both commands run inside a named probe session`() throws {
         let usage = try call("cli").session
         let cost = try call("cliCost").session
 
-        // The session contract is the same on both: the id lives in one file
-        // in the probe directory, so /usage creates the session and /cost
-        // joins it.
+        // The session contract is the same on both — only the vendor's facts;
+        // which session a login is in is the worker's own memory.
         for session in [usage, cost] {
             let session = try #require(session)
-            #expect(session.file == "probe-session.json")
             #expect(session.create == ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"])
             #expect(session.resume == ["--resume", "{{id}}"])
             #expect(session.recreateOn == ["no conversation found", "no session found"])
@@ -125,15 +123,7 @@ struct ClaudeCLIDefinitionTests {
             #expect(session.unsupportedOn.contains("unknown option '--resume'"))
             #expect(session.unsupportedOn.allSatisfy { $0.hasPrefix("unknown option") || $0.hasPrefix("unexpected argument") })
         }
-        #expect(usage?.file == cost?.file)
-    }
-
-    @Test
-    func `the probe session file lives in the probe directory`() throws {
-        let session = try #require(try call("cli").session)
-
-        #expect(CLISessionRunner.fileURL(session.file, workingDirectory: .dedicated, homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
-            == CLIWorkingDirectory.resolve().appendingPathComponent("probe-session.json"))
+        #expect(usage == cost)
     }
 
     @Test

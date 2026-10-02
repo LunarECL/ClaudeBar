@@ -62,7 +62,6 @@
             "Yes, I trust this folder": "\r"
           },
           "session": {
-            "file": "probe-session.json",
             "create": ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"],
             "resume": ["--resume", "{{id}}"],
             "recreateOn": ["no conversation found", "no session found"],
@@ -130,7 +129,6 @@
             "Yes, I trust this folder": "\r"
           },
           "session": {
-            "file": "probe-session.json",
             "create": ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"],
             "resume": ["--resume", "{{id}}"],
             "recreateOn": ["no conversation found", "no session found"],

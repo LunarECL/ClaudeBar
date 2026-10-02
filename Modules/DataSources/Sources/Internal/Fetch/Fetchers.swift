@@ -184,9 +184,9 @@ struct CLIFetcher: Fetching {
 
     let call: CLICall
     let makeExecutor: MakeExecutor
-    /// Whether the CLI accepts the session flags — one per fetcher, which the
-    /// provider binds for its lifetime (#132).
-    private let latch = SessionFlagLatch()
+    /// The session this worker runs in — one per worker, and the provider
+    /// makes a worker per login, so each login keeps its own (#132).
+    private let session = SessionMemory()
 
     func isReady() -> Bool {
         makeExecutor(call).locate(call.cli) != nil
@@ -196,18 +196,13 @@ struct CLIFetcher: Fetching {
         let directory = call.workingDirectory == .dedicated ? CLIWorkingDirectory.resolve() : nil
         let result: CLIResult
         do {
-            if let reuse = call.session {
+            if let plan = call.session {
                 result = try await CLISessionRunner(
                     call: call,
-                    reuse: reuse,
+                    session: plan,
                     directory: directory,
                     makeExecutor: makeExecutor,
-                    fileURL: CLISessionRunner.fileURL(
-                        reuse.file,
-                        workingDirectory: call.workingDirectory,
-                        homeDirectory: FileManager.default.homeDirectoryForCurrentUser
-                    ),
-                    latch: latch
+                    memory: session
                 ).run()
             } else {
                 result = try await makeExecutor(call).execute(
