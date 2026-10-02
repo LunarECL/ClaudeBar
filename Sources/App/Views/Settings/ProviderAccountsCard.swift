@@ -10,7 +10,6 @@ struct ProviderAccountsCard: View {
     let provider: Provider
     let monitor: QuotaMonitor
     @Environment(\.appTheme) private var theme
-    @Environment(\.colorScheme) private var colorScheme
     @State private var adding = false
     @State private var renaming: Account?
     @State private var newName = ""
@@ -61,12 +60,7 @@ struct ProviderAccountsCard: View {
         .background(RoundedRectangle(cornerRadius: theme.cardCornerRadius).fill(theme.cardGradient))
         .overlay(RoundedRectangle(cornerRadius: theme.cardCornerRadius).stroke(theme.glassBorder, lineWidth: 1))
         .sheet(isPresented: $adding) {
-            // A sheet is its own window: give it the theme's appearance, or
-            // the theme's light text lands on the system's white sheet.
-            AddAccountSheet(provider: provider, monitor: monitor)
-                .environment(\.appTheme, theme)
-                .environment(\.colorScheme, colorScheme)
-                .preferredColorScheme(colorScheme)
+            AddAccountSheet(provider: provider, monitor: monitor).themedSheet()
         }
         .alert("Rename Account", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)

@@ -40,7 +40,6 @@ struct AddAccountSheet: View {
         }
         .padding(24)
         .frame(width: 440)
-        .background(theme.backgroundGradient)
         .onAppear {
             if text.ways.count == 1, let only = text.ways.first { start(only.way) }
         }
