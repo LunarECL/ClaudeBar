@@ -6,7 +6,7 @@ description: Contributor design for multiple accounts under one provider — how
 
 User guide: [README.md](README.md).
 
-**Status: DESIGN, slices 1–5 built.** Built: one `Provider` owns `[Account]`; an
+**Status: BUILT, slices 1–6.** Built: one `Provider` owns `[Account]`; an
 added login runs the **same** data sources with `accounts.patch` merged in and
 `{{account.x}}` filled from its values; added by `accounts.folder` — Codex
 (#356) and Claude (slice 1: `IdentityField`, `derived`, identity from a context
@@ -16,7 +16,11 @@ menu-bar names (slice 2); `accounts.signIn`, `provider.signIn` /
 (slice 3); the Accounts card and the Add Account sheet, `Provider.move` and
 `signInAgain` (slice 4); `accounts.form`, `addAccount(filling:)`,
 `SecretStore.scoped(to:)` and `SecretVault`, with API providers made in Add
-Provider asking for a key per account (slice 5). PR #358 adds Claude (as data — kept), browser sign-in, rename and
+Provider asking for a key per account (slice 5); the popover by provider —
+`ProductTab`, `QuotaMonitor.tabs` / `selectedTab`, `Provider.worstAccount`,
+account chips and the callout (slice 6). `selectedProviderId` stays a lineup id
+underneath (the tab's first login), so the menu bar, the refresh loop and the
+Touch Bar read it unchanged. PR #358 adds Claude (as data — kept), browser sign-in, rename and
 compact labels (kept, reshaped below), and a Swift bridge that gives the 18
 legacy providers, custom definitions and extensions accounts (replaced by this
 design — see [§ What is wrong today](#what-is-wrong-today)).
@@ -506,7 +510,7 @@ Each slice one PR, test first, green.
 | 2 ✅ | **Rename + display name** — `Account.displayName`, `setLabel` for default and added, `MenuBarAccountName` in App | labels survive relaunch; one login shows the product name; collisions number, never widen |
 | 3 ✅ | **`accounts.signIn` + the ways to add** — `AccountSignIn` worker, `codex.json`/`claude.json` declare it; `signIn.alsoAt`; `SignedInFolder`, `LoginFolders` | cancel/timeout/fail leave no folder and no config; env carries only `homeVariable`, `unset` removed; *Remove* of a signed-in account deletes its folder, of a chosen one never — README's *Remove* paragraph updated with the screen (slice 4) |
 | 4 ✅ | **one Accounts card** (§3.5) — renders `accounts.ways`, reorder, menu-bar pin, Rename · Pause · Remove, Re-auth; the 4-step Add Account sheet with VERIFY by step; `CodexAccountsCard` goes | a provider with `accounts: nil` shows no button; *Add anyway* is absent until identity passed; order survives relaunch |
-| 6 | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |
+| 6 ✅ | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |
 | 5 ✅ | **`form` + scoped secrets** (`SecretStore.scoped(to:)`, `SecretVault`) — account-scope settings in the form; custom definitions can declare `accounts` | an added account's missing key is *Key needed*, never the default's |
 | — | legacy providers | gain accounts in TARGET slices 2 and 5, when they become JSON — by adding an `accounts` block, nothing else |
 
