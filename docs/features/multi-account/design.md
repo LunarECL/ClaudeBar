@@ -435,7 +435,7 @@ are the cases the definition declares (§8).
 | sign-in never writes to an existing folder and saves nothing on failure, cancel or timeout | `AccountSignIn` |
 | display name is label, else email, else the provider's name | `Account.displayName` |
 | one refresh per account in flight; a failed refresh keeps the last usage | `Provider` |
-| today's usage and guest passes are read from the default login's files, so only the default login shows them | `Provider` (daily usage) · `Account.guestPasses` |
+| today's usage is read from one login's local logs — Claude's default login's — so only that login shows it; guest passes likewise | `UsageHistory` (keyed by lineup id) · `Account.guestPasses` |
 | removing deletes only what ClaudeBar made — the account's settings, its vault corner, and its folder when it goes with the account; never a folder the person chose or the CLI's files | `Provider.remove`, asking `SignedInFolder.goesWithAccount` |
 | a data source whose key lookup ClaudeBar cannot see (`fetch: script`) declares an `identity`, or the definition is refused on load | `ProviderDefinition` validation (`DefinitionError`) |
 | the data source choice is the provider's; a login the patch leaves without it uses the next on the fallback chain, and its usage says which | `Provider` |
@@ -487,7 +487,7 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 | `AccountMenuBarLabel` (Domain) | **built**: `MenuBarAccountName` in App ([CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree): not in the model). Named so, not `MenuBarLabel`, which is already the quota text |
 | `ProviderAccountsCard` | **kept**, rendering `accounts.ways` and the form's account scope; no `switch provider.id` |
 | `CodexAccountsCard` | folded into `ProviderAccountsCard` |
-| `withDailyUsage` / `guestPasses` default-only | **kept as a `Provider` / `Account` law** (§4): both are injected Swift capabilities that read the default login's files, so the default-only rule stays beside them. **Follow-up:** today's usage is UsageHistory, which [CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree) keeps outside the tree, so `refresh` should stop merging it into an account's usage; the popover would read it beside the usage instead |
+| `withDailyUsage` / `guestPasses` default-only | **built**: today's usage moved out of `Provider.refresh` into `UsageHistory` (Domain), beside the providers as [CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree) asks — keyed by the login whose logs it reads, read when the popover opens or refreshes, never in the background. Guest passes stay an `Account` law |
 
 ### What dies
 

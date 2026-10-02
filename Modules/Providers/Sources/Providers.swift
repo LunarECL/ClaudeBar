@@ -71,7 +71,6 @@ public enum Providers {
         settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
         secrets: (any SecretVault)? = nil,
-        dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
     ) -> Provider {
         Provider(
@@ -81,7 +80,6 @@ public enum Providers {
             makeDataSource: { source, login in
                 DataSources.make(source, providerId: definition.id, scripts: builtInScripts, secrets: secrets?.scoped(to: login))
             },
-            dailyUsage: dailyUsage,
             guestPasses: guestPasses,
             vault: secrets
         )
@@ -93,9 +91,8 @@ public enum Providers {
         _ id: String,
         settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
-        dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
     ) throws -> Provider {
-        make(try builtIn(id), settings: settings, accounts: accounts, dailyUsage: dailyUsage, guestPasses: guestPasses)
+        make(try builtIn(id), settings: settings, accounts: accounts, guestPasses: guestPasses)
     }
 }
