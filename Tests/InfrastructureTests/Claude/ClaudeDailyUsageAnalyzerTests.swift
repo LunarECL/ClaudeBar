@@ -271,6 +271,25 @@ struct ClaudeDailyUsageAnalyzerTests {
         #expect(report.previous.totalTokens == 1500)
     }
 
+    @Test func `counts lines appended between scans once`() async throws {
+        let first = #"{"type":"assistant","requestId":"req_1","message":{"id":"msg_A","model":"claude-sonnet-4-6","usage":{"input_tokens":1000,"output_tokens":500}},"timestamp":"\#(Self.todayTimestamp())"}"#
+        let second = #"{"type":"assistant","requestId":"req_2","message":{"id":"msg_B","model":"claude-sonnet-4-6","usage":{"input_tokens":2000,"output_tokens":1000}},"timestamp":"\#(Self.todayTimestamp())"}"#
+        let claudeDir = try setupTempClaudeDir(with: first + "\n")
+        defer { try? FileManager.default.removeItem(at: claudeDir) }
+        let analyzer = ClaudeDailyUsageAnalyzer(claudeDir: claudeDir)
+
+        let before = try await analyzer.analyzeToday()
+        let fileURL = claudeDir.appendingPathComponent("projects/test-project/test-session.jsonl")
+        let handle = try FileHandle(forWritingTo: fileURL)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((second + "\n").utf8))
+        try handle.close()
+        let after = try await analyzer.analyzeToday()
+
+        #expect(before.today.totalTokens == 1500)
+        #expect(after.today.totalTokens == 4500)
+    }
+
     @Test func `separates today and yesterday records`() async throws {
         let now = Date()
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: now))!.addingTimeInterval(3600 * 12)
