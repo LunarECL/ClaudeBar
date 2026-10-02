@@ -13,6 +13,7 @@ import Infrastructure
 final class NotchWindowDriver {
     private let monitor: QuotaMonitor
     private let sessionMonitor: SessionMonitor
+    private let usageHistory: UsageHistory
     private let settings: AppSettings
     private let controller = NotchWindowController()
     private let resolver = NotchActivityResolver()
@@ -36,7 +37,8 @@ final class NotchWindowDriver {
     /// How long a finished session stays worth listing in the panel.
     private static let recentSessionWindow: TimeInterval = 10 * 60
 
-    init(monitor: QuotaMonitor, sessionMonitor: SessionMonitor, settings: AppSettings) {
+    init(monitor: QuotaMonitor, sessionMonitor: SessionMonitor, usageHistory: UsageHistory, settings: AppSettings) {
+        self.usageHistory = usageHistory
         self.monitor = monitor
         self.sessionMonitor = sessionMonitor
         self.settings = settings
@@ -156,7 +158,7 @@ final class NotchWindowDriver {
             // The panel is about what is nearly gone, so lead with the most
             // depleted rather than whichever quota happens to be first.
             quotas: Array(quotas.sorted { $0.percentRemaining < $1.percentRemaining }.prefix(3)),
-            today: snapshot?.dailyUsageReport?.today,
+            today: (selected.flatMap { usageHistory.report(for: $0.id) } ?? snapshot?.dailyUsageReport)?.today,
             headline: headline,
             isRefreshing: selected?.isSyncing ?? false
         )

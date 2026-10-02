@@ -112,31 +112,20 @@ struct ClaudeAccountsTests {
         #expect(cli.context["account"]?.path == "${CLAUDE_CONFIG_DIR:-~}/.claude.json")
     }
 
-    // MARK: - Today's usage and guest passes are the default login's
+    // MARK: - Guest passes are the default login's
 
     @Test
-    func `today's usage and guest passes belong to the default login only`() async throws {
+    func `guest passes belong to the default login only`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         let work = try claude.writeLogin(in: "work", email: "work@example.com", token: "work-token")
-        answerByToken(claude, ["work-token": 70])
-        let analyzer = MockDailyUsageAnalyzing()
-        given(analyzer).analyzeToday().willReturn(DailyUsageReport(
-            today: DailyUsageStat(date: Date(), totalCost: 14, totalTokens: 1, workingTime: 0, sessionCount: 1),
-            previous: DailyUsageStat(date: Date(), totalCost: 41, totalTokens: 1, workingTime: 0, sessionCount: 1)
-        ))
         let provider = try claude.provider(
             settings: Self.api,
             accounts: [config("w", folder: work, email: "work@example.com")],
-            dailyUsage: analyzer,
             guestPasses: GuestPasses(source: MockGuestPassSource())
         ).provider
-        let added = provider.accounts[1]
 
-        let usage = try await added.refresh(.interactive)
-
-        #expect(usage.dailyUsageReport == nil)
-        #expect(added.guestPasses == nil)
+        #expect(provider.accounts[1].guestPasses == nil)
         #expect(provider.defaultAccount.guestPasses != nil)
     }
 

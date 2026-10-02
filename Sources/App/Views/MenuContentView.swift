@@ -12,6 +12,8 @@ struct MenuContentView: View {
     let monitor: QuotaMonitor
     let sessionMonitor: SessionMonitor
     let quotaAlerter: QuotaAlerter
+    /// Today's usage, read from local logs beside the providers.
+    var usageHistory: UsageHistory = UsageHistory()
     /// Closes the popover (Escape). The presentation binding lives on the App.
     var onClose: (() -> Void)?
     var onHookSettingsChanged: ((Bool) -> Void)?
@@ -890,7 +892,8 @@ struct MenuContentView: View {
 
             // Show daily usage cards from JSONL session analysis (e.g., Claude Code)
             // Controlled via Settings toggle or ~/.claudebar/settings.json
-            if settings.showDailyUsageCards, let report = snapshot.dailyUsageReport {
+            if settings.showDailyUsageCards,
+               let report = usageHistory.report(for: snapshot.providerId) ?? snapshot.dailyUsageReport {
                 let baseDelay = Double(snapshot.quotas.count + 1) * 0.08
                 HStack(spacing: 10) {
                     DailyUsageCardView(metric: .cost, report: report, delay: baseDelay)
@@ -1102,6 +1105,9 @@ struct MenuContentView: View {
                 }
             }
         }
+        for provider in monitor.enabledProviders {
+            await usageHistory.read(for: provider.id)
+        }
     }
 
     /// Refresh a specific provider by ID
@@ -1115,7 +1121,10 @@ struct MenuContentView: View {
         let refreshes = members.filter { !$0.isSyncing }.map { provider in
             Task { _ = try? await provider.refresh(kind) }
         }
+        // Today's usage is read with the popover open, never in the background.
+        let history = members.map { member in Task { await usageHistory.read(for: member.id) } }
         for refresh in refreshes { await refresh.value }
+        for read in history { await read.value }
     }
 
     /// The selected provider's guest passes, when it has any to offer.

@@ -101,7 +101,7 @@ A second Claude login lives in its own config folder, as `CLAUDE_CONFIG_DIR=<fol
   - Folder trust is written into the folder's own `.claude.json`.
   - `api` looks up the folder's key only. There is no `CLAUDE_CODE_OAUTH_TOKEN` step, because a shared environment token belongs to nobody in particular. The OAuth refresh block is kept by the merge, so a refreshed token is written back to the folder's file or Keychain item.
 - **Identity, fail closed.** Every data source checks `$context.account.email` against `loginEmail` before fetching. If someone else has signed in to the folder since, the account reports *Reconnect the original Claude account in this folder* and shows no usage.
-- **Default login only:** today's usage (read from the default login's local logs) and guest passes (read with the default login's CLI).
+- **Default login only:** today's usage (`UsageHistory`, read from the default login's local logs) and guest passes (read with the default login's CLI).
 
 ## Rate limiting (API)
 

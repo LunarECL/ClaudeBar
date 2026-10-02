@@ -24,9 +24,6 @@ public final class Provider {
     /// wherever the person moved it.
     public var defaultAccount: Account { accounts.first(where: \.isDefault)! }
 
-    /// Today's and yesterday's usage, read on an interactive refresh only —
-    /// a background poll stays cheap (#204).
-    public let dailyUsage: (any DailyUsageAnalyzing)?
     /// *Share Claude Code*, for a provider whose plan can issue guest passes.
     public let guestPasses: GuestPasses?
 
@@ -48,7 +45,6 @@ public final class Provider {
         settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
         makeDataSource: @escaping (DataSourceDefinition, String) -> DataSource,
-        dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil,
         folders: any LoginFolders = DiskLoginFolders(),
         vault: (any SecretVault)? = nil
@@ -58,7 +54,6 @@ public final class Provider {
         self.definition = definition
         self.settings = settings
         self.makeDataSource = makeDataSource
-        self.dailyUsage = dailyUsage
         self.guestPasses = guestPasses
         let label = settings.defaultAccountLabel(forProvider: definition.id) ?? ""
         self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: label), values: [:])]
@@ -81,13 +76,12 @@ public final class Provider {
         settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
         makeDataSource: @escaping (DataSourceDefinition) -> DataSource,
-        dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil,
         folders: any LoginFolders = DiskLoginFolders()
     ) {
         self.init(definition: definition, settings: settings, accounts: accounts,
                   makeDataSource: { source, _ in makeDataSource(source) },
-                  dailyUsage: dailyUsage, guestPasses: guestPasses, folders: folders)
+                  guestPasses: guestPasses, folders: folders)
     }
 
     public var id: String { definition.id }
@@ -437,8 +431,7 @@ public final class Provider {
         while true {
             do {
                 let usage = try await current.fetchUsage()
-                let read = account.isDefault ? await withDailyUsage(usage, kind) : usage
-                return account.succeed(identified(read, for: account), from: current.kind)
+                return account.succeed(identified(usage, for: account), from: current.kind)
             } catch {
                 let reason = Self.reason(of: error)
                 if case .rateLimited? = reason {
@@ -517,29 +510,6 @@ public final class Provider {
         return dataSource(fallback.to, for: account)
     }
 
-    /// Today's usage is read from the default login's local logs, so only
-    /// the default login is shown it.
-    private func withDailyUsage(_ usage: UsageSnapshot, _ kind: RefreshKind) async -> UsageSnapshot {
-        guard kind != .background,
-              let dailyUsage,
-              let report = try? await dailyUsage.analyzeToday(),
-              !report.today.isEmpty || !report.previous.isEmpty else {
-            return usage
-        }
-        return UsageSnapshot(
-            providerId: usage.providerId,
-            quotas: usage.quotas,
-            capturedAt: usage.capturedAt,
-            accountEmail: usage.accountEmail,
-            accountOrganization: usage.accountOrganization,
-            loginMethod: usage.loginMethod,
-            accountTier: usage.accountTier,
-            costUsage: usage.costUsage,
-            bedrockUsage: usage.bedrockUsage,
-            dailyUsageReport: report,
-            extensionMetrics: usage.extensionMetrics
-        )
-    }
 
     static func reason(of error: Error) -> UsageError? {
         (error as? DataSourceError)?.reason ?? (error as? UsageError)
