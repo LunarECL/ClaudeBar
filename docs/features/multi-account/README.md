@@ -32,4 +32,4 @@ For an expired session, sign in again using the same folder and account. If you 
 
 ## See also
 
-[Codex setup](../../providers/codex/README.md) · [Settings storage](../../settings.md)
+[Codex setup](../../providers/codex/README.md) · [Settings storage](../../settings.md) · [Design (contributors)](design.md)
