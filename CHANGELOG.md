@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Popover: a provider with several accounts is one tab, its accounts side by side. Chips hide one from view without pausing it, and a line names the account behind a warning. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
+- Providers you made with Add Provider can have more than one account: Add Account asks for each account's API key, kept in your Keychain for that account only. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
+- Claude and Codex accounts: Settings → Providers → Accounts adds a login by signing in with your browser or choosing a signed-in folder, then names, reorders, pins, pauses, removes and re-signs-in each one. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Share a provider you made: Export… saves it as a file without your keys; Import… shows where it sends a key and any command it runs before you add it, then asks for your own key. ([#355](https://github.com/tddworks/ClaudeBar/issues/355))
 - Add Provider: track a service ClaudeBar doesn't ship. Settings → Providers → Add Provider… starts from an API, a command, a file or a copy; test it, click the numbers to map them, name it. Keys stay in your Keychain. ([#354](https://github.com/tddworks/ClaudeBar/issues/354))

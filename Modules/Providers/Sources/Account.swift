@@ -28,6 +28,9 @@ public final class Account: AIProvider {
     public let email: String?
     /// Its account settings — the Codex folder, the login's account id.
     public let values: [String: String]
+    /// How it was added — `nil` for the default login and for logins saved
+    /// before it was recorded.
+    public let madeBy: AccountOrigin?
 
     public var isEnabled: Bool {
         didSet { provider.settings.setEnabled(isEnabled, forProvider: id) }
@@ -49,7 +52,7 @@ public final class Account: AIProvider {
         answeredBy.map { provider.definition.dataSource($0)?.label ?? $0 }
     }
 
-    init(provider: Provider, login: ProviderAccount, values: [String: String]) {
+    init(provider: Provider, login: ProviderAccount, values: [String: String], madeBy: AccountOrigin? = nil) {
         self.provider = provider
         self.id = login.id
         self.isDefault = login.isDefault
@@ -57,12 +60,19 @@ public final class Account: AIProvider {
         self.label = login.label
         self.email = login.email
         self.values = values
+        self.madeBy = madeBy
         self.isEnabled = provider.settings.isEnabled(forProvider: login.id, defaultValue: provider.definition.enabledByDefault)
     }
 
     /// QUOTA health — the worst quota in its usage. A failed fetch is not a
     /// status: it is `lastError`, and the last usage stays.
     public var status: QuotaStatus { snapshot?.overallStatus ?? .healthy }
+
+    /// Where the login lives, for a login added by its folder.
+    public var folder: SignedInFolder? {
+        guard !isDefault, let rule = provider.definition.accounts?.folder, let path = values[rule.savedAs] else { return nil }
+        return SignedInFolder(url: URL(fileURLWithPath: path), madeBy: madeBy ?? .folder)
+    }
 
     /// The email the data source reported, else the one it was added with.
     public var accountEmail: String? { snapshot?.accountEmail ?? email }

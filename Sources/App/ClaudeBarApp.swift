@@ -181,7 +181,7 @@ struct ClaudeBarApp: App {
             ),
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in claude.accounts.dropFirst() + codex.accounts.dropFirst() {
+        for account in (claude.accounts + codex.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after
@@ -189,7 +189,9 @@ struct ClaudeBarApp: App {
         let vault = ProviderVault()
         for definition in ProviderCatalog().custom() {
             Providers.register(custom: definition)
-            repository.add(Providers.make(definition, settings: settingsRepository, secrets: vault).defaultAccount)
+            let custom = Providers.make(definition, settings: settingsRepository,
+                                        accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault)
+            for account in custom.accounts { repository.add(account) }
         }
         AppLog.providers.info("Created \(repository.all.count) providers")
 

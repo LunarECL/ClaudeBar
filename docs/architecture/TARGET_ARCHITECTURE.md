@@ -353,7 +353,7 @@ other field), because the CLI that owns that file must keep working.
 | `JSONMapper` · `TextMapper` | every mapping feature | small JSON/text fixtures, one feature per test |
 | a mapping script | the old probe's screens and responses, quota for quota | run through its definition in `ProvidersTests` (`ClaudeHarness`), never by calling JavaScript directly |
 | `DataSource` | look up → fetch → map, `fetchResponse` stops before mapping, 401-refresh-retry, each error's step | built with mocked connections |
-| `Provider` | lifecycle: keeps usage on failure, fallback, `use`, enabled persists | data sources over mocked connections |
+| `Provider` | lifecycle: keeps usage on failure, fallback (and a switched-off one), a rate limit not handed over, one request for overlapping refreshes, `use`, the background floor, held until checked (#216), status across logins | `ProviderTests`: a provider no vendor ships ("Acme") over a fake `NetworkClient` |
 | each definition | **golden test**: today's recorded responses (`Tests/…/Fixtures/codex/`) through the definition produce exactly the snapshot today's probe produced | the fixtures are captured from the current probe tests before the probe is deleted |
 | the catalog | every bundled definition decodes | one test over `Resources/Providers/*.json` |
 

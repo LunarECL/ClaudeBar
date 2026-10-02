@@ -146,17 +146,18 @@ struct ClaudeAccountsTests {
     func `choosing a signed-in folder saves the folder, its email and its keychain service`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
+        let settings = InMemoryProviderSettings()
         let work = try claude.writeLogin(in: "work", email: "work@example.com")
+        let provider = try claude.provider(settings: settings).provider
 
-        let saved = try AddedAccounts.configuration(
-            "claude", folder: work.path, existing: [], defaultFolder: "/nonexistent", makeDataSource: claude.make
-        )
+        let added = try provider.addAccount(signedInAt: work)
 
-        let folder = try #require(saved.probeConfig["configDirectory"])
+        let folder = try #require(added.values["configDirectory"])
         let hash = SHA256.hash(data: Data(folder.utf8)).map { String(format: "%02x", $0) }.joined()
-        #expect(saved.email == "work@example.com")
-        #expect(saved.probeConfig["loginEmail"] == "work@example.com")
-        #expect(saved.probeConfig["credentialService"] == "Claude Code-credentials-\(hash.prefix(8))")
+        #expect(added.email == "work@example.com")
+        #expect(added.values["loginEmail"] == "work@example.com")
+        #expect(added.values["credentialService"] == "Claude Code-credentials-\(hash.prefix(8))")
+        #expect(settings.accounts(forProvider: "claude").map(\.accountId) == [added.accountId])
     }
 
     @Test
@@ -165,16 +166,12 @@ struct ClaudeAccountsTests {
         defer { claude.cleanUp() }
         let work = try claude.writeLogin(in: "work", email: "work@example.com")
         let again = try claude.writeLogin(in: "work-again", email: "work@example.com")
-        let saved = try AddedAccounts.configuration(
-            "claude", folder: work.path, existing: [], defaultFolder: "/nonexistent", makeDataSource: claude.make
-        )
+        let provider = try claude.provider().provider
+        try provider.addAccount(signedInAt: work)
 
-        #expect(throws: UsageError.self) {
-            try AddedAccounts.configuration("claude", folder: work.path, existing: [saved], defaultFolder: "/nonexistent", makeDataSource: claude.make)
-        }
-        #expect(throws: UsageError.self) {
-            try AddedAccounts.configuration("claude", folder: again.path, existing: [saved], defaultFolder: "/nonexistent", makeDataSource: claude.make)
-        }
+        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: work) }
+        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: again) }
+        #expect(provider.accounts.count == 2)
     }
 
     @Test
@@ -183,20 +180,19 @@ struct ClaudeAccountsTests {
         defer { claude.cleanUp() }
         let folder = try claude.writeLogin(in: "half", email: "half@example.com")
         try FileManager.default.removeItem(at: folder.appendingPathComponent(".credentials.json"))
+        let provider = try claude.provider().provider
 
-        #expect(throws: UsageError.self) {
-            try AddedAccounts.configuration("claude", folder: folder.path, existing: [], defaultFolder: "/nonexistent", makeDataSource: claude.make)
-        }
+        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: folder) }
     }
 
     @Test
-    func `the default config folder is not added as a second login`() throws {
+    func `the default login is not added again from another folder`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        let folder = try claude.writeLogin(in: ".claude", email: "me@example.com")
+        try claude.writeClaudeConfig(email: "me@example.com")
+        let copy = try claude.writeLogin(in: "copy", email: "me@example.com")
+        let provider = try claude.provider().provider
 
-        #expect(throws: UsageError.self) {
-            try AddedAccounts.configuration("claude", folder: folder.path, existing: [], defaultFolder: folder.path, makeDataSource: claude.make)
-        }
+        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: copy) }
     }
 }
