@@ -49,13 +49,22 @@ struct AddAccountSheet: View {
     private var content: some View {
         switch step {
         case .how:
-            Text("How do you want to add it?").foregroundStyle(theme.textSecondary)
+            Text("How do you want to add it?")
+                .font(.system(size: 12, design: theme.fontDesign))
+                .foregroundStyle(theme.textSecondary)
             ForEach(text.ways, id: \.label) { way in
                 Button { start(way.way) } label: {
                     Label(way.label, systemImage: way.way == .signIn ? "globe" : way.way == .folder ? "folder" : "key")
+                        .font(.system(size: 13, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(theme.glassBackground))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.glassBorder, lineWidth: 1))
+                        .contentShape(.rect)
                 }
-                .controlSize(.large)
+                .buttonStyle(.plain)
             }
             HStack { Spacer(); Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction) }
 

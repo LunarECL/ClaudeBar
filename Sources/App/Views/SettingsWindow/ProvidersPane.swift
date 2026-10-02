@@ -56,10 +56,10 @@ struct ProvidersPane: View {
             }
         }
         .sheet(isPresented: $addingProvider) {
-            AddProviderSheet(monitor: monitor) { addingProvider = false }
+            AddProviderSheet(monitor: monitor) { addingProvider = false }.themedSheet()
         }
         .sheet(item: $importing) { review in
-            ImportProviderSheet(monitor: monitor, review: review.value) { importing = nil }
+            ImportProviderSheet(monitor: monitor, review: review.value) { importing = nil }.themedSheet()
         }
     }
 

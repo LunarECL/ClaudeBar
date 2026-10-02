@@ -285,6 +285,13 @@ public final class Provider {
         }
     }
 
+    /// The enabled login that makes the provider's status what it is — the
+    /// one the popover names. `nil` while every login is healthy.
+    public var worstAccount: Account? {
+        let worst = accounts.filter(\.isEnabled).max { $0.status < $1.status }
+        return worst.flatMap { $0.status > .healthy ? $0 : nil }
+    }
+
     /// The worst quota health across the enabled logins.
     public var status: QuotaStatus {
         accounts.filter(\.isEnabled).map(\.status).max() ?? .healthy
