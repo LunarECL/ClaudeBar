@@ -118,7 +118,7 @@ public final class PersistentTouchBarDriver: NSObject, NSTouchBarDelegate {
             // Fall back to the globally selected provider only for the primary slot
             guard let provider = monitor.provider(for: providerId) else { continue }
             let config = settings.menuBarConfiguration(for: providerId)
-            let snapshot = provider.snapshot
+            let snapshot = monitor.usage(of: provider)
             let quotas = snapshot?.quotas ?? []
 
             // Resolve primary quota: match by configured key or fallback to first quota

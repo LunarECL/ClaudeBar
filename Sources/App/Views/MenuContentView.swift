@@ -341,7 +341,7 @@ struct MenuContentView: View {
     /// usage — nil when none has a snapshot.
     private var selectedProviderStatus: QuotaStatus? {
         let members = monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? []
-        return members.compactMap { $0.snapshot?.overallStatus(under: settings.statusPolicy) }.max()
+        return members.compactMap { monitor.usage(of: $0)?.overallStatus(under: settings.statusPolicy) }.max()
     }
 
     /// What the header pill says. A provider that failed to probe reads as
@@ -484,7 +484,7 @@ struct MenuContentView: View {
             }
         } else if let tab = monitor.selectedTab, tab.accounts.count > 1 {
             accountsContent(tab)
-        } else if let provider = selectedProvider, let snapshot = provider.snapshot {
+        } else if let provider = selectedProvider, let snapshot = monitor.usage(of: provider) {
             let report = RefreshReport.of(provider)
             VStack(spacing: 12) {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
@@ -542,7 +542,7 @@ struct MenuContentView: View {
                             Text(account.name).lineLimit(1)
                             Circle()
                                 .fill(account.lastError != nil ? theme.textTertiary
-                                      : theme.statusColor(for: account.snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy))
+                                      : theme.statusColor(for: monitor.usage(of: account)?.overallStatus(under: settings.statusPolicy) ?? .healthy))
                                 .frame(width: 6, height: 6)
                         }
                         .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
@@ -561,8 +561,8 @@ struct MenuContentView: View {
 
     /// "Work is at 18% Session — causing Warning": the aggregate names its cause.
     private func worstAccountCallout(_ worst: Account) -> some View {
-        let status = worst.snapshot?.overallStatus(under: settings.statusPolicy) ?? worst.status
-        let lowest = worst.snapshot?.lowestQuota
+        let status = monitor.usage(of: worst)?.overallStatus(under: settings.statusPolicy) ?? worst.status
+        let lowest = monitor.usage(of: worst)?.lowestQuota
         let detail = lowest.map { " is at \(Int($0.percentRemaining))% \($0.quotaType.displayName)" } ?? ""
         return HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.statusColor(for: status))
@@ -598,7 +598,7 @@ struct MenuContentView: View {
         VStack(spacing: 8) {
             providerSectionHeader(provider: provider)
 
-            if let snapshot = provider.snapshot {
+            if let snapshot = monitor.usage(of: provider) {
                 let report = RefreshReport.of(provider)
                 if let failure = report?.failure {
                     failureNotice(failure)
@@ -624,7 +624,7 @@ struct MenuContentView: View {
 
             Spacer()
 
-            let status = provider.snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy
+            let status = monitor.usage(of: provider)?.overallStatus(under: settings.statusPolicy) ?? .healthy
             Text(provider.isSyncing ? "Syncing..." : status.badgeText)
                 .badge(theme.statusColor(for: status))
         }

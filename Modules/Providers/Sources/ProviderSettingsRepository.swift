@@ -35,6 +35,14 @@ public protocol ProviderSettingsRepository: Sendable {
 
     /// Saves a provider's on/off setting by name.
     func setOn(_ on: Bool, _ setting: String, forProvider id: String)
+
+    /// Gets the quota keys hidden for a provider (issue #140), e.g. a
+    /// model-specific window the user never uses. Empty set = show all.
+    /// Keys the probe no longer reports are ignored at read time.
+    func hiddenQuotaKeys(forProvider id: String) -> Set<String>
+
+    /// Sets the quota keys hidden for a provider (empty set shows all)
+    func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String)
 }
 
 public extension ProviderSettingsRepository {
@@ -49,6 +57,12 @@ public extension ProviderSettingsRepository {
 
     /// Default for conformers that keep no such setting.
     func setOn(_ on: Bool, _ setting: String, forProvider id: String) {}
+
+    /// Default for conformers that keep no such setting: every quota is watched.
+    func hiddenQuotaKeys(forProvider id: String) -> Set<String> { [] }
+
+    /// Default for conformers that keep no such setting.
+    func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {}
 }
 
 // MARK: - Default Implementation
