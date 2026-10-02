@@ -30,6 +30,9 @@ public protocol AppSettingsRepository: Sendable {
     func menuBarDurationEnabled() -> Bool
     func setMenuBarDurationEnabled(_ enabled: Bool)
 
+    func menuBarAccountLabelsEnabled() -> Bool
+    func setMenuBarAccountLabelsEnabled(_ enabled: Bool)
+
     func menuBarStackedEnabled() -> Bool
     func setMenuBarStackedEnabled(_ enabled: Bool)
 

@@ -229,7 +229,8 @@ final class StatusItemLabelDriver {
             additionalLabels: additionalLabels,
             primaryProviderId: primaryProviderName == nil ? nil : settings.menuBarPercentageProviderId,
             primaryProviderName: primaryProviderName,
-            accountNames: accountNames,
+            // Hidden labels still keep the icon: the full names decide that above.
+            accountNames: settings.menuBarAccountLabelsEnabled ? accountNames : [:],
             fallbackStatus: effectiveSelectedProviderStatus,
             sessionPhase: sessionMonitor.activeSession?.phase,
             themeModeId: settings.themeMode,
