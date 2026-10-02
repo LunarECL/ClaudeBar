@@ -72,12 +72,12 @@ public struct DataSource: Sendable {
         return fetcher.isReady()
     }
 
-    /// A fact that names the login — the account id, the email — read from
+    /// What an identity field holds — the account id, the email — read from
     /// the credential or a context file. Never a token; `nil` when nothing
     /// answers.
-    public func fact(_ fact: LoginFact) -> String? {
+    public func value(of field: IdentityField) -> String? {
         let credential = (try? credentials?.find())?.credential
-        return value(of: fact, credential: credential.map { Credential(Self.withoutSecrets($0.values)) })
+        return read(field, credential: credential.map { Credential(Self.withoutSecrets($0.values)) })
     }
 
     /// Looks up the key and fetches. Nothing is mapped and nothing is saved.
@@ -152,8 +152,8 @@ public struct DataSource: Sendable {
         return values.filter { !secret.contains($0.key) }
     }
 
-    private func value(of fact: LoginFact, credential: Credential?) -> String? {
-        switch fact {
+    private func read(_ field: IdentityField, credential: Credential?) -> String? {
+        switch field {
         case .credential(let name): credential?[name]
         case .context(let file, let field): contextFiles[file]?.fields()[field]
         }
@@ -161,7 +161,7 @@ public struct DataSource: Sendable {
 
     private func isExpectedLogin(_ credential: Credential?) -> Bool {
         guard let identity = definition.identity else { return true }
-        return value(of: identity.field, credential: credential) == identity.equals
+        return read(identity.field, credential: credential) == identity.equals
     }
 
     /// Fails closed when the login now belongs to another account.

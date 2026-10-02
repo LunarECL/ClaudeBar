@@ -350,7 +350,7 @@
       "savedAs": "codexHome",
       "default": "${CODEX_HOME:-~/.codex}",
       "accountId": {
-        "fact": "account",
+        "field": "account",
         "savedAs": "chatgptAccountId"
       },
       "notSignedIn": "No ChatGPT account found in this folder. Sign in with Codex using file credential storage, then choose the folder again."

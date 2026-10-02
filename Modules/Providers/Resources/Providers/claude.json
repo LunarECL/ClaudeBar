@@ -322,7 +322,7 @@
     "folder": {
       "savedAs": "configDirectory",
       "default": "${CLAUDE_CONFIG_DIR:-~/.claude}",
-      "accountId": { "fact": "$context.account.email", "savedAs": "loginEmail" },
+      "accountId": { "field": "$context.account.email", "savedAs": "loginEmail" },
       "email": "$context.account.email",
       "derived": {
         "credentialService": { "prefix": "Claude Code-credentials-", "sha256": 8 }

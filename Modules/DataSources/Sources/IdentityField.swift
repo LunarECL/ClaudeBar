@@ -1,12 +1,12 @@
 import Foundation
 
-/// A fact that names a login — where to read the account id or the email a
-/// data source learns without asking the vendor. Written as the mapping writes
-/// paths and decoded once into what it points at:
+/// A field that identifies a login — where its account id or email is read,
+/// without asking the vendor. Written as the mapping writes paths and decoded
+/// once into what it points at:
 ///
 /// - `"account"` or `"$credential.account"` — a value of the looked-up credential
 /// - `"$context.account.email"` — field `email` of the context file `account`
-public enum LoginFact: Sendable, Equatable, Hashable, Codable {
+public enum IdentityField: Sendable, Equatable, Hashable, Codable {
     case credential(String)
     case context(file: String, field: String)
 

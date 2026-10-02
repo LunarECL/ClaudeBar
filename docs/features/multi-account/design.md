@@ -9,7 +9,7 @@ User guide: [README.md](README.md).
 **Status: DESIGN, slice 1 built.** Built: one `Provider` owns `[Account]`; an
 added login runs the **same** data sources with `accounts.patch` merged in and
 `{{account.x}}` filled from its values; added by `accounts.folder` — Codex
-(#356) and Claude (slice 1: `LoginFact`, `derived`, identity from a context
+(#356) and Claude (slice 1: `IdentityField`, `derived`, identity from a context
 file). No screen adds a Claude account yet (slice 4). PR #358 adds Claude (as data — kept), browser sign-in, rename and
 compact labels (kept, reshaped below), and a Swift bridge that gives the 18
 legacy providers, custom definitions and extensions accounts (replaced by this
@@ -438,7 +438,7 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 | #358 piece | Becomes |
 |---|---|
 | `claude.json` `accounts` (folder, patch, identity, `derivedValues`) | **kept** — re-flow the file to its original formatting |
-| context identity (`"context.account.email"` parsed as a string) | **built**: `LoginFact` — `"account"`, `"$credential.x"` or `"$context.file.field"`, written as the mapping writes paths, decoded once; used by `identity.field`, `folder.accountId.fact` and `folder.email` |
+| context identity (`"context.account.email"` parsed as a string) | **built**: `IdentityField` — `"account"`, `"$credential.x"` or `"$context.file.field"`, written as the mapping writes paths, decoded once; used by `identity.field`, `folder.accountId.field` and `folder.email` |
 | `DataSource.fetchUsage` checks identity before the cache | **built**: checked with the lookup, before and after each fetch; a cached usage is what that login showed when it was fetched |
 | `BrowserAccountLogin` (Infrastructure, Codex defaults) | `AccountSignIn` worker in `DataSources`, driven by `accounts.add.signIn` in `codex.json` / `claude.json`; process behind the existing `CLIExecutor`-style port |
 | `BinaryLocator.findInApplicationBundles` | the definition's `cli` gains `alsoAt: [paths]`; the locator checks what it is told |

@@ -71,8 +71,8 @@ public enum AddedAccounts {
                 email = nil
                 return
             }
-            accountId = live.fact(rule.accountId.fact).flatMap { $0.isEmpty ? nil : $0 }
-            email = live.fact(rule.email)
+            accountId = live.value(of: rule.accountId.field).flatMap { $0.isEmpty ? nil : $0 }
+            email = live.value(of: rule.email)
         }
     }
 

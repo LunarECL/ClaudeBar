@@ -76,18 +76,18 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         public let patch: [String: JSONValue]
 
         /// `{ "savedAs": "codexHome", "default": "${CODEX_HOME:-~/.codex}",
-        /// "accountId": { "fact": "account", "savedAs": "chatgptAccountId" } }`
+        /// "accountId": { "field": "account", "savedAs": "chatgptAccountId" } }`
         /// — the folder and the login's account id are saved as the account's
         /// values; `notSignedIn` is what a folder without a login says.
         public struct Folder: Sendable, Equatable, Codable {
             public struct AccountId: Sendable, Equatable, Codable {
-                /// The fact that names the login — a credential value, or a
-                /// field of a context file (`$context.account.email`).
-                public let fact: LoginFact
+                /// The field that identifies the login — a credential value,
+                /// or a field of a context file (`$context.account.email`).
+                public let field: IdentityField
                 public let savedAs: String
 
-                public init(fact: LoginFact, savedAs: String) {
-                    self.fact = fact
+                public init(field: IdentityField, savedAs: String) {
+                    self.field = field
                     self.savedAs = savedAs
                 }
             }
@@ -111,7 +111,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             public let accountId: AccountId
             /// Where the login's email is read. A credential's `email` unless
             /// the definition says otherwise.
-            public let email: LoginFact
+            public let email: IdentityField
             /// Values saved beside the folder, by name, for `{{account.<name>}}`.
             public let derived: [String: Derived]
             public let notSignedIn: String?
@@ -120,7 +120,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
                 savedAs: String,
                 default folder: String? = nil,
                 accountId: AccountId,
-                email: LoginFact = .credential("email"),
+                email: IdentityField = .credential("email"),
                 derived: [String: Derived] = [:],
                 notSignedIn: String? = nil
             ) {
@@ -137,7 +137,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
                 savedAs = try container.decode(String.self, forKey: .savedAs)
                 self.default = try container.decodeIfPresent(String.self, forKey: .default)
                 accountId = try container.decode(AccountId.self, forKey: .accountId)
-                email = try container.decodeIfPresent(LoginFact.self, forKey: .email) ?? .credential("email")
+                email = try container.decodeIfPresent(IdentityField.self, forKey: .email) ?? .credential("email")
                 derived = try container.decodeIfPresent([String: Derived].self, forKey: .derived) ?? [:]
                 notSignedIn = try container.decodeIfPresent(String.self, forKey: .notSignedIn)
             }
