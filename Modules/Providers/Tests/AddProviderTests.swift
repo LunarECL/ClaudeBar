@@ -252,10 +252,12 @@ struct AddProviderTests {
 }
 
 /// A vault in memory, keyed `<provider>.<name>`.
-final class MemoryVault: SecretStore, @unchecked Sendable {
+final class MemoryVault: SecretVault, @unchecked Sendable {
     var secrets: [String: String]
     init(_ secrets: [String: String] = [:]) { self.secrets = secrets }
     func secret(_ name: String, provider: String) -> String? { secrets["\(provider).\(name)"] }
+    func save(_ value: String, _ name: String, provider: String) { secrets["\(provider).\(name)"] = value }
+    @discardableResult func delete(_ name: String, provider: String) -> Bool { secrets.removeValue(forKey: "\(provider).\(name)") != nil }
 }
 
 /// Screens that only hold an id find a custom provider's face and name too.
