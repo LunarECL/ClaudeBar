@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Claude and Codex: the popover says which data source answered ("via RPC", or "via Terminal" after a fallback) and, when a refresh fails, which step went wrong ("Couldn't read your key"), keeping the last usage dimmed. ([#351](https://github.com/tddworks/ClaudeBar/issues/351))
 
 ### Fixed
+- MiniMax no longer shows 0% left on every model: it reads the Token Plan endpoint and shows each model's 5-hour and weekly windows, with request counts for older plans. ([#359](https://github.com/tddworks/ClaudeBar/pull/359))
 - A prepaid balance (Vercel, Copilot, Cursor, Grok, Command Code, Amp) shows its money in the menu bar instead of "100%", and no longer claims a pace. Pace only uses a provider's real window, never one guessed from a quota's name. ([#329](https://github.com/tddworks/ClaudeBar/pull/329))
 - Notifications, provider pills, the Touch Bar, the status export and Notify! now follow the burn-rate warning setting like the menu bar does, so a quota that's on pace no longer sends a warning while the menu bar says healthy. ([#357](https://github.com/tddworks/ClaudeBar/issues/357))
 
