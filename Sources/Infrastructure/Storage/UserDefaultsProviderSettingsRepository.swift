@@ -598,6 +598,14 @@ extension UserDefaultsProviderSettingsRepository: MultiAccountSettingsRepository
         userDefaults.set(label, forKey: "providerConfig.\(id).defaultAccountLabel")
     }
 
+    public func accountOrder(forProvider id: String) -> [String] {
+        userDefaults.stringArray(forKey: "providerConfig.\(id).accountOrder") ?? []
+    }
+
+    public func setAccountOrder(_ accountIds: [String], forProvider id: String) {
+        userDefaults.set(accountIds, forKey: "providerConfig.\(id).accountOrder")
+    }
+
     private static func accountsKey(_ id: String) -> String { "providerConfig.\(id).accounts" }
 
     private func writeAccounts(_ configs: [ProviderAccountConfig], forProvider id: String) {
