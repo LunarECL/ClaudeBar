@@ -284,6 +284,14 @@ public final class JSONSettingsRepository:
         store.write(value: value, key: "app.statusColorOverrides")
     }
 
+    public func nativeMenuBarIconsEnabled() -> Bool {
+        store.read(key: "app.nativeMenuBarIconsEnabled") ?? false
+    }
+
+    public func setNativeMenuBarIconsEnabled(_ enabled: Bool) {
+        store.write(value: enabled, key: "app.nativeMenuBarIconsEnabled")
+    }
+
     public func highContrastEnabled() -> Bool {
         store.read(key: "app.highContrastEnabled") ?? false
     }
