@@ -4,7 +4,7 @@ description: Track more than one Claude or Codex login side by side — sign in 
 
 # Multiple accounts
 
-Claude and Codex can each watch more than one login: a personal and a work account, or two ChatGPT workspaces under one email. Every account has its own quotas, refreshes, pause switch and errors. Other providers have one account for now.
+Claude and Codex can each watch more than one login: a personal and a work account, or two ChatGPT workspaces under one email. So can an API provider you made with **Add Provider**: each account has its own key. Every account has its own quotas, refreshes, pause switch and errors. The other built-in providers have one account for now.
 
 ## Add an account
 
@@ -21,6 +21,8 @@ ClaudeBar then checks the login before keeping it:
 
 Last, you can give the account a name, such as *Work*. Leave it empty to show its email.
 
+For an API provider you made, **Add Account** asks for the account's **API key** instead. The key is kept in your Keychain under that account only. An account without a key of its own shows *Key needed*; it never borrows your first account's key, or one in an environment variable.
+
 Don't copy an existing `auth.json` or `.credentials.json` to make a second login. Sign in separately, so each login refreshes its own session.
 
 ## See them side by side
@@ -36,6 +38,7 @@ The data source choice (for example RPC or API) applies to every account of a pr
 **Remove** forgets the account in ClaudeBar and drops it from the menu bar:
 
 - An account you added with **Sign in with browser** has its folder deleted too, since ClaudeBar made that folder and nothing else uses it.
+- An account added with a key has its key deleted from your Keychain.
 - A folder you chose stays exactly where it is.
 - Your usual login can't be removed.
 

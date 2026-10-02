@@ -70,7 +70,7 @@ public enum Providers {
         _ definition: ProviderDefinition,
         settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
-        secrets: (any SecretStore)? = nil,
+        secrets: (any SecretVault)? = nil,
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
     ) -> Provider {
@@ -78,9 +78,12 @@ public enum Providers {
             definition: definition,
             settings: settings,
             accounts: accounts,
-            makeDataSource: { DataSources.make($0, providerId: definition.id, scripts: builtInScripts, secrets: secrets) },
+            makeDataSource: { source, login in
+                DataSources.make(source, providerId: definition.id, scripts: builtInScripts, secrets: secrets?.scoped(to: login))
+            },
             dailyUsage: dailyUsage,
-            guestPasses: guestPasses
+            guestPasses: guestPasses,
+            vault: secrets
         )
     }
 

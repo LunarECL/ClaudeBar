@@ -36,6 +36,21 @@ struct AccountsCardTextTests {
     }
 
     @Test
+    func `a provider someone added asks for its key`() throws {
+        var draft = ProviderDraft(start: .api)
+        draft.url = "https://openrouter.ai/api/v1/auth/key"
+        draft.key = .apiKey
+        draft.measure = .percentUsed
+        draft.used = "$.used"
+        draft.name = "OpenRouter"
+        let settings = JSONSettingsRepository(store: JSONSettingsStore(
+            fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("accounts-card-\(UUID().uuidString).json")))
+        let provider = Providers.make(try draft.definition(id: "custom-openrouter"), settings: settings)
+
+        #expect(AccountsCardText(provider: provider).ways.map(\.label) == ["Enter API key"])
+    }
+
+    @Test
     func `signing in yourself uses the definition's own command`() throws {
         let text = AccountsCardText(provider: try codex())
 

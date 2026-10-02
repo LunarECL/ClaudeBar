@@ -124,7 +124,8 @@ public struct ProviderDraft: Sendable, Equatable {
             profile: profile(id: id, name: name, links: links, base: nil),
             cli: cliName,
             dataSources: [source],
-            defaultDataSource: kind
+            defaultDataSource: kind,
+            accounts: try accounts()
         )
     }
 
@@ -191,6 +192,18 @@ public struct ProviderDraft: Sendable, Equatable {
             ),
             origin: .custom
         )
+    }
+
+    /// A key that is the person's own takes a second account by a second
+    /// key, typed into *Add Account* and kept under that account. A key read
+    /// from an environment variable is the default login's alone.
+    private func accounts() throws -> ProviderDefinition.Accounts? {
+        guard let credential = try credential() else { return nil }
+        var patch: [String: JSONValue] = [:]
+        if credential != .setting("apiKey") {
+            patch[kind] = try JSONDecoder().decode(JSONValue.self, from: Data(#"{ "credential": { "environment": null, "setting": "apiKey" } }"#.utf8))
+        }
+        return .init(form: [.init(id: "apiKey", label: "API key", secret: true)], patch: patch)
     }
 
     private func credential() throws -> CredentialLookup? {
