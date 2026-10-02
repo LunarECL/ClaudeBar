@@ -215,6 +215,32 @@ struct MiniMaxUsageProbeParsingTests {
     }
 
     @Test
+    func `a model with neither counts nor a percentage shows no window rather than 0% left`() throws {
+        let data = Data("""
+        { "base_resp": { "status_code": 0 }, "model_remains": [
+          { "model_name": "MiniMax-M2", "current_interval_total_count": 0, "current_interval_usage_count": 0 },
+          { "model_name": "speech-2.8", "current_interval_total_count": 100, "current_interval_usage_count": 40 } ] }
+        """.utf8)
+
+        let snapshot = try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
+
+        #expect(snapshot.quotas.map(\.quotaType) == [.modelSpecific("speech-2.8")])
+        #expect(snapshot.quotas.first?.percentRemaining == 40)
+    }
+
+    @Test
+    func `a response where no model reports anything has no data`() throws {
+        let data = Data("""
+        { "base_resp": { "status_code": 0 }, "model_remains": [
+          { "model_name": "MiniMax-M2", "current_interval_total_count": 0, "current_interval_usage_count": 0 } ] }
+        """.utf8)
+
+        #expect(throws: UsageError.noData) {
+            try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
+        }
+    }
+
+    @Test
     func `generates reset text with usage counts`() throws {
         // Given
         let data = Data(Self.sampleSuccessResponse.utf8)

@@ -151,20 +151,22 @@ public struct MiniMaxUsageProbe: UsageProbe {
             let usedCount = max(total - clampedRemaining, 0)
 
             let intervalPercent = model.currentIntervalRemainingPercent.map(Self.clampPercentage)
-            let intervalRemaining = intervalPercent
-                ?? (total > 0 ? Double(clampedRemaining) / Double(total) * 100.0 : 0.0)
-            let intervalText = intervalPercent != nil
-                ? "\(Int((100 - intervalRemaining).rounded()))% used"
-                : "\(usedCount)/\(total) requests"
-
-            var quotas = [UsageQuota(
-                percentRemaining: intervalRemaining,
-                quotaType: .modelSpecific(model.modelName),
-                providerId: providerId,
-                resetsAt: model.endTime.map { Date(timeIntervalSince1970: Double($0) / 1000.0) },
-                resetText: intervalText,
-                windowDuration: Self.windowDuration(start: model.startTime, end: model.endTime)
-            )]
+            var quotas: [UsageQuota] = []
+            // No percentage and no counts says nothing about what's left —
+            // show no window rather than a made-up 0% (CANONICAL §5).
+            if let intervalRemaining = intervalPercent ?? (total > 0 ? Double(clampedRemaining) / Double(total) * 100.0 : nil) {
+                let intervalText = intervalPercent != nil
+                    ? "\(Int((100 - intervalRemaining).rounded()))% used"
+                    : "\(usedCount)/\(total) requests"
+                quotas.append(UsageQuota(
+                    percentRemaining: intervalRemaining,
+                    quotaType: .modelSpecific(model.modelName),
+                    providerId: providerId,
+                    resetsAt: model.endTime.map { Date(timeIntervalSince1970: Double($0) / 1000.0) },
+                    resetText: intervalText,
+                    windowDuration: Self.windowDuration(start: model.startTime, end: model.endTime)
+                ))
+            }
 
             // Weekly window — only when the API reports a weekly percentage.
             if let weeklyPercent = model.currentWeeklyRemainingPercent.map(Self.clampPercentage) {
@@ -179,6 +181,11 @@ public struct MiniMaxUsageProbe: UsageProbe {
             }
 
             return quotas
+        }
+
+        guard !quotas.isEmpty else {
+            AppLog.probes.error("MiniMax: no model reported a remaining amount")
+            throw UsageError.noData
         }
 
         return UsageSnapshot(

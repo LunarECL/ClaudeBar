@@ -48,4 +48,4 @@ Token Plan responses carry `current_interval_remaining_percent` and `current_wee
 
 Older responses (and older coding-plan payloads) only expose counts, where — despite the name — `current_interval_usage_count` is what's **left**, not what's used. This was confirmed against the MiniMax dashboard: at "3% used" the API returned `usage_count=1459` of `total=1500`. The probe clamps it to `0…total`, shows `total − usage_count` as used, and `usage_count / total` as percent remaining, with reset text "used/total requests".
 
-A model with `current_interval_total_count` 0 and no percentage fields shows 0% remaining.
+A model with `current_interval_total_count` 0 and no percentage fields says nothing about what is left, so it shows no 5-hour window rather than a made-up 0% (the "no fake 100%" law, CANONICAL §5). If no model reports anything, the refresh fails with no data.
