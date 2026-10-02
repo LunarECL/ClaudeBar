@@ -17,9 +17,12 @@ import Observation
 public final class Provider {
     public let definition: ProviderDefinition
 
-    /// The logins — never empty; the first is the default login.
+    /// The logins, in the order the person put them — never empty, and one
+    /// of them is the default login.
     public private(set) var accounts: [Account] = []
-    public var defaultAccount: Account { accounts[0] }
+    /// The plain login the CLI already uses — found by being the default,
+    /// wherever the person moved it.
+    public var defaultAccount: Account { accounts.first(where: \.isDefault)! }
 
     /// Today's and yesterday's usage, read on an interactive refresh only —
     /// a background poll stays cheap (#204).
@@ -57,6 +60,12 @@ public final class Provider {
         for config in accounts {
             attach(config)
         }
+        let order = settings.accountOrder(forProvider: definition.id)
+        self.accounts = self.accounts.enumerated().sorted { lhs, rhs in
+            let (left, right) = (order.firstIndex(of: lhs.element.accountId) ?? order.count + lhs.offset,
+                                 order.firstIndex(of: rhs.element.accountId) ?? order.count + rhs.offset)
+            return left < right
+        }.map(\.element)
     }
 
     public var id: String { definition.id }
@@ -186,6 +195,27 @@ public final class Provider {
             settings.updateAccount(saved.named(label), forProvider: id)
         }
         account.label = label
+    }
+
+    /// *Move* — puts a login at `index` in the person's order, saved.
+    public func move(_ account: Account, to index: Int) {
+        guard let from = accounts.firstIndex(where: { $0 === account }) else { return }
+        accounts.remove(at: from)
+        accounts.insert(account, at: min(max(0, index), accounts.count))
+        settings.setAccountOrder(accounts.map(\.accountId), forProvider: id)
+    }
+
+    /// *Re-auth* for a login ClaudeBar signed in to: runs the definition's
+    /// login again in that login's own folder, then refreshes it — so the
+    /// identity rule decides whether the same person came back. A folder the
+    /// person chose is theirs to sign in to; ClaudeBar never runs a login there.
+    @discardableResult
+    public func signInAgain(_ account: Account, with runner: AccountSignIn = AccountSignIn()) async throws -> UsageSnapshot {
+        guard let call = definition.accounts?.signIn, let folder = account.folder, folder.goesWithAccount else {
+            throw UsageError.executionFailed("Sign in again in this folder yourself, then refresh.")
+        }
+        try await runner.signInAgain(call, in: folder.url)
+        return try await refresh(account, .interactive)
     }
 
     /// More than one enabled login, so each needs telling apart by name.

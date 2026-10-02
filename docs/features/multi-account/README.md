@@ -1,35 +1,51 @@
 ---
-description: Track separate Codex accounts by email, with independent usage cards and menu bar selections. Use when you have more than one ChatGPT login.
+description: Track more than one Claude or Codex login side by side — sign in with your browser or choose a signed-in folder, name each account, pin them to the menu bar, and sign in again when a session expires. Use when you have personal and work accounts.
 ---
 
 # Multiple accounts
 
-Codex supports separate ChatGPT accounts. Each account appears with the Codex icon and its signed-in email, with independent quotas, refreshes, enable toggles and errors. Other providers retain their existing account behavior.
+Claude and Codex can each watch more than one login: a personal and a work account, or two ChatGPT workspaces under one email. Every account has its own quotas, refreshes, pause switch and errors. Other providers have one account for now.
 
-## Add a Codex account
+## Add an account
 
-1. Open **Settings → Providers → Codex → Codex Accounts → Add Codex Account**. If Codex already shows an email, select that entry instead.
-2. Copy the provided login command and run it in Terminal. It creates a separate Codex folder and opens the normal Codex sign-in flow. Sign in to the account you want to add.
-3. After sign-in completes, click **Choose Signed-in Folder** and select that folder. Its email is read automatically; no name or token needs to be pasted into ClaudeBar.
+Open **Settings → Providers → Claude** (or **Codex**) **→ Accounts → Add Account**, then pick one of two ways:
 
-You can also choose an existing independently authenticated Codex folder. Additional accounts require file credential storage (`cli_auth_credentials_store = "file"`); the default account still supports Keychain through RPC mode.
+- **Sign in with browser.** ClaudeBar makes a new folder for this login and runs the provider's own sign-in in it (`claude auth login`, or `codex login`). Finish signing in in your browser. Your usual login isn't touched.
+- **Choose Signed-in Folder.** Pick a folder a login already lives in. For Claude that's a `CLAUDE_CONFIG_DIR` folder; for Codex it's a `CODEX_HOME` folder that uses file credential storage (`cli_auth_credentials_store = "file"`).
 
-The default login remains the one used by your ordinary Codex CLI. Added accounts use their own folders. Do not copy an existing `auth.json` to make a second login: authenticate separately so token refreshes have independent sessions.
+ClaudeBar then checks the login before keeping it:
 
-## View both accounts
+1. **Found a login:** the folder holds a key.
+2. **Signed in as …:** the email it belongs to. A login that's already listed, or that is your usual login, is refused.
+3. **Fetched usage:** the first refresh. If only this step fails (for example, you're offline), you can **Add anyway**, and the account shows **Re-auth** until it works.
 
-- Select either email in the dropdown's provider tabs.
-- Enable **General → Overview Mode** to see all enabled accounts together.
-- In **Menu Bar** settings, select both accounts to pin both quotas. When a provider has more than one enabled account, each icon gets a short name: the name you gave the account (up to 12 characters) or the part of its email before the @ (up to 8). Names that would look alike are numbered (`work·1`, `work·2`); the tooltip shows the full name. Accounts count toward the existing three-selection limit.
+Last, you can give the account a name, such as *Work*. Leave it empty to show its email.
 
-The Codex probe mode setting applies to all Codex accounts. Both RPC and API modes use each added account's own folder. Account-specific RPC failures never fall back to the default account's terminal session.
+Don't copy an existing `auth.json` or `.credentials.json` to make a second login. Sign in separately, so each login refreshes its own session.
 
-## Remove or reconnect
+## See them side by side
 
-**Remove** only unlinks the account from ClaudeBar and its menu bar selections. It does not sign out of Codex or delete the folder.
+- **Settings → Providers → Claude → Accounts** lists every login. Drag to reorder, use **⋯** to rename, pause or remove one, and click the pin to show it in the menu bar.
+- With one account, the provider is called by its name ("Codex"). With several, each shows the name you gave it, or its email.
+- In the menu bar, each pinned account gets a short name beside the icon: up to 12 characters of the name you gave, or up to 8 of the part of its email before the @. Names that would look alike are numbered (`work·1`, `work·2`). The tooltip shows the full name. Accounts count toward the three-entry menu bar limit.
 
-For an expired session, sign in again using the same folder and account. If you sign in to a different account in that folder, ClaudeBar asks you to remove and re-add it rather than displaying the new account under the old email.
+The data source choice (for example RPC or API) applies to every account of a provider. Each added account runs it against its own folder, and its failures never fall back to your usual login's session.
+
+## Remove or sign in again
+
+**Remove** forgets the account in ClaudeBar and drops it from the menu bar:
+
+- An account you added with **Sign in with browser** has its folder deleted too, since ClaudeBar made that folder and nothing else uses it.
+- A folder you chose stays exactly where it is.
+- Your usual login can't be removed.
+
+When a session expires, the account shows **Re-auth**:
+
+- For an account ClaudeBar signed in to, the button runs the sign-in again in the same folder.
+- For a folder you chose, ClaudeBar shows the command to run yourself.
+
+If a different person signs in to that folder, ClaudeBar refuses to show their usage under the old account. Remove it and add the new login instead.
 
 ## See also
 
-[Codex setup](../../providers/codex/README.md) · [Settings storage](../../settings.md) · [Design (contributors)](design.md)
+[Claude setup](../../providers/claude/README.md) · [Codex setup](../../providers/codex/README.md) · [Settings storage](../../settings.md) · [Design (contributors)](design.md)

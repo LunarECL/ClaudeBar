@@ -97,17 +97,31 @@ public struct AccountSignIn: Sendable {
         guard !folders.exists(folder) else { throw SignInError.folderExists }
         try folders.create(folder)
 
-        var variables = environment()
-        for name in call.unset { variables.removeValue(forKey: name) }
-        variables[call.homeVariable] = folder.path
         do {
-            let status = try await process.run(executable: executable, arguments: call.args, environment: variables,
-                                               directory: folder, timeout: call.timeout)
-            guard status == 0 else { throw SignInError.didNotFinish }
+            try await run(call, executable, in: folder)
         } catch {
             folders.delete(folder)
             throw error
         }
+    }
+
+    /// Signs in again in a folder this login already lives in — for a login
+    /// whose session expired. The folder is kept whatever happens.
+    public func signInAgain(_ call: SignInCall, in folder: URL) async throws {
+        guard let executable = executable(for: call) else { throw SignInError.cliNotFound(call.cli) }
+        guard folders.exists(folder) else { throw SignInError.didNotFinish }
+        try await run(call, executable, in: folder)
+    }
+
+    /// The login, pointed at `folder` and nothing inherited that would pick
+    /// another way in.
+    private func run(_ call: SignInCall, _ executable: String, in folder: URL) async throws {
+        var variables = environment()
+        for name in call.unset { variables.removeValue(forKey: name) }
+        variables[call.homeVariable] = folder.path
+        let status = try await process.run(executable: executable, arguments: call.args, environment: variables,
+                                           directory: folder, timeout: call.timeout)
+        guard status == 0 else { throw SignInError.didNotFinish }
     }
 
     private func executable(for call: SignInCall) -> String? {

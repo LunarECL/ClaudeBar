@@ -81,4 +81,14 @@ final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked
     func setDefaultAccountLabel(_ label: String?, forProvider id: String) {
         defaultLabels[id] = label
     }
+
+    private var orders: [String: [String]] = [:]
+
+    func accountOrder(forProvider id: String) -> [String] {
+        orders[id] ?? []
+    }
+
+    func setAccountOrder(_ accountIds: [String], forProvider id: String) {
+        orders[id] = accountIds
+    }
 }

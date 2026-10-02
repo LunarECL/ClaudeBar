@@ -939,7 +939,16 @@ extension JSONSettingsRepository: MultiAccountSettingsRepository {
     // MARK: Storage helpers
 
     private static func accountsKey(_ id: String) -> String { "providers.\(id).accounts" }
+    public func accountOrder(forProvider id: String) -> [String] {
+        store.read(key: Self.accountOrderKey(id)) ?? []
+    }
+
+    public func setAccountOrder(_ accountIds: [String], forProvider id: String) {
+        store.write(value: accountIds.isEmpty ? nil : accountIds, key: Self.accountOrderKey(id))
+    }
+
     private static func defaultAccountLabelKey(_ id: String) -> String { "providers.\(id).defaultAccountLabel" }
+    private static func accountOrderKey(_ id: String) -> String { "providers.\(id).accountOrder" }
 
     private func writeAccounts(_ configs: [ProviderAccountConfig], forProvider id: String) {
         // Persist an empty list as a removal so the file stays free of empty arrays,

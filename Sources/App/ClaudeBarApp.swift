@@ -181,7 +181,7 @@ struct ClaudeBarApp: App {
             ),
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in claude.accounts.dropFirst() + codex.accounts.dropFirst() {
+        for account in (claude.accounts + codex.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after

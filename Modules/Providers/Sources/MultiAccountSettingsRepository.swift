@@ -36,6 +36,12 @@ public protocol MultiAccountSettingsRepository: ProviderSettingsRepository {
 
     /// Saves the default login's name; `nil` forgets it.
     func setDefaultAccountLabel(_ label: String?, forProvider id: String)
+
+    /// The order the person put the logins in, by account id (`default` for
+    /// the default login). Empty until they move one.
+    func accountOrder(forProvider id: String) -> [String]
+
+    func setAccountOrder(_ accountIds: [String], forProvider id: String)
 }
 
 /// Configuration for a single account within a provider.
