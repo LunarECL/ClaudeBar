@@ -76,8 +76,9 @@ final class StatusItemLabelDriver {
         var additionalLabels: [MenuBarProviderLabel] = []
         var primaryProviderId: String? = nil
         var primaryProviderName: String? = nil
-        /// Changes to label visibility must repaint the status item.
-        var showAccountLabels: Bool = true
+        /// Short account names by lineup id, for providers with several
+        /// enabled logins — `MenuBarAccountName`.
+        var accountNames: [String: String] = [:]
         var fallbackStatus: QuotaStatus
         var sessionPhase: ClaudeSession.Phase?
         var themeModeId: String
@@ -215,7 +216,12 @@ final class StatusItemLabelDriver {
             .contains { !CountdownColon.ranges(in: $0.text).isEmpty }
         let primaryProvider = monitor.enabledProviders.first { $0.id == settings.menuBarPercentageProviderId }
         let showsQuota = settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled
-        let primaryProviderName = !showsQuota || (additionalLabels.isEmpty && (primaryProvider as? Account)?.isNamedByAccount != true)
+        let shownIds = [settings.menuBarPercentageProviderId] + additionalLabels.map(\.providerId)
+        let accountNames = MenuBarAccountName.names(Dictionary(uniqueKeysWithValues: Set(shownIds).compactMap { id in
+            (monitor.enabledProviders.first { $0.id == id } as? Account)
+                .flatMap { $0.provider.hasSeveralAccounts ? (id, $0.displayName) : nil }
+        }))
+        let primaryProviderName = !showsQuota || (additionalLabels.isEmpty && accountNames[settings.menuBarPercentageProviderId] == nil)
             ? nil : primaryProvider?.name
 
         return LabelContent(
@@ -223,7 +229,8 @@ final class StatusItemLabelDriver {
             additionalLabels: additionalLabels,
             primaryProviderId: primaryProviderName == nil ? nil : settings.menuBarPercentageProviderId,
             primaryProviderName: primaryProviderName,
-            showAccountLabels: settings.menuBarAccountLabelsEnabled,
+            // Hidden labels still keep the icon: the full names decide that above.
+            accountNames: settings.menuBarAccountLabelsEnabled ? accountNames : [:],
             fallbackStatus: effectiveSelectedProviderStatus,
             sessionPhase: sessionMonitor.activeSession?.phase,
             themeModeId: settings.themeMode,
@@ -318,10 +325,8 @@ final class StatusItemLabelDriver {
             parts.append(providerIcon(for: providerId))
         }
 
-        let codexEmails = ([content.primaryProviderName].compactMap { $0 } + content.additionalLabels.map(\.providerName))
-            .filter { $0.contains("@") }
-        if content.showAccountLabels, let id = content.primaryProviderId, let name = content.primaryProviderName {
-            appendAccountLabel(id: id, email: name, emails: codexEmails, to: &parts)
+        if let id = content.primaryProviderId, let name = content.accountNames[id] {
+            parts.append(StatusBarPercentageImageRenderer.image(text: name, color: .primary))
         }
 
         if let label = content.label {
@@ -340,20 +345,13 @@ final class StatusItemLabelDriver {
                 text: " | ", color: theme.statusColor(for: label.status)
             ))
             parts.append(providerIcon(for: label.providerId))
-            if content.showAccountLabels {
-                appendAccountLabel(id: label.providerId, email: label.providerName, emails: codexEmails, to: &parts)
+            if let name = content.accountNames[label.providerId] {
+                parts.append(StatusBarPercentageImageRenderer.image(text: name, color: .primary))
             }
             parts.append(quotaImage(label.label, stacked: label.stacked, size: label.stackedSize,
                                     colonVisible: content.colonVisible, theme: theme))
         }
         return hStack(parts, spacing: 3)
-    }
-
-    private static func appendAccountLabel(id: String, email: String, emails: [String], to parts: inout [NSImage]) {
-        guard (id == "codex" || id.hasPrefix("codex.")), email.contains("@") else { return }
-        parts.append(StatusBarPercentageImageRenderer.image(
-            text: CodexAccountLabel.compact(email, among: emails), color: .primary
-        ))
     }
 
     private static func quotaImage(_ label: MenuBarLabel, stacked: Bool, size: MenuBarStackedSize,
