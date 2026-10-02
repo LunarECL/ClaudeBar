@@ -17,9 +17,12 @@ import Observation
 public final class Provider {
     public let definition: ProviderDefinition
 
-    /// The logins — never empty; the first is the default login.
+    /// The logins, in the order the person put them — never empty, and one
+    /// of them is the default login.
     public private(set) var accounts: [Account] = []
-    public var defaultAccount: Account { accounts[0] }
+    /// The plain login the CLI already uses — found by being the default,
+    /// wherever the person moved it.
+    public var defaultAccount: Account { accounts.first(where: \.isDefault)! }
 
     /// Today's and yesterday's usage, read on an interactive refresh only —
     /// a background poll stays cheap (#204).
@@ -28,7 +31,11 @@ public final class Provider {
     public let guestPasses: GuestPasses?
 
     let settings: any MultiAccountSettingsRepository
-    private let makeDataSource: (DataSourceDefinition) -> DataSource
+    /// Makes a definition live for one login, by its lineup id — so its
+    /// keys come from that login's corner of the vault.
+    private let makeDataSource: (DataSourceDefinition, String) -> DataSource
+    /// Where keys typed into *Add Account*'s form are kept.
+    private let vault: (any SecretVault)?
     /// Where added logins' folders are made and deleted.
     private let folders: any LoginFolders
     @ObservationIgnored private var bound: [String: [DataSource]] = [:]
@@ -40,12 +47,14 @@ public final class Provider {
         definition: ProviderDefinition,
         settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
-        makeDataSource: @escaping (DataSourceDefinition) -> DataSource,
+        makeDataSource: @escaping (DataSourceDefinition, String) -> DataSource,
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil,
-        folders: any LoginFolders = DiskLoginFolders()
+        folders: any LoginFolders = DiskLoginFolders(),
+        vault: (any SecretVault)? = nil
     ) {
         self.folders = folders
+        self.vault = vault
         self.definition = definition
         self.settings = settings
         self.makeDataSource = makeDataSource
@@ -53,10 +62,32 @@ public final class Provider {
         self.guestPasses = guestPasses
         let label = settings.defaultAccountLabel(forProvider: definition.id) ?? ""
         self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: label), values: [:])]
-        bound[definition.id] = definition.dataSources.map(makeDataSource)
+        bound[definition.id] = definition.dataSources.map { makeDataSource($0, definition.id) }
         for config in accounts {
             attach(config)
         }
+        let order = settings.accountOrder(forProvider: definition.id)
+        self.accounts = self.accounts.enumerated().sorted { lhs, rhs in
+            let (left, right) = (order.firstIndex(of: lhs.element.accountId) ?? order.count + lhs.offset,
+                                 order.firstIndex(of: rhs.element.accountId) ?? order.count + rhs.offset)
+            return left < right
+        }.map(\.element)
+    }
+
+    /// A provider whose data sources ignore which login they run for — the
+    /// default login's keys and every added login's are looked up alike.
+    public convenience init(
+        definition: ProviderDefinition,
+        settings: any MultiAccountSettingsRepository,
+        accounts: [ProviderAccountConfig] = [],
+        makeDataSource: @escaping (DataSourceDefinition) -> DataSource,
+        dailyUsage: (any DailyUsageAnalyzing)? = nil,
+        guestPasses: GuestPasses? = nil,
+        folders: any LoginFolders = DiskLoginFolders()
+    ) {
+        self.init(definition: definition, settings: settings, accounts: accounts,
+                  makeDataSource: { source, _ in makeDataSource(source) },
+                  dailyUsage: dailyUsage, guestPasses: guestPasses, folders: folders)
     }
 
     public var id: String { definition.id }
@@ -82,7 +113,7 @@ public final class Provider {
             return nil
         }
         do {
-            bound[login.id] = try definition.dataSources(forAccount: config.probeConfig).map(makeDataSource)
+            bound[login.id] = try definition.dataSources(forAccount: config.probeConfig).map { makeDataSource($0, login.id) }
         } catch {
             AppLog.providers.error("\(definition.id): can't run account \(login.id): \(error.localizedDescription)")
             return nil
@@ -100,6 +131,9 @@ public final class Provider {
         if let folder = account.folder, folder.goesWithAccount {
             folders.delete(folder.url)
         }
+        for field in definition.accounts?.form ?? [] where field.secret {
+            vault?.delete(field.id, provider: account.id)
+        }
         accounts.removeAll { $0.id == account.id }
         bound[account.id] = nil
         refreshTasks[account.id]?.cancel()
@@ -113,6 +147,36 @@ public final class Provider {
     @discardableResult
     public func addAccount(signedInAt folder: URL) throws -> Account {
         try addAccount(SignedInFolder(url: folder, madeBy: .folder))
+    }
+
+    /// *Add Account* by its form — the account's own settings. A secret is
+    /// kept in the vault under the new login's id, never in its saved values;
+    /// every field must be filled, and a choice must be one of its choices.
+    @discardableResult
+    public func addAccount(filling entered: [String: String]) throws -> Account {
+        let fields = definition.accounts?.form ?? []
+        guard !fields.isEmpty else { throw UsageError.executionFailed("\(name) has no account form.") }
+        var values: [String: String] = [:]
+        var secrets: [String: String] = [:]
+        for field in fields {
+            let value = (entered[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { throw UsageError.executionFailed("Fill in \(field.label).") }
+            if let choices = field.choices, !choices.contains(value) {
+                throw UsageError.executionFailed("Choose a \(field.label) from the list.")
+            }
+            if field.secret { secrets[field.id] = value } else { values[field.id] = value }
+        }
+        guard secrets.isEmpty || vault != nil else {
+            throw UsageError.executionFailed("ClaudeBar can't keep this key securely here.")
+        }
+        let config = ProviderAccountConfig(accountId: UUID().uuidString.lowercased(), label: "", probeConfig: values, madeBy: .form)
+        let lineupId = config.toProviderAccount(providerId: id).id
+        for (name, value) in secrets { vault?.save(value, name, provider: lineupId) }
+        guard let account = add(config) else {
+            for name in secrets.keys { vault?.delete(name, provider: lineupId) }
+            throw UsageError.executionFailed("This \(name) account can't be added.")
+        }
+        return account
     }
 
     /// *Sign in with browser* — runs the definition's login into a new folder
@@ -170,7 +234,7 @@ public final class Provider {
     /// no login, whatever else it holds.
     private func signedIn(with values: [String: String], rule: ProviderDefinition.Accounts.Folder) -> (accountId: String?, email: String?)? {
         guard let source = try? definition.dataSources(forAccount: values).first(where: { $0.credential != nil }) else { return nil }
-        let live = makeDataSource(source)
+        let live = makeDataSource(source, "\(id).new")
         guard live.hasKey else { return nil }
         return (live.value(of: rule.accountId.field).flatMap { $0.isEmpty ? nil : $0 }, live.value(of: rule.email))
     }
@@ -188,6 +252,27 @@ public final class Provider {
         account.label = label
     }
 
+    /// *Move* — puts a login at `index` in the person's order, saved.
+    public func move(_ account: Account, to index: Int) {
+        guard let from = accounts.firstIndex(where: { $0 === account }) else { return }
+        accounts.remove(at: from)
+        accounts.insert(account, at: min(max(0, index), accounts.count))
+        settings.setAccountOrder(accounts.map(\.accountId), forProvider: id)
+    }
+
+    /// *Re-auth* for a login ClaudeBar signed in to: runs the definition's
+    /// login again in that login's own folder, then refreshes it — so the
+    /// identity rule decides whether the same person came back. A folder the
+    /// person chose is theirs to sign in to; ClaudeBar never runs a login there.
+    @discardableResult
+    public func signInAgain(_ account: Account, with runner: AccountSignIn = AccountSignIn()) async throws -> UsageSnapshot {
+        guard let call = definition.accounts?.signIn, let folder = account.folder, folder.goesWithAccount else {
+            throw UsageError.executionFailed("Sign in again in this folder yourself, then refresh.")
+        }
+        try await runner.signInAgain(call, in: folder.url)
+        return try await refresh(account, .interactive)
+    }
+
     /// More than one enabled login, so each needs telling apart by name.
     public var hasSeveralAccounts: Bool {
         accounts.lazy.filter(\.isEnabled).prefix(2).count > 1
@@ -198,6 +283,13 @@ public final class Provider {
         accounts.filter(\.isEnabled).max {
             ($0.snapshot?.lowestQuota?.percentRemaining ?? -.infinity) < ($1.snapshot?.lowestQuota?.percentRemaining ?? -.infinity)
         }
+    }
+
+    /// The enabled login that makes the provider's status what it is — the
+    /// one the popover names. `nil` while every login is healthy.
+    public var worstAccount: Account? {
+        let worst = accounts.filter(\.isEnabled).max { $0.status < $1.status }
+        return worst.flatMap { $0.status > .healthy ? $0 : nil }
     }
 
     /// The worst quota health across the enabled logins.
