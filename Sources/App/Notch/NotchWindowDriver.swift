@@ -138,7 +138,7 @@ final class NotchWindowDriver {
             }
 
         let selected = monitor.selectedProvider
-        let snapshot = selected?.snapshot
+        let snapshot = selected.flatMap { monitor.usage(of: $0) }
         let quotas = snapshot?.quotas ?? []
         let headline = snapshot?.lowestQuota
 

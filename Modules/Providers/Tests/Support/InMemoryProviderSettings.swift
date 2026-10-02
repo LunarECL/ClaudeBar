@@ -12,6 +12,8 @@ final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked
     private var cardURLs: [String: String] = [:]
     /// `"<provider>.<setting>"` → on/off, as `settings.json` keeps them.
     private var flags: [String: Bool]
+    /// Quota keys hidden per provider (issue #140).
+    private var hiddenKeys: [String: Set<String>] = [:]
 
     init(dataSourceKinds: [String: String] = [:], flags: [String: Bool] = [:]) {
         self.kinds = dataSourceKinds
@@ -90,5 +92,13 @@ final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked
 
     func setAccountOrder(_ accountIds: [String], forProvider id: String) {
         orders[id] = accountIds
+    }
+
+    func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
+        hiddenKeys[id] ?? []
+    }
+
+    func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {
+        hiddenKeys[id] = keys
     }
 }

@@ -23,6 +23,37 @@ struct MiniMaxUsageProbeParsingTests {
     }
     """
 
+    /// Token Plan responses carry percentages; the count fields are 0 there.
+    static let sampleTokenPlanResponse = """
+    {
+      "base_resp": { "status_code": 0, "status_msg": "success" },
+      "model_remains": [
+        {
+          "model_name": "general",
+          "current_interval_total_count": 0,
+          "current_interval_usage_count": 0,
+          "current_interval_remaining_percent": 100,
+          "current_weekly_remaining_percent": 98,
+          "start_time": 1787673600000,
+          "end_time": 1787691600000,
+          "weekly_start_time": 1787500800000,
+          "weekly_end_time": 1788105600000
+        },
+        {
+          "model_name": "video",
+          "current_interval_total_count": 0,
+          "current_interval_usage_count": 0,
+          "current_interval_remaining_percent": 100,
+          "current_weekly_remaining_percent": 100,
+          "start_time": 1787673600000,
+          "end_time": 1787760000000,
+          "weekly_start_time": 1787500800000,
+          "weekly_end_time": 1788105600000
+        }
+      ]
+    }
+    """
+
     static let sampleMultiModelResponse = """
     {
       "base_resp": { "status_code": 0, "status_msg": "success" },
@@ -103,6 +134,34 @@ struct MiniMaxUsageProbeParsingTests {
     }
 
     @Test
+    func `emits interval and weekly quotas per model`() throws {
+        // Given: Token Plan returns current_*_remaining_percent; count totals are 0
+        let data = Data(Self.sampleTokenPlanResponse.utf8)
+
+        // When
+        let snapshot = try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
+
+        // Then: one interval (5h) quota and one weekly quota per model
+        #expect(snapshot.quotas.count == 4)
+
+        #expect(snapshot.quotas[0].quotaType == .modelSpecific("general"))
+        #expect(snapshot.quotas[0].percentRemaining == 100)
+        #expect(snapshot.quotas[0].resetText == "0% used")
+        #expect(snapshot.quotas[0].windowDuration == 18_000.0)
+
+        #expect(snapshot.quotas[1].quotaType == .timeLimit("general Weekly"))
+        #expect(snapshot.quotas[1].percentRemaining == 98)
+        #expect(snapshot.quotas[1].resetText == "2% used")
+        #expect(snapshot.quotas[1].windowDuration == 604_800.0)
+        #expect(snapshot.quotas[1].resetsAt == Date(timeIntervalSince1970: 1_788_105_600.0))
+
+        #expect(snapshot.quotas[2].quotaType == .modelSpecific("video"))
+        #expect(snapshot.quotas[2].percentRemaining == 100)
+        #expect(snapshot.quotas[3].quotaType == .timeLimit("video Weekly"))
+        #expect(snapshot.quotas[3].percentRemaining == 100)
+    }
+
+    @Test
     func `parses reset time from end_time millisecond timestamp`() throws {
         // Given: end_time = 1735689600000 ms → 1735689600 seconds
         let data = Data(Self.sampleSuccessResponse.utf8)
@@ -150,6 +209,32 @@ struct MiniMaxUsageProbeParsingTests {
         let data = Data(Self.sampleEmptyRemainsResponse.utf8)
 
         // When & Then
+        #expect(throws: UsageError.noData) {
+            try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
+        }
+    }
+
+    @Test
+    func `a model with neither counts nor a percentage shows no window rather than 0% left`() throws {
+        let data = Data("""
+        { "base_resp": { "status_code": 0 }, "model_remains": [
+          { "model_name": "MiniMax-M2", "current_interval_total_count": 0, "current_interval_usage_count": 0 },
+          { "model_name": "speech-2.8", "current_interval_total_count": 100, "current_interval_usage_count": 40 } ] }
+        """.utf8)
+
+        let snapshot = try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
+
+        #expect(snapshot.quotas.map(\.quotaType) == [.modelSpecific("speech-2.8")])
+        #expect(snapshot.quotas.first?.percentRemaining == 40)
+    }
+
+    @Test
+    func `a response where no model reports anything has no data`() throws {
+        let data = Data("""
+        { "base_resp": { "status_code": 0 }, "model_remains": [
+          { "model_name": "MiniMax-M2", "current_interval_total_count": 0, "current_interval_usage_count": 0 } ] }
+        """.utf8)
+
         #expect(throws: UsageError.noData) {
             try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
         }

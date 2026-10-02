@@ -83,7 +83,7 @@ struct MiniMaxConfigCard: View {
                     .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
 
-                Text("Coding Plan quota tracking")
+                Text("Token Plan quota tracking")
                     .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }

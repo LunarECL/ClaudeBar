@@ -111,6 +111,54 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.customCardURL(forProvider: "gemini") == nil)
     }
 
+    // MARK: - Hidden Quota Keys (issue #140)
+
+    @Test
+    func `hiddenQuotaKeys defaults to empty`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.hiddenQuotaKeys(forProvider: "gemini") == [])
+    }
+
+    @Test
+    func `setHiddenQuotaKeys persists across store reopen`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setHiddenQuotaKeys(["model:gemini-2.0-flash", "time:mcp"], forProvider: "gemini")
+
+        // Reopen the same settings file as a fresh repository
+        let store = JSONSettingsStore(fileURL: dir.appendingPathComponent("settings.json"))
+        let reopened = JSONSettingsRepository(store: store)
+
+        #expect(reopened.hiddenQuotaKeys(forProvider: "gemini") == ["model:gemini-2.0-flash", "time:mcp"])
+    }
+
+    @Test
+    func `hiddenQuotaKeys is per provider`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
+        repo.setHiddenQuotaKeys(["weekly"], forProvider: "codex")
+
+        #expect(repo.hiddenQuotaKeys(forProvider: "gemini") == ["model:gemini-2.0-flash"])
+        #expect(repo.hiddenQuotaKeys(forProvider: "codex") == ["weekly"])
+        #expect(repo.hiddenQuotaKeys(forProvider: "claude") == [])
+    }
+
+    @Test
+    func `setHiddenQuotaKeys with empty set clears the stored keys`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
+        repo.setHiddenQuotaKeys([], forProvider: "gemini")
+
+        #expect(repo.hiddenQuotaKeys(forProvider: "gemini") == [])
+    }
+
     // MARK: - Claude Settings
 
     @Test

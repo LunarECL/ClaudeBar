@@ -203,9 +203,11 @@ struct ClaudeBarApp: App {
         // Initialize the domain service with quota alerter
         // QuotaMonitor automatically validates selected provider on init
         // Alerts and every status follow the person's burn-rate setting (#357).
+        // Hidden quotas (#140) are read from the same settings, per product.
         let monitor = QuotaMonitor(
             providers: repository,
             alerter: quotaAlerter,
+            settingsRepository: settingsRepository,
             statusPolicy: { AppSettings.shared.statusPolicy }
         )
         self.monitor = monitor

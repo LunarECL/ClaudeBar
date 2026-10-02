@@ -68,18 +68,18 @@ struct MiniMaxRegionTests {
             "https://platform.minimaxi.com/user-center/payment/coding-plan")
     }
 
-    // MARK: - codingPlanRemainsURL
+    // MARK: - tokenPlanRemainsURL
 
     @Test
-    func `international codingPlanRemainsURL`() {
-        #expect(MiniMaxRegion.international.codingPlanRemainsURL ==
-            "https://api.minimax.io/v1/api/openplatform/coding_plan/remains")
+    func `international tokenPlanRemainsURL`() {
+        #expect(MiniMaxRegion.international.tokenPlanRemainsURL ==
+            "https://api.minimax.io/v1/token_plan/remains")
     }
 
     @Test
-    func `china codingPlanRemainsURL`() {
-        #expect(MiniMaxRegion.china.codingPlanRemainsURL ==
-            "https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains")
+    func `china tokenPlanRemainsURL`() {
+        #expect(MiniMaxRegion.china.tokenPlanRemainsURL ==
+            "https://api.minimaxi.com/v1/token_plan/remains")
     }
 
     // MARK: - rawValue & allCases
