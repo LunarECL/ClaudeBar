@@ -4,7 +4,9 @@ import Foundation
 
 /// A settings repository that keeps everything in memory — the real behaviour
 /// a `Provider` relies on, without touching `~/.claudebar/settings.json`.
-final class InMemoryProviderSettings: ProviderSettingsRepository, @unchecked Sendable {
+final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked Sendable {
+    private var accountConfigs: [String: [ProviderAccountConfig]] = [:]
+    private var defaultLabels: [String: String] = [:]
     private var enabled: [String: Bool] = [:]
     private var kinds: [String: String] = [:]
     private var cardURLs: [String: String] = [:]
@@ -50,5 +52,43 @@ final class InMemoryProviderSettings: ProviderSettingsRepository, @unchecked Sen
 
     func setDataSourceKind(_ kind: String, forProvider id: String) {
         kinds[id] = kind
+    }
+
+    // MARK: - Accounts
+
+    func accounts(forProvider id: String) -> [ProviderAccountConfig] {
+        accountConfigs[id] ?? []
+    }
+
+    func addAccount(_ config: ProviderAccountConfig, forProvider id: String) {
+        accountConfigs[id, default: []].removeAll { $0.accountId == config.accountId }
+        accountConfigs[id, default: []].append(config)
+    }
+
+    func removeAccount(accountId: String, forProvider id: String) {
+        accountConfigs[id]?.removeAll { $0.accountId == accountId }
+    }
+
+    func updateAccount(_ config: ProviderAccountConfig, forProvider id: String) {
+        guard let index = accountConfigs[id]?.firstIndex(where: { $0.accountId == config.accountId }) else { return }
+        accountConfigs[id]?[index] = config
+    }
+
+    func defaultAccountLabel(forProvider id: String) -> String? {
+        defaultLabels[id]
+    }
+
+    func setDefaultAccountLabel(_ label: String?, forProvider id: String) {
+        defaultLabels[id] = label
+    }
+
+    private var orders: [String: [String]] = [:]
+
+    func accountOrder(forProvider id: String) -> [String] {
+        orders[id] ?? []
+    }
+
+    func setAccountOrder(_ accountIds: [String], forProvider id: String) {
+        orders[id] = accountIds
     }
 }

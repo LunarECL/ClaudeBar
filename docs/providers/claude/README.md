@@ -36,6 +36,7 @@ Each mode falls back to the other when it fails. In API mode, **CLI fallback** (
 - **Max or Pro billed through Apple showing "The Claude CLI did not see this account's subscription".** On some subscriptions `/usage` reports API billing instead of a plan — either the cost panel on its own, or "only available for subscription plans". ClaudeBar sees from `~/.claude.json` that you have a subscription, so it tries the API rather than showing $0.00. If the API also fails, run `claude login` again or switch to API mode.
 - **"Authentication required" when you're already signed in** usually means the Keychain read failed. The log records the `security` exit status. See [troubleshooting](../../troubleshooting.md).
 - **Account email and organization come from `~/.claude.json`**, because Claude CLI v2.1.79+ no longer shows them on the Usage tab.
+- **More than one Claude login?** Use **Accounts → Add Account** in the provider settings to sign in with your browser or choose a `CLAUDE_CONFIG_DIR` folder. See [multiple accounts](../../features/multi-account/README.md). Today's cost and guest passes stay with your usual login.
 - **Daily cost and token cards** read `~/.claude/projects/*/*.jsonl`. They're only calculated when the popover is open, not during background refreshes.
 - **Share Claude Code** (guest passes) only appears for Max accounts.
 - **Claude API Budget** in the same pane only applies to pay-as-you-go API accounts, not to Max or Pro Extra Usage.
