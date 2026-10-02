@@ -408,13 +408,19 @@ public final class QuotaMonitor {
         }
     }
 
-    /// Selects the enabled provider in the given 1-based slot, counted the way
-    /// the popover lists them (⌘1 is the first pill). A slot with no provider
-    /// leaves the selection alone.
+    /// The popover's pills: one per product, its enabled logins inside.
+    public var tabs: [ProductTab] { ProductTab.tabs(of: providers.enabled) }
+
+    /// The tab the selected login belongs to.
+    public var selectedTab: ProductTab? { tabs.first { $0.contains(selectedProviderId) } }
+
+    /// Selects the tab in the given 1-based slot, counted the way the popover
+    /// lists them (⌘1 is the first pill), opening on its first login. A slot
+    /// with no tab leaves the selection alone.
     public func selectProvider(atPosition position: Int) {
-        let enabled = providers.enabled
-        guard enabled.indices.contains(position - 1) else { return }
-        selectedProviderId = enabled[position - 1].id
+        let tabs = tabs
+        guard tabs.indices.contains(position - 1), let first = tabs[position - 1].accounts.first else { return }
+        selectedProviderId = first.id
     }
 
     /// Sets a provider's enabled state.

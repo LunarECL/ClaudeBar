@@ -56,10 +56,10 @@ struct ProvidersPane: View {
             }
         }
         .sheet(isPresented: $addingProvider) {
-            AddProviderSheet(monitor: monitor) { addingProvider = false }
+            AddProviderSheet(monitor: monitor) { addingProvider = false }.themedSheet()
         }
         .sheet(item: $importing) { review in
-            ImportProviderSheet(monitor: monitor, review: review.value) { importing = nil }
+            ImportProviderSheet(monitor: monitor, review: review.value) { importing = nil }.themedSheet()
         }
     }
 
@@ -268,13 +268,14 @@ private struct ProviderDetailView: View {
         case "claude":
             if let claude = (provider as? Account)?.provider {
                 DataSourceSection(provider: claude, monitor: monitor)
+                ProviderAccountsCard(provider: claude, monitor: monitor)
             }
             ClaudeBudgetCard()
         case "codex":
             if let codex = (provider as? Account)?.provider {
                 DataSourceSection(provider: codex, monitor: monitor)
+                ProviderAccountsCard(provider: codex, monitor: monitor)
             }
-            CodexAccountsCard(monitor: monitor)
         case "kimi":
             KimiConfigCard(monitor: monitor)
         case "minimax":
@@ -294,6 +295,9 @@ private struct ProviderDetailView: View {
         default:
             if let custom = (provider as? Account)?.provider, custom.definition.profile.origin == .custom {
                 DataSourceSection(provider: custom, monitor: monitor)
+                if custom.definition.accounts != nil {
+                    ProviderAccountsCard(provider: custom, monitor: monitor)
+                }
                 CustomProviderCard(provider: custom, monitor: monitor, onDeleted: onBack)
             } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
                 ExtensionConfigCard(

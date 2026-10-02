@@ -1,5 +1,6 @@
 import DataSources
 import Quotas
+import CryptoKit
 import Foundation
 
 /// A provider as data — what ships in `Resources/Providers/<id>.json` for a
@@ -64,29 +65,70 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     /// its saved values filling `{{account.<name>}}` — one definition, never
     /// a copy per login.
     public struct Accounts: Sendable, Equatable, Codable {
-        /// The login's email names it — two logins of one product are told
-        /// apart by who they are.
-        public let nameFromEmail: Bool
         /// How a person adds one: by choosing the folder its login lives in.
         public let folder: Folder?
+        /// …or by running the vendor's login into a new folder, which
+        /// `folder` then checks — so a sign-in needs a folder rule.
+        public let signIn: SignInCall?
+        /// …or by filling in the account's own settings — an API key, a
+        /// region. A secret field is kept in the vault, under the account.
+        public let form: [Field]
+
+        /// One setting *Add Account*'s form asks for.
+        public struct Field: Sendable, Equatable, Codable {
+            public let id: String
+            public let label: String
+            public let secret: Bool
+            /// The only values it takes, when it is a choice.
+            public let choices: [String]?
+
+            public init(id: String, label: String, secret: Bool = false, choices: [String]? = nil) {
+                self.id = id
+                self.label = label
+                self.secret = secret
+                self.choices = choices
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                id = try container.decode(String.self, forKey: .id)
+                label = try container.decode(String.self, forKey: .label)
+                secret = try container.decodeIfPresent(Bool.self, forKey: .secret) ?? false
+                choices = try container.decodeIfPresent([String].self, forKey: .choices)
+            }
+        }
         /// By data source kind, what an added login changes — its own folder,
         /// its identity check, no fallback to the shared terminal. `null`
         /// leaves that data source out for added logins.
         public let patch: [String: JSONValue]
 
         /// `{ "savedAs": "codexHome", "default": "${CODEX_HOME:-~/.codex}",
-        /// "accountId": { "fact": "account", "savedAs": "chatgptAccountId" } }`
+        /// "accountId": { "field": "account", "savedAs": "chatgptAccountId" } }`
         /// — the folder and the login's account id are saved as the account's
         /// values; `notSignedIn` is what a folder without a login says.
         public struct Folder: Sendable, Equatable, Codable {
             public struct AccountId: Sendable, Equatable, Codable {
-                /// The credential value that names the login.
-                public let fact: String
+                /// The field that identifies the login — a credential value,
+                /// or a field of a context file (`$context.account.email`).
+                public let field: IdentityField
                 public let savedAs: String
 
-                public init(fact: String, savedAs: String) {
-                    self.fact = fact
+                public init(field: IdentityField, savedAs: String) {
+                    self.field = field
                     self.savedAs = savedAs
+                }
+            }
+
+            /// A value worked out from the chosen folder rather than read from
+            /// it: `prefix` + the first `sha256` hex digits of the folder's
+            /// path — how Claude Code names a config folder's Keychain item.
+            public struct Derived: Sendable, Equatable, Codable {
+                public let prefix: String
+                public let sha256: Int
+
+                public init(prefix: String, sha256: Int) {
+                    self.prefix = prefix
+                    self.sha256 = sha256
                 }
             }
 
@@ -94,26 +136,73 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             /// The default login's folder — never added a second time.
             public let `default`: String?
             public let accountId: AccountId
+            /// Where the login's email is read. A credential's `email` unless
+            /// the definition says otherwise.
+            public let email: IdentityField
+            /// Values saved beside the folder, by name, for `{{account.<name>}}`.
+            public let derived: [String: Derived]
             public let notSignedIn: String?
 
-            public init(savedAs: String, default folder: String? = nil, accountId: AccountId, notSignedIn: String? = nil) {
+            public init(
+                savedAs: String,
+                default folder: String? = nil,
+                accountId: AccountId,
+                email: IdentityField = .credential("email"),
+                derived: [String: Derived] = [:],
+                notSignedIn: String? = nil
+            ) {
                 self.savedAs = savedAs
                 self.default = folder
                 self.accountId = accountId
+                self.email = email
+                self.derived = derived
                 self.notSignedIn = notSignedIn
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                savedAs = try container.decode(String.self, forKey: .savedAs)
+                self.default = try container.decodeIfPresent(String.self, forKey: .default)
+                accountId = try container.decode(AccountId.self, forKey: .accountId)
+                email = try container.decodeIfPresent(IdentityField.self, forKey: .email) ?? .credential("email")
+                derived = try container.decodeIfPresent([String: Derived].self, forKey: .derived) ?? [:]
+                notSignedIn = try container.decodeIfPresent(String.self, forKey: .notSignedIn)
+            }
+
+            /// The account's values for a chosen folder: the folder, and what
+            /// is derived from it.
+            public func values(for folder: String) -> [String: String] {
+                var values = [savedAs: folder]
+                guard !derived.isEmpty else { return values }
+                let hash = SHA256.hash(data: Data(folder.utf8)).map { String(format: "%02x", $0) }.joined()
+                for (name, rule) in derived {
+                    values[name] = rule.prefix + hash.prefix(max(0, rule.sha256))
+                }
+                return values
             }
         }
 
-        public init(nameFromEmail: Bool = false, folder: Folder? = nil, patch: [String: JSONValue] = [:]) {
-            self.nameFromEmail = nameFromEmail
+        /// The ways *Add Account* offers, easiest first.
+        public var ways: [AddAccountWay] {
+            [signIn.map { _ in .signIn }, folder.map { _ in .folder }, form.isEmpty ? nil : .form].compactMap { $0 }
+        }
+
+        public init(folder: Folder? = nil, signIn: SignInCall? = nil, form: [Field] = [], patch: [String: JSONValue] = [:]) {
+            self.signIn = signIn
+            self.form = form
             self.folder = folder
             self.patch = patch
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            nameFromEmail = try container.decodeIfPresent(Bool.self, forKey: .nameFromEmail) ?? false
             folder = try container.decodeIfPresent(Folder.self, forKey: .folder)
+            signIn = try container.decodeIfPresent(SignInCall.self, forKey: .signIn)
+            form = try container.decodeIfPresent([Field].self, forKey: .form) ?? []
+            if signIn != nil, folder == nil {
+                throw DecodingError.dataCorruptedError(forKey: .signIn, in: container,
+                    debugDescription: "accounts.signIn needs accounts.folder to check the folder it signs into")
+            }
             patch = try container.decodeIfPresent([String: JSONValue].self, forKey: .patch) ?? [:]
         }
     }
@@ -313,4 +402,14 @@ public struct ProviderLook: Sendable, Equatable, Codable {
         self.color = color
         self.gradientEnd = gradientEnd
     }
+}
+
+/// A way *Add Account* offers — one per key of a definition's `accounts`.
+public enum AddAccountWay: Sendable, Equatable {
+    /// *Sign in with browser*
+    case signIn
+    /// *Choose Signed-in Folder*
+    case folder
+    /// The account's own settings — *Enter API key*
+    case form
 }

@@ -23,7 +23,7 @@ struct ClaudeBarApp: App {
     @MainActor
     private static func builtIn(
         _ id: String,
-        settings: any ProviderSettingsRepository,
+        settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
@@ -99,10 +99,12 @@ struct ClaudeBarApp: App {
         // Claude is data: Modules/Providers/Resources/Providers/claude.json
         // and the mapping scripts beside it. What isn't usage rides along:
         // today's usage from local session logs (#190 keeps loopback
-        // inference free) and guest passes.
+        // inference free) and guest passes — both the default login's. Logins
+        // added beside it live in their own config folders.
         let claude = Self.builtIn(
             "claude",
             settings: settingsRepository,
+            accounts: settingsRepository.accounts(forProvider: "claude"),
             dailyUsage: ClaudeDailyUsageAnalyzer(
                 isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
             ),
@@ -178,8 +180,8 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
         ])
-        // Added Codex logins follow the built-in lineup, as they always have.
-        for account in codex.accounts.dropFirst() {
+        // Added logins follow the built-in lineup, as they always have.
+        for account in (claude.accounts + codex.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after
@@ -187,7 +189,9 @@ struct ClaudeBarApp: App {
         let vault = ProviderVault()
         for definition in ProviderCatalog().custom() {
             Providers.register(custom: definition)
-            repository.add(Providers.make(definition, settings: settingsRepository, secrets: vault).defaultAccount)
+            let custom = Providers.make(definition, settings: settingsRepository,
+                                        accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault)
+            for account in custom.accounts { repository.add(account) }
         }
         AppLog.providers.info("Created \(repository.all.count) providers")
 
