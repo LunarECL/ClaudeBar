@@ -15,6 +15,8 @@ struct StubbedProvider {
     let transport = MockRPCTransport()
     /// Every CLI started for JSON-RPC: its arguments and environment.
     let launches = Launches()
+    /// The login folders adding and removing accounts makes and deletes.
+    let folders = InMemoryLoginFolders()
     let home: URL
     let settings: InMemoryProviderSettings
     var environment: [String: String] = [:]
@@ -60,7 +62,8 @@ struct StubbedProvider {
                     homeDirectory: home,
                     now: { Date() }
                 )
-            }
+            },
+            folders: folders
         )
     }
 

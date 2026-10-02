@@ -29,7 +29,7 @@ struct CodexConfigSpec {
     /// `~` pointing at a fresh temporary folder.
     @MainActor
     private static func makeCodex(
-        settings: any ProviderSettingsRepository,
+        settings: any MultiAccountSettingsRepository,
         home: URL,
         network: MockNetworkClient = MockNetworkClient(),
         transport: MockRPCTransport = MockRPCTransport()

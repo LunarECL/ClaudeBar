@@ -6,11 +6,21 @@ description: Contributor design for multiple accounts under one provider — how
 
 User guide: [README.md](README.md).
 
-**Status: DESIGN, slice 1 built.** Built: one `Provider` owns `[Account]`; an
+**Status: BUILT, slices 1–6.** Built: one `Provider` owns `[Account]`; an
 added login runs the **same** data sources with `accounts.patch` merged in and
 `{{account.x}}` filled from its values; added by `accounts.folder` — Codex
 (#356) and Claude (slice 1: `IdentityField`, `derived`, identity from a context
-file). No screen adds a Claude account yet (slice 4). PR #358 adds Claude (as data — kept), browser sign-in, rename and
+file); `displayName`, `rename`, a saved default-account name and short
+menu-bar names (slice 2); `accounts.signIn`, `provider.signIn` /
+`addAccount(signedInAt:)`, `SignedInFolder` and the `LoginFolders` port
+(slice 3); the Accounts card and the Add Account sheet, `Provider.move` and
+`signInAgain` (slice 4); `accounts.form`, `addAccount(filling:)`,
+`SecretStore.scoped(to:)` and `SecretVault`, with API providers made in Add
+Provider asking for a key per account (slice 5); the popover by provider —
+`ProductTab`, `QuotaMonitor.tabs` / `selectedTab`, `Provider.worstAccount`,
+account chips and the callout (slice 6). `selectedProviderId` stays a lineup id
+underneath (the tab's first login), so the menu bar, the refresh loop and the
+Touch Bar read it unchanged. PR #358 adds Claude (as data — kept), browser sign-in, rename and
 compact labels (kept, reshaped below), and a Swift bridge that gives the 18
 legacy providers, custom definitions and extensions accounts (replaced by this
 design — see [§ What is wrong today](#what-is-wrong-today)).
@@ -103,7 +113,8 @@ diff:
 | **added account** | a login beside it; id `<provider>.<acct>` | a copy of the provider |
 | **account values** | the account-scope settings that fill `{{account.x}}` — a folder, a login id, a region | secrets |
 | **account secret** | an account-scope secret (an API key) — a *name*, its value in the vault under that account | a value in `settings.json` |
-| **way to add** (`accounts.add`) | how the definition lets a person add one: `folder` · `signIn` · `form` | a data source kind |
+| **way to add** (`accounts.ways`) | how the definition lets a person add one — the keys it has: `signIn` · `folder` · `form` | a data source kind |
+| **signed-in folder** | the folder an added login lives in, and who made it — the person, or ClaudeBar by signing in | the default login's folder |
 | **identity** | the fact that names a login (email, account id) and the rule that a fetch must still match it | the label |
 | **label** | the name a person gave an account ("work") | the email |
 | **display name** | what the pill says: label, else email, else the provider's name | the menu bar label |
@@ -130,14 +141,13 @@ Monitor ◆                                  the menu bar's root
          ├── definition ◇                  the JSON — written once
          │   ├── dataSources               may say {{account.x}}
          │   └── accounts: Accounts? ◇     NIL = this provider has one login, and no "Add Account"
-         │       ├── add: AddAccount ◇     THE WAYS TO ADD — a closed sum, one or more:
-         │       │     folder(rule)          "Choose Signed-in Folder" — read facts from a folder
+         │       ├── ways → [AddAccountWay] THE WAYS TO ADD — DERIVED from which keys are present:
          │       │     signIn(command)       "Sign in with browser" — run the vendor's login into a
          │       │                           NEW folder, then the folder rule checks it
-         │       │     form                  fill the form's ACCOUNT-scope settings (an API key, a region)
+         │       │     folder(rule)          "Choose Signed-in Folder" — read who is signed in there
+         │       │     form                  fill the form's ACCOUNT-scope settings (slice 5)
          │       ├── patch                 by data source kind: what an added login changes (RFC 7396)
-         │       ├── identity              which fact names the login; a mismatch fails closed
-         │       └── nameFromEmail         the email names the pill
+         │       └── identity              which field names the login; a mismatch fails closed
          ├── settingsForm ◇                [Setting], each with a SCOPE: provider | account
          ├── accounts: [Account] ◆         NEVER EMPTY; [0] is the default
          │   └── Account ◆                 A LOGIN — no behaviour of its own
@@ -164,15 +174,16 @@ Account* button. A legacy provider (still a Swift `XxxProvider`) has
 `accounts: nil` by construction — it gains accounts in the slice that turns it
 into JSON, and not before.
 
-### `AddAccount` — the ways to add, a closed sum
+### The ways to add — one key each in `accounts`
 
 | Case | JSON | Carries | What it does |
 |---|---|---|---|
-| **folder** | `"folder": { savedAs, default, accountId: {fact, savedAs}, derived?, notSignedIn }` | where the login lives, which fact names it | reads the folder through the definition's own credential/context lookup (filled with that folder), refuses the default folder and duplicates, saves `{savedAs: folder, accountId.savedAs: fact}` |
-| **signIn** | `"signIn": { cli, args, homeVariable, unset, timeout }` | the vendor's login command | makes `~/.claudebar/accounts/<provider>/<uuid>/` (0700), runs `cli args` with `homeVariable=<folder>` and `unset` removed, waits; on exit 0 hands the folder to **folder** with `madeBy: .signIn` — never saves anything itself |
+| **folder** | `"folder": { savedAs, default, accountId: {field, savedAs}, email?, derived?, notSignedIn }` | where the login lives, which field names it | reads the folder through the definition's own credential/context lookup (filled with that folder), refuses the default folder and duplicates, saves `{savedAs: folder, accountId.savedAs: fact}` |
+| **signIn** | `"signIn": { cli, args, homeVariable, unset, timeout, alsoAt }` | the vendor's login command, and where else its CLI may be | makes `~/.claudebar/accounts/<provider>/<uuid>/` (0700), runs `cli args` with `homeVariable=<folder>` and `unset` removed, waits; on exit 0 the provider checks the folder as **folder** does, recorded `madeBy: .signIn` |
 | **form** | `"form": true` | — | renders the form's account-scope settings; non-secrets → `values`, secrets → the account's vault; then *Test Connection* with them before saving |
 
-`signIn` requires `folder` (it ends in one). `derived` — #358's
+`signIn` requires `folder` (it ends in one) — a definition with one and not
+the other is refused on load. `derived` — #358's
 `derivedValues`, e.g. Claude's Keychain service `Claude Code-credentials-<hash8>`
 — is a feature of the folder rule, so stays.
 
@@ -182,9 +193,9 @@ into JSON, and not before.
 
 | | |
 |---|---|
-| **Owns** | its id, label, values, enabled flag, last usage and sync state |
+| **Owns** | its id, label, values, how it was added (`madeBy`), enabled flag, last usage and sync state |
 | **Tell it** | nothing — the provider tells it `succeed(usage)` / `fail(error)` |
-| **It answers** | `displayName`, `status`, `email` (usage's, else what it was added with) |
+| **It answers** | `displayName`, `status`, `email` (usage's, else what it was added with), `folder: SignedInFolder?` |
 | **Never** | fetches; reads settings; downcasts a repository; knows a vendor; carries a secret's value |
 
 ### `Provider` — the lifecycle, once
@@ -194,9 +205,36 @@ into JSON, and not before.
 | | |
 |---|---|
 | **Owns** | which data source is active, the fallback, the in-flight refresh per account, binding each account's data sources |
-| **Tell it** | `add(_ config)`, `rename(account, to:)`, `remove(account)`, `refresh(account, kind)`, `use(kind)` |
-| **It answers** | `accounts`, `status`, `bestAccount`, `canAddAccounts` (`definition.accounts?.add` non-empty) |
-| **Never** | has a second refresh path; holds an `AIProvider` inside it; switches on its id |
+| **Tell it** | `signIn(with:under:)`, `addAccount(signedInAt:)`, `add(_ config)`, `rename(account, to:)`, `remove(account)`, `refresh(account, kind)`, `use(kind)` |
+| **It answers** | `accounts`, `status`, `bestAccount`, `hasSeveralAccounts`, the ways to add (`definition.accounts?.ways`) |
+| **Never** | has a second refresh path; holds an `AIProvider` inside it; switches on its id; touches the disk except through `LoginFolders` |
+
+It owns *Add Account* because only it knows its accounts: "already listed"
+and "the default login" are questions about them, so a caller never passes
+`existing:` in. (`AddedAccounts` — a namespace of procedures nobody could
+point at — is gone.)
+
+### `SignedInFolder` — where an added login lives
+
+> **Pointable as:** the folder *Choose Signed-in Folder* picks, or the one
+> *Sign in with browser* makes.
+
+| | |
+|---|---|
+| **Owns** | its path, and who made it (`madeBy`) |
+| **It answers** | `goesWithAccount` — true only for a folder ClaudeBar made by signing in, named `<uuid>` as it names them |
+| **Never** | decides from where it is on disk; deletes itself |
+
+### Ports — what a test stubs
+
+| Port | Real | Used by |
+|---|---|---|
+| `LoginFolders` (`exists` · `create` private and new · `delete`) | `DiskLoginFolders` | `Provider` (Remove, a failed sign-in), `AccountSignIn` |
+| `SignInProcess` (`run(executable:…) → exit status`) | `FoundationSignInProcess` — output never read | `AccountSignIn` |
+| `makeDataSource` | `DataSources.make` | `Provider` — reading who is signed in to a folder |
+
+Each is `@Mockable`, and the tests also keep in-memory fakes, so they check
+what exists afterwards rather than which calls were made.
 
 ---
 
@@ -212,13 +250,13 @@ ClaudeBarApp.init (composition root)
   ▼
 Providers.make(definition, settings, vault)
   │
-  ├─ default account:  definition.dataSources ──map──▶ DataSources.make(_, secrets: vault.scoped(nil))
+  ├─ default account:  definition.dataSources ──map──▶ DataSources.make(_, secrets: vault.scoped(to: "<id>"))
   │
   └─ for each config:  provider.add(config)
         │  definition.dataSources(forAccount: config.values)     patch merged, {{account.x}} filled
         │  ── a data source the patch nulls is left out for that login
         ▼
-        DataSources.make(_, secrets: vault.scoped(config.accountId))
+        DataSources.make(_, secrets: vault.scoped(to: "<id>.<acct>"))
         │
         └─ fails (bad folder, unfilled {{account.x}})?  → logged by account id, account left out.
                                                           The app never crashes.
@@ -231,31 +269,32 @@ Legacy providers enter the lineup as today: one `AIProvider`, one pill.
 ### 3.2 · Add Account
 
 ```text
- ProviderAccountsCard                      (renders definition.accounts.add — no switch on id)
+ ProviderAccountsCard                      (renders definition.accounts.ways — no switch on id)
    │
-   ├─ "Sign in with browser" ──▶ provider.signIn() ───────────────────────────┐
+   ├─ "Sign in with browser" ──▶ provider.signIn(with:under:) ─────────────────┐
    │                               │ AccountSignIn (DataSources worker)        │
-   │                               │   mkdir ~/.claudebar/accounts/<p>/<uuid>  │
+   │                               │   folders.create(<root>/<p>/<uuid>)       │
    │                               │   run signIn.cli signIn.args              │
    │                               │     env[homeVariable] = folder            │
    │                               │     env -= signIn.unset                   │
    │                               │   exit 0? else throw (folder removed)     │
    │                               ▼                                           │
-   ├─ "Choose Signed-in Folder" ─▶ AddedAccounts.check(definition, folder) ◀───┘
+   ├─ "Choose Signed-in Folder" ─▶ provider.addAccount(signedInAt:) ◀─────────┘
    │                               │ definition.dataSources(forAccount: {folder})
-   │                               │ → its credential + context lookups → facts
-   │                               │ refuse: default folder · duplicate · no login
+   │                               │ → its credential + context lookups → who
+   │                               │ refuse: default login · already listed · no key
+   │                               │ (a sign-in folder that fails here: folders.delete)
    │                               ▼
-   │                             ProviderAccountConfig { accountId: uuid, email, values }
+   │                             ProviderAccountConfig { accountId: uuid, email, values, madeBy }
    │
    └─ "Add Account" (form) ─────▶ form's account-scope settings
-                                   │ secrets → vault.scoped(uuid).save(name, value)
+                                   │ provider.addAccount(filling:) — secrets → vault.save(name, "<id>.<acct>")
                                    │ provider.testConnection(draft) — before saving
                                    ▼
                                  ProviderAccountConfig { accountId: uuid, values }
                                    │
                                    ▼
-               settings.addAccount(config) ; provider.add(config) ; monitor.add(account)
+               provider.add(config) — saves it ; monitor.add(account)
 ```
 
 One door in: `provider.add(config)`. The three ways differ only in how the
@@ -288,10 +327,10 @@ not again in `Provider` and not before the cache.
               settings.setLabel("work", account: account.id)      ONE store for default and added
               account.label = "work"
 "Remove"  → provider.remove(account)                               never the default
-              settings.removeAccount · vault.scoped(acct).deleteAll · bound/refreshTasks dropped
+              settings.removeAccount · vault.delete(each secret field, "<id>.<acct>") · bound/refreshTasks dropped
               config.madeBy == .signIn → its folder is deleted too (ClaudeBar made it, nobody else uses it)
               a folder the person chose, and the CLI's own files, are never touched
-Menu bar  → MenuBarLabel(accounts.map(\.displayName))              App — shortens, numbers collisions
+Menu bar  → MenuBarAccountName.names(displayNames)                 App — shortens, numbers collisions
 ```
 
 ---
@@ -336,7 +375,7 @@ provider with an `accounts` block gets it.
 │ ⋮⋮ (P) Personal         henry@personal.dev   ⓜ  ⋯        │ ← ⋮⋮ reorder → settings order
 │ ⋮⋮ (W) Work — Acme Corp henry@acme.com       ⓜ  ⋯        │ ← ⓜ = shown in the menu bar (pin)
 │ ⋮⋮ (S) Side Project     dev@sideproject.io  [Re-auth]    │ ← sync failed: re-run its way to add
-│ ┌ ⊕ Add Account ────────────────────────────────────┐    │ ← only when definition.accounts.add
+│ ┌ ⊕ Add Account ────────────────────────────────────┐    │ ← only when definition.accounts.ways
 │ └───────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────┘
   ⋯ = Rename · Pause (isEnabled) · Remove (not on the default)
@@ -360,7 +399,7 @@ provider with an `accounts` block gets it.
 ```text
  1 ⊕ Add Account
       │
- 2 HOW?   ← the cases of definition.accounts.add, nothing else:
+ 2 HOW?   ← definition.accounts.ways, nothing else:
       │      "Sign in with browser" (signIn) · "Choose Signed-in Folder" (folder) · "API key" (form)
       │      only one case? this step is skipped
       ▼
@@ -389,19 +428,19 @@ are the cases the definition declares (§8).
 | a provider has at least one account; the default's id is the provider id, an added one's `<provider>.<acct>` | `Provider.accounts` |
 | one definition serves every account — an added login's data sources are the definition patched and filled, never a hand-built copy | `ProviderDefinition.dataSources(forAccount:)` |
 | a provider without `accounts` cannot add one — the button is absent, not disabled | `ProviderDefinition.accounts` |
-| an account's secret is read only from that account's vault corner; a missing one is *Key needed*, never the default's key or the environment | `ProviderVault.scoped(_:)` |
+| an account's secret is read only from that account's vault corner; a missing one is *Key needed*, never the default's key or the environment | `SecretStore.scoped(to:)`, used by every added login's data sources |
 | an added login's CLI never sees the default login's credentials: what to set and unset is the definition's `patch`, per data source | the definition (data) — run by `CLIFetcher` |
 | usage shown under a login was fetched with that login's credential; a different identity fails closed with the definition's hint | `DataSource` (lookup) |
-| a folder already listed, or the default folder, is not added twice | `AddedAccounts` |
+| a folder already listed, or the default login, is not added twice | `Provider` (`addAccount`) |
 | sign-in never writes to an existing folder and saves nothing on failure, cancel or timeout | `AccountSignIn` |
 | display name is label, else email, else the provider's name | `Account.displayName` |
 | one refresh per account in flight; a failed refresh keeps the last usage | `Provider` |
 | today's usage and guest passes are read from the default login's files, so only the default login shows them | `Provider` (daily usage) · `Account.guestPasses` |
-| removing deletes only what ClaudeBar made — the account's settings, its vault corner, and its folder when `madeBy == .signIn`; never a folder the person chose or the CLI's files | `Provider.remove` |
+| removing deletes only what ClaudeBar made — the account's settings, its vault corner, and its folder when it goes with the account; never a folder the person chose or the CLI's files | `Provider.remove`, asking `SignedInFolder.goesWithAccount` |
 | a data source whose key lookup ClaudeBar cannot see (`fetch: script`) declares an `identity`, or the definition is refused on load | `ProviderDefinition` validation (`DefinitionError`) |
 | the data source choice is the provider's; a login the patch leaves without it uses the next on the fallback chain, and its usage says which | `Provider` |
-| a menu bar label is shortened for width and never widens to a full email | `MenuBarLabel` (App) |
-| an account is added only once its identity is known; *Add anyway* exists only after that step passed | `AddedAccounts` |
+| a menu bar name is shortened for width and never widens to a full email | `MenuBarAccountName` (App) |
+| an account is added only once its identity is known; *Add anyway* exists only after that step passed | `Provider` (`addAccount`) |
 | accounts keep the order the person gave them; the default is found by `isDefault`, not by position | `Provider.accounts` |
 | the provider's status names the account that causes it | `Provider.worstAccount` |
 
@@ -413,9 +452,9 @@ Two laws #358 put in two places, now one each: the identity check (it ran in
 
 ```swift
 // Card
-if provider.canAddAccounts { AddAccountMenu(ways: provider.definition.accounts!.add) }
-try await provider.signIn()                                    // signIn ∘ folder ∘ add
-try provider.add(AddedAccounts.check(provider.definition, folder: url, existing: settings.accounts(forProvider: provider.id)))
+if let ways = provider.definition.accounts?.ways { AddAccountMenu(ways: ways) }
+try await provider.signIn()                                    // sign in, check, add, save
+try provider.addAccount(signedInAt: url)                       // check, add, save
 provider.rename(account, to: name)
 provider.remove(account)
 
@@ -425,7 +464,7 @@ Providers.make(definition, settings: settings, vault: vault)   // binds every sa
 
 // Page
 Text(account.displayName)
-MenuBarLabel.labels(for: monitor.lineup)
+MenuBarAccountName.names(displayNames)
 ```
 
 Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
@@ -440,14 +479,15 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 | `claude.json` `accounts` (folder, patch, identity, `derivedValues`) | **kept** — re-flow the file to its original formatting |
 | context identity (`"context.account.email"` parsed as a string) | **built**: `IdentityField` — `"account"`, `"$credential.x"` or `"$context.file.field"`, written as the mapping writes paths, decoded once; used by `identity.field`, `folder.accountId.field` and `folder.email` |
 | `DataSource.fetchUsage` checks identity before the cache | **built**: checked with the lookup, before and after each fetch; a cached usage is what that login showed when it was fetched |
-| `BrowserAccountLogin` (Infrastructure, Codex defaults) | `AccountSignIn` worker in `DataSources`, driven by `accounts.add.signIn` in `codex.json` / `claude.json`; process behind the existing `CLIExecutor`-style port |
-| `BinaryLocator.findInApplicationBundles` | the definition's `cli` gains `alsoAt: [paths]`; the locator checks what it is told |
-| `Provider.rename`, `ProviderAccountConfig.named` | **kept**; default account's label stored by `MultiAccountSettingsRepository.setLabel(_:account:)`, which `Provider` receives typed — no downcast |
-| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | one `displayName`; the tooltip's "name (email)" is the page's |
-| `AccountMenuBarLabel` (Domain) | `MenuBarLabel` in App ([CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree): not in the model) |
-| `ProviderAccountsCard` | **kept**, rendering `accounts.add` cases and the form's account scope; no `switch provider.id` |
+| `BrowserAccountLogin` (Infrastructure, Codex defaults) | **built**: `AccountSignIn` in `DataSources`, driven by `accounts.signIn` in `codex.json` / `claude.json` (Claude: `claude auth login --claudeai`); the process behind `SignInProcess`, folders behind `LoginFolders` |
+| `AddedAccounts` (a static namespace) | **gone**: `provider.addAccount(signedInAt:)` and `provider.signIn(…)`; the deletable-folder rule is `SignedInFolder.goesWithAccount` |
+| `BinaryLocator.findInApplicationBundles` | **built** as `signIn.alsoAt: [paths]` — checked only when the CLI isn't on the PATH |
+| `Provider.rename`, `ProviderAccountConfig.named` | **built**: `Provider` receives `any MultiAccountSettingsRepository`, so `rename` and `remove` save without a downcast; the default login's name is `setDefaultAccountLabel` (`providers.<id>.defaultAccountLabel`); the unused `activeAccountId` is gone |
+| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | **built**: one `displayName`; `name` (the pill) is the product's while `provider.hasSeveralAccounts` is false; `nameFromEmail` is gone |
+| `AccountMenuBarLabel` (Domain) | **built**: `MenuBarAccountName` in App ([CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree): not in the model). Named so, not `MenuBarLabel`, which is already the quota text |
+| `ProviderAccountsCard` | **kept**, rendering `accounts.ways` and the form's account scope; no `switch provider.id` |
 | `CodexAccountsCard` | folded into `ProviderAccountsCard` |
-| `withDailyUsage` / `guestPasses` default-only | **kept as a `Provider` / `Account` law** (§4): both are injected Swift capabilities that read the default login's files, so the default-only rule stays beside them. It moves into data if those capabilities do |
+| `withDailyUsage` / `guestPasses` default-only | **kept as a `Provider` / `Account` law** (§4): both are injected Swift capabilities that read the default login's files, so the default-only rule stays beside them. **Follow-up:** today's usage is UsageHistory, which [CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree) keeps outside the tree, so `refresh` should stop merging it into an account's usage; the popover would read it beside the usage instead |
 
 ### What dies
 
@@ -455,7 +495,7 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 and `accountSources` · `LegacyAccountUsageSource` · `LegacyAccountConnections` ·
 `AccountConnectionRecipe` · `AccountCommandContext` · `CustomAccountConnections`
 · `ExtensionAccountConnections` · `ScopedCredentialRepository` (→
-`ProviderVault.scoped`) · `AccountNamingSettingsRepository` · the probe init
+`SecretStore.scoped(to:)`) · `AccountNamingSettingsRepository` · the probe init
 parameters added for accounts · `isolatedAccountCredentials` ·
 `docs/features/multi-account/universal-design.md` (this doc replaces it) · the
 per-provider "Accounts" paragraphs for providers that have `accounts: nil`.
@@ -467,11 +507,11 @@ Each slice one PR, test first, green.
 | # | Slice | Pins |
 |---|---|---|
 | 1 ✅ | **Claude accounts as data** — #358's `claude.json` block, typed `identity`, identity in lookup only; `ClaudeAccountsTests` | a Claude folder adds; another email in it fails closed; default untouched |
-| 2 | **Rename + display name** — `Account.displayName`, `setLabel` for default and added, `MenuBarLabel` in App | labels survive relaunch; one login shows the product name; collisions number, never widen |
-| 3 | **`accounts.add` sum + `signIn`** — `AccountSignIn` worker, `codex.json`/`claude.json` declare it; `cli.alsoAt` | cancel/timeout/fail leave no folder and no config; env carries only `homeVariable`, `unset` removed; *Remove* of a signed-in account deletes its folder, of a chosen one never — README's *Remove* paragraph updated |
-| 4 | **one Accounts card** (§3.5) — renders `accounts.add`, reorder, menu-bar pin, Rename · Pause · Remove, Re-auth; the 4-step Add Account sheet with VERIFY by step; `CodexAccountsCard` goes | a provider with `accounts: nil` shows no button; *Add anyway* is absent until identity passed; order survives relaunch |
-| 6 | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |
-| 5 | **`form` + `ProviderVault.scoped`** — account-scope settings in the form; custom definitions can declare `accounts` | an added account's missing key is *Key needed*, never the default's |
+| 2 ✅ | **Rename + display name** — `Account.displayName`, `setLabel` for default and added, `MenuBarAccountName` in App | labels survive relaunch; one login shows the product name; collisions number, never widen |
+| 3 ✅ | **`accounts.signIn` + the ways to add** — `AccountSignIn` worker, `codex.json`/`claude.json` declare it; `signIn.alsoAt`; `SignedInFolder`, `LoginFolders` | cancel/timeout/fail leave no folder and no config; env carries only `homeVariable`, `unset` removed; *Remove* of a signed-in account deletes its folder, of a chosen one never — README's *Remove* paragraph updated with the screen (slice 4) |
+| 4 ✅ | **one Accounts card** (§3.5) — renders `accounts.ways`, reorder, menu-bar pin, Rename · Pause · Remove, Re-auth; the 4-step Add Account sheet with VERIFY by step; `CodexAccountsCard` goes | a provider with `accounts: nil` shows no button; *Add anyway* is absent until identity passed; order survives relaunch |
+| 6 ✅ | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |
+| 5 ✅ | **`form` + scoped secrets** (`SecretStore.scoped(to:)`, `SecretVault`) — account-scope settings in the form; custom definitions can declare `accounts` | an added account's missing key is *Key needed*, never the default's |
 | — | legacy providers | gain accounts in TARGET slices 2 and 5, when they become JSON — by adding an `accounts` block, nothing else |
 
 ## 8 · Open questions
@@ -509,7 +549,7 @@ and *who owns the thing?* — never from what is easiest to build.
   ([CANONICAL §5](../../architecture/CANONICAL_MODEL.md#5--the-laws-on-the-node-that-owns-them):
   a budget judges one account's cost). Bedrock gets this when it becomes JSON
   in slice 5:
-  - `accounts.add.form` with `profile` as an account value, chosen from
+  - `accounts.form` with `profile` as an account value, chosen from
     `~/.aws/config`;
   - `budget` as an account-scope setting.
 
@@ -521,8 +561,7 @@ and *who owns the thing?* — never from what is easiest to build.
   `patch` leaves out the active kind (a form account with only a key has no
   CLI) uses the first remaining data source on the active one's fallback
   chain. Its pill says which one (*via API*), so the difference is never
-  silent. *Designed, not built:* today `Provider.dataSource(_:for:)` returns
-  nil and the refresh throws `noData`. (§4)
+  silent. **Built** (`ProviderTests`): the refresh starts at the next data source on the chain the login has. (§4)
 - ~~**Can the default account be renamed?**~~ **Yes.** Two people with
   *personal* and *work* logins do not think of one of them as the "default".
   That is ClaudeBar's word for the login the CLI already uses. *Rename* works
@@ -544,7 +583,7 @@ and *who owns the thing?* — never from what is easiest to build.
 - ~~**"CLI profile / API token" as the choice of how to fetch?**~~ **The
   choices are the definition's ways to add.** `claude --profile` does not
   exist: a Claude login lives in a config folder. Every provider's honest
-  choices are different, which is why they are data (`accounts.add`). A
+  choices are different, which is why they are data (`accounts.ways`). A
   provider with one way skips the step.
 - ~~**"Add anyway" when verification fails?**~~ **Only after identity
   passed.** If ClaudeBar knows *who* the login is but the fetch failed

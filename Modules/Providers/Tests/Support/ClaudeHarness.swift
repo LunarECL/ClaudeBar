@@ -39,7 +39,7 @@ struct ClaudeHarness {
     /// A `Provider` built from `claude.json` over these connections.
     @MainActor
     func provider(
-        settings: any ProviderSettingsRepository = InMemoryProviderSettings(),
+        settings: any MultiAccountSettingsRepository = InMemoryProviderSettings(),
         accounts: [ProviderAccountConfig] = [],
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
@@ -55,9 +55,7 @@ struct ClaudeHarness {
         ).defaultAccount
     }
 
-    /// Makes a definition live over these connections — what `AddedAccounts`
-    /// reads a chosen folder with.
-    func make(_ source: DataSourceDefinition) -> DataSource {
+    private func make(_ source: DataSourceDefinition) -> DataSource {
         let environment = self.environment
         let password = keychainPassword
         let now = self.now
