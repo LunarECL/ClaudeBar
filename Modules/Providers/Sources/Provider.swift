@@ -260,7 +260,7 @@ public final class Provider {
     /// Ready when the active data source is — or, failing that, the fallback
     /// it would hand over to.
     public func isAvailable(_ account: Account) async -> Bool {
-        guard let active = dataSource(activeKind, for: account) else { return false }
+        guard let active = startingDataSource(for: account) else { return false }
         if await active.isReady() { return true }
         guard let fallback = enabledFallback(of: active, for: account) else { return false }
         return await fallback.isReady()
@@ -272,7 +272,7 @@ public final class Provider {
     /// and not a fallback's, which would send the person chasing the wrong problem.
     @discardableResult
     public func refresh(_ account: Account, _ kind: RefreshKind = .interactive) async throws -> UsageSnapshot {
-        guard let active = dataSource(activeKind, for: account) else {
+        guard let active = startingDataSource(for: account) else {
             throw UsageError.noData
         }
         // Held back until one explicit refresh succeeded (#216): a CLI that
@@ -321,6 +321,18 @@ public final class Provider {
 
     private func dataSource(_ kind: String, for account: Account) -> DataSource? {
         dataSources(for: account).first { $0.kind == kind }
+    }
+
+    /// Where a login's refresh starts: the active data source — or, when the
+    /// login's patch left it out, the next one along its fallback chain.
+    private func startingDataSource(for account: Account) -> DataSource? {
+        var kind: String? = activeKind
+        var seen: Set<String> = []
+        while let current = kind, seen.insert(current).inserted {
+            if let source = dataSource(current, for: account) { return source }
+            kind = definition.dataSource(current)?.fallback?.to
+        }
+        return nil
     }
 
     private func run(_ account: Account, from start: DataSource, _ kind: RefreshKind) async throws -> UsageSnapshot {

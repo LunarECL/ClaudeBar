@@ -480,7 +480,7 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 | `AccountMenuBarLabel` (Domain) | **built**: `MenuBarAccountName` in App ([CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree): not in the model). Named so, not `MenuBarLabel`, which is already the quota text |
 | `ProviderAccountsCard` | **kept**, rendering `accounts.ways` and the form's account scope; no `switch provider.id` |
 | `CodexAccountsCard` | folded into `ProviderAccountsCard` |
-| `withDailyUsage` / `guestPasses` default-only | **kept as a `Provider` / `Account` law** (§4): both are injected Swift capabilities that read the default login's files, so the default-only rule stays beside them. It moves into data if those capabilities do |
+| `withDailyUsage` / `guestPasses` default-only | **kept as a `Provider` / `Account` law** (§4): both are injected Swift capabilities that read the default login's files, so the default-only rule stays beside them. **Follow-up:** today's usage is UsageHistory, which [CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree) keeps outside the tree, so `refresh` should stop merging it into an account's usage; the popover would read it beside the usage instead |
 
 ### What dies
 
@@ -554,8 +554,7 @@ and *who owns the thing?* — never from what is easiest to build.
   `patch` leaves out the active kind (a form account with only a key has no
   CLI) uses the first remaining data source on the active one's fallback
   chain. Its pill says which one (*via API*), so the difference is never
-  silent. *Designed, not built:* today `Provider.dataSource(_:for:)` returns
-  nil and the refresh throws `noData`. (§4)
+  silent. **Built** (`ProviderTests`): the refresh starts at the next data source on the chain the login has. (§4)
 - ~~**Can the default account be renamed?**~~ **Yes.** Two people with
   *personal* and *work* logins do not think of one of them as the "default".
   That is ClaudeBar's word for the login the CLI already uses. *Rename* works
