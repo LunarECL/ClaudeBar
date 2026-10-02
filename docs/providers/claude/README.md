@@ -21,11 +21,11 @@ Shows your Claude Code 5-hour session and weekly limits, any model-specific week
 
 Each mode falls back to the other when it fails. In API mode, **CLI fallback** (on by default) controls whether `claude /usage` runs when the API can't answer; turn it off if running the CLI causes prompts (e.g. SSH key prompts) and you'd rather see the error. A rate-limit error never triggers the fallback, because the CLI hits the same backend.
 
-## Custom Claude binary
+## CLI location
 
-The CLI data source and guest passes exec the Claude binary directly. If yours is not the `claude` on your PATH — a versioned install (`claude-work`), a different prefix, a wrapper script — set **Settings → Providers → Claude → Claude CLI Binary** to the binary's full path, or to a name that can be found in PATH. Leave it empty to keep using `claude`. A change applies the next time ClaudeBar starts.
+If ClaudeBar can't find the `claude` program, or finds a different one than you use, set **Settings → Providers → Claude → Configuration → CLI location**. Use **Choose…** to pick the program, or type its full path and press Return. The change takes effect immediately, for every account and for Add Account's sign-in. **Reset** goes back to finding `claude` on its own.
 
-A shell alias or function (`alias c=claude`, `claudel() { … }`) does **not** work here: ClaudeBar launches a process, not a shell, and a process can't run an alias. Point the setting at the real binary (or script) the alias calls — `which c` in a terminal shows where it leads.
+A shell alias or function (`alias c=…`) can't be used: ClaudeBar starts a program, not a shell. Run `which c` (or `type c`) in a terminal to see what the alias runs, and choose that. An alias that only points `claude` at another config folder is a second account, not a different program: add that folder in **Accounts → Add Account**.
 
 ## Permissions
 
@@ -41,6 +41,7 @@ A shell alias or function (`alias c=claude`, `claudel() { … }`) does **not** w
 - **Max or Pro billed through Apple showing "The Claude CLI did not see this account's subscription".** On some subscriptions `/usage` reports API billing instead of a plan — either the cost panel on its own, or "only available for subscription plans". ClaudeBar sees from `~/.claude.json` that you have a subscription, so it tries the API rather than showing $0.00. If the API also fails, run `claude login` again or switch to API mode.
 - **"Authentication required" when you're already signed in** usually means the Keychain read failed. The log records the `security` exit status. See [troubleshooting](../../troubleshooting.md).
 - **Account email and organization come from `~/.claude.json`**, because Claude CLI v2.1.79+ no longer shows them on the Usage tab.
+- **More than one Claude login?** Use **Accounts → Add Account** in the provider settings to sign in with your browser or choose a `CLAUDE_CONFIG_DIR` folder. See [multiple accounts](../../features/multi-account/README.md). Today's cost and guest passes stay with your usual login.
 - **Daily cost and token cards** read `~/.claude/projects/*/*.jsonl`. They're only calculated when the popover is open, not during background refreshes.
 - **Share Claude Code** (guest passes) only appears for Max accounts.
 - **Claude API Budget** in the same pane only applies to pay-as-you-go API accounts, not to Max or Pro Extra Usage.

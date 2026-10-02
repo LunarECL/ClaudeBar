@@ -35,6 +35,13 @@ public protocol ProviderSettingsRepository: Sendable {
 
     /// Saves a provider's on/off setting by name.
     func setOn(_ on: Bool, _ setting: String, forProvider id: String)
+
+    /// Where the provider's CLI lives on this Mac, when the person chose one
+    /// — *CLI location* (#210). `nil` means "find it as usual".
+    func cliPath(forProvider id: String) -> String?
+
+    /// Saves the CLI location; `nil` forgets it.
+    func setCLIPath(_ path: String?, forProvider id: String)
 }
 
 public extension ProviderSettingsRepository {
@@ -49,6 +56,12 @@ public extension ProviderSettingsRepository {
 
     /// Default for conformers that keep no such setting.
     func setOn(_ on: Bool, _ setting: String, forProvider id: String) {}
+
+    /// Default for conformers that keep no such setting: find the CLI as usual.
+    func cliPath(forProvider id: String) -> String? { nil }
+
+    /// Default for conformers that keep no such setting.
+    func setCLIPath(_ path: String?, forProvider id: String) {}
 }
 
 // MARK: - Default Implementation

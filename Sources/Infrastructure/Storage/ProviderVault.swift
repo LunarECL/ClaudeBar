@@ -4,7 +4,7 @@ import Foundation
 /// The vault custom providers read their keys from — ClaudeBar's credential
 /// store, under `provider.<id>.<name>`. A definition names the key; the value
 /// lives only here.
-public struct ProviderVault: SecretStore {
+public struct ProviderVault: SecretVault {
     private let credentials: any CredentialRepository
 
     public init(credentials: any CredentialRepository = KeychainCredentialRepository.shared) {

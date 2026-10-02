@@ -35,15 +35,6 @@ still hold — they are now lines in `claude.json`, pinned by
 | Guest passes | `claude /passes`, which copies the link to the clipboard | Max only (#243) |
 | Daily usage | `~/.claude/projects/*/*.jsonl` | Deduplicated by `(message.id, requestId)`, because Claude Code writes the same usage more than once |
 
-## Configurable CLI binary (#210)
-
-- `ClaudeSettingsRepository.claudeBinary()` stores the user's value — key `claude.binary` in `~/.claudebar/settings.json`, `providerConfig.claudeBinary` in the legacy UserDefaults store. The resolver `resolvedClaudeBinary()`, a default protocol implementation in the Domain layer, trims the value and falls back to `"claude"` when it is unset, empty, or whitespace-only.
-- Claude runs from `claude.json` (#329), so the resolver feeds `ProviderDefinition.runningCLI(_:)` in the Providers module: it re-points the `cli` field of the definition's `cli`/`jsonRpc` data sources with an RFC 7396 merge patch (`patched(with:)`), the same mechanism an added login uses. Only the executable changes — arguments, prompts, timeout and screen rendering ride along — and the definition stays valid (the `runningCLI` tests in `ClaudeCLIDefinitionTests` pin this).
-- `ClaudeBarApp.init` reads the resolved value once at construction and builds the claude provider from `definition.runningCLI(resolved)`; the same value goes to `ClaudeGuestPassSource(claudeBinary:)`, which locates (`CLIExecutor.locate`) and executes exactly that binary for `/passes`.
-- Security posture: the value is only ever the executable a data source or the guest-pass source hands the CLI executor — argv[0] of a process, resolved by `BinaryLocator`, which passes absolute paths through unchanged and `which`es bare names. It is never interpreted as a shell command line; nothing in the codebase builds a `sh -c`. Shell aliases and functions are unsupported by construction, because a subprocess has no shell to resolve them — the Settings help text says so (#210).
-- Settings UI: the `ClaudeCLICard` ("Claude CLI Binary") beside the Data source section and the budget card — the definition-driven `DataSourceSection` (#352) has no hook for a custom text field, so the setting lives in its own card and writes through `AppSettings.claude` (`setClaudeBinary`).
-- Changing the setting takes effect on the next app launch: the patched definition is built once in the composition root, not per refresh.
-
 ## Fallback chain
 
 `ClaudeProvider` runs the chosen mode first and, if it fails, the other one:
@@ -98,6 +89,20 @@ still hold — they are now lines in `claude.json`, pinned by
 - A failed Keychain read is logged with the `security` exit status. Before this, it looked like "no credentials" to someone who was signed in (#271).
 - A missing `~/.claude/.credentials.json` is *not* logged — it is the normal case on macOS, and the Keychain read that follows logs its own failure. So when `isAvailable()` says there are no credentials and nothing was logged, the file simply was not there and the Keychain read succeeded, which is not a failure to report (#317).
 
+## Added accounts
+
+A second Claude login lives in its own config folder, as `CLAUDE_CONFIG_DIR=<folder> claude` makes it. The `accounts` block in `claude.json` says everything; no Swift knows Claude. Design: [features/multi-account/design.md](../../features/multi-account/design.md).
+
+- **Choosing the folder** (`accounts.folder`). The folder must hold a key (`.credentials.json`, or the Keychain item below) and `.claude.json` with `oauthAccount.emailAddress`. The email names the login (`accountId.field: $context.account.email`) and is saved as `loginEmail`. A folder with an email but no key is not a login. Neither the default folder nor a login already listed is added again.
+- **Signing in** (`accounts.signIn`). `claude auth login --claudeai` runs with `CLAUDE_CONFIG_DIR` set to a new folder under `~/.claudebar/accounts/claude/`, and with the inherited Anthropic keys unset. Then that folder is checked like a chosen one. *Remove* deletes a folder made this way, and never a folder you chose. Not yet tried against a real login: whether `claude auth login` completes without a terminal attached.
+- **Keychain item.** For a config folder that isn't the default, Claude Code names its Keychain item `Claude Code-credentials-<first 8 hex digits of sha256(folder)>`. `accounts.folder.derived` works this out from the chosen path and saves it as `credentialService`. A folder signed in from a terminal with a different spelling of the same path (a symlink, a trailing slash) gets a different hash, so only its `.credentials.json` is found.
+- **Each data source, patched** (`accounts.patch`, RFC 7396):
+  - `cli` and `cliCost` run with `CLAUDE_CONFIG_DIR` set to the folder, and unset `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_PROFILE` and the `CLAUDE_CODE_USE_BEDROCK` / `_VERTEX` / `_FOUNDRY` switches. Without that, an inherited key would answer for the wrong account.
+  - Folder trust is written into the folder's own `.claude.json`.
+  - `api` looks up the folder's key only. There is no `CLAUDE_CODE_OAUTH_TOKEN` step, because a shared environment token belongs to nobody in particular. The OAuth refresh block is kept by the merge, so a refreshed token is written back to the folder's file or Keychain item.
+- **Identity, fail closed.** Every data source checks `$context.account.email` against `loginEmail` before fetching. If someone else has signed in to the folder since, the account reports *Reconnect the original Claude account in this folder* and shows no usage.
+- **Default login only:** today's usage (`UsageHistory`, read from the default login's local logs) and guest passes (read with the default login's CLI).
+
 ## Rate limiting (API)
 
 - A 429 stores `retryAt` from `Retry-After` (seconds or an HTTP date). If the header is missing, malformed, in the past or `0`, the wait is 5 minutes. The endpoint has been seen sending `Retry-After: 0` while still returning 429 (anthropics/claude-code#30930). Until `retryAt`, `probe()` returns straight away without touching the network.
@@ -105,5 +110,5 @@ still hold — they are now lines in `claude.json`, pinned by
 
 ## Known limits
 
-- The credential file path ignores `CLAUDE_CONFIG_DIR`. Only the trust write and `.claude.json` lookup respect it.
+- The default login's credential file path ignores `CLAUDE_CONFIG_DIR`. Only the trust write and `.claude.json` lookup respect it. An added login's paths all use its folder.
 - The OAuth `client_id` is Claude Code's. If Claude Code changes it, token refresh breaks.

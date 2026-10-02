@@ -432,11 +432,33 @@ struct ClaudeCLIDefinitionTests {
     }
 
     @Test
+    func `codex's rpc, terminal and sign-in all run the configured binary`() throws {
+        let definition = try Providers.builtIn("codex").runningCLI("/opt/tools/bin/codex-work")
+
+        guard case .jsonRpc(let rpc)? = definition.dataSource("rpc")?.fetch,
+              case .cli(let tty)? = definition.dataSource("tty")?.fetch else {
+            Issue.record("codex lost its rpc or terminal data source")
+            throw UsageError.noData
+        }
+        #expect(rpc.cli == "/opt/tools/bin/codex-work")
+        #expect(tty.cli == "/opt/tools/bin/codex-work")
+        #expect(definition.accounts?.signIn?.cli == "/opt/tools/bin/codex-work")
+        #expect(definition.accounts?.signIn?.args == (try Providers.builtIn("codex")).accounts?.signIn?.args)
+    }
+
+    @Test
+    func `claude's sign-in runs the configured binary`() throws {
+        let definition = try Providers.builtIn("claude").runningCLI("/opt/tools/bin/claude-work")
+
+        #expect(definition.accounts?.signIn?.cli == "/opt/tools/bin/claude-work")
+    }
+
+    @Test
     func `an empty, blank or unchanged name is a no-op`() throws {
         let claude = try Providers.builtIn("claude")
-        #expect(claude.runningCLI("") == claude)
-        #expect(claude.runningCLI("   \n ") == claude)
-        #expect(claude.runningCLI("claude") == claude)
+        #expect(try claude.runningCLI("") == claude)
+        #expect(try claude.runningCLI("   \n ") == claude)
+        #expect(try claude.runningCLI("claude") == claude)
     }
 
     @Test
@@ -455,7 +477,7 @@ struct ClaudeCLIDefinitionTests {
           ]
         }
         """.utf8))
-        #expect(definition.runningCLI("/opt/tools/bin/gemini-work") == definition)
+        #expect(try definition.runningCLI("/opt/tools/bin/gemini-work") == definition)
     }
 
     @Test
@@ -476,7 +498,7 @@ struct ClaudeCLIDefinitionTests {
         }
         """.utf8))
 
-        let rePointed = definition.runningCLI("/opt/tools/bin/codex-work")
+        let rePointed = try definition.runningCLI("/opt/tools/bin/codex-work")
         guard case .jsonRpc(let call)? = rePointed.dataSource("rpc")?.fetch else {
             Issue.record("rpc is not a JSON-RPC data source")
             throw UsageError.noData

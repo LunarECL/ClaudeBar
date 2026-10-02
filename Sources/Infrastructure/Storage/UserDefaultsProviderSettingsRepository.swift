@@ -61,6 +61,14 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(kind, forKey: "providerConfig.\(id)ProbeMode")
     }
 
+    public func cliPath(forProvider id: String) -> String? {
+        userDefaults.string(forKey: "providerConfig.\(id).cliPath")
+    }
+
+    public func setCLIPath(_ path: String?, forProvider id: String) {
+        userDefaults.set(path, forKey: "providerConfig.\(id).cliPath")
+    }
+
     /// `providerConfig.<id><Setting>` — e.g. `providerConfig.claudeCliFallbackEnabled`.
     public func isOn(_ setting: String, forProvider id: String) -> Bool? {
         let key = "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())"
@@ -269,14 +277,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
 
     public func setClaudeCliFallbackEnabled(_ enabled: Bool) {
         userDefaults.set(enabled, forKey: Keys.claudeCliFallbackEnabled)
-    }
-
-    public func claudeBinary() -> String {
-        userDefaults.string(forKey: Keys.claudeBinary) ?? ""
-    }
-
-    public func setClaudeBinary(_ binary: String) {
-        userDefaults.set(binary, forKey: Keys.claudeBinary)
     }
 
     // MARK: - CodexSettingsRepository
@@ -530,7 +530,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         // Claude settings
         static let claudeProbeMode = "providerConfig.claudeProbeMode"
         static let claudeCliFallbackEnabled = "providerConfig.claudeCliFallbackEnabled"
-        static let claudeBinary = "providerConfig.claudeBinary"
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
         static let codexVerifiedAtLeastOnce = "providerConfig.codexVerifiedAtLeastOnce"
@@ -576,5 +575,48 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
     /// Generates the UserDefaults key for a provider's enabled state
     private static func enabledKey(forProvider id: String) -> String {
         "provider.\(id).isEnabled"
+    }
+}
+
+// MARK: - MultiAccountSettingsRepository
+
+extension UserDefaultsProviderSettingsRepository: MultiAccountSettingsRepository {
+    public func accounts(forProvider id: String) -> [ProviderAccountConfig] {
+        guard let data = userDefaults.data(forKey: Self.accountsKey(id)) else { return [] }
+        return (try? JSONDecoder().decode([ProviderAccountConfig].self, from: data)) ?? []
+    }
+
+    public func addAccount(_ config: ProviderAccountConfig, forProvider id: String) {
+        writeAccounts(accounts(forProvider: id).filter { $0.accountId != config.accountId } + [config], forProvider: id)
+    }
+
+    public func removeAccount(accountId: String, forProvider id: String) {
+        writeAccounts(accounts(forProvider: id).filter { $0.accountId != accountId }, forProvider: id)
+    }
+
+    public func updateAccount(_ config: ProviderAccountConfig, forProvider id: String) {
+        writeAccounts(accounts(forProvider: id).map { $0.accountId == config.accountId ? config : $0 }, forProvider: id)
+    }
+
+    public func defaultAccountLabel(forProvider id: String) -> String? {
+        userDefaults.string(forKey: "providerConfig.\(id).defaultAccountLabel")
+    }
+
+    public func setDefaultAccountLabel(_ label: String?, forProvider id: String) {
+        userDefaults.set(label, forKey: "providerConfig.\(id).defaultAccountLabel")
+    }
+
+    public func accountOrder(forProvider id: String) -> [String] {
+        userDefaults.stringArray(forKey: "providerConfig.\(id).accountOrder") ?? []
+    }
+
+    public func setAccountOrder(_ accountIds: [String], forProvider id: String) {
+        userDefaults.set(accountIds, forKey: "providerConfig.\(id).accountOrder")
+    }
+
+    private static func accountsKey(_ id: String) -> String { "providerConfig.\(id).accounts" }
+
+    private func writeAccounts(_ configs: [ProviderAccountConfig], forProvider id: String) {
+        userDefaults.set(try? JSONEncoder().encode(configs), forKey: Self.accountsKey(id))
     }
 }

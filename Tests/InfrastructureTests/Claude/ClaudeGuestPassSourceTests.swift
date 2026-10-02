@@ -254,4 +254,14 @@ struct ClaudeGuestPassSourceTests {
             _ = try await probe.fetch()
         }
     }
+
+    @Test
+    func `guest passes run the claude cli at its chosen location`() async {
+        let mockExecutor = MockCLIExecutor()
+        given(mockExecutor).locate(.value("/opt/tools/bin/claude-work")).willReturn("/opt/tools/bin/claude-work")
+        given(mockExecutor).locate(.value("claude")).willReturn(nil)
+        let probe = ClaudeGuestPassSource(claudeBinary: { "/opt/tools/bin/claude-work" }, cliExecutor: mockExecutor)
+
+        #expect(await probe.isAvailable())
+    }
 }

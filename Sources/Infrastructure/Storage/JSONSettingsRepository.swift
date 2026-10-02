@@ -308,6 +308,14 @@ public final class JSONSettingsRepository:
         store.write(value: kind, key: "\(id).probeMode")
     }
 
+    public func cliPath(forProvider id: String) -> String? {
+        store.read(key: "providers.\(id).cliPath")
+    }
+
+    public func setCLIPath(_ path: String?, forProvider id: String) {
+        store.write(value: path, key: "providers.\(id).cliPath")
+    }
+
     /// `<id>.<setting>` — e.g. `claude.cliFallbackEnabled`, the key the Claude card writes.
     public func isOn(_ setting: String, forProvider id: String) -> Bool? {
         store.read(key: "\(id).\(setting)")
@@ -350,14 +358,6 @@ public final class JSONSettingsRepository:
 
     public func setClaudeCliFallbackEnabled(_ enabled: Bool) {
         store.write(value: enabled, key: "claude.cliFallbackEnabled")
-    }
-
-    public func claudeBinary() -> String {
-        store.read(key: "claude.binary") ?? ""
-    }
-
-    public func setClaudeBinary(_ binary: String) {
-        store.write(value: binary, key: "claude.binary")
     }
 
     // MARK: - CodexSettingsRepository
@@ -927,11 +927,6 @@ extension JSONSettingsRepository: MultiAccountSettingsRepository {
     public func removeAccount(accountId: String, forProvider id: String) {
         let remaining = accounts(forProvider: id).filter { $0.accountId != accountId }
         writeAccounts(remaining, forProvider: id)
-
-        // The active pointer must not outlive the account it points at.
-        if activeAccountId(forProvider: id) == accountId {
-            setActiveAccountId(nil, forProvider: id)
-        }
     }
 
     public func updateAccount(_ config: ProviderAccountConfig, forProvider id: String) {
@@ -941,18 +936,27 @@ extension JSONSettingsRepository: MultiAccountSettingsRepository {
         writeAccounts(configs, forProvider: id)
     }
 
-    public func activeAccountId(forProvider id: String) -> String? {
-        store.read(key: Self.activeAccountKey(id))
+    public func defaultAccountLabel(forProvider id: String) -> String? {
+        store.read(key: Self.defaultAccountLabelKey(id))
     }
 
-    public func setActiveAccountId(_ accountId: String?, forProvider id: String) {
-        store.write(value: accountId, key: Self.activeAccountKey(id))
+    public func setDefaultAccountLabel(_ label: String?, forProvider id: String) {
+        store.write(value: label, key: Self.defaultAccountLabelKey(id))
     }
 
     // MARK: Storage helpers
 
     private static func accountsKey(_ id: String) -> String { "providers.\(id).accounts" }
-    private static func activeAccountKey(_ id: String) -> String { "providers.\(id).activeAccountId" }
+    public func accountOrder(forProvider id: String) -> [String] {
+        store.read(key: Self.accountOrderKey(id)) ?? []
+    }
+
+    public func setAccountOrder(_ accountIds: [String], forProvider id: String) {
+        store.write(value: accountIds.isEmpty ? nil : accountIds, key: Self.accountOrderKey(id))
+    }
+
+    private static func defaultAccountLabelKey(_ id: String) -> String { "providers.\(id).defaultAccountLabel" }
+    private static func accountOrderKey(_ id: String) -> String { "providers.\(id).accountOrder" }
 
     private func writeAccounts(_ configs: [ProviderAccountConfig], forProvider id: String) {
         // Persist an empty list as a removal so the file stays free of empty arrays,

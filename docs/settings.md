@@ -31,6 +31,7 @@ A key that's missing means "use the default", so a fresh install starts with an 
 |---|---|---|
 | `app.*` | App-wide preferences: theme, menu bar readout, refresh, burn rate, status colors, notch, Touch Bar | `"app": { "burnRateWarningEnabled": true, "burnRateThreshold": 1.5 }` |
 | `providers.<id>.*` | Per-provider switches, keyed by the provider id | `"providers": { "gemini": { "isEnabled": false } }` |
+| `providers.<id>.cliPath` | The *CLI location* a person chose for a provider that runs a CLI; absent means "find it as usual" (#210) | `"providers": { "claude": { "cliPath": "/opt/tools/bin/claude" } }` |
 | `<provider>.*` | Settings only one provider has: probe mode, env var name, region, config path | `"kimi": { "probeMode": "api", "region": "international" }` |
 | `hook.*` | [Session hooks](features/session-hooks/README.md) | `"hook": { "enabled": true }` |
 | `notify.*` | [Notify!](features/notify/README.md) device link and surfaces | `"notify": { "enabled": true, "widgetEnabled": true }` |

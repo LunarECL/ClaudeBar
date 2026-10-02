@@ -193,66 +193,6 @@ struct UserDefaultsProviderSettingsRepositoryTests {
         #expect(repository.claudeCliFallbackEnabled() == false)
     }
 
-    // MARK: - Claude Binary
-
-    @Test
-    func `claudeBinary defaults to empty string`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        #expect(repository.claudeBinary() == "")
-    }
-
-    @Test
-    func `setClaudeBinary persists value`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        repository.setClaudeBinary("/opt/tools/bin/claude-work")
-        #expect(repository.claudeBinary() == "/opt/tools/bin/claude-work")
-    }
-
-    @Test
-    func `claudeBinary persists across repository instances`() {
-        let defaults = UserDefaults(suiteName: testSuiteName)!
-        defer { cleanupDefaults() }
-
-        let repository1 = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-        repository1.setClaudeBinary("/opt/tools/bin/claude-work")
-
-        let repository2 = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-        #expect(repository2.claudeBinary() == "/opt/tools/bin/claude-work")
-    }
-
-    @Test
-    func `resolvedClaudeBinary defaults to claude`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        #expect(repository.resolvedClaudeBinary() == "claude")
-    }
-
-    @Test
-    func `resolvedClaudeBinary returns the configured binary`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        repository.setClaudeBinary("/opt/tools/bin/claude-work")
-        #expect(repository.resolvedClaudeBinary() == "/opt/tools/bin/claude-work")
-    }
-
-    @Test
-    func `resolvedClaudeBinary falls back to claude for empty or whitespace setting`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        repository.setClaudeBinary("   ")
-        #expect(repository.resolvedClaudeBinary() == "claude")
-
-        repository.setClaudeBinary("")
-        #expect(repository.resolvedClaudeBinary() == "claude")
-    }
-
     // MARK: - Kimi Region
 
     @Test

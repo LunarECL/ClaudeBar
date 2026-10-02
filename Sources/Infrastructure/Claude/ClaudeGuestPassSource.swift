@@ -19,13 +19,15 @@ public final class SystemClipboardReader: ClipboardReader, @unchecked Sendable {
 /// Probes the Claude CLI to fetch guest pass information.
 /// Executes `claude /passes` which copies the referral link to clipboard.
 public final class ClaudeGuestPassSource: GuestPassSource, @unchecked Sendable {
-    private let claudeBinary: String
+    /// The Claude CLI to run — the provider's *CLI location* when the person
+    /// chose one, read each time so a change applies at once (#210).
+    private let claudeBinary: @Sendable () -> String
     private let timeout: TimeInterval
     private let cliExecutor: CLIExecutor
     private let clipboardReader: ClipboardReader
 
     public init(
-        claudeBinary: String = "claude",
+        claudeBinary: @escaping @Sendable () -> String = { "claude" },
         timeout: TimeInterval = 20.0,
         cliExecutor: CLIExecutor? = nil,
         clipboardReader: ClipboardReader? = nil
@@ -42,13 +44,13 @@ public final class ClaudeGuestPassSource: GuestPassSource, @unchecked Sendable {
 
     /// Checks if the Claude CLI is available
     public func isAvailable() async -> Bool {
-        if cliExecutor.locate(claudeBinary) != nil {
+        if cliExecutor.locate(claudeBinary()) != nil {
             return true
         }
 
         // Log diagnostic info when binary not found
         let env = ProcessInfo.processInfo.environment
-        AppLog.probes.error("Claude binary '\(claudeBinary)' not found in PATH")
+        AppLog.probes.error("Claude binary '\(claudeBinary())' not found in PATH")
         AppLog.probes.info("Current directory: \(FileManager.default.currentDirectoryPath)")
         AppLog.probes.info("PATH: \(env["PATH"] ?? "<not set>")")
         if let configDir = env["CLAUDE_CONFIG_DIR"] {
@@ -66,7 +68,7 @@ public final class ClaudeGuestPassSource: GuestPassSource, @unchecked Sendable {
         let result: CLIResult
         do {
             result = try await cliExecutor.execute(
-                binary: claudeBinary,
+                binary: claudeBinary(),
                 args: ["/passes", "--allowed-tools", ""],
                 input: "",
                 timeout: timeout,

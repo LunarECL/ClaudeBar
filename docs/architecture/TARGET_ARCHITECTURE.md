@@ -353,7 +353,7 @@ other field), because the CLI that owns that file must keep working.
 | `JSONMapper` · `TextMapper` | every mapping feature | small JSON/text fixtures, one feature per test |
 | a mapping script | the old probe's screens and responses, quota for quota | run through its definition in `ProvidersTests` (`ClaudeHarness`), never by calling JavaScript directly |
 | `DataSource` | look up → fetch → map, `fetchResponse` stops before mapping, 401-refresh-retry, each error's step | built with mocked connections |
-| `Provider` | lifecycle: keeps usage on failure, fallback, `use`, enabled persists | data sources over mocked connections |
+| `Provider` | lifecycle: keeps usage on failure, fallback (and a switched-off one), a rate limit not handed over, one request for overlapping refreshes, `use`, the background floor, held until checked (#216), status across logins | `ProviderTests`: a provider no vendor ships ("Acme") over a fake `NetworkClient` |
 | each definition | **golden test**: today's recorded responses (`Tests/…/Fixtures/codex/`) through the definition produce exactly the snapshot today's probe produced | the fixtures are captured from the current probe tests before the probe is deleted |
 | the catalog | every bundled definition decodes | one test over `Resources/Providers/*.json` |
 
@@ -390,9 +390,10 @@ vendor type:
 | 15-minute cache, a remembered 429 | `cache.ttl` (also the background floor) and rate-limit memory on `DataSource` |
 | the account's email and billing type | `context` files handed to the mapping |
 | the folder-trust prompt | `recover.patchJSONFile`, tried once |
-| Codex logins in their own folders (#326) | `accounts` (`nameFromEmail`, `folder`), `{{account.x}}`, `identity` (fail closed when a folder signs in to someone else), `requiresFiles` (#216), `verifyBeforeBackground`, JSON-RPC `then` + `environment`, `#jwt.claim` and `$credential.` paths |
+| Codex logins in their own folders (#326) | `accounts` (`folder`), `{{account.x}}`, `identity` (fail closed when a folder signs in to someone else), `requiresFiles` (#216), `verifyBeforeBackground`, JSON-RPC `then` + `environment`, `#jwt.claim` and `$credential.` paths |
 | the usage API's model limits, plan and money | JSON mapping rules, not a script: `each` + `where`, names by `firstWord`/`lowercase`, `unique` (first wins), `overLimit` (negative left), `countdown: "hours"`, `plan.plans` from `$credential.`, and a list of `cost` shapes with `when` and exact `{amount, decimals}` minor units |
-| today's usage and guest passes | `Provider.dailyUsage` (interactive refreshes only) and the `GuestPasses` capability |
+| today's usage and guest passes | `UsageHistory` beside the providers (read with the popover open, never in the background; keyed by the login whose logs it reads) and the `GuestPasses` capability |
+| Claude logins in their own config folders | `accounts.folder` with `email` and `accountId.field` as an `IdentityField` (`$context.account.email`), `derived` values (the Keychain service, from a sha256 of the folder), `identity` read from a context file; today's usage and guest passes stay with the default login |
 
 ## 9 · Open
 
@@ -406,7 +407,8 @@ vendor type:
   a definition declares how an account is added (`accounts.folder` today, an
   account-scope setting in the form later); the provider owns `[Account]`;
   one definition serves every account, the account's values filled when the
-  fetch runs. Accounts are simultaneous — each is a pill. Claude (slice 7)
-  follows the same shape. **Built** for Codex (#356): `accounts.patch` and
-  `{{account.x}}`, one `Provider` owning its `Account`s.
+  fetch runs. Accounts are simultaneous. **Built** for Codex (#356) and
+  Claude (`claude.json`'s `accounts`): `accounts.patch` and `{{account.x}}`,
+  one `Provider` owning its `Account`s. The rest is designed in
+  [features/multi-account/design.md](../features/multi-account/design.md).
 - **A `command` fetch from the UI** — see [CANONICAL_MODEL §9](CANONICAL_MODEL.md#9--open).

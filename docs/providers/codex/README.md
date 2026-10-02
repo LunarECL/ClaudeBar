@@ -14,7 +14,7 @@ Shows your OpenAI Codex rate-limit windows (usually the 5-hour session and weekl
 
 ## Multiple accounts
 
-Use **Codex Accounts → Add Codex Account** in the provider settings to link another independent ChatGPT login. Accounts are identified by email and can be pinned separately in the menu bar. See [multiple accounts](../../features/multi-account/README.md) for setup and reconnect instructions.
+Use **Accounts → Add Account** in the provider settings to add another ChatGPT login: sign in with your browser, or choose a Codex folder that's already signed in. Accounts are told apart by their ChatGPT account, so two workspaces under one email are two accounts. Each can be named and pinned separately in the menu bar. See [multiple accounts](../../features/multi-account/README.md) for setup and reconnect instructions.
 
 ## Probe modes
 
@@ -24,6 +24,12 @@ Use **Codex Accounts → Add Codex Account** in the provider settings to link an
 | API | A ChatGPT sign-in saved in `~/.codex/auth.json` | You'd rather not start a `codex` process on every refresh |
 
 RPC mode starts `codex app-server` for each refresh and asks it for your rate limits. If that fails it runs `codex` with `/status` and reads the screen instead. API mode calls the ChatGPT usage endpoint directly and refreshes the token in `~/.codex/auth.json` when it's more than 8 days old. Neither mode falls back to the other, so if one keeps failing, switch modes.
+
+## CLI location
+
+If ClaudeBar can't find the `codex` program, or finds a different one than you use, set **Settings → Providers → Codex → Configuration → CLI location**. Use **Choose…** to pick the program, or type its full path and press Return. The change takes effect immediately, for every account and for Add Account's sign-in. **Reset** goes back to finding `codex` on its own.
+
+A shell alias or function (`alias c=…`) can't be used: ClaudeBar starts a program, not a shell. Run `which c` (or `type c`) in a terminal to see what the alias runs, and choose that. An alias that only points `codex` at another config folder is a second account, not a different program: add that folder in **Accounts → Add Account**.
 
 ## Gotchas
 

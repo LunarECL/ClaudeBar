@@ -23,22 +23,12 @@ struct ClaudeBarApp: App {
     @MainActor
     private static func builtIn(
         _ id: String,
-        settings: any ProviderSettingsRepository,
+        settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
-        dailyUsage: (any DailyUsageAnalyzing)? = nil,
-        guestPasses: GuestPasses? = nil,
-        runningCLI binary: String? = nil
+        guestPasses: GuestPasses? = nil
     ) -> Provider {
         do {
-            var definition = try Providers.builtIn(id)
-            if let binary { definition = definition.runningCLI(binary) }
-            return Providers.make(
-                definition,
-                settings: settings,
-                accounts: accounts,
-                dailyUsage: dailyUsage,
-                guestPasses: guestPasses
-            )
+            return try Providers.make(id, settings: settings, accounts: accounts, guestPasses: guestPasses)
         } catch {
             preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
         }
@@ -50,6 +40,9 @@ struct ClaudeBarApp: App {
 
     /// Monitors Claude Code sessions via hook events
     @State private var sessionMonitor: SessionMonitor
+
+    /// Today's usage from local session logs — beside the providers, not in them.
+    @State private var usageHistory: UsageHistory
 
     /// Drives the menu-bar pixels and the background-refresh lifecycle
     /// imperatively, outside SwiftUI — the MenuBarExtra label hosting can
@@ -106,22 +99,25 @@ struct ClaudeBarApp: App {
         let settingsRepository = JSONSettingsRepository.shared
 
         // Claude is data: Modules/Providers/Resources/Providers/claude.json
-        // and the mapping scripts beside it. What isn't usage rides along:
-        // today's usage from local session logs (#190 keeps loopback
-        // inference free) and guest passes. The CLI binary is the user's
-        // setting (#210): a real path or PATH-resolvable name, defaulting
-        // to "claude" — used only as the executable the definitions and the
-        // guest-pass probe run, never a shell line.
-        let claudeBinary = settingsRepository.resolvedClaudeBinary()
+        // and the mapping scripts beside it. Guest passes ride along, the
+        // default login's. Logins added beside it live in their own config
+        // folders.
         let claude = Self.builtIn(
             "claude",
             settings: settingsRepository,
-            dailyUsage: ClaudeDailyUsageAnalyzer(
-                isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }
-            ),
-            guestPasses: GuestPasses(source: ClaudeGuestPassSource(claudeBinary: claudeBinary)),
-            runningCLI: claudeBinary
+            accounts: settingsRepository.accounts(forProvider: "claude"),
+            // Guest passes run the same Claude CLI, at its CLI location (#210).
+            guestPasses: GuestPasses(source: ClaudeGuestPassSource(
+                claudeBinary: { settingsRepository.cliPath(forProvider: "claude") ?? "claude" }
+            ))
         )
+        // Today's usage is read from local session logs, not a meter, so it
+        // lives beside the providers: Claude's logs are its default login's
+        // (#190 keeps loopback inference free).
+        let usageHistory = UsageHistory(logs: [
+            "claude": ClaudeDailyUsageAnalyzer(isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }),
+        ])
+        self.usageHistory = usageHistory
         // Codex is data: Modules/Providers/Resources/Providers/codex.json — the
         // product once, with the logins added beside the default one (#326).
         let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
@@ -192,8 +188,8 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
         ])
-        // Added Codex logins follow the built-in lineup, as they always have.
-        for account in codex.accounts.dropFirst() {
+        // Added logins follow the built-in lineup, as they always have.
+        for account in (claude.accounts + codex.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after
@@ -201,7 +197,9 @@ struct ClaudeBarApp: App {
         let vault = ProviderVault()
         for definition in ProviderCatalog().custom() {
             Providers.register(custom: definition)
-            repository.add(Providers.make(definition, settings: settingsRepository, secrets: vault).defaultAccount)
+            let custom = Providers.make(definition, settings: settingsRepository,
+                                        accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault)
+            for account in custom.accounts { repository.add(account) }
         }
         AppLog.providers.info("Created \(repository.all.count) providers")
 
@@ -233,6 +231,7 @@ struct ClaudeBarApp: App {
         notchDriver = NotchWindowDriver(
             monitor: monitor,
             sessionMonitor: sessionMonitor,
+            usageHistory: usageHistory,
             settings: AppSettings.shared
         )
         notchDriver.startWhenLaunched()
@@ -377,13 +376,13 @@ struct ClaudeBarApp: App {
         MenuBarExtra {
             Group {
                 #if ENABLE_SPARKLE
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, onClose: { isMenuPresented = false }) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, usageHistory: usageHistory, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)
                     .environment(\.sparkleUpdater, sparkleUpdater)
                 #else
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, onClose: { isMenuPresented = false }) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, usageHistory: usageHistory, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)

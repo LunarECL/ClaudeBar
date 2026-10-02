@@ -19,7 +19,7 @@ struct DataSourceSectionTextTests {
         #expect(text.title == "Codex Configuration")
         #expect(text.subtitle == "Data fetching method for all Codex accounts")
         #expect(text.origin == "Built in")
-        #expect(DataSourceSectionText(definition: try claude()).subtitle == "Data fetching method")
+        #expect(DataSourceSectionText(definition: try claude()).subtitle == "Data fetching method for all Claude accounts")
     }
 
     @Test
@@ -58,5 +58,25 @@ struct DataSourceSectionTextTests {
         #expect(DataSourceSectionText.testResult(.success(Response(text: "screen"))) == "Connected")
         #expect(DataSourceSectionText.testResult(.failure(DataSourceError(.lookup, .authenticationRequired)))
             .hasPrefix("Couldn't read your key · "))
+    }
+
+    @Test
+    func `a provider that runs a cli says where it finds it`() throws {
+        let text = DataSourceSectionText(definition: try claude())
+
+        #expect(text.cliLocation?.placeholder == "Found automatically: claude")
+        #expect(text.cliLocation?.help.contains("Add Account") == true)
+    }
+
+    @Test
+    func `a provider without a cli has no cli location`() throws {
+        var draft = ProviderDraft(start: .api)
+        draft.url = "https://example.test/usage"
+        draft.key = .apiKey
+        draft.measure = .percentUsed
+        draft.used = "$.used"
+        draft.name = "Example"
+
+        #expect(DataSourceSectionText(definition: try draft.definition(id: "custom-example")).cliLocation == nil)
     }
 }

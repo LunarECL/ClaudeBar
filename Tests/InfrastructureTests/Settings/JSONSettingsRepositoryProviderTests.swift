@@ -147,52 +147,6 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.claudeCliFallbackEnabled() == false)
     }
 
-    @Test
-    func `claudeBinary defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.claudeBinary() == "")
-    }
-
-    @Test
-    func `setClaudeBinary persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setClaudeBinary("/opt/tools/bin/claude-work")
-        #expect(repo.claudeBinary() == "/opt/tools/bin/claude-work")
-    }
-
-    @Test
-    func `resolvedClaudeBinary defaults to claude`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.resolvedClaudeBinary() == "claude")
-    }
-
-    @Test
-    func `resolvedClaudeBinary returns the configured binary`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setClaudeBinary("/opt/tools/bin/claude-work")
-        #expect(repo.resolvedClaudeBinary() == "/opt/tools/bin/claude-work")
-    }
-
-    @Test
-    func `resolvedClaudeBinary falls back to claude for empty or whitespace setting`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setClaudeBinary("   ")
-        #expect(repo.resolvedClaudeBinary() == "claude")
-
-        repo.setClaudeBinary("")
-        #expect(repo.resolvedClaudeBinary() == "claude")
-    }
-
     // MARK: - Codex Settings
 
     @Test
