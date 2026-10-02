@@ -62,7 +62,7 @@ struct ProviderTests {
                 .queryItems?.first { $0.name == "login" }?.value ?? ""
             lock.withLock { asked.append(host) }
             await waitIfHeld()
-            let answer = lock.withLock { answers["\(host)/\(login)"] ?? answers[host] } ?? (500, "{}")
+            let answer: (status: Int, body: String) = lock.withLock { answers["\(host)/\(login)"] ?? answers[host] } ?? (500, "{}")
             let headers = answer.status == 429 ? ["Retry-After": "60"] : [:]
             return (Data(answer.body.utf8),
                     HTTPURLResponse(url: request.url!, statusCode: answer.status, httpVersion: nil, headerFields: headers)!)
