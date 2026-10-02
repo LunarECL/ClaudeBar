@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.4.95] - 2026-10-02
+
 ### Added
 - CLI location: when ClaudeBar can't find Claude's or Codex's CLI, or finds the wrong one, choose the program in Settings → Providers → Configuration. It applies at once, to every account and to sign-in. ([#361](https://github.com/tddworks/ClaudeBar/pull/361))
 - Settings → Providers lists the providers you turned on first, so the one you use isn't at the bottom of the list. ([#141](https://github.com/tddworks/ClaudeBar/issues/141))
@@ -1173,7 +1177,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.94...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.95...HEAD
+[0.4.95]: https://github.com/tddworks/ClaudeBar/compare/v0.4.94...v0.4.95
 [0.4.94]: https://github.com/tddworks/ClaudeBar/compare/v0.4.93...v0.4.94
 [0.4.93]: https://github.com/tddworks/ClaudeBar/compare/v0.4.92...v0.4.93
 [0.4.92]: https://github.com/tddworks/ClaudeBar/compare/v0.4.91...v0.4.92
