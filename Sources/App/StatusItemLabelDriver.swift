@@ -183,7 +183,7 @@ final class StatusItemLabelDriver {
 
     private func currentLabelContent() -> LabelContent {
         let primaryQuotaKey = settings.menuBarPercentageQuotaKey.isEmpty
-            ? (monitor.provider(for: settings.menuBarPercentageProviderId)?.snapshot?.quotas.first?.quotaType.quotaKey ?? "session")
+            ? (monitor.provider(for: settings.menuBarPercentageProviderId).flatMap { monitor.usage(of: $0) }?.quotas.first?.quotaType.quotaKey ?? "session")
             : settings.menuBarPercentageQuotaKey
         let freshLabel = monitor.menuBarLabel(
             providerId: settings.menuBarPercentageProviderId,
@@ -266,7 +266,7 @@ final class StatusItemLabelDriver {
     /// Status of the selected provider, considering the burn-rate setting.
     /// Mirrors the dropdown's status logic for the icon-only fallback.
     private var effectiveSelectedProviderStatus: QuotaStatus {
-        monitor.selectedProvider?.snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy
+        monitor.selectedProvider.flatMap { monitor.usage(of: $0) }?.overallStatus(under: settings.statusPolicy) ?? .healthy
     }
 
     private func render(_ content: LabelContent) {

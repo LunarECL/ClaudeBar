@@ -134,6 +134,53 @@ struct UserDefaultsProviderSettingsRepositoryTests {
         #expect(enabled == true)
     }
 
+    // MARK: - Hidden Quota Keys (issue #140)
+
+    @Test
+    func `hiddenQuotaKeys defaults to empty`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        #expect(repository.hiddenQuotaKeys(forProvider: "gemini") == [])
+    }
+
+    @Test
+    func `setHiddenQuotaKeys persists across repository instances`() {
+        let defaults = UserDefaults(suiteName: testSuiteName)!
+        defer { cleanupDefaults() }
+
+        let repository1 = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        repository1.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
+
+        let repository2 = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+
+        #expect(repository2.hiddenQuotaKeys(forProvider: "gemini") == ["model:gemini-2.0-flash"])
+    }
+
+    @Test
+    func `hiddenQuotaKeys is per provider`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
+        repository.setHiddenQuotaKeys(["weekly"], forProvider: "codex")
+
+        #expect(repository.hiddenQuotaKeys(forProvider: "gemini") == ["model:gemini-2.0-flash"])
+        #expect(repository.hiddenQuotaKeys(forProvider: "codex") == ["weekly"])
+        #expect(repository.hiddenQuotaKeys(forProvider: "claude") == [])
+    }
+
+    @Test
+    func `setHiddenQuotaKeys with empty set clears the stored keys`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
+        repository.setHiddenQuotaKeys([], forProvider: "gemini")
+
+        #expect(repository.hiddenQuotaKeys(forProvider: "gemini") == [])
+    }
+
     // MARK: - Copilot Monthly Limit Tests
 
     @Test

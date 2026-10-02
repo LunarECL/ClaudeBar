@@ -91,7 +91,7 @@ private struct ProviderListRow: View {
     @State private var isHovering = false
 
     private var lowestQuota: UsageQuota? {
-        provider.snapshot?.lowestQuota
+        monitor.usage(of: provider)?.lowestQuota
     }
 
     private var statusText: String {
@@ -221,6 +221,8 @@ private struct ProviderDetailView: View {
                 if provider.isEnabled {
                     configCard
 
+                    QuotaVisibilityCard(provider: provider, monitor: monitor)
+
                     SettingsCard {
                         SettingsFieldLabel(text: "CUSTOM WEB CARD")
                             .padding(.bottom, 8)
@@ -305,6 +307,59 @@ private struct ProviderDetailView: View {
                     configRepository: AppSettings.shared.extensionConfig
                 )
             }
+        }
+    }
+}
+
+// MARK: - Quotas (issue #140)
+
+/// *QUOTAS* — one switch per quota the provider reports, so a person can
+/// stop watching the ones they never use (Gemini Flash 2.0, …). A hidden
+/// quota is never shown and never sets a status or an alert, anywhere: the
+/// monitor leaves it out of the usage every surface reads.
+private struct QuotaVisibilityCard: View {
+    let provider: any AIProvider
+    let monitor: QuotaMonitor
+
+    @Environment(\.appTheme) private var theme
+    @State private var refused: String?
+
+    var body: some View {
+        SettingsCard {
+            SettingsFieldLabel(text: "QUOTAS")
+                .padding(.bottom, 12)
+
+            if let quotas = provider.snapshot?.quotas, quotas.count > 1 {
+                VStack(spacing: 0) {
+                    ForEach(Array(quotas.enumerated()), id: \.element.quotaType) { index, quota in
+                        if index > 0 {
+                            SettingsRowDivider()
+                        }
+                        toggleRow(quota)
+                    }
+                }
+                Text(refused ?? "Turn off a quota you don't use: it disappears everywhere and no longer sets \(provider.name)'s status or alerts.")
+                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(refused == nil ? theme.textTertiary : theme.statusWarning)
+                    .padding(.top, 8)
+            } else {
+                Text("No quotas to choose from yet. Refresh \(provider.name) once, then pick the ones you watch.")
+                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+            }
+        }
+    }
+
+    private func toggleRow(_ quota: UsageQuota) -> some View {
+        let key = quota.quotaType.quotaKey
+        return SettingsRow(title: quota.compactTitle ?? quota.quotaType.displayName, subtitle: nil) {
+            SettingsSwitch(isOn: Binding(
+                get: { !monitor.hiddenQuotaKeys(for: provider).contains(key) },
+                set: { watched in
+                    refused = monitor.setQuota(key, hidden: !watched, for: provider)
+                        ? nil : "Keep at least one quota: \(provider.name) needs something to watch."
+                }
+            ))
         }
     }
 }
