@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import DataSources
 import Domain
 import Providers
@@ -20,6 +21,8 @@ struct DataSourceSection: View {
     @State private var testResult: String?
     @State private var testFailed = false
     @State private var isTesting = false
+    @State private var cliPath = ""
+    @State private var cliPathError: String?
 
     private var text: DataSourceSectionText { DataSourceSectionText(definition: provider.definition) }
 
@@ -138,11 +141,64 @@ struct DataSourceSection: View {
                 fallbackRow(fallback)
             }
 
+            if let location = text.cliLocation {
+                cliLocationRow(location)
+            }
+
             testConnection
         }
         // Fill the card, aligned with its header — a disclosure group centres
         // content that is narrower than itself.
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// *CLI LOCATION* — saved when the person presses Return or picks a file.
+    private func cliLocationRow(_ location: (placeholder: String, help: String)) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("CLI LOCATION")
+            HStack(spacing: 6) {
+                TextField(location.placeholder, text: $cliPath)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 10, design: .monospaced))
+                    .onSubmit { saveCLIPath() }
+                Button("Choose…") { chooseCLI() }
+                    .controlSize(.small)
+                if provider.cliPath != nil {
+                    Button("Reset") { cliPath = ""; saveCLIPath() }
+                        .controlSize(.small)
+                }
+            }
+            Text(cliPathError ?? location.help)
+                .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                .foregroundStyle(cliPathError == nil ? theme.textTertiary : theme.statusWarning)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onAppear { cliPath = provider.cliPath ?? "" }
+    }
+
+    private func saveCLIPath() {
+        do {
+            try provider.setCLIPath(cliPath)
+            cliPathError = nil
+            cliPath = provider.cliPath ?? ""
+        } catch {
+            cliPathError = error.localizedDescription
+        }
+    }
+
+    private func chooseCLI() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.showsHiddenFiles = true
+        panel.treatsFilePackagesAsDirectories = true
+        panel.prompt = "Use"
+        panel.message = "Choose the \(provider.definition.cli ?? provider.name) program."
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            cliPath = url.path
+            saveCLIPath()
+        }
     }
 
     private func choiceRow(_ choice: DataSourceSectionText.Choice) -> some View {

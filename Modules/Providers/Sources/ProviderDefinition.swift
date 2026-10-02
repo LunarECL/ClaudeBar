@@ -285,6 +285,44 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     public func dataSource(_ kind: String) -> DataSourceDefinition? {
         dataSources.first { $0.kind == kind }
     }
+
+    /// The same definition running `binary` instead of its CLI's name — the
+    /// person's *CLI location* (#210). Only the executable changes: every
+    /// CLI and JSON-RPC data source keeps its arguments, prompts and
+    /// timing, and so does Add Account's sign-in. The value reaches a
+    /// subprocess as argv[0], never a shell command line. An empty,
+    /// whitespace-only or unchanged name is a no-op.
+    public func runningCLI(_ binary: String) throws -> ProviderDefinition {
+        let binary = binary.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let cli, !binary.isEmpty, binary != cli else { return self }
+        let sources = try dataSources.map { source -> DataSourceDefinition in
+            let tag: String
+            switch source.fetch {
+            case .cli(let call) where call.cli == cli: tag = "cli"
+            case .jsonRpc(let call) where call.cli == cli: tag = "jsonRpc"
+            default: return source
+            }
+            return try source.patched(with: .object(["fetch": .object([tag: .object(["cli": .string(binary)])])]))
+        }
+        var accounts = accounts
+        if let signIn = accounts?.signIn, signIn.cli == cli {
+            accounts = Accounts(
+                folder: accounts?.folder,
+                signIn: SignInCall(cli: binary, args: signIn.args, homeVariable: signIn.homeVariable,
+                                   unset: signIn.unset, timeout: signIn.timeout, alsoAt: signIn.alsoAt),
+                form: accounts?.form ?? [],
+                patch: accounts?.patch ?? [:]
+            )
+        }
+        return ProviderDefinition(
+            profile: profile,
+            cli: cli,
+            enabledByDefault: enabledByDefault,
+            dataSources: sources,
+            defaultDataSource: defaultDataSource,
+            accounts: accounts
+        )
+    }
 }
 
 public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {

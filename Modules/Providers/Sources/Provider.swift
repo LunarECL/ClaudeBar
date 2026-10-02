@@ -35,6 +35,13 @@ public final class Provider {
     private let vault: (any SecretVault)?
     /// Where added logins' folders are made and deleted.
     private let folders: any LoginFolders
+    /// Whether a path is a program the CLI location may point at.
+    private let isExecutable: @Sendable (String) -> Bool
+    /// The definition as it runs here: the CLI at the person's location.
+    @ObservationIgnored private var running: ProviderDefinition
+    /// *CLI location* — where this provider's CLI lives on this Mac, when the
+    /// person chose one (#210). `nil` finds it as usual.
+    public private(set) var cliPath: String?
     @ObservationIgnored private var bound: [String: [DataSource]] = [:]
     @ObservationIgnored private var refreshTasks: [String: Task<UsageSnapshot, Error>] = [:]
 
@@ -47,17 +54,27 @@ public final class Provider {
         makeDataSource: @escaping (DataSourceDefinition, String) -> DataSource,
         guestPasses: GuestPasses? = nil,
         folders: any LoginFolders = DiskLoginFolders(),
-        vault: (any SecretVault)? = nil
+        vault: (any SecretVault)? = nil,
+        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) {
         self.folders = folders
         self.vault = vault
+        self.isExecutable = isExecutable
         self.definition = definition
+        let cliPath = settings.cliPath(forProvider: definition.id)
+        self.cliPath = cliPath
+        do {
+            self.running = try definition.runningCLI(cliPath ?? "")
+        } catch {
+            AppLog.providers.error("\(definition.id): can't run the CLI at the saved location: \(error.localizedDescription)")
+            self.running = definition
+        }
         self.settings = settings
         self.makeDataSource = makeDataSource
         self.guestPasses = guestPasses
         let label = settings.defaultAccountLabel(forProvider: definition.id) ?? ""
         self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: label), values: [:])]
-        bound[definition.id] = definition.dataSources.map { makeDataSource($0, definition.id) }
+        bound[definition.id] = running.dataSources.map { makeDataSource($0, definition.id) }
         for config in accounts {
             attach(config)
         }
@@ -77,11 +94,34 @@ public final class Provider {
         accounts: [ProviderAccountConfig] = [],
         makeDataSource: @escaping (DataSourceDefinition) -> DataSource,
         guestPasses: GuestPasses? = nil,
-        folders: any LoginFolders = DiskLoginFolders()
+        folders: any LoginFolders = DiskLoginFolders(),
+        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) {
         self.init(definition: definition, settings: settings, accounts: accounts,
                   makeDataSource: { source, _ in makeDataSource(source) },
-                  guestPasses: guestPasses, folders: folders)
+                  guestPasses: guestPasses, folders: folders, isExecutable: isExecutable)
+    }
+
+    // MARK: - CLI location
+
+    /// *CLI location* — runs this provider's CLI from `path` for every login
+    /// and for Add Account's sign-in, saved and in effect at once. Empty goes
+    /// back to finding the CLI as usual. A path that isn't a program is
+    /// refused, and nothing changes.
+    public func setCLIPath(_ path: String?) throws {
+        let trimmed = (path ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let chosen = trimmed.isEmpty ? nil : NSString(string: trimmed).expandingTildeInPath
+        if let chosen, !isExecutable(chosen) {
+            throw UsageError.executionFailed("\(chosen) isn't a program ClaudeBar can run. Choose the \(definition.cli ?? name) executable itself.")
+        }
+        let running = try definition.runningCLI(chosen ?? "")
+        self.running = running
+        cliPath = chosen
+        settings.setCLIPath(chosen, forProvider: id)
+        for account in accounts {
+            let sources = account.isDefault ? running.dataSources : try running.dataSources(forAccount: account.values)
+            bound[account.id] = sources.map { makeDataSource($0, account.id) }
+        }
     }
 
     public var id: String { definition.id }
@@ -107,7 +147,7 @@ public final class Provider {
             return nil
         }
         do {
-            bound[login.id] = try definition.dataSources(forAccount: config.probeConfig).map { makeDataSource($0, login.id) }
+            bound[login.id] = try running.dataSources(forAccount: config.probeConfig).map { makeDataSource($0, login.id) }
         } catch {
             AppLog.providers.error("\(definition.id): can't run account \(login.id): \(error.localizedDescription)")
             return nil
@@ -178,7 +218,7 @@ public final class Provider {
     /// that ends up holding no new login is deleted.
     @discardableResult
     public func signIn(with runner: AccountSignIn = AccountSignIn(), under root: URL = SignedInFolder.signInRoot) async throws -> Account {
-        guard let call = definition.accounts?.signIn else {
+        guard let call = running.accounts?.signIn else {
             throw UsageError.executionFailed("\(name) has no sign-in.")
         }
         let folder = SignedInFolder.forSignIn(to: id, under: root)
@@ -227,7 +267,7 @@ public final class Provider {
     /// up a key, filled with them. A folder whose key does not answer holds
     /// no login, whatever else it holds.
     private func signedIn(with values: [String: String], rule: ProviderDefinition.Accounts.Folder) -> (accountId: String?, email: String?)? {
-        guard let source = try? definition.dataSources(forAccount: values).first(where: { $0.credential != nil }) else { return nil }
+        guard let source = try? running.dataSources(forAccount: values).first(where: { $0.credential != nil }) else { return nil }
         let live = makeDataSource(source, "\(id).new")
         guard live.hasKey else { return nil }
         return (live.value(of: rule.accountId.field).flatMap { $0.isEmpty ? nil : $0 }, live.value(of: rule.email))
@@ -260,7 +300,7 @@ public final class Provider {
     /// person chose is theirs to sign in to; ClaudeBar never runs a login there.
     @discardableResult
     public func signInAgain(_ account: Account, with runner: AccountSignIn = AccountSignIn()) async throws -> UsageSnapshot {
-        guard let call = definition.accounts?.signIn, let folder = account.folder, folder.goesWithAccount else {
+        guard let call = running.accounts?.signIn, let folder = account.folder, folder.goesWithAccount else {
             throw UsageError.executionFailed("Sign in again in this folder yourself, then refresh.")
         }
         try await runner.signInAgain(call, in: folder.url)

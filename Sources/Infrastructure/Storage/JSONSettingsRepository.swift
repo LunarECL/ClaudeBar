@@ -316,6 +316,14 @@ public final class JSONSettingsRepository:
         store.write(value: kind, key: "\(id).probeMode")
     }
 
+    public func cliPath(forProvider id: String) -> String? {
+        store.read(key: "providers.\(id).cliPath")
+    }
+
+    public func setCLIPath(_ path: String?, forProvider id: String) {
+        store.write(value: path, key: "providers.\(id).cliPath")
+    }
+
     /// `<id>.<setting>` — e.g. `claude.cliFallbackEnabled`, the key the Claude card writes.
     public func isOn(_ setting: String, forProvider id: String) -> Bool? {
         store.read(key: "\(id).\(setting)")
