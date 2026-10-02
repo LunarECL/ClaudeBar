@@ -15,6 +15,7 @@ struct AddProviderSheet: View {
     let onDone: () -> Void
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
 
     private enum Step: Int, CaseIterable {
         case start, connect, map, look
@@ -459,15 +460,19 @@ struct AddProviderSheet: View {
 
         label("SYMBOL · COLOUR")
         HStack(spacing: 10) {
-            Image(systemName: draft.symbol ?? "gauge.with.dots.needle.33percent")
+            Image(systemName: draft.symbol ?? baseLook?.symbol ?? "gauge.with.dots.needle.33percent")
                 .font(.system(size: 18))
                 .foregroundStyle(color)
                 .frame(width: 28)
-            TextField("SF Symbol", text: Binding(get: { draft.symbol ?? "" }, set: { draft.symbol = $0.isEmpty ? nil : $0 }))
+            TextField(baseLook?.symbol ?? "SF Symbol", text: Binding(get: { draft.symbol ?? "" }, set: { draft.symbol = $0.isEmpty ? nil : $0 }))
                 .textFieldStyle(.roundedBorder)
-            ColorPicker("", selection: $color, supportsOpacity: false)
+            // Only the person picking a colour changes it — showing the
+            // copied provider's colour is not a change.
+            ColorPicker("", selection: Binding(get: { color }, set: { color = $0; colorChanged = true }), supportsOpacity: false)
                 .labelsHidden()
-                .onChange(of: color) { _, _ in colorChanged = true }
+        }
+        .onAppear {
+            if !colorChanged, let base = baseLook?.color { color = base.color(for: colorScheme) }
         }
 
         label("DASHBOARD (OPTIONAL)")
@@ -485,6 +490,12 @@ struct AddProviderSheet: View {
                 .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.statusWarning)
         }
+    }
+
+    /// The look a copy keeps unless the person changes it.
+    private var baseLook: ProviderLook? {
+        guard case .copy(let source) = draft.start else { return nil }
+        return source.profile.look
     }
 
     /// A copy of a provider whose key the person gave ClaudeBar needs that key

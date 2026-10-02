@@ -39,7 +39,8 @@ struct ClaudeHarness {
     /// A `Provider` built from `claude.json` over these connections.
     @MainActor
     func provider(
-        settings: any ProviderSettingsRepository = InMemoryProviderSettings(),
+        settings: any MultiAccountSettingsRepository = InMemoryProviderSettings(),
+        accounts: [ProviderAccountConfig] = [],
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
     ) throws -> Account {
@@ -47,6 +48,7 @@ struct ClaudeHarness {
         return Provider(
             definition: definition,
             settings: settings,
+            accounts: accounts,
             makeDataSource: make,
             dailyUsage: dailyUsage,
             guestPasses: guestPasses
@@ -172,6 +174,23 @@ struct ClaudeHarness {
         let url = home.appendingPathComponent(".claude/.credentials.json")
         let document = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         return document?["claudeAiOauth"] as? [String: Any] ?? [:]
+    }
+
+    /// A separate Claude config folder (`CLAUDE_CONFIG_DIR`) signed in as
+    /// `email`: its `.claude.json` and `.credentials.json`.
+    @discardableResult
+    func writeLogin(in name: String, email: String?, token: String = "token") throws -> URL {
+        let folder = home.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let config: [String: Any] = email.map { ["oauthAccount": ["emailAddress": $0]] } ?? [:]
+        try JSONSerialization.data(withJSONObject: config).write(to: folder.appendingPathComponent(".claude.json"))
+        let oauth: [String: Any] = [
+            "accessToken": token, "subscriptionType": "pro",
+            "expiresAt": Date().addingTimeInterval(3600).timeIntervalSince1970 * 1000,
+        ]
+        try JSONSerialization.data(withJSONObject: ["claudeAiOauth": oauth])
+            .write(to: folder.appendingPathComponent(".credentials.json"))
+        return folder
     }
 
     static func response(_ status: Int, _ headers: [String: String] = [:]) -> HTTPURLResponse {
