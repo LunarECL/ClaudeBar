@@ -76,6 +76,7 @@ struct DeepSeekDefinitionTests {
                        "Bearer work": #"{"balance_infos":[{"currency":"CNY","total_balance":"7"}]}"#]
         let provider = try make(vault: vault, environment: ["DEEPSEEK_API_KEY": "environment"], balancesByKey: replies)
         let work = try provider.addAccount(filling: ["apiKey": "work"])
+        #expect(work.isEnabled)
         let personalUsage = try await provider.defaultAccount.refresh()
         let workUsage = try await work.refresh()
         #expect(personalUsage.quotas.first?.left == .money(Money(40, currency: "USD"), of: nil))
@@ -145,8 +146,11 @@ struct DeepSeekDefinitionTests {
         #expect(settings.accounts(forProvider: "deepseek").first?.probeConfig["apiKey"] == nil)
         #expect(vault.secrets["\(work.id).apiKey"] == "work")
         let reloaded = try make(vault: vault, settings: settings)
+        #expect(reloaded.accounts[1].isEnabled)
         let usage = try await reloaded.accounts[1].refresh()
         #expect(usage.providerId == work.id)
+        reloaded.accounts[1].isEnabled = false
+        #expect(try make(vault: vault, settings: settings).accounts[1].isEnabled == false)
         vault.secrets["\(work.id).apiKey"] = nil
         await #expect(throws: UsageError.authenticationRequired) { try await work.refresh() }
         #expect(work.lastFailedStep == .lookup)

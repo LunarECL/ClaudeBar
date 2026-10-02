@@ -75,7 +75,9 @@ An added login changes the credential rule to `setting: apiKey` and reads
 `provider.deepseek.<UUID>.apiKey`. It never reads a process environment key or
 the default-login migration entry. `accounts.form` drives the existing shared
 Add Account, rename, pause, reorder, pin and remove flows. Account configuration
-stores identity/origin, not the key.
+stores identity/origin, not the key. Explicitly adding a key-based account
+activates that login, even though the unconfigured default starts disabled;
+a later pause remains saved across relaunches.
 
 ## Validation
 

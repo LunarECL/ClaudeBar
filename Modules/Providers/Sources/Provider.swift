@@ -210,6 +210,9 @@ public final class Provider {
             for name in secrets.keys { vault?.delete(name, provider: lineupId) }
             throw UsageError.executionFailed("This \(name) account can't be added.")
         }
+        // Supplying this login's key is an explicit opt-in, even when the
+        // product's unconfigured default login starts disabled.
+        account.isEnabled = true
         return account
     }
 
