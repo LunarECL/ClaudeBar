@@ -56,6 +56,16 @@ final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked
         kinds[id] = kind
     }
 
+    private var cliPaths: [String: String] = [:]
+
+    func cliPath(forProvider id: String) -> String? {
+        cliPaths[id]
+    }
+
+    func setCLIPath(_ path: String?, forProvider id: String) {
+        cliPaths[id] = path
+    }
+
     // MARK: - Accounts
 
     func accounts(forProvider id: String) -> [ProviderAccountConfig] {

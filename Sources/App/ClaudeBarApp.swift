@@ -106,7 +106,10 @@ struct ClaudeBarApp: App {
             "claude",
             settings: settingsRepository,
             accounts: settingsRepository.accounts(forProvider: "claude"),
-            guestPasses: GuestPasses(source: ClaudeGuestPassSource())
+            // Guest passes run the same Claude CLI, at its CLI location (#210).
+            guestPasses: GuestPasses(source: ClaudeGuestPassSource(
+                claudeBinary: { settingsRepository.cliPath(forProvider: "claude") ?? "claude" }
+            ))
         )
         // Today's usage is read from local session logs, not a meter, so it
         // lives beside the providers: Claude's logs are its default login's

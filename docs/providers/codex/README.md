@@ -25,6 +25,12 @@ Use **Accounts → Add Account** in the provider settings to add another ChatGPT
 
 RPC mode starts `codex app-server` for each refresh and asks it for your rate limits. If that fails it runs `codex` with `/status` and reads the screen instead. API mode calls the ChatGPT usage endpoint directly and refreshes the token in `~/.codex/auth.json` when it's more than 8 days old. Neither mode falls back to the other, so if one keeps failing, switch modes.
 
+## CLI location
+
+If ClaudeBar can't find the `codex` program, or finds a different one than you use, set **Settings → Providers → Codex → Configuration → CLI location**. Use **Choose…** to pick the program, or type its full path and press Return. The change takes effect immediately, for every account and for Add Account's sign-in. **Reset** goes back to finding `codex` on its own.
+
+A shell alias or function (`alias c=…`) can't be used: ClaudeBar starts a program, not a shell. Run `which c` (or `type c`) in a terminal to see what the alias runs, and choose that. An alias that only points `codex` at another config folder is a second account, not a different program: add that folder in **Accounts → Add Account**.
+
 ## Gotchas
 
 - **Sign in with ChatGPT, not an API key.** API mode reads only the OAuth tokens in `~/.codex/auth.json`. `OPENAI_API_KEY` isn't used. If the pane says "No OAuth credentials found", run `codex` and sign in.

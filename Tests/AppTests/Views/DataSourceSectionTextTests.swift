@@ -59,4 +59,24 @@ struct DataSourceSectionTextTests {
         #expect(DataSourceSectionText.testResult(.failure(DataSourceError(.lookup, .authenticationRequired)))
             .hasPrefix("Couldn't read your key · "))
     }
+
+    @Test
+    func `a provider that runs a cli says where it finds it`() throws {
+        let text = DataSourceSectionText(definition: try claude())
+
+        #expect(text.cliLocation?.placeholder == "Found automatically: claude")
+        #expect(text.cliLocation?.help.contains("Add Account") == true)
+    }
+
+    @Test
+    func `a provider without a cli has no cli location`() throws {
+        var draft = ProviderDraft(start: .api)
+        draft.url = "https://example.test/usage"
+        draft.key = .apiKey
+        draft.measure = .percentUsed
+        draft.used = "$.used"
+        draft.name = "Example"
+
+        #expect(DataSourceSectionText(definition: try draft.definition(id: "custom-example")).cliLocation == nil)
+    }
 }

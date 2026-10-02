@@ -36,7 +36,11 @@ struct StubbedProvider {
 
     /// The provider with its default login and every login in `accounts`,
     /// its data sources on the stubbed connections.
-    func makeProvider(_ id: String, accounts: [ProviderAccountConfig] = []) throws -> Provider {
+    func makeProvider(
+        _ id: String,
+        accounts: [ProviderAccountConfig] = [],
+        isExecutable: @escaping @Sendable (String) -> Bool = { _ in true }
+    ) throws -> Provider {
         let transport = self.transport
         let launches = self.launches
         let environment = self.environment
@@ -63,7 +67,8 @@ struct StubbedProvider {
                     now: { Date() }
                 )
             },
-            folders: folders
+            folders: folders,
+            isExecutable: isExecutable
         )
     }
 

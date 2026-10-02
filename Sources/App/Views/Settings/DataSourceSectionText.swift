@@ -30,6 +30,15 @@ struct DataSourceSectionText {
         }
     }
 
+    /// *CLI LOCATION* — for a provider that runs a CLI: what it finds on its
+    /// own, and where the chosen program is used (#210).
+    var cliLocation: (placeholder: String, help: String)? {
+        definition.cli.map { cli in
+            ("Found automatically: \(cli)",
+             "The \(cli) program ClaudeBar runs for every account and for Add Account's sign-in. Choose one when yours isn't found, or isn't the one you want. A shell alias can't be used: choose the program it runs.")
+        }
+    }
+
     /// The data sources a person can pick — not the ones only a fallback reaches.
     var choices: [Choice] {
         definition.dataSources.filter { !$0.hidden }.map {

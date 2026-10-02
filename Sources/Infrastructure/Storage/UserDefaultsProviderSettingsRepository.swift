@@ -61,6 +61,14 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(kind, forKey: "providerConfig.\(id)ProbeMode")
     }
 
+    public func cliPath(forProvider id: String) -> String? {
+        userDefaults.string(forKey: "providerConfig.\(id).cliPath")
+    }
+
+    public func setCLIPath(_ path: String?, forProvider id: String) {
+        userDefaults.set(path, forKey: "providerConfig.\(id).cliPath")
+    }
+
     /// `providerConfig.<id><Setting>` — e.g. `providerConfig.claudeCliFallbackEnabled`.
     public func isOn(_ setting: String, forProvider id: String) -> Bool? {
         let key = "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())"
