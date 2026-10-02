@@ -414,8 +414,11 @@ complete line:
 | Same inode, larger, prefix guard matches | Parse from the saved offset; append the new records |
 | Anything else (new inode, shrink, guard mismatch, whole-second `ctime`) | Parse the whole file |
 
-- **Prefix guard**: a hash of the first and last 64 KB of the bytes already read,
-  so a rewrite that keeps or grows the size is caught without re-reading the file.
+- **Prefix guard**: a hash of the first and last 64 KB of the bytes already read.
+  It catches a file truncated and rewritten, or changed at either edge, without
+  re-reading it. It does not catch a same-length edit in the middle of a prefix
+  over 128 KB; the cache relies on Claude Code only appending, and anything else
+  is out of scope.
 - **Unterminated last line**: its record counts, but the offset stays before it and
   the next read parses it again. Unkeyed records are never deduplicated (§3), so
   resuming inside the line or counting it twice would both corrupt the totals.

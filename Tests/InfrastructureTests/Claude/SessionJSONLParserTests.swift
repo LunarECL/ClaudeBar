@@ -98,6 +98,22 @@ struct SessionJSONLParserTests {
         #expect(chunk.tail.map(\.model) == ["claude-haiku-4-5"])
     }
 
+    @Test func `parses a line longer than one read`() throws {
+        // A pasted image or large tool result can make one line several MB.
+        let padding = String(repeating: "x", count: 3 * 1024 * 1024)
+        let long = #"{"type":"assistant","message":{"model":"claude-sonnet-4-6","content":"\#(padding)","usage":{"input_tokens":1,"output_tokens":1}},"timestamp":"2026-03-11T10:00:00.000Z"}"#
+        let short = #"{"type":"assistant","message":{"model":"claude-opus-4-6","usage":{"input_tokens":2,"output_tokens":2}},"timestamp":"2026-03-11T10:01:00.000Z"}"#
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).jsonl")
+        try "\(long)\n\(short)\n".write(to: fileURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let chunk = try parser.parse(fileURL: fileURL, fromOffset: 0)
+
+        #expect(chunk.records.map(\.model) == ["claude-sonnet-4-6", "claude-opus-4-6"])
+        #expect(chunk.endOffset == UInt64(long.utf8.count + short.utf8.count + 2))
+        #expect(chunk.tail.isEmpty)
+    }
+
     @Test func `ignores usage that only appears inside a quoted string`() {
         let jsonl = #"""
         {"type":"user","message":{"role":"user","content":"the \"usage\" field of an \"assistant\" line"},"timestamp":"2026-03-11T10:00:00.000Z"}

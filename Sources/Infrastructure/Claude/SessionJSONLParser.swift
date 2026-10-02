@@ -52,8 +52,10 @@ struct SessionJSONLParser {
         var endOffset = offset
         var pending = Data()
         while let data = try handle.read(upToCount: Self.readChunkSize), !data.isEmpty {
+            // `pending` holds no newline before this read, so only the new bytes need searching.
+            let searchFrom = pending.count
             pending.append(data)
-            let consumed = scanCompleteLines(in: pending, formatters: formatters, into: &records)
+            let consumed = scanCompleteLines(in: pending, searchingFrom: searchFrom, formatters: formatters, into: &records)
             endOffset += UInt64(consumed)
             pending.removeSubrange(pending.startIndex..<pending.startIndex + consumed)
         }
@@ -65,7 +67,7 @@ struct SessionJSONLParser {
         let data = Data(content.utf8)
         let formatters = Formatters()
         var records: [TokenUsageRecord] = []
-        let consumed = scanCompleteLines(in: data, formatters: formatters, into: &records)
+        let consumed = scanCompleteLines(in: data, searchingFrom: 0, formatters: formatters, into: &records)
         return records + parseTail(data.dropFirst(consumed), formatters: formatters)
     }
 
@@ -88,19 +90,27 @@ struct SessionJSONLParser {
     }
 
     /// Appends a record for each newline-terminated line in `data` and returns how
-    /// many bytes those lines span.
-    private func scanCompleteLines(in data: Data, formatters: Formatters, into records: inout [TokenUsageRecord]) -> Int {
+    /// many bytes those lines span. The first newline is searched for from
+    /// `searchFrom`, which callers set past bytes already known to hold none.
+    private func scanCompleteLines(
+        in data: Data,
+        searchingFrom searchFrom: Int,
+        formatters: Formatters,
+        into records: inout [TokenUsageRecord]
+    ) -> Int {
         data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> Int in
             guard let base = buffer.baseAddress else { return 0 }
             var lineStart = 0
-            while lineStart < buffer.count,
-                  let found = memchr(base + lineStart, Int32(Self.newline), buffer.count - lineStart) {
+            var searchStart = searchFrom
+            while searchStart < buffer.count,
+                  let found = memchr(base + searchStart, Int32(Self.newline), buffer.count - searchStart) {
                 let lineEnd = UnsafeRawPointer(found) - base
                 let line = UnsafeRawBufferPointer(rebasing: buffer[lineStart..<lineEnd])
                 if let record = parseLine(line, formatters: formatters) {
                     records.append(record)
                 }
                 lineStart = lineEnd + 1
+                searchStart = lineStart
             }
             return lineStart
         }

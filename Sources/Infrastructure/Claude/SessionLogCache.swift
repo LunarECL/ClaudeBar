@@ -86,8 +86,10 @@ actor SessionLogCache {
         return Entry(stamp: stamp, endOffset: chunk.endOffset, prefixGuard: guardHash, records: chunk.records, tail: chunk.tail)
     }
 
-    /// Hash of the first and last `guardBytes` of the file's first `length` bytes:
-    /// a bounded check that the part already read is still the same bytes.
+    /// Hash of the first and last `guardBytes` of the file's first `length` bytes.
+    /// A bounded spot check, not a proof: it catches truncate-and-rewrite and changed
+    /// edges, but not a same-length edit in the middle of a prefix over 128 KB, which
+    /// the append-only assumption above rules out.
     private func prefixGuard(of url: URL, length: UInt64) -> Int? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
