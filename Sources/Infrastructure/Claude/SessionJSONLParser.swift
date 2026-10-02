@@ -20,46 +20,120 @@ struct TokenUsageRecord: Sendable, Equatable {
     }
 }
 
+/// Usage records read from part of a session file: the complete lines from the
+/// starting offset onward, and any final line still missing its newline.
+struct SessionLogChunk: Sendable, Equatable {
+    /// Records from lines that end in a newline.
+    let records: [TokenUsageRecord]
+    /// Byte offset just past the last complete line; the next read resumes here.
+    let endOffset: UInt64
+    /// Records from a final line with no newline yet. Claude Code may still be
+    /// writing it, so the next read parses it again instead of resuming inside it.
+    let tail: [TokenUsageRecord]
+}
+
 /// Parses Claude Code session JSONL files to extract token usage records.
 struct SessionJSONLParser {
-    /// Parse a single JSONL file and extract all token usage records.
-    func parse(fileURL: URL) throws -> [TokenUsageRecord] {
-        let data = try Data(contentsOf: fileURL)
-        guard let content = String(data: data, encoding: .utf8) else { return [] }
-        return parse(content: content)
+    private static let readChunkSize = 1 << 20
+    private static let newline = UInt8(ascii: "\n")
+    /// Every usage-bearing line holds both of these byte sequences, so a line lacking
+    /// either is skipped without being decoded. Inside a JSON string the quotes would be
+    /// escaped (`\"usage\"`), so quoted mentions never match.
+    private static let requiredFragments = [Array(#""usage""#.utf8), Array(#""assistant""#.utf8)]
+
+    /// Parse a file from `offset` to its end, streaming it rather than loading it whole.
+    func parse(fileURL: URL, fromOffset offset: UInt64) throws -> SessionLogChunk {
+        let handle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? handle.close() }
+        try handle.seek(toOffset: offset)
+
+        let formatters = Formatters()
+        var records: [TokenUsageRecord] = []
+        var endOffset = offset
+        var pending = Data()
+        while let data = try handle.read(upToCount: Self.readChunkSize), !data.isEmpty {
+            // `pending` holds no newline before this read, so only the new bytes need searching.
+            let searchFrom = pending.count
+            pending.append(data)
+            let consumed = scanCompleteLines(in: pending, searchingFrom: searchFrom, formatters: formatters, into: &records)
+            endOffset += UInt64(consumed)
+            pending.removeSubrange(pending.startIndex..<pending.startIndex + consumed)
+        }
+        return SessionLogChunk(records: records, endOffset: endOffset, tail: parseTail(pending, formatters: formatters))
     }
 
     /// Parse content string directly.
     func parse(content: String) -> [TokenUsageRecord] {
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let fallbackFormatter = ISO8601DateFormatter()
-        fallbackFormatter.formatOptions = [.withInternetDateTime]
-
+        let data = Data(content.utf8)
+        let formatters = Formatters()
         var records: [TokenUsageRecord] = []
-        for line in content.split(separator: "\n") {
-            if let record = parseLine(line, dateFormatter: dateFormatter, fallbackFormatter: fallbackFormatter) {
-                records.append(record)
-            }
+        let consumed = scanCompleteLines(in: data, searchingFrom: 0, formatters: formatters, into: &records)
+        return records + parseTail(data.dropFirst(consumed), formatters: formatters)
+    }
+
+    // MARK: - Private
+
+    private final class Formatters {
+        let fractional: ISO8601DateFormatter
+        let whole: ISO8601DateFormatter
+
+        init() {
+            fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            whole = ISO8601DateFormatter()
+            whole.formatOptions = [.withInternetDateTime]
         }
-        return records
+
+        func date(from string: String) -> Date? {
+            fractional.date(from: string) ?? whole.date(from: string)
+        }
+    }
+
+    /// Appends a record for each newline-terminated line in `data` and returns how
+    /// many bytes those lines span. The first newline is searched for from
+    /// `searchFrom`, which callers set past bytes already known to hold none.
+    private func scanCompleteLines(
+        in data: Data,
+        searchingFrom searchFrom: Int,
+        formatters: Formatters,
+        into records: inout [TokenUsageRecord]
+    ) -> Int {
+        data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> Int in
+            guard let base = buffer.baseAddress else { return 0 }
+            var lineStart = 0
+            var searchStart = searchFrom
+            while searchStart < buffer.count,
+                  let found = memchr(base + searchStart, Int32(Self.newline), buffer.count - searchStart) {
+                let lineEnd = UnsafeRawPointer(found) - base
+                let line = UnsafeRawBufferPointer(rebasing: buffer[lineStart..<lineEnd])
+                if let record = parseLine(line, formatters: formatters) {
+                    records.append(record)
+                }
+                lineStart = lineEnd + 1
+                searchStart = lineStart
+            }
+            return lineStart
+        }
+    }
+
+    private func parseTail(_ data: Data, formatters: Formatters) -> [TokenUsageRecord] {
+        data.withUnsafeBytes { parseLine($0, formatters: formatters) }.map { [$0] } ?? []
     }
 
     /// Extract a single record from one JSONL line, or `nil` if it is not a usage-bearing
     /// assistant message (or fails to parse).
-    private func parseLine(
-        _ line: Substring,
-        dateFormatter: ISO8601DateFormatter,
-        fallbackFormatter: ISO8601DateFormatter
-    ) -> TokenUsageRecord? {
-        guard let lineData = line.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+    private func parseLine(_ line: UnsafeRawBufferPointer, formatters: Formatters) -> TokenUsageRecord? {
+        guard let base = line.baseAddress,
+              Self.requiredFragments.allSatisfy({ fragment in
+                  memmem(base, line.count, fragment, fragment.count) != nil
+              }),
+              let json = try? JSONSerialization.jsonObject(with: Data(bytes: base, count: line.count)) as? [String: Any],
               json["type"] as? String == "assistant",
               let message = json["message"] as? [String: Any],
               let usage = message["usage"] as? [String: Any],
               let model = message["model"] as? String,
               let timestampStr = json["timestamp"] as? String,
-              let timestamp = dateFormatter.date(from: timestampStr) ?? fallbackFormatter.date(from: timestampStr)
+              let timestamp = formatters.date(from: timestampStr)
         else { return nil }
 
         return TokenUsageRecord(
