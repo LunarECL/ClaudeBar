@@ -297,4 +297,19 @@ struct ProviderTests {
         acme.accounts[1].isEnabled = false
         #expect(acme.status == .healthy)
     }
+
+    @Test
+    func `the worst login is the one that makes the provider's status, and nobody when all is well`() async throws {
+        let network = AcmeNetwork()
+        network.answer(Self.api, used: 40)
+        network.answer(Self.api, login: "low", used: 90)
+        let acme = acme(network, logins: ["low"])
+
+        #expect(acme.worstAccount == nil)
+        for account in acme.accounts { try await account.refresh() }
+
+        #expect(acme.worstAccount?.accountId == "low")
+        acme.accounts[1].isEnabled = false
+        #expect(acme.worstAccount == nil)
+    }
 }

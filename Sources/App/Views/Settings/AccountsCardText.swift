@@ -23,9 +23,13 @@ struct AccountsCardText {
             switch way {
             case .signIn: Way(way: way, label: "Sign in with browser")
             case .folder: Way(way: way, label: "Choose Signed-in Folder")
+            case .form: Way(way: way, label: "Enter \(fields.first?.label ?? "Details")")
             }
         }
     }
+
+    /// What *Add Account*'s form asks for.
+    var fields: [ProviderDefinition.Accounts.Field] { provider.definition.accounts?.form ?? [] }
 
     /// The login a person runs themselves to sign in to `folder`.
     func signInCommand(in folder: String) -> String? {

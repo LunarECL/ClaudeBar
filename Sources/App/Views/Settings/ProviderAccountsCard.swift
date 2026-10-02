@@ -60,7 +60,7 @@ struct ProviderAccountsCard: View {
         .background(RoundedRectangle(cornerRadius: theme.cardCornerRadius).fill(theme.cardGradient))
         .overlay(RoundedRectangle(cornerRadius: theme.cardCornerRadius).stroke(theme.glassBorder, lineWidth: 1))
         .sheet(isPresented: $adding) {
-            AddAccountSheet(provider: provider, monitor: monitor).environment(\.appTheme, theme)
+            AddAccountSheet(provider: provider, monitor: monitor).themedSheet()
         }
         .alert("Rename Account", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)

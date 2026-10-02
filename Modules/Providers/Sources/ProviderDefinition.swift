@@ -70,6 +70,33 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         /// …or by running the vendor's login into a new folder, which
         /// `folder` then checks — so a sign-in needs a folder rule.
         public let signIn: SignInCall?
+        /// …or by filling in the account's own settings — an API key, a
+        /// region. A secret field is kept in the vault, under the account.
+        public let form: [Field]
+
+        /// One setting *Add Account*'s form asks for.
+        public struct Field: Sendable, Equatable, Codable {
+            public let id: String
+            public let label: String
+            public let secret: Bool
+            /// The only values it takes, when it is a choice.
+            public let choices: [String]?
+
+            public init(id: String, label: String, secret: Bool = false, choices: [String]? = nil) {
+                self.id = id
+                self.label = label
+                self.secret = secret
+                self.choices = choices
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                id = try container.decode(String.self, forKey: .id)
+                label = try container.decode(String.self, forKey: .label)
+                secret = try container.decodeIfPresent(Bool.self, forKey: .secret) ?? false
+                choices = try container.decodeIfPresent([String].self, forKey: .choices)
+            }
+        }
         /// By data source kind, what an added login changes — its own folder,
         /// its identity check, no fallback to the shared terminal. `null`
         /// leaves that data source out for added logins.
@@ -157,11 +184,12 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
 
         /// The ways *Add Account* offers, easiest first.
         public var ways: [AddAccountWay] {
-            [signIn.map { _ in .signIn }, folder.map { _ in .folder }].compactMap { $0 }
+            [signIn.map { _ in .signIn }, folder.map { _ in .folder }, form.isEmpty ? nil : .form].compactMap { $0 }
         }
 
-        public init(folder: Folder? = nil, signIn: SignInCall? = nil, patch: [String: JSONValue] = [:]) {
+        public init(folder: Folder? = nil, signIn: SignInCall? = nil, form: [Field] = [], patch: [String: JSONValue] = [:]) {
             self.signIn = signIn
+            self.form = form
             self.folder = folder
             self.patch = patch
         }
@@ -170,6 +198,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             folder = try container.decodeIfPresent(Folder.self, forKey: .folder)
             signIn = try container.decodeIfPresent(SignInCall.self, forKey: .signIn)
+            form = try container.decodeIfPresent([Field].self, forKey: .form) ?? []
             if signIn != nil, folder == nil {
                 throw DecodingError.dataCorruptedError(forKey: .signIn, in: container,
                     debugDescription: "accounts.signIn needs accounts.folder to check the folder it signs into")
@@ -381,4 +410,6 @@ public enum AddAccountWay: Sendable, Equatable {
     case signIn
     /// *Choose Signed-in Folder*
     case folder
+    /// The account's own settings — *Enter API key*
+    case form
 }

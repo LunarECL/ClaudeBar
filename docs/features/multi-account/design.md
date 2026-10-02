@@ -6,7 +6,7 @@ description: Contributor design for multiple accounts under one provider — how
 
 User guide: [README.md](README.md).
 
-**Status: DESIGN, slices 1–4 built.** Built: one `Provider` owns `[Account]`; an
+**Status: BUILT, slices 1–6.** Built: one `Provider` owns `[Account]`; an
 added login runs the **same** data sources with `accounts.patch` merged in and
 `{{account.x}}` filled from its values; added by `accounts.folder` — Codex
 (#356) and Claude (slice 1: `IdentityField`, `derived`, identity from a context
@@ -14,7 +14,13 @@ file); `displayName`, `rename`, a saved default-account name and short
 menu-bar names (slice 2); `accounts.signIn`, `provider.signIn` /
 `addAccount(signedInAt:)`, `SignedInFolder` and the `LoginFolders` port
 (slice 3); the Accounts card and the Add Account sheet, `Provider.move` and
-`signInAgain` (slice 4). PR #358 adds Claude (as data — kept), browser sign-in, rename and
+`signInAgain` (slice 4); `accounts.form`, `addAccount(filling:)`,
+`SecretStore.scoped(to:)` and `SecretVault`, with API providers made in Add
+Provider asking for a key per account (slice 5); the popover by provider —
+`ProductTab`, `QuotaMonitor.tabs` / `selectedTab`, `Provider.worstAccount`,
+account chips and the callout (slice 6). `selectedProviderId` stays a lineup id
+underneath (the tab's first login), so the menu bar, the refresh loop and the
+Touch Bar read it unchanged. PR #358 adds Claude (as data — kept), browser sign-in, rename and
 compact labels (kept, reshaped below), and a Swift bridge that gives the 18
 legacy providers, custom definitions and extensions accounts (replaced by this
 design — see [§ What is wrong today](#what-is-wrong-today)).
@@ -244,13 +250,13 @@ ClaudeBarApp.init (composition root)
   ▼
 Providers.make(definition, settings, vault)
   │
-  ├─ default account:  definition.dataSources ──map──▶ DataSources.make(_, secrets: vault.scoped(nil))
+  ├─ default account:  definition.dataSources ──map──▶ DataSources.make(_, secrets: vault.scoped(to: "<id>"))
   │
   └─ for each config:  provider.add(config)
         │  definition.dataSources(forAccount: config.values)     patch merged, {{account.x}} filled
         │  ── a data source the patch nulls is left out for that login
         ▼
-        DataSources.make(_, secrets: vault.scoped(config.accountId))
+        DataSources.make(_, secrets: vault.scoped(to: "<id>.<acct>"))
         │
         └─ fails (bad folder, unfilled {{account.x}})?  → logged by account id, account left out.
                                                           The app never crashes.
@@ -282,7 +288,7 @@ Legacy providers enter the lineup as today: one `AIProvider`, one pill.
    │                             ProviderAccountConfig { accountId: uuid, email, values, madeBy }
    │
    └─ "Add Account" (form) ─────▶ form's account-scope settings
-                                   │ secrets → vault.scoped(uuid).save(name, value)
+                                   │ provider.addAccount(filling:) — secrets → vault.save(name, "<id>.<acct>")
                                    │ provider.testConnection(draft) — before saving
                                    ▼
                                  ProviderAccountConfig { accountId: uuid, values }
@@ -321,7 +327,7 @@ not again in `Provider` and not before the cache.
               settings.setLabel("work", account: account.id)      ONE store for default and added
               account.label = "work"
 "Remove"  → provider.remove(account)                               never the default
-              settings.removeAccount · vault.scoped(acct).deleteAll · bound/refreshTasks dropped
+              settings.removeAccount · vault.delete(each secret field, "<id>.<acct>") · bound/refreshTasks dropped
               config.madeBy == .signIn → its folder is deleted too (ClaudeBar made it, nobody else uses it)
               a folder the person chose, and the CLI's own files, are never touched
 Menu bar  → MenuBarAccountName.names(displayNames)                 App — shortens, numbers collisions
@@ -422,7 +428,7 @@ are the cases the definition declares (§8).
 | a provider has at least one account; the default's id is the provider id, an added one's `<provider>.<acct>` | `Provider.accounts` |
 | one definition serves every account — an added login's data sources are the definition patched and filled, never a hand-built copy | `ProviderDefinition.dataSources(forAccount:)` |
 | a provider without `accounts` cannot add one — the button is absent, not disabled | `ProviderDefinition.accounts` |
-| an account's secret is read only from that account's vault corner; a missing one is *Key needed*, never the default's key or the environment | `ProviderVault.scoped(_:)` |
+| an account's secret is read only from that account's vault corner; a missing one is *Key needed*, never the default's key or the environment | `SecretStore.scoped(to:)`, used by every added login's data sources |
 | an added login's CLI never sees the default login's credentials: what to set and unset is the definition's `patch`, per data source | the definition (data) — run by `CLIFetcher` |
 | usage shown under a login was fetched with that login's credential; a different identity fails closed with the definition's hint | `DataSource` (lookup) |
 | a folder already listed, or the default login, is not added twice | `Provider` (`addAccount`) |
@@ -489,7 +495,7 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 and `accountSources` · `LegacyAccountUsageSource` · `LegacyAccountConnections` ·
 `AccountConnectionRecipe` · `AccountCommandContext` · `CustomAccountConnections`
 · `ExtensionAccountConnections` · `ScopedCredentialRepository` (→
-`ProviderVault.scoped`) · `AccountNamingSettingsRepository` · the probe init
+`SecretStore.scoped(to:)`) · `AccountNamingSettingsRepository` · the probe init
 parameters added for accounts · `isolatedAccountCredentials` ·
 `docs/features/multi-account/universal-design.md` (this doc replaces it) · the
 per-provider "Accounts" paragraphs for providers that have `accounts: nil`.
@@ -504,8 +510,8 @@ Each slice one PR, test first, green.
 | 2 ✅ | **Rename + display name** — `Account.displayName`, `setLabel` for default and added, `MenuBarAccountName` in App | labels survive relaunch; one login shows the product name; collisions number, never widen |
 | 3 ✅ | **`accounts.signIn` + the ways to add** — `AccountSignIn` worker, `codex.json`/`claude.json` declare it; `signIn.alsoAt`; `SignedInFolder`, `LoginFolders` | cancel/timeout/fail leave no folder and no config; env carries only `homeVariable`, `unset` removed; *Remove* of a signed-in account deletes its folder, of a chosen one never — README's *Remove* paragraph updated with the screen (slice 4) |
 | 4 ✅ | **one Accounts card** (§3.5) — renders `accounts.ways`, reorder, menu-bar pin, Rename · Pause · Remove, Re-auth; the 4-step Add Account sheet with VERIFY by step; `CodexAccountsCard` goes | a provider with `accounts: nil` shows no button; *Add anyway* is absent until identity passed; order survives relaunch |
-| 6 | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |
-| 5 | **`form` + `ProviderVault.scoped`** — account-scope settings in the form; custom definitions can declare `accounts` | an added account's missing key is *Key needed*, never the default's |
+| 6 ✅ | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |
+| 5 ✅ | **`form` + scoped secrets** (`SecretStore.scoped(to:)`, `SecretVault`) — account-scope settings in the form; custom definitions can declare `accounts` | an added account's missing key is *Key needed*, never the default's |
 | — | legacy providers | gain accounts in TARGET slices 2 and 5, when they become JSON — by adding an `accounts` block, nothing else |
 
 ## 8 · Open questions

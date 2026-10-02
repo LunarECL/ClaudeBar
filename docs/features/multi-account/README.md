@@ -4,7 +4,7 @@ description: Track more than one Claude or Codex login side by side — sign in 
 
 # Multiple accounts
 
-Claude and Codex can each watch more than one login: a personal and a work account, or two ChatGPT workspaces under one email. Every account has its own quotas, refreshes, pause switch and errors. Other providers have one account for now.
+Claude and Codex can each watch more than one login: a personal and a work account, or two ChatGPT workspaces under one email. So can an API provider you made with **Add Provider**: each account has its own key. Every account has its own quotas, refreshes, pause switch and errors. The other built-in providers have one account for now.
 
 ## Add an account
 
@@ -21,10 +21,13 @@ ClaudeBar then checks the login before keeping it:
 
 Last, you can give the account a name, such as *Work*. Leave it empty to show its email.
 
+For an API provider you made, **Add Account** asks for the account's **API key** instead. The key is kept in your Keychain under that account only. An account without a key of its own shows *Key needed*; it never borrows your first account's key, or one in an environment variable.
+
 Don't copy an existing `auth.json` or `.credentials.json` to make a second login. Sign in separately, so each login refreshes its own session.
 
 ## See them side by side
 
+- In the popover, a provider with several accounts is one tab. Its accounts appear one below another, each with its own quotas. The **ACCOUNTS** chips at the top hide an account from this view only; it keeps refreshing and alerting. When an account makes the provider's status a warning, a line at the bottom names it, for example *"Work is at 18% Session — causing Warning"*.
 - **Settings → Providers → Claude → Accounts** lists every login. Drag to reorder, use **⋯** to rename, pause or remove one, and click the pin to show it in the menu bar.
 - With one account, the provider is called by its name ("Codex"). With several, each shows the name you gave it, or its email.
 - In the menu bar, each pinned account gets a short name beside the icon: up to 12 characters of the name you gave, or up to 8 of the part of its email before the @. Names that would look alike are numbered (`work·1`, `work·2`). The tooltip shows the full name. Accounts count toward the three-entry menu bar limit.
@@ -36,6 +39,7 @@ The data source choice (for example RPC or API) applies to every account of a pr
 **Remove** forgets the account in ClaudeBar and drops it from the menu bar:
 
 - An account you added with **Sign in with browser** has its folder deleted too, since ClaudeBar made that folder and nothing else uses it.
+- An account added with a key has its key deleted from your Keychain.
 - A folder you chose stays exactly where it is.
 - Your usual login can't be removed.
 

@@ -14,6 +14,7 @@ struct AddAccountSheet: View {
 
     private enum Step {
         case how
+        case form
         case signingIn(Task<Void, Never>)
         case verify(Account, fetch: FetchCheck)
         case name(Account)
@@ -28,6 +29,7 @@ struct AddAccountSheet: View {
 
     @State private var step: Step = .how
     @State private var name = ""
+    @State private var entered: [String: String] = [:]
 
     private var text: AccountsCardText { AccountsCardText(provider: provider) }
 
@@ -47,15 +49,51 @@ struct AddAccountSheet: View {
     private var content: some View {
         switch step {
         case .how:
-            Text("How do you want to add it?").foregroundStyle(theme.textSecondary)
+            Text("How do you want to add it?")
+                .font(.system(size: 12, design: theme.fontDesign))
+                .foregroundStyle(theme.textSecondary)
             ForEach(text.ways, id: \.label) { way in
                 Button { start(way.way) } label: {
-                    Label(way.label, systemImage: way.way == .signIn ? "globe" : "folder")
+                    Label(way.label, systemImage: way.way == .signIn ? "globe" : way.way == .folder ? "folder" : "key")
+                        .font(.system(size: 13, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(theme.glassBackground))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.glassBorder, lineWidth: 1))
+                        .contentShape(.rect)
                 }
-                .controlSize(.large)
+                .buttonStyle(.plain)
             }
             HStack { Spacer(); Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction) }
+
+        case .form:
+            ForEach(text.fields, id: \.id) { field in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(field.label).font(.callout).foregroundStyle(theme.textSecondary)
+                    if let choices = field.choices {
+                        Picker(field.label, selection: Binding(get: { entered[field.id] ?? choices.first ?? "" },
+                                                               set: { entered[field.id] = $0 })) {
+                            ForEach(choices, id: \.self) { Text($0).tag($0) }
+                        }
+                        .labelsHidden()
+                    } else if field.secret {
+                        SecureField(field.label, text: Binding(get: { entered[field.id] ?? "" }, set: { entered[field.id] = $0 }))
+                            .textFieldStyle(.roundedBorder)
+                    } else {
+                        TextField(field.label, text: Binding(get: { entered[field.id] ?? "" }, set: { entered[field.id] = $0 }))
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
+            }
+            Text("Kept for this account only. Keys are saved in your Keychain.")
+                .font(.caption).foregroundStyle(theme.textSecondary)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Add") { addFromForm() }.keyboardShortcut(.defaultAction)
+            }
 
         case .signingIn(let task):
             HStack(spacing: 10) {
@@ -67,8 +105,12 @@ struct AddAccountSheet: View {
             HStack { Spacer(); Button("Cancel") { task.cancel(); step = .how }.keyboardShortcut(.cancelAction) }
 
         case .verify(let account, let fetch):
-            check(true, "Found a login")
-            check(true, "Signed in as \(account.accountEmail ?? account.displayName)")
+            if account.madeBy == .form {
+                check(true, "Saved for this account")
+            } else {
+                check(true, "Found a login")
+                check(true, "Signed in as \(account.accountEmail ?? account.displayName)")
+            }
             switch fetch {
             case .running:
                 HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Fetching usage…") }
@@ -79,10 +121,13 @@ struct AddAccountSheet: View {
             }
             HStack {
                 if case .failed = fetch {
-                    Button("Remove") { provider.remove(account); dismiss() }
+                    Button("Remove") { provider.remove(account); monitor.removeProvider(id: account.id); dismiss() }
                     Spacer()
                     Button("Retry") { verify(account) }
-                    Button("Add anyway") { name = account.accountEmail ?? ""; step = .name(account) }
+                    // Only a login ClaudeBar knows the owner of may stay unchecked.
+                    if account.madeBy != .form {
+                        Button("Add anyway") { name = account.accountEmail ?? ""; step = .name(account) }
+                    }
                 } else {
                     Spacer()
                     Button("Next") { name = account.accountEmail ?? ""; step = .name(account) }
@@ -138,6 +183,18 @@ struct AddAccountSheet: View {
             step = .signingIn(task)
         case .folder:
             chooseFolder()
+        case .form:
+            step = .form
+        }
+    }
+
+    private func addFromForm() {
+        var values = entered
+        for field in text.fields where values[field.id] == nil { values[field.id] = field.choices?.first }
+        do {
+            added(try provider.addAccount(filling: values))
+        } catch {
+            step = .failed(error.localizedDescription)
         }
     }
 
