@@ -318,6 +318,15 @@
     }
   ],
   "accounts": {
+    "signIn": {
+      "cli": "claude",
+      "args": ["auth", "login", "--claudeai"],
+      "homeVariable": "CLAUDE_CONFIG_DIR",
+      "unset": [
+        "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_PROFILE",
+        "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"
+      ]
+    },
     "folder": {
       "savedAs": "configDirectory",
       "default": "${CLAUDE_CONFIG_DIR:-~/.claude}",

@@ -139,14 +139,8 @@ private struct CodexAccountSetupSheet: View {
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do {
-                let settings = JSONSettingsRepository.shared
-                let config = try AddedAccounts.configuration(
-                    "codex", folder: url.path, existing: settings.accounts(forProvider: "codex"))
-                guard let codex = (monitor.provider(for: "codex") as? Account)?.provider,
-                      let provider = codex.add(config) else {
-                    return
-                }
-                settings.addAccount(config, forProvider: "codex")
+                guard let codex = (monitor.provider(for: "codex") as? Account)?.provider else { return }
+                let provider = try codex.addAccount(signedInAt: url)
                 monitor.addProvider(provider)
                 Task { await monitor.refresh(providerId: provider.id) }
                 dismiss()

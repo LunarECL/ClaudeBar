@@ -29,6 +29,8 @@ public final class Provider {
 
     let settings: any MultiAccountSettingsRepository
     private let makeDataSource: (DataSourceDefinition) -> DataSource
+    /// Where added logins' folders are made and deleted.
+    private let folders: any LoginFolders
     @ObservationIgnored private var bound: [String: [DataSource]] = [:]
     @ObservationIgnored private var refreshTasks: [String: Task<UsageSnapshot, Error>] = [:]
 
@@ -40,8 +42,10 @@ public final class Provider {
         accounts: [ProviderAccountConfig] = [],
         makeDataSource: @escaping (DataSourceDefinition) -> DataSource,
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
-        guestPasses: GuestPasses? = nil
+        guestPasses: GuestPasses? = nil,
+        folders: any LoginFolders = DiskLoginFolders()
     ) {
+        self.folders = folders
         self.definition = definition
         self.settings = settings
         self.makeDataSource = makeDataSource
@@ -51,7 +55,7 @@ public final class Provider {
         self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: label), values: [:])]
         bound[definition.id] = definition.dataSources.map(makeDataSource)
         for config in accounts {
-            add(config)
+            attach(config)
         }
     }
 
@@ -60,11 +64,19 @@ public final class Provider {
 
     // MARK: - Accounts
 
-    /// *Add Account* — a login beside the default one. `nil` when the
+    /// *Add Account* — a login beside the default one, saved. `nil` when the
     /// definition has no added accounts, the login is already listed, or its
     /// saved values don't fill what the definition needs.
     @discardableResult
     public func add(_ config: ProviderAccountConfig) -> Account? {
+        guard let account = attach(config) else { return nil }
+        settings.addAccount(config, forProvider: id)
+        return account
+    }
+
+    /// A saved login made live — at launch, and by `add`.
+    @discardableResult
+    private func attach(_ config: ProviderAccountConfig) -> Account? {
         let login = config.toProviderAccount(providerId: definition.id)
         guard definition.accounts != nil, !login.isDefault, !accounts.contains(where: { $0.id == login.id }) else {
             return nil
@@ -75,20 +87,92 @@ public final class Provider {
             AppLog.providers.error("\(definition.id): can't run account \(login.id): \(error.localizedDescription)")
             return nil
         }
-        let account = Account(provider: self, login: login, values: config.probeConfig)
+        let account = Account(provider: self, login: login, values: config.probeConfig, madeBy: config.madeBy)
         accounts.append(account)
         return account
     }
 
-    /// *Remove* — forgets the login here and its saved settings; its CLI's
-    /// files are never touched. The default login can't be removed.
+    /// *Remove* — forgets the login here and its saved settings, and deletes
+    /// the folder only when ClaudeBar made it by signing in. A folder the
+    /// person chose is theirs and stays. The default login can't be removed.
     public func remove(_ account: Account) {
         guard !account.isDefault, accounts.contains(where: { $0 === account }) else { return }
+        if let folder = account.folder, folder.goesWithAccount {
+            folders.delete(folder.url)
+        }
         accounts.removeAll { $0.id == account.id }
         bound[account.id] = nil
         refreshTasks[account.id]?.cancel()
         refreshTasks[account.id] = nil
         settings.removeAccount(accountId: account.accountId, forProvider: id)
+    }
+
+    /// *Choose Signed-in Folder* — adds the login a folder holds, read by the
+    /// definition's own lookups filled with that folder. Refused when the
+    /// folder holds no key, or the login is the default one or already listed.
+    @discardableResult
+    public func addAccount(signedInAt folder: URL) throws -> Account {
+        try addAccount(SignedInFolder(url: folder, madeBy: .folder))
+    }
+
+    /// *Sign in with browser* — runs the definition's login into a new folder
+    /// under `root`, then adds it as *Choose Signed-in Folder* would. A folder
+    /// that ends up holding no new login is deleted.
+    @discardableResult
+    public func signIn(with runner: AccountSignIn = AccountSignIn(), under root: URL = SignedInFolder.signInRoot) async throws -> Account {
+        guard let call = definition.accounts?.signIn else {
+            throw UsageError.executionFailed("\(name) has no sign-in.")
+        }
+        let folder = SignedInFolder.forSignIn(to: id, under: root)
+        try await runner.signIn(call, into: folder.url)
+        do {
+            return try addAccount(folder)
+        } catch {
+            folders.delete(folder.url)
+            throw error
+        }
+    }
+
+    private func addAccount(_ folder: SignedInFolder) throws -> Account {
+        guard let rule = definition.accounts?.folder else {
+            throw UsageError.executionFailed("\(name) has no added accounts.")
+        }
+        let home = folder.url.resolvingSymlinksInPath().path
+        let defaultHome = rule.default.map { URL(fileURLWithPath: DataSources.expandPath($0)).resolvingSymlinksInPath().path }
+        guard home != defaultHome else {
+            throw UsageError.executionFailed("This is the default \(name) login, which is already listed.")
+        }
+        let values = rule.values(for: home)
+        guard let login = signedIn(with: values.merging([rule.accountId.savedAs: ""]) { _, empty in empty }, rule: rule),
+              let accountId = login.accountId, let email = login.email else {
+            throw UsageError.executionFailed(rule.notSignedIn ?? "No \(name) login found in this folder.")
+        }
+        let defaultAccountId = dataSources(for: defaultAccount).lazy.compactMap { $0.value(of: rule.accountId.field) }.first
+        let listed = accounts.contains {
+            $0.values[rule.accountId.savedAs] == accountId || $0.folder?.url.resolvingSymlinksInPath().path == home
+        }
+        guard accountId != defaultAccountId, !listed else {
+            throw UsageError.executionFailed("This \(name) account is already listed.")
+        }
+        let config = ProviderAccountConfig(
+            accountId: UUID().uuidString.lowercased(), label: "", email: email,
+            probeConfig: values.merging([rule.accountId.savedAs: accountId]) { _, id in id },
+            madeBy: folder.madeBy
+        )
+        guard let account = add(config) else {
+            throw UsageError.executionFailed("This \(name) login can't be added.")
+        }
+        return account
+    }
+
+    /// Who is signed in with these values: the first data source that looks
+    /// up a key, filled with them. A folder whose key does not answer holds
+    /// no login, whatever else it holds.
+    private func signedIn(with values: [String: String], rule: ProviderDefinition.Accounts.Folder) -> (accountId: String?, email: String?)? {
+        guard let source = try? definition.dataSources(forAccount: values).first(where: { $0.credential != nil }) else { return nil }
+        let live = makeDataSource(source)
+        guard live.hasKey else { return nil }
+        return (live.value(of: rule.accountId.field).flatMap { $0.isEmpty ? nil : $0 }, live.value(of: rule.email))
     }
 
     /// *Rename* — the name the person gives a login. Who it is, its values

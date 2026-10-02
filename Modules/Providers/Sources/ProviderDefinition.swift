@@ -67,6 +67,9 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     public struct Accounts: Sendable, Equatable, Codable {
         /// How a person adds one: by choosing the folder its login lives in.
         public let folder: Folder?
+        /// …or by running the vendor's login into a new folder, which
+        /// `folder` then checks — so a sign-in needs a folder rule.
+        public let signIn: SignInCall?
         /// By data source kind, what an added login changes — its own folder,
         /// its identity check, no fallback to the shared terminal. `null`
         /// leaves that data source out for added logins.
@@ -152,7 +155,13 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             }
         }
 
-        public init(folder: Folder? = nil, patch: [String: JSONValue] = [:]) {
+        /// The ways *Add Account* offers, easiest first.
+        public var ways: [AddAccountWay] {
+            [signIn.map { _ in .signIn }, folder.map { _ in .folder }].compactMap { $0 }
+        }
+
+        public init(folder: Folder? = nil, signIn: SignInCall? = nil, patch: [String: JSONValue] = [:]) {
+            self.signIn = signIn
             self.folder = folder
             self.patch = patch
         }
@@ -160,6 +169,11 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             folder = try container.decodeIfPresent(Folder.self, forKey: .folder)
+            signIn = try container.decodeIfPresent(SignInCall.self, forKey: .signIn)
+            if signIn != nil, folder == nil {
+                throw DecodingError.dataCorruptedError(forKey: .signIn, in: container,
+                    debugDescription: "accounts.signIn needs accounts.folder to check the folder it signs into")
+            }
             patch = try container.decodeIfPresent([String: JSONValue].self, forKey: .patch) ?? [:]
         }
     }
@@ -359,4 +373,12 @@ public struct ProviderLook: Sendable, Equatable, Codable {
         self.color = color
         self.gradientEnd = gradientEnd
     }
+}
+
+/// A way *Add Account* offers — one per key of a definition's `accounts`.
+public enum AddAccountWay: Sendable, Equatable {
+    /// *Sign in with browser*
+    case signIn
+    /// *Choose Signed-in Folder*
+    case folder
 }
