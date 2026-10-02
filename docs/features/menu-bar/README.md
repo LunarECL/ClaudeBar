@@ -28,7 +28,7 @@ The Providers card only appears once percentage or duration is on. Only provider
 - **Quota Display** (top of the pane) picks what the percentage means: remaining or used. The third, gauge-icon choice is Pace: popover cards show "Running hot" / "On track" / "Room to spare", and the menu bar shows the remaining percentage.
 - With two windows, each one is labelled by the probe's short menu bar title or the window type (`5h`, `7d`, a model name). The label takes the worse of the two statuses, and **Stack in Menu Bar** draws them as two smaller lines with their own colors. Stacked text comes in Small, Medium or Large.
 - With more than one provider, each readout starts with that provider's logo, separated by `|`. Hover the item to see a tooltip with the provider names.
-- Turn off **Show Account Labels in Menu Bar** to hide account names or emails beside the logos and save space. This applies to every selected account, including a single Codex account. Labels are shown by default; account details remain in the hover tooltip and accessibility description.
+- **Show Names for Multiple Accounts** shows short account names beside provider icons when the same provider has more than one enabled account. Turn it off to hide those names and save space. Single accounts show only the provider icon beside their quotas, regardless of this setting. The hover tooltip shows provider names and quota information; it does not identify a single account.
 - The color of each readout follows its quota status; see [status colors](../status-colors/README.md).
 
 ## Countdown format

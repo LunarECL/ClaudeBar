@@ -46,7 +46,7 @@ A few `app.*` keys worth knowing:
 |---|---|
 | `app.themeMode` | `system` (default), `light`, `dark`, `cli`, `christmas`, or `imported-<name>` |
 | `app.usageDisplayMode` | `remaining` (default), `used`, `pace` |
-| `app.menuBarAccountLabelsEnabled` | `true` (default) shows account labels; `false` hides their menu bar text while retaining hover details |
+| `app.menuBarAccountLabelsEnabled` | `true` (default) shows names when the same provider has multiple enabled accounts; `false` hides those names. Single accounts show only the provider icon beside their quotas in either mode |
 | `app.menuBarProviderSettings` | Per-provider menu bar choices: `{ "codex": { "primaryQuotaKey": "session", "secondaryQuotaKey": "weekly", "stacked": false, "stackedSize": "small" } }` |
 | `app.statusColorOverrides` | `{ "warning": "#F2BF33" }`; only the levels you set |
 
