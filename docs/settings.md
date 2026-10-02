@@ -44,6 +44,7 @@ A few `app.*` keys worth knowing:
 |---|---|
 | `app.themeMode` | `system` (default), `light`, `dark`, `cli`, `christmas`, or `imported-<name>` |
 | `app.usageDisplayMode` | `remaining` (default), `used`, `pace` |
+| `app.menuBarAccountLabelsEnabled` | `true` (default) shows account labels; `false` hides their menu bar text while retaining hover details |
 | `app.menuBarProviderSettings` | Per-provider menu bar choices: `{ "codex": { "primaryQuotaKey": "session", "secondaryQuotaKey": "weekly", "stacked": false, "stackedSize": "small" } }` |
 | `app.statusColorOverrides` | `{ "warning": "#F2BF33" }`; only the levels you set |
 

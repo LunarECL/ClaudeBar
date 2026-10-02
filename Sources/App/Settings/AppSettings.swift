@@ -58,6 +58,14 @@ public final class AppSettings {
         }
     }
 
+    /// Whether account labels appear beside provider icons in the menu bar.
+    /// Tooltip and accessibility descriptions keep the account identity.
+    public var menuBarAccountLabelsEnabled: Bool {
+        didSet {
+            repository.setMenuBarAccountLabelsEnabled(menuBarAccountLabelsEnabled)
+        }
+    }
+
     /// Whether a dual-window menu bar label should render as two stacked
     /// smaller lines (one per quota window) instead of one long "A | B" line,
     /// roughly halving the menu bar width it occupies. Opt-in, default off;
@@ -407,6 +415,7 @@ public final class AppSettings {
         self.backgroundSyncInterval = repository.backgroundSyncInterval()
         self.menuBarPercentageEnabled = repository.menuBarPercentageEnabled()
         self.menuBarDurationEnabled = repository.menuBarDurationEnabled()
+        self.menuBarAccountLabelsEnabled = repository.menuBarAccountLabelsEnabled()
         self.menuBarStackedEnabled = repository.menuBarStackedEnabled()
         // The stored size decodes through the Domain fallback so an unknown
         // raw value (from a newer build's settings file) renders small

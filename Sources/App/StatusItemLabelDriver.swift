@@ -76,6 +76,8 @@ final class StatusItemLabelDriver {
         var additionalLabels: [MenuBarProviderLabel] = []
         var primaryProviderId: String? = nil
         var primaryProviderName: String? = nil
+        /// Changes to label visibility must repaint the status item.
+        var showAccountLabels: Bool = true
         var fallbackStatus: QuotaStatus
         var sessionPhase: ClaudeSession.Phase?
         var themeModeId: String
@@ -221,6 +223,7 @@ final class StatusItemLabelDriver {
             additionalLabels: additionalLabels,
             primaryProviderId: primaryProviderName == nil ? nil : settings.menuBarPercentageProviderId,
             primaryProviderName: primaryProviderName,
+            showAccountLabels: settings.menuBarAccountLabelsEnabled,
             fallbackStatus: effectiveSelectedProviderStatus,
             sessionPhase: sessionMonitor.activeSession?.phase,
             themeModeId: settings.themeMode,
@@ -317,7 +320,7 @@ final class StatusItemLabelDriver {
 
         let codexEmails = ([content.primaryProviderName].compactMap { $0 } + content.additionalLabels.map(\.providerName))
             .filter { $0.contains("@") }
-        if let id = content.primaryProviderId, let name = content.primaryProviderName {
+        if content.showAccountLabels, let id = content.primaryProviderId, let name = content.primaryProviderName {
             appendAccountLabel(id: id, email: name, emails: codexEmails, to: &parts)
         }
 
@@ -337,7 +340,9 @@ final class StatusItemLabelDriver {
                 text: " | ", color: theme.statusColor(for: label.status)
             ))
             parts.append(providerIcon(for: label.providerId))
-            appendAccountLabel(id: label.providerId, email: label.providerName, emails: codexEmails, to: &parts)
+            if content.showAccountLabels {
+                appendAccountLabel(id: label.providerId, email: label.providerName, emails: codexEmails, to: &parts)
+            }
             parts.append(quotaImage(label.label, stacked: label.stacked, size: label.stackedSize,
                                     colonVisible: content.colonVisible, theme: theme))
         }
