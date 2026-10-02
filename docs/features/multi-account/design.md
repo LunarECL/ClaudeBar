@@ -6,11 +6,12 @@ description: Contributor design for multiple accounts under one provider — how
 
 User guide: [README.md](README.md).
 
-**Status: DESIGN, slice 1 built.** Built: one `Provider` owns `[Account]`; an
+**Status: DESIGN, slices 1–2 built.** Built: one `Provider` owns `[Account]`; an
 added login runs the **same** data sources with `accounts.patch` merged in and
 `{{account.x}}` filled from its values; added by `accounts.folder` — Codex
 (#356) and Claude (slice 1: `IdentityField`, `derived`, identity from a context
-file). No screen adds a Claude account yet (slice 4). PR #358 adds Claude (as data — kept), browser sign-in, rename and
+file); `displayName`, `rename`, a saved default-account name and short
+menu-bar names (slice 2). No screen adds a Claude account yet (slice 4). PR #358 adds Claude (as data — kept), browser sign-in, rename and
 compact labels (kept, reshaped below), and a Swift bridge that gives the 18
 legacy providers, custom definitions and extensions accounts (replaced by this
 design — see [§ What is wrong today](#what-is-wrong-today)).
@@ -136,8 +137,7 @@ Monitor ◆                                  the menu bar's root
          │       │                           NEW folder, then the folder rule checks it
          │       │     form                  fill the form's ACCOUNT-scope settings (an API key, a region)
          │       ├── patch                 by data source kind: what an added login changes (RFC 7396)
-         │       ├── identity              which fact names the login; a mismatch fails closed
-         │       └── nameFromEmail         the email names the pill
+         │       └── identity              which field names the login; a mismatch fails closed
          ├── settingsForm ◇                [Setting], each with a SCOPE: provider | account
          ├── accounts: [Account] ◆         NEVER EMPTY; [0] is the default
          │   └── Account ◆                 A LOGIN — no behaviour of its own
@@ -291,7 +291,7 @@ not again in `Provider` and not before the cache.
               settings.removeAccount · vault.scoped(acct).deleteAll · bound/refreshTasks dropped
               config.madeBy == .signIn → its folder is deleted too (ClaudeBar made it, nobody else uses it)
               a folder the person chose, and the CLI's own files, are never touched
-Menu bar  → MenuBarLabel(accounts.map(\.displayName))              App — shortens, numbers collisions
+Menu bar  → MenuBarAccountName.names(displayNames)                 App — shortens, numbers collisions
 ```
 
 ---
@@ -400,7 +400,7 @@ are the cases the definition declares (§8).
 | removing deletes only what ClaudeBar made — the account's settings, its vault corner, and its folder when `madeBy == .signIn`; never a folder the person chose or the CLI's files | `Provider.remove` |
 | a data source whose key lookup ClaudeBar cannot see (`fetch: script`) declares an `identity`, or the definition is refused on load | `ProviderDefinition` validation (`DefinitionError`) |
 | the data source choice is the provider's; a login the patch leaves without it uses the next on the fallback chain, and its usage says which | `Provider` |
-| a menu bar label is shortened for width and never widens to a full email | `MenuBarLabel` (App) |
+| a menu bar name is shortened for width and never widens to a full email | `MenuBarAccountName` (App) |
 | an account is added only once its identity is known; *Add anyway* exists only after that step passed | `AddedAccounts` |
 | accounts keep the order the person gave them; the default is found by `isDefault`, not by position | `Provider.accounts` |
 | the provider's status names the account that causes it | `Provider.worstAccount` |
@@ -425,7 +425,7 @@ Providers.make(definition, settings: settings, vault: vault)   // binds every sa
 
 // Page
 Text(account.displayName)
-MenuBarLabel.labels(for: monitor.lineup)
+MenuBarAccountName.names(displayNames)
 ```
 
 Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
@@ -442,9 +442,9 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 | `DataSource.fetchUsage` checks identity before the cache | **built**: checked with the lookup, before and after each fetch; a cached usage is what that login showed when it was fetched |
 | `BrowserAccountLogin` (Infrastructure, Codex defaults) | `AccountSignIn` worker in `DataSources`, driven by `accounts.add.signIn` in `codex.json` / `claude.json`; process behind the existing `CLIExecutor`-style port |
 | `BinaryLocator.findInApplicationBundles` | the definition's `cli` gains `alsoAt: [paths]`; the locator checks what it is told |
-| `Provider.rename`, `ProviderAccountConfig.named` | **kept**; default account's label stored by `MultiAccountSettingsRepository.setLabel(_:account:)`, which `Provider` receives typed — no downcast |
-| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | one `displayName`; the tooltip's "name (email)" is the page's |
-| `AccountMenuBarLabel` (Domain) | `MenuBarLabel` in App ([CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree): not in the model) |
+| `Provider.rename`, `ProviderAccountConfig.named` | **built**: `Provider` receives `any MultiAccountSettingsRepository`, so `rename` and `remove` save without a downcast; the default login's name is `setDefaultAccountLabel` (`providers.<id>.defaultAccountLabel`); the unused `activeAccountId` is gone |
+| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | **built**: one `displayName`; `name` (the pill) is the product's while `provider.hasSeveralAccounts` is false; `nameFromEmail` is gone |
+| `AccountMenuBarLabel` (Domain) | **built**: `MenuBarAccountName` in App ([CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree): not in the model). Named so, not `MenuBarLabel`, which is already the quota text |
 | `ProviderAccountsCard` | **kept**, rendering `accounts.add` cases and the form's account scope; no `switch provider.id` |
 | `CodexAccountsCard` | folded into `ProviderAccountsCard` |
 | `withDailyUsage` / `guestPasses` default-only | **kept as a `Provider` / `Account` law** (§4): both are injected Swift capabilities that read the default login's files, so the default-only rule stays beside them. It moves into data if those capabilities do |
@@ -467,7 +467,7 @@ Each slice one PR, test first, green.
 | # | Slice | Pins |
 |---|---|---|
 | 1 ✅ | **Claude accounts as data** — #358's `claude.json` block, typed `identity`, identity in lookup only; `ClaudeAccountsTests` | a Claude folder adds; another email in it fails closed; default untouched |
-| 2 | **Rename + display name** — `Account.displayName`, `setLabel` for default and added, `MenuBarLabel` in App | labels survive relaunch; one login shows the product name; collisions number, never widen |
+| 2 ✅ | **Rename + display name** — `Account.displayName`, `setLabel` for default and added, `MenuBarAccountName` in App | labels survive relaunch; one login shows the product name; collisions number, never widen |
 | 3 | **`accounts.add` sum + `signIn`** — `AccountSignIn` worker, `codex.json`/`claude.json` declare it; `cli.alsoAt` | cancel/timeout/fail leave no folder and no config; env carries only `homeVariable`, `unset` removed; *Remove* of a signed-in account deletes its folder, of a chosen one never — README's *Remove* paragraph updated |
 | 4 | **one Accounts card** (§3.5) — renders `accounts.add`, reorder, menu-bar pin, Rename · Pause · Remove, Re-auth; the 4-step Add Account sheet with VERIFY by step; `CodexAccountsCard` goes | a provider with `accounts: nil` shows no button; *Add anyway* is absent until identity passed; order survives relaunch |
 | 6 | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |

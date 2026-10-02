@@ -20,7 +20,7 @@ The default login remains the one used by your ordinary Codex CLI. Added account
 
 - Select either email in the dropdown's provider tabs.
 - Enable **General → Overview Mode** to see all enabled accounts together.
-- In **Menu Bar** settings, select both accounts to pin both quotas. Codex icons get email labels, with full addresses in the tooltip. Long labels shorten only when that still distinguishes the addresses. Accounts count toward the existing three-selection limit.
+- In **Menu Bar** settings, select both accounts to pin both quotas. When a provider has more than one enabled account, each icon gets a short name: the name you gave the account (up to 12 characters) or the part of its email before the @ (up to 8). Names that would look alike are numbered (`work·1`, `work·2`); the tooltip shows the full name. Accounts count toward the existing three-selection limit.
 
 The Codex probe mode setting applies to all Codex accounts. Both RPC and API modes use each added account's own folder. Account-specific RPC failures never fall back to the default account's terminal session.
 

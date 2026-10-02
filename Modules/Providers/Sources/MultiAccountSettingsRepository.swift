@@ -30,11 +30,12 @@ public protocol MultiAccountSettingsRepository: ProviderSettingsRepository {
     /// Updates an existing account configuration.
     func updateAccount(_ config: ProviderAccountConfig, forProvider id: String)
 
-    /// Gets the active account ID for a provider (nil = default/first account).
-    func activeAccountId(forProvider id: String) -> String?
+    /// The name the person gave the default login — added logins keep
+    /// theirs in `ProviderAccountConfig.label`.
+    func defaultAccountLabel(forProvider id: String) -> String?
 
-    /// Sets the active account ID for a provider.
-    func setActiveAccountId(_ accountId: String?, forProvider id: String)
+    /// Saves the default login's name; `nil` forgets it.
+    func setDefaultAccountLabel(_ label: String?, forProvider id: String)
 }
 
 /// Configuration for a single account within a provider.
@@ -73,6 +74,11 @@ public struct ProviderAccountConfig: Sendable, Equatable, Codable {
     }
 
     /// Converts to a ProviderAccount domain model
+    /// The same login under another name — who it is and its values stay.
+    public func named(_ label: String) -> ProviderAccountConfig {
+        ProviderAccountConfig(accountId: accountId, label: label, email: email, organization: organization, probeConfig: probeConfig)
+    }
+
     public func toProviderAccount(providerId: String) -> ProviderAccount {
         ProviderAccount(
             accountId: accountId,

@@ -318,7 +318,6 @@
     }
   ],
   "accounts": {
-    "nameFromEmail": true,
     "folder": {
       "savedAs": "configDirectory",
       "default": "${CLAUDE_CONFIG_DIR:-~/.claude}",

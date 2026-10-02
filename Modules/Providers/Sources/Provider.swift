@@ -27,7 +27,7 @@ public final class Provider {
     /// *Share Claude Code*, for a provider whose plan can issue guest passes.
     public let guestPasses: GuestPasses?
 
-    let settings: any ProviderSettingsRepository
+    let settings: any MultiAccountSettingsRepository
     private let makeDataSource: (DataSourceDefinition) -> DataSource
     @ObservationIgnored private var bound: [String: [DataSource]] = [:]
     @ObservationIgnored private var refreshTasks: [String: Task<UsageSnapshot, Error>] = [:]
@@ -36,7 +36,7 @@ public final class Provider {
     ///   connections in the app, stubbed ones in tests.
     public init(
         definition: ProviderDefinition,
-        settings: any ProviderSettingsRepository,
+        settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
         makeDataSource: @escaping (DataSourceDefinition) -> DataSource,
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
@@ -47,7 +47,8 @@ public final class Provider {
         self.makeDataSource = makeDataSource
         self.dailyUsage = dailyUsage
         self.guestPasses = guestPasses
-        self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: ""), values: [:])]
+        let label = settings.defaultAccountLabel(forProvider: definition.id) ?? ""
+        self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: label), values: [:])]
         bound[definition.id] = definition.dataSources.map(makeDataSource)
         for config in accounts {
             add(config)
@@ -79,13 +80,33 @@ public final class Provider {
         return account
     }
 
-    /// *Remove* — forgets the login here; its CLI's files are never touched.
-    /// The default login can't be removed.
+    /// *Remove* — forgets the login here and its saved settings; its CLI's
+    /// files are never touched. The default login can't be removed.
     public func remove(_ account: Account) {
-        guard !account.isDefault else { return }
+        guard !account.isDefault, accounts.contains(where: { $0 === account }) else { return }
         accounts.removeAll { $0.id == account.id }
         bound[account.id] = nil
+        refreshTasks[account.id]?.cancel()
         refreshTasks[account.id] = nil
+        settings.removeAccount(accountId: account.accountId, forProvider: id)
+    }
+
+    /// *Rename* — the name the person gives a login. Who it is, its values
+    /// and its usage stay; an empty name goes back to the email.
+    public func rename(_ account: Account, to name: String) {
+        guard accounts.contains(where: { $0 === account }) else { return }
+        let label = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if account.isDefault {
+            settings.setDefaultAccountLabel(label.isEmpty ? nil : label, forProvider: id)
+        } else if let saved = settings.accounts(forProvider: id).first(where: { $0.accountId == account.accountId }) {
+            settings.updateAccount(saved.named(label), forProvider: id)
+        }
+        account.label = label
+    }
+
+    /// More than one enabled login, so each needs telling apart by name.
+    public var hasSeveralAccounts: Bool {
+        accounts.lazy.filter(\.isEnabled).prefix(2).count > 1
     }
 
     /// The enabled login with the most left — *switch to work*.

@@ -23,7 +23,7 @@ struct ClaudeBarApp: App {
     @MainActor
     private static func builtIn(
         _ id: String,
-        settings: any ProviderSettingsRepository,
+        settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil

@@ -22,7 +22,8 @@ public final class Account: AIProvider {
     public let isDefault: Bool
     /// The login's own id within the provider — `default` for the default login.
     public let accountId: String
-    public let label: String
+    /// The name the person gave it — empty when they gave none.
+    public internal(set) var label: String
     /// What the person gave, or its login file holds.
     public let email: String?
     /// Its account settings — the Codex folder, the login's account id.
@@ -66,16 +67,19 @@ public final class Account: AIProvider {
     /// The email the data source reported, else the one it was added with.
     public var accountEmail: String? { snapshot?.accountEmail ?? email }
 
-    /// Whether logins of this provider are named by email.
-    public var isNamedByAccount: Bool { provider.definition.accounts?.nameFromEmail == true }
+    /// What it is called: the name the person gave it, else its login's
+    /// email, else the product's name.
+    public var displayName: String {
+        let given = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !given.isEmpty { return given }
+        return accountEmail ?? provider.name
+    }
 
     // MARK: - AIProvider (forwarded to the provider)
 
-    /// The login's email when the provider names logins by it, else the product.
-    public var name: String {
-        guard isNamedByAccount, let accountEmail else { return provider.name }
-        return accountEmail
-    }
+    /// The pill's name: the product's while this is the only login to tell
+    /// apart, else the account's own.
+    public var name: String { provider.hasSeveralAccounts ? displayName : provider.name }
 
     public var cliCommand: String { provider.definition.cli ?? "" }
     /// The dashboard for the plan the last usage reported (#328).

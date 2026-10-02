@@ -345,7 +345,6 @@
     }
   ],
   "accounts": {
-    "nameFromEmail": true,
     "folder": {
       "savedAs": "codexHome",
       "default": "${CODEX_HOME:-~/.codex}",

@@ -62,7 +62,6 @@ struct CodexAccountsCard: View {
 
     private func remove(_ provider: Account) {
         codex?.remove(provider)
-        JSONSettingsRepository.shared.removeAccount(accountId: provider.accountId, forProvider: "codex")
         let settings = AppSettings.shared
         let remaining = settings.menuBarProviderIds.filter { $0 != provider.id }
         settings.setMenuBarProviderIds(remaining.isEmpty ? ["codex"] : remaining)

@@ -68,7 +68,7 @@ public enum Providers {
     @MainActor
     public static func make(
         _ definition: ProviderDefinition,
-        settings: any ProviderSettingsRepository,
+        settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
         secrets: (any SecretStore)? = nil,
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
@@ -88,7 +88,7 @@ public enum Providers {
     @MainActor
     public static func make(
         _ id: String,
-        settings: any ProviderSettingsRepository,
+        settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil

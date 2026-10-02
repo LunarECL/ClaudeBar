@@ -569,3 +569,38 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         "provider.\(id).isEnabled"
     }
 }
+
+// MARK: - MultiAccountSettingsRepository
+
+extension UserDefaultsProviderSettingsRepository: MultiAccountSettingsRepository {
+    public func accounts(forProvider id: String) -> [ProviderAccountConfig] {
+        guard let data = userDefaults.data(forKey: Self.accountsKey(id)) else { return [] }
+        return (try? JSONDecoder().decode([ProviderAccountConfig].self, from: data)) ?? []
+    }
+
+    public func addAccount(_ config: ProviderAccountConfig, forProvider id: String) {
+        writeAccounts(accounts(forProvider: id).filter { $0.accountId != config.accountId } + [config], forProvider: id)
+    }
+
+    public func removeAccount(accountId: String, forProvider id: String) {
+        writeAccounts(accounts(forProvider: id).filter { $0.accountId != accountId }, forProvider: id)
+    }
+
+    public func updateAccount(_ config: ProviderAccountConfig, forProvider id: String) {
+        writeAccounts(accounts(forProvider: id).map { $0.accountId == config.accountId ? config : $0 }, forProvider: id)
+    }
+
+    public func defaultAccountLabel(forProvider id: String) -> String? {
+        userDefaults.string(forKey: "providerConfig.\(id).defaultAccountLabel")
+    }
+
+    public func setDefaultAccountLabel(_ label: String?, forProvider id: String) {
+        userDefaults.set(label, forKey: "providerConfig.\(id).defaultAccountLabel")
+    }
+
+    private static func accountsKey(_ id: String) -> String { "providerConfig.\(id).accounts" }
+
+    private func writeAccounts(_ configs: [ProviderAccountConfig], forProvider id: String) {
+        userDefaults.set(try? JSONEncoder().encode(configs), forKey: Self.accountsKey(id))
+    }
+}

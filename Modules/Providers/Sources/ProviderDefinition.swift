@@ -65,9 +65,6 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     /// its saved values filling `{{account.<name>}}` — one definition, never
     /// a copy per login.
     public struct Accounts: Sendable, Equatable, Codable {
-        /// The login's email names it — two logins of one product are told
-        /// apart by who they are.
-        public let nameFromEmail: Bool
         /// How a person adds one: by choosing the folder its login lives in.
         public let folder: Folder?
         /// By data source kind, what an added login changes — its own folder,
@@ -155,15 +152,13 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             }
         }
 
-        public init(nameFromEmail: Bool = false, folder: Folder? = nil, patch: [String: JSONValue] = [:]) {
-            self.nameFromEmail = nameFromEmail
+        public init(folder: Folder? = nil, patch: [String: JSONValue] = [:]) {
             self.folder = folder
             self.patch = patch
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            nameFromEmail = try container.decodeIfPresent(Bool.self, forKey: .nameFromEmail) ?? false
             folder = try container.decodeIfPresent(Folder.self, forKey: .folder)
             patch = try container.decodeIfPresent([String: JSONValue].self, forKey: .patch) ?? [:]
         }

@@ -39,7 +39,7 @@ struct ClaudeHarness {
     /// A `Provider` built from `claude.json` over these connections.
     @MainActor
     func provider(
-        settings: any ProviderSettingsRepository = InMemoryProviderSettings(),
+        settings: any MultiAccountSettingsRepository = InMemoryProviderSettings(),
         accounts: [ProviderAccountConfig] = [],
         dailyUsage: (any DailyUsageAnalyzing)? = nil,
         guestPasses: GuestPasses? = nil
