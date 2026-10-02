@@ -88,7 +88,8 @@ struct MenuBarNativeIconsTests {
         }
         let colors = try visibleColors(StatusItemLabelDriver.compose(content, theme: DarkTheme()))
         #expect(colors.contains { abs($0.redComponent-$0.greenComponent) > 0.1 })
+        let darkContent = content
         content.isDarkAppearance = false
-        #expect(content != original)
+        #expect(content != darkContent)
     }
 }
