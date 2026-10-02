@@ -8,7 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Pick which quotas to show per provider: Settings → Providers → provider, hide windows you never use. Hidden windows vanish from the popover and stop driving the menu bar and notifications; the Touch Bar and status export still show them. [#140](https://github.com/tddworks/ClaudeBar/issues/140)
+- Popover: a provider with several accounts is one tab, its accounts side by side. Chips hide one from view without pausing it, and a line names the account behind a warning. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
+- Providers you made with Add Provider can have more than one account: Add Account asks for each account's API key, kept in your Keychain for that account only. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
+- Claude and Codex accounts: Settings → Providers → Accounts adds a login by signing in with your browser or choosing a signed-in folder, then names, reorders, pins, pauses, removes and re-signs-in each one. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
+- Hide quotas you don't use: Settings → Providers → a provider → Quotas. A hidden quota disappears everywhere (popover, menu bar, Touch Bar, notch, status export, Notify!) and no longer sets a status or an alert. ([#140](https://github.com/tddworks/ClaudeBar/issues/140))
 - Share a provider you made: Export… saves it as a file without your keys; Import… shows where it sends a key and any command it runs before you add it, then asks for your own key. ([#355](https://github.com/tddworks/ClaudeBar/issues/355))
 - Add Provider: track a service ClaudeBar doesn't ship. Settings → Providers → Add Provider… starts from an API, a command, a file or a copy; test it, click the numbers to map them, name it. Keys stay in your Keychain. ([#354](https://github.com/tddworks/ClaudeBar/issues/354))
 - Claude and Codex: the popover says which data source answered ("via RPC", or "via Terminal" after a fallback) and, when a refresh fails, which step went wrong ("Couldn't read your key"), keeping the last usage dimmed. ([#351](https://github.com/tddworks/ClaudeBar/issues/351))
@@ -29,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Breaking: Claude's Dashboard button (⌘D) now opens your usage page on claude.ai on a subscription (Max, Pro, Team) instead of the Console billing page. Pay-as-you-go API accounts still get the Console; on a subscription, open console.anthropic.com yourself if you need it. ([#328](https://github.com/tddworks/ClaudeBar/pull/328))
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Codex: add separate ChatGPT accounts, identify them by email, and pin both quotas in the menu bar. Each login keeps its own usage and refreshes. [#308](https://github.com/tddworks/ClaudeBar/issues/308)
 - Z.ai: paste your GLM API key in Settings → Providers → Z.ai → API KEY. It wins over the settings.json token and env vars, and works even when no Z.ai URL is in settings.json (quota then comes from api.z.ai).
 - Codex: the GPT-5.3-Codex-Spark research preview has its own 5h and weekly windows, separate from your main limits. Those Spark windows now show as extra rows after your session and weekly gauges. ([#178](https://github.com/tddworks/ClaudeBar/issues/178))
@@ -55,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.93] - 2026-09-24
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Custom status colors. Settings → Appearance → Status Colors has a color well for each level (healthy, warning, critical, depleted). A custom color overrides the theme in the menu bar label, the popover, the notch, and Settings. "Reset to defaults" restores the theme. ([#200](https://github.com/tddworks/ClaudeBar/issues/200))
 - High Contrast switch in the same card: a built-in palette that clears 4.5:1 on both light and dark menu bars and follows the bar's appearance. The stock theme greens and ambers measured under 2:1 on a light menu bar. Custom colors win over High Contrast for the levels you set. ([#200](https://github.com/tddworks/ClaudeBar/issues/200))
 
@@ -75,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.91] - 2026-09-09
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - The Notify! quota tile can now live on the iPhone Home Screen as well as the Lock Screen. Notify! added Home Screen widgets in its September 2026 update, and a screen widget carries exactly the content a Live Activity does, so the same tile ClaudeBar already builds (up to six quota windows, a progress bar and the reset countdown) can sit there permanently instead of appearing and vanishing with a job. It has its own switch in Settings then Notify!, is on once you link a device, and is placed through iOS's own widget picker after adding it under Settings then Home Screen Widgets in Notify!. If your copy of Notify! is not serving Home Screen widgets yet, ClaudeBar treats that as "not yet" rather than an error and quietly tries again later.
 
 ---
@@ -89,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.89] - 2026-09-04
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Quota state can now be published to an iPhone Lock Screen through [Notify!](https://getnotifyapp.com), so the number the app exists for is readable without opening the laptop. ClaudeBar keeps two things on the phone: a Live Activity showing up to six quota windows with a progress bar, and a Lock Screen widget whose gauge is one quota you pick (or whichever needs attention most). Percentages are remaining, the same as everywhere else in the app, so a full ring means a full quota. To set it up, get Notify! (https://getnotifyapp.com), open it once on the phone so Live Activities are allowed to start, then copy the device ID and token out of the app into Settings → Notify!. The Live Activity needs an iPhone or iPad ID. A Mac or browser ID keeps the widget gauge perfectly well, but Notify! cannot start a Live Activity on one, so ClaudeBar disables that switch and says why instead of publishing into nothing; a group ID owns no Lock Screen at all and gets neither. Either surface can be switched off on its own. This is off by default and sends provider names, window labels and remaining percentages to a third-party service; the device token is stored in the Keychain, never in `settings.json`, falling back to ClaudeBar's app credentials on a self-built copy whose ad-hoc signature the Keychain will not accept.
 - `JSONSettingsRepository` now conforms to `MultiAccountSettingsRepository`, persisting per-provider accounts under `providers.{id}.accounts` and the active account under `providers.{id}.activeAccountId`. Nothing changes for existing installs: a provider with no `accounts` key reads back an empty list, which is the single-account path, so no migration runs. Removing the active account clears the active pointer rather than leaving it dangling at an account that is gone. (#164)
 
@@ -112,6 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.86] - 2026-09-01
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Claude Code's session and quota state can now be shown in the notch. With nothing running it reports the selected provider's most depleted quota, so the number the app exists for is readable without opening anything. A running session takes the notch over — repository, elapsed time, and how many subagents are fanned out — then hands it back when the turn ends. Hovering expands it into the session list, quota cards and today's usage, with buttons to refresh that provider or snooze the notch for 30 minutes. Off by default: turn it on in Settings → General → Notch Live Activity. Displays without a physical notch, including every external monitor, get a virtual one sized to the menu bar. (#274)
 - ClaudeBar now registers Claude Code's `Notification` hook alongside the session hooks it already installed, so it can tell that Claude is blocked waiting on a permission prompt instead of showing the session as merely active. That state outranks everything else in the notch and stays put until it is answered. (#274)
 
@@ -205,6 +214,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.75] - 2026-08-04
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Grok Build (xAI) provider: monitors weekly credit usage and per-product
   limits (Grok Build, Grok Imagine, Grok Voice) via the same billing endpoint
   the `grok` CLI uses. Reads OAuth credentials from `~/.grok/auth.json`,
@@ -247,6 +257,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now"), so the marker no longer reads as a misaligned rendering glitch.
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Claude Extra Usage now reads the current OAuth `spend` payload (with the
   legacy `extra_usage` shape as a tolerant fallback), converts minor units with
   exponent-aware decimal math, and renders spend as a distinct "EXTRA USAGE"
@@ -284,6 +295,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.71] - 2026-07-13
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Oh My Pi (`omp`) provider: shows the rate-limit windows of every account the
   harness is signed into (Claude, Codex, Z.ai, ...) via `omp usage --json`. Each
   window appears as its own quota with reset countdown; pace math uses the
@@ -312,6 +324,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.70] - 2026-07-02
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Claude Fable 5 weekly limit is now parsed from both the CLI `/usage` output
   ("Current week (Fable)") and the OAuth usage API's new `limits` array, shown as a
   quota card in the window and selectable as a menu-bar metric. The API-side parsing
@@ -393,6 +406,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.62] - 2026-05-14
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **[OpenCode Go](https://opencode.ai/go) quota tracking**: New `OpenCodeProvider` monitors OpenCode Go usage windows (5hr/$12, weekly/$30, monthly/$60) by querying the local OpenCode SQLite database via `opencode db --format json`. Session, weekly, and monthly quotas are displayed with percentage remaining and reset times.
 
 ### Fixed
@@ -407,6 +421,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.61] - 2026-05-08
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Optional menu bar quota percentage**: A new setting shows the active provider's quota percentage directly in the menu bar next to the icon, so you can see usage at a glance without opening the popover. Configurable in Settings, with optional pace-aware status coloring driven by `burnRateThreshold`.
 
 ### Fixed
@@ -417,6 +432,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.60] - 2026-05-02
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Cache visibility on Claude daily usage cards**: Token Usage now shows the total *with* cache included plus a "X% from cache" subtitle, and Cost Usage shows a "Saved $X (Y%)" line — making the value of prompt caching visible at a glance.
 - `DailyUsageStat` exposes `inputTokens`, `outputTokens`, `cacheCreationTokens`, `cacheReadTokens`, `cachedSavings`, plus `cacheHitRate`, `totalTokensWithCache`, and formatted helpers for downstream consumers.
 - `ModelPricing.savings(for:)` estimates dollars saved by cache hits (`cache_read × (input_price − cache_read_price)`).
@@ -451,6 +467,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.56] - 2026-03-22
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Mistral provider backed by Vibe session logs for quota monitoring.
 
 ### Fixed
@@ -499,6 +516,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.50] - 2026-03-17
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Extensions System**: Raycast-style user extensions for custom provider monitoring. Drop a folder with a `manifest.json` and probe scripts into `~/.claudebar/extensions/` to add your own provider. Each extension defines composable sections (`quotaGrid`, `metricsRow`, `dailyUsage`, `costUsage`, `statusBanner`, `healthCheck`) with per-section probe commands and independent refresh intervals. Probe scripts can be any language (bash, python, swift) — just output JSON to stdout. Extensions auto-register as providers with custom branding (icon, colors) and appear in the provider pills alongside built-in providers. See `docs/features/extensions.md` for the full spec and example.
 - **Built-in Health Check for Extensions**: Extensions can now define a `healthCheck` section with a URL endpoint — no probe script needed. ClaudeBar pings the URL and renders Status (UP/DOWN with HTTP code) and Latency cards automatically. Configure via `"probe": { "builtIn": "healthCheck", "url": "https://..." }` in `manifest.json`.
 
@@ -507,6 +525,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.49] - 2026-03-17
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Custom Web Card per Provider**: Configure a custom URL for any provider to display an embedded web page as an additional card below the quota cards. Useful for third-party dashboards like [claude.owo.nz](https://claude.owo.nz/). Set via Settings → Providers → Custom Card URL field. The page is rendered inline with WKWebView, scaled to fit the card, with an "open in browser" button.
 
 ### Fixed
@@ -517,6 +536,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.48] - 2026-03-16
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Burn Rate Warnings**: New pace-aware warning system that alerts based on consumption rate rather than fixed usage thresholds. Instead of warning at arbitrary percentages (e.g., 57% used = warning), it calculates whether you're on track to exhaust your quota before the period resets. For example, 57% used with 85% of the session elapsed is healthy (burn rate 0.67), while 53% used with only 8.5% of the week elapsed is a real warning (burn rate 6.2). Configurable threshold multiplier (1.2x–3.0x) in Settings. Disabled by default — opt in via Settings → Burn Rate Warnings. Critical (<20%) and depleted (0%) thresholds remain absolute as a safety net. ([#151](https://github.com/tddworks/ClaudeBar/issues/151))
 
 ---
@@ -528,6 +548,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.46] - 2026-03-12
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Alibaba Coding Plan Provider**: Monitor your Alibaba Coding Plan usage quotas directly from the menu bar. Supports three quota windows — 5-hour session, weekly, and monthly — with reset times and progress tracking. Authenticate via API key or browser cookies (auto-extract with SweetCookieKit or paste manually). Supports both International (`modelstudio.console.alibabacloud.com`) and China Mainland (`bailian.console.aliyun.com`) regions.
 
 ---
@@ -535,6 +556,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.45] - 2026-03-12
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Daily Usage Cards Toggle**: New setting to show/hide daily usage report cards (API Cost, Token Usage, Working Time) in the menu bar. Useful for users who don't use the Claude API or prefer a cleaner view. Toggle in Settings → Display.
 
 ### Improved
@@ -570,6 +592,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.43] - 2026-03-11
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Daily Usage Report Cards**: See your daily Claude Code cost, token usage, and working time right in the menu bar. ClaudeBar now analyzes your local session files (`~/.claude/projects/`) and displays three new cards below the quota cards:
   - **Cost Usage** — Estimated daily spend based on token counts and Anthropic's published model pricing (Opus, Sonnet, Haiku)
   - **Token Usage** — Total tokens consumed (input, output, and cache)
@@ -595,6 +618,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.38] - 2026-02-25
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Claude Setup-Token Support**: ClaudeBar now recognizes users who authenticate via `claude setup-token`. The app loads the `CLAUDE_CODE_OAUTH_TOKEN` environment variable as a credential source and gracefully falls back to stored credentials (file/keychain) that have full scope, so quota monitoring continues to work seamlessly regardless of how you authenticated (contributed by [@brendandebeasi](https://github.com/brendandebeasi) in [#129](https://github.com/tddworks/ClaudeBar/pull/129)).
 
 ### Fixed
@@ -608,6 +632,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.36] - 2026-02-16
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Cursor Support**: Monitor your [Cursor](https://cursor.com) IDE subscription usage (included requests and on-demand spending) directly from the menu bar. Supports Pro, Business, Free, and Ultra plans with automatic tier detection.
   - Reads auth token from Cursor's local SQLite database automatically
   - Calls `cursor.com/api/usage-summary` for real-time usage data
@@ -626,6 +651,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.35] - 2026-02-15
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Kiro Support**: Monitor your [Kiro](https://kiro.dev) (by AWS) AI coding assistant usage quotas via `kiro-cli`. Displays weekly bonus credits and monthly regular credits with reset time tracking.
   - Install with `uv tool install kiro-cli` and authenticate via Kiro IDE
   - Automatically parses usage data from `kiro-cli /usage` output
@@ -641,6 +667,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.34] - 2026-02-15
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **MiniMax Support**: Monitor your [MiniMax](https://www.minimax.io) Coding Plan usage quota directly from the menu bar. Queries the MiniMax API for remaining coding plan credits.
   - Configurable API key and environment variable support in Settings
   - Test connection button to verify API key
@@ -657,6 +684,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.33] - 2026-02-14
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Claude Code Session Tracking**: Real-time monitoring of Claude Code sessions via hooks. When Claude Code is running, ClaudeBar shows session status directly in the menu bar and popover:
   - **Menu bar indicator**: A terminal icon appears next to the quota icon with phase-colored status (green = active, blue = subagents working, orange = stopped)
   - **Session card**: Detailed session info in the popover showing phase, task count, active subagents, duration, and working directory
@@ -684,6 +712,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.32] - 2026-02-12
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Overview Mode**: New "Overview" toggle in Settings to display all enabled providers at once in a single scrollable view. Ideal for juggling multiple AI assistants (Claude + Codex + Kimi + ...) throughout the day — see all your quotas at a glance without switching between pills.
 
 ### Technical
@@ -693,6 +722,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.31] - 2026-02-12
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Kimi Support**: Monitor your [Kimi](https://www.kimi.com/code/console) AI coding assistant usage quota directly from the menu bar. Displays weekly quota and 5-hour session rate limit with automatic tier detection (Andante/Moderato/Allegretto).
 - **Kimi Dual Probe Mode**: Kimi now supports both CLI and API modes, switchable in Settings:
   - **CLI Mode (Recommended)**: Launches the interactive `kimi` CLI and sends `/usage`. No Full Disk Access needed — just install `kimi` CLI (`uv tool install kimi-cli`).
@@ -714,6 +744,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.28] - 2026-02-10
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Amp Code Support**: Monitor your [Amp](https://ampcode.com) (by Sourcegraph) AI coding assistant usage quota directly from the menu bar. Automatically detects the `amp` CLI and displays your usage and plan tier.
 - **Amp Tier Detection**: Automatically identifies your Amp subscription tier (Free, Pro, etc.) for accurate quota display.
 - **Provider Icon**: New Amp icon with branded styling in the provider list.
@@ -732,6 +763,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.26] - 2026-02-09
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Launch at Login**: New toggle in Settings to automatically start ClaudeBar when you log in to your Mac. Uses macOS native `SMAppService` — no helper app required.
 - **Pace Tick Mark**: Visual tick mark below the consumption bar showing your expected usage pace. ([#96](https://github.com/tddworks/ClaudeBar/pull/96) - thanks [@frankhommers](https://github.com/frankhommers)!)
 
@@ -744,6 +776,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.2] - 2026-02-04
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Codex API Mode**: New alternative to RPC mode that fetches quota data directly via the ChatGPT backend API. Faster than RPC mode (no subprocess spawning), with automatic OAuth token refresh. Switch between modes in Settings → Codex Configuration.
 - **Codex Configuration Card**: New settings panel to choose between RPC mode (default, uses `codex app-server` JSON-RPC) and API mode (direct HTTP API calls using OAuth credentials from `~/.codex/auth.json`).
 
@@ -761,6 +794,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.1] - 2026-02-04
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Remaining / Used Display Toggle**: Switch between "25% Remaining" and "75% Used" views for all quota cards. Choose whichever framing makes more sense for your workflow — see how much you have left, or how much you've consumed. Toggle in Settings → Quota Display.
 
 ### Technical
@@ -774,6 +808,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.0] - 2026-02-03
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Claude API Mode**: New alternative to CLI mode that fetches quota data directly via Anthropic's OAuth API. Faster than CLI mode (no subprocess spawning), with automatic token refresh. Switch between modes in Settings → Claude Configuration.
 - **Claude Configuration Card**: New settings panel to choose between CLI mode (default, uses `claude /usage` command) and API mode (direct HTTP API calls using OAuth credentials).
 - **Copilot Manual Usage Override**: For users with organization-based Copilot subscriptions where API data isn't available, manually enter your usage from GitHub settings. Supports both request counts (e.g., "99") and percentages (e.g., "198%").
@@ -803,6 +838,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.15] - 2026-01-23
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **AWS Bedrock Support**: Monitor your AWS Bedrock AI usage directly from the menu bar. Track daily costs, token counts, and per-model breakdowns for your Claude, Llama, and other Bedrock models. ([#75](https://github.com/tddworks/ClaudeBar/pull/75) - thanks [@tomstetson](https://github.com/tomstetson)!)
 - **Bedrock Usage Card**: New dedicated view showing daily costs, input/output token counts, and detailed per-model usage breakdown
 - **Provider Icon**: New Bedrock provider icon with AWS orange theme for easy identification
@@ -832,6 +868,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.6] - 2026-01-11
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **SwiftTerm Integration**: Added SwiftTerm terminal emulator library to properly render Claude CLI output. This fixes parsing issues with Claude Code v2.1.4+ which uses advanced terminal UI with cursor movements that previously corrupted captured output.
 
 ### Improved
@@ -852,6 +889,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.4] - 2026-01-08
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Background Sync**: Your quota data now syncs automatically in the background, so it's always fresh when you open the menu. No more waiting! Configure sync intervals (30s, 1min, 2min, or 5min) in Settings → Background Sync.
 - **Fresh App Logo**: Updated app icon with a refreshed design.
 
@@ -871,6 +909,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2026-01-05
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Pluggable Theme System**: ClaudeBar now supports multiple visual themes with a protocol-based architecture. Switch themes instantly from Settings to match your workflow and preferences.
 - **CLI Terminal Theme**: New monochrome, terminal-inspired theme for developers who prefer a classic command-line aesthetic. Features monospace fonts, green accents, and a retro terminal look.
 - **Theme-Specific Menu Bar Icons**: Each theme can display its own custom menu bar icon, providing a cohesive visual experience across the entire app.
@@ -895,6 +934,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.15] - 2026-01-05
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Claude API Billing Support**: Users with API Usage Billing accounts (pay-per-use) can now monitor their Claude usage. The app automatically detects billing plan type and uses the `/cost` command to display total cost and API duration when `/usage` is unavailable.
 - **Z.ai Environment Variable Fallback**: Configure a custom environment variable for GLM authentication in Settings, useful when you have multiple API keys or non-standard setups.
 - **Custom Z.ai Config Path**: Specify a custom path to your Z.ai configuration file if it's not in the default Claude Code settings location.
@@ -941,6 +981,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.12] - 2026-01-02
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Provider Enable/Disable**: Toggle individual AI providers on/off from Settings. Disabled providers are hidden from the menu bar and excluded from quota monitoring.
 - **Copilot Credential Management**: GitHub Copilot now manages its own credentials (token and username) directly within the provider, making setup more intuitive.
 
@@ -968,6 +1009,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.11] - 2026-01-01
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Share Claude Pass**: Share referral links with friends to give them a free week of Claude Code! Click the gift icon (🎁) in the action bar when Claude is selected to copy or open your referral link.
 
 ### Improved
@@ -994,6 +1036,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.9] - 2025-12-31
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Z.ai GLM Coding Plan Support**: Monitor your [Z.ai GLM Coding Plan](https://z.ai/subscribe) usage quota directly from the menu bar. Automatically detects Z.ai configuration in Claude Code settings and displays your 5-hour session limit and MCP usage in real-time.
 - **Provider Icon**: New Z.ai icon with blue branding in the provider list
 
@@ -1031,6 +1074,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.5] - 2025-12-29
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Google Antigravity Support**: Monitor your Antigravity AI assistant usage quota directly from the menu bar alongside Claude, Codex, Gemini, and GitHub Copilot
 - **Local Server Detection**: Automatically detects running Antigravity language server and retrieves quota information via local API
 - **Provider Icon**: New Antigravity icon in the provider list for easy identification
@@ -1049,6 +1093,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.4] - 2025-12-29
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Dual-Output Logging**: Logs now write to both OSLog (for developers via Console.app) and persistent files (for users) at `~/Library/Logs/ClaudeBar/ClaudeBar.log`
 - **Open Logs Button**: New "Open Logs Folder" button in Settings for easy access to log files when troubleshooting
 - **Comprehensive Error Logging**: All AI provider probes now log detailed error information for easier debugging
@@ -1067,6 +1112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.3] - 2025-12-28
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Beta Updates Channel**: Opt into beta releases to get early access to new features before they're widely available
 - **Dual Update Tracks**: Stable and beta releases now coexist - stable users get stable updates, beta users get the latest beta
 
@@ -1081,12 +1127,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.2] - 2025-12-26
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Update Notification Badge: See a visual indicator on the settings button when a new version is available
 - Version Info Display: View the available update version directly in the menu
 
 ## [0.2.1] - 2025-12-26
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - **Auto-Update Toggle**: Control automatic update checks from Settings
 - **Update Progress Indicator**: See visual feedback when checking for updates
 
@@ -1098,6 +1146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2025-12-25
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - CHANGELOG.md as single source of truth for release notes
 - `extract-changelog.sh` script to parse version-specific notes
 - Sparkle checks for updates when menu opens (instead of automatic background checks)
@@ -1112,6 +1161,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-12-15
 
 ### Added
+- Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Initial release
 - Claude CLI usage monitoring
 - Codex CLI usage monitoring

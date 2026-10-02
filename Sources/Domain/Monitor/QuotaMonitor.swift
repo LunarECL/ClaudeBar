@@ -30,11 +30,6 @@ public final class QuotaMonitor {
     /// Optional alerter for quota changes (e.g., system notifications)
     private let alerter: (any QuotaAlerter)?
 
-    /// Optional provider settings, consulted for hidden quota keys (issue #140).
-    /// `nil` treats every quota as visible — the default for tests and for
-    /// call sites that don't care.
-    private let settingsRepository: (any ProviderSettingsRepository)?
-
     /// Clock for scheduling intervals (injectable for tests)
     private let clock: any Clock
 
@@ -59,6 +54,14 @@ public final class QuotaMonitor {
     /// The currently selected provider ID (for UI display)
     public var selectedProviderId: String = "claude"
 
+    /// Where a person's choices about providers are kept — hidden quotas.
+    /// `nil` hides nothing.
+    private let settingsRepository: (any ProviderSettingsRepository)?
+
+    /// The quotas each product hides (#140), by product id — loaded from
+    /// settings, observable so every surface follows a change at once.
+    private var hiddenQuotas: [String: Set<String>] = [:]
+
     // MARK: - Initialization
 
     /// Creates a QuotaMonitor with a provider repository.
@@ -73,11 +76,55 @@ public final class QuotaMonitor {
     ) {
         self.providers = providers
         self.alerter = alerter
-        self.settingsRepository = settingsRepository
         self.clock = clock
         self.powerStateProvider = powerStateProvider
         self.readStatusPolicy = statusPolicy
+        self.settingsRepository = settingsRepository
+        for provider in providers.all { loadHiddenQuotas(for: provider) }
         selectFirstEnabledIfNeeded()
+    }
+
+    // MARK: - Hidden quotas (#140)
+
+    /// A provider's usage as every surface reads it: without the quotas the
+    /// person hid for its product, so a quota they don't watch is never shown
+    /// and never sets a status or an alert.
+    public func usage(of provider: any AIProvider) -> UsageSnapshot? {
+        provider.snapshot?.hiding(hiddenQuotaKeys(for: provider))
+    }
+
+    /// The quota keys hidden for a provider's product — shared by its accounts.
+    public func hiddenQuotaKeys(for provider: any AIProvider) -> Set<String> {
+        hiddenQuotas[Self.productId(of: provider)] ?? []
+    }
+
+    /// Hides or shows one quota for a provider's product, saved. Refused —
+    /// `false` — when it would hide the last quota the provider reports.
+    @discardableResult
+    public func setQuota(_ key: String, hidden: Bool, for provider: any AIProvider) -> Bool {
+        let product = Self.productId(of: provider)
+        var keys = hiddenQuotas[product] ?? []
+        if hidden {
+            let reported = Set(provider.snapshot?.quotas.map(\.quotaType.quotaKey) ?? [])
+            guard !reported.subtracting(keys).subtracting([key]).isEmpty else { return false }
+            keys.insert(key)
+        } else {
+            keys.remove(key)
+        }
+        hiddenQuotas[product] = keys
+        settingsRepository?.setHiddenQuotaKeys(keys, forProvider: product)
+        return true
+    }
+
+    private func loadHiddenQuotas(for provider: any AIProvider) {
+        let product = Self.productId(of: provider)
+        guard hiddenQuotas[product] == nil, let keys = settingsRepository?.hiddenQuotaKeys(forProvider: product) else { return }
+        hiddenQuotas[product] = keys
+    }
+
+    /// The product a lineup entry belongs to — `codex` for `codex.<acct>`.
+    private static func productId(of provider: any AIProvider) -> String {
+        (provider as? Account)?.provider.id ?? provider.id
     }
 
     // MARK: - Monitoring Operations
@@ -111,20 +158,11 @@ public final class QuotaMonitor {
         }
     }
 
-    /// Hidden quota keys configured for a provider (issue #140); empty when
-    /// no settings repository is wired, so nothing is ever hidden by accident.
-    private func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
-        settingsRepository?.hiddenQuotaKeys(forProvider: id) ?? []
-    }
-
     /// Handles snapshot update and alerts user if status changed
     private func handleSnapshotUpdate(provider: any AIProvider, snapshot: UsageSnapshot) async {
         let previousStatus = previousStatuses[provider.id] ?? .healthy
-        // Hidden quotas don't count: a quota the user hid must not page them.
-        let newStatus = snapshot.visibleOverallStatus(
-            hiding: hiddenQuotaKeys(forProvider: provider.id),
-            under: statusPolicy
-        )
+        // A quota the person hid doesn't page them.
+        let newStatus = snapshot.hiding(hiddenQuotaKeys(for: provider)).overallStatus(under: statusPolicy)
 
         previousStatuses[provider.id] = newStatus
 
@@ -195,6 +233,7 @@ public final class QuotaMonitor {
     /// Adds a provider dynamically
     public func addProvider(_ provider: any AIProvider) {
         providers.add(provider)
+        loadHiddenQuotas(for: provider)
     }
 
     /// Removes a provider by ID
@@ -202,13 +241,10 @@ public final class QuotaMonitor {
         providers.remove(id: id)
     }
 
-    /// Returns the lowest quota across all enabled providers, counting only
-    /// quotas visible for each provider (issue #140).
+    /// Returns the lowest quota across all enabled providers
     public func lowestQuota() -> UsageQuota? {
         providers.enabled
-            .compactMap { provider in
-                provider.snapshot?.visibleLowestQuota(hiding: hiddenQuotaKeys(forProvider: provider.id))
-            }
+            .compactMap { usage(of: $0)?.lowestQuota }
             .min()
     }
 
@@ -276,7 +312,7 @@ public final class QuotaMonitor {
             guard let provider = enabledProviders.first(where: { $0.id == id }) else { return nil }
             let config = configurations[id] ?? MenuBarProviderSettings()
             let key = config.primaryQuotaKey.isEmpty
-                ? provider.snapshot?.quotas.first?.quotaType.quotaKey : config.primaryQuotaKey
+                ? usage(of: provider)?.quotas.first?.quotaType.quotaKey : config.primaryQuotaKey
             guard let key,
                   let label = menuBarLabel(
                     providerId: id, primaryQuotaKey: key, secondaryQuotaKey: config.secondaryQuotaKey,
@@ -317,7 +353,7 @@ public final class QuotaMonitor {
         burnRateThreshold: Double = 1.5
     ) -> MenuBarLabel? {
         let primaryQuotaKey = primaryQuotaKey.isEmpty
-            ? (enabledProviders.first { $0.id == providerId }?.snapshot?.quotas.first?.quotaType.quotaKey ?? "")
+            ? (enabledProviders.first { $0.id == providerId }.flatMap { usage(of: $0) }?.quotas.first?.quotaType.quotaKey ?? "")
             : primaryQuotaKey
         func segment(forQuotaKey quotaKey: String) -> (text: String, status: QuotaStatus)? {
             let percentage = showPercentage
@@ -397,18 +433,10 @@ public final class QuotaMonitor {
     /// HOW STRICT TO BE — the person's policy (Settings → General).
     public var statusPolicy: StatusPolicy { readStatusPolicy() }
 
-    /// Returns the overall status across enabled providers (worst status wins),
-    /// counting only quotas visible for each provider (issue #140)
+    /// Returns the overall status across enabled providers (worst status wins)
     public var overallStatus: QuotaStatus {
         providers.enabled
-            .compactMap { provider in
-                provider.snapshot.map {
-                    $0.visibleOverallStatus(
-                        hiding: hiddenQuotaKeys(forProvider: provider.id),
-                        under: statusPolicy
-                    )
-                }
-            }
+            .compactMap { usage(of: $0)?.overallStatus(under: statusPolicy) }
             .max() ?? .healthy
     }
 
@@ -419,16 +447,9 @@ public final class QuotaMonitor {
         providers.enabled.first { $0.id == selectedProviderId }
     }
 
-    /// Status of the currently selected provider (for menu bar icon),
-    /// counting only its visible quotas (issue #140)
+    /// Status of the currently selected provider (for menu bar icon)
     public var selectedProviderStatus: QuotaStatus {
-        guard let provider = selectedProvider, let snapshot = provider.snapshot else {
-            return .healthy
-        }
-        return snapshot.visibleOverallStatus(
-            hiding: hiddenQuotaKeys(forProvider: provider.id),
-            under: statusPolicy
-        )
+        selectedProvider.flatMap { usage(of: $0) }?.overallStatus(under: statusPolicy) ?? .healthy
     }
 
     /// Whether any provider is currently refreshing
@@ -443,13 +464,19 @@ public final class QuotaMonitor {
         }
     }
 
-    /// Selects the enabled provider in the given 1-based slot, counted the way
-    /// the popover lists them (⌘1 is the first pill). A slot with no provider
-    /// leaves the selection alone.
+    /// The popover's pills: one per product, its enabled logins inside.
+    public var tabs: [ProductTab] { ProductTab.tabs(of: providers.enabled) }
+
+    /// The tab the selected login belongs to.
+    public var selectedTab: ProductTab? { tabs.first { $0.contains(selectedProviderId) } }
+
+    /// Selects the tab in the given 1-based slot, counted the way the popover
+    /// lists them (⌘1 is the first pill), opening on its first login. A slot
+    /// with no tab leaves the selection alone.
     public func selectProvider(atPosition position: Int) {
-        let enabled = providers.enabled
-        guard enabled.indices.contains(position - 1) else { return }
-        selectedProviderId = enabled[position - 1].id
+        let tabs = tabs
+        guard tabs.indices.contains(position - 1), let first = tabs[position - 1].accounts.first else { return }
+        selectedProviderId = first.id
     }
 
     /// Sets a provider's enabled state.

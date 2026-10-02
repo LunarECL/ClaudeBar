@@ -83,12 +83,62 @@ struct QuotaMonitorHiddenQuotasTests {
     }
 
     @Test
-    func `hiding every quota leaves no lowest quota`() async {
+    func `settings that hide every quota show them all rather than nothing`() async {
         let (monitor, _) = await makeRefreshedGeminiMonitor(
             hiddenKeys: ["session", "weekly", "model:gemini-2.0-flash"]
         )
 
-        #expect(monitor.lowestQuota() == nil)
+        #expect(monitor.lowestQuota()?.quotaType == .modelSpecific("gemini-2.0-flash"))
+    }
+
+    // MARK: - One usage for every surface
+
+    @Test
+    func `the usage every surface reads leaves the hidden quota out`() async throws {
+        let (monitor, _) = await makeRefreshedGeminiMonitor(hiddenKeys: ["model:gemini-2.0-flash"])
+        let gemini = try #require(monitor.provider(for: "gemini"))
+
+        let usage = try #require(monitor.usage(of: gemini))
+
+        #expect(usage.quotas.map(\.quotaType) == [.session, .weekly])
+        #expect(gemini.snapshot?.quotas.count == 3)
+    }
+
+    @Test
+    func `hiding a quota is saved and takes effect at once`() async throws {
+        let (monitor, settings) = await makeRefreshedGeminiMonitor(hiddenKeys: [])
+        given(settings).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
+        let gemini = try #require(monitor.provider(for: "gemini"))
+
+        #expect(monitor.setQuota("model:gemini-2.0-flash", hidden: true, for: gemini))
+
+        #expect(monitor.hiddenQuotaKeys(for: gemini) == ["model:gemini-2.0-flash"])
+        #expect(monitor.overallStatus == .healthy)
+        #expect(monitor.usage(of: gemini)?.quotas.count == 2)
+    }
+
+    @Test
+    func `the last visible quota can't be hidden`() async throws {
+        let (monitor, settings) = await makeRefreshedGeminiMonitor(hiddenKeys: ["session", "weekly"])
+        given(settings).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
+        let gemini = try #require(monitor.provider(for: "gemini"))
+
+        #expect(monitor.setQuota("model:gemini-2.0-flash", hidden: true, for: gemini) == false)
+
+        #expect(monitor.hiddenQuotaKeys(for: gemini) == ["session", "weekly"])
+        #expect(monitor.usage(of: gemini)?.quotas.map(\.quotaType) == [.modelSpecific("gemini-2.0-flash")])
+    }
+
+    @Test
+    func `showing a quota again brings it back`() async throws {
+        let (monitor, settings) = await makeRefreshedGeminiMonitor(hiddenKeys: ["model:gemini-2.0-flash"])
+        given(settings).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
+        let gemini = try #require(monitor.provider(for: "gemini"))
+
+        #expect(monitor.setQuota("model:gemini-2.0-flash", hidden: false, for: gemini))
+
+        #expect(monitor.hiddenQuotaKeys(for: gemini).isEmpty)
+        #expect(monitor.overallStatus == .critical)
     }
 
     @Test

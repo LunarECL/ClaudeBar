@@ -492,148 +492,63 @@ struct UsageSnapshotTests {
         #expect(snapshot.quotaGroups.isEmpty)
     }
 
-    // MARK: - Visible Quotas (hidden per provider — issue #140)
+    // MARK: - Hiding quotas (issue #140)
 
-    @Test
-    func `visible quotas exclude only the hidden key`() {
-        // Given — Gemini-style snapshot: two windows plus a model-specific quota
-        let quotas = [
+    private func gemini(flashLeft: Double = 60) -> UsageSnapshot {
+        UsageSnapshot(providerId: "gemini", quotas: [
             UsageQuota(percentRemaining: 80, quotaType: .session, providerId: "gemini"),
-            UsageQuota(percentRemaining: 70, quotaType: .weekly, providerId: "gemini"),
-            UsageQuota(percentRemaining: 60, quotaType: .modelSpecific("gemini-2.0-flash"), providerId: "gemini"),
-        ]
-        let snapshot = UsageSnapshot(providerId: "gemini", quotas: quotas, capturedAt: Date())
-
-        // When
-        let visible = snapshot.visibleQuotas(hiding: ["model:gemini-2.0-flash"])
-
-        // Then
-        #expect(visible.map(\.quotaType) == [.session, .weekly])
+            UsageQuota(percentRemaining: 25, quotaType: .weekly, providerId: "gemini"),
+            UsageQuota(percentRemaining: flashLeft, quotaType: .modelSpecific("gemini-2.0-flash"), providerId: "gemini"),
+        ], capturedAt: Date(), accountEmail: "me@example.com")
     }
 
     @Test
-    func `visible quotas with an empty hidden set are unchanged`() {
-        // Given
-        let quotas = [
-            UsageQuota(percentRemaining: 80, quotaType: .session, providerId: "gemini"),
-            UsageQuota(percentRemaining: 60, quotaType: .modelSpecific("gemini-2.0-flash"), providerId: "gemini"),
-        ]
-        let snapshot = UsageSnapshot(providerId: "gemini", quotas: quotas, capturedAt: Date())
+    func `hiding a quota leaves the rest of the usage as it was`() {
+        let usage = gemini().hiding(["model:gemini-2.0-flash"])
 
-        // When
-        let visible = snapshot.visibleQuotas(hiding: [])
-
-        // Then
-        #expect(visible == quotas)
+        #expect(usage.quotas.map(\.quotaType) == [.session, .weekly])
+        #expect(usage.accountEmail == "me@example.com")
+        #expect(usage.providerId == "gemini")
     }
 
     @Test
-    func `visible quotas ignore stale keys the probe no longer reports`() {
-        // Given
-        let quotas = [
-            UsageQuota(percentRemaining: 80, quotaType: .session, providerId: "gemini"),
-        ]
-        let snapshot = UsageSnapshot(providerId: "gemini", quotas: quotas, capturedAt: Date())
+    func `hiding nothing, or keys no longer reported, changes nothing`() {
+        let usage = gemini()
 
-        // When — a removed model's key lingers in settings; nothing matches it
-        let visible = snapshot.visibleQuotas(hiding: ["model:gemini-2.0-flash", "time:mcp"])
-
-        // Then
-        #expect(visible == quotas)
+        #expect(usage.hiding([]) == usage)
+        #expect(usage.hiding(["time:mcp", "model:gone"]) == usage)
     }
 
     @Test
-    func `visible quota groups filter within each group and keep note-only sections`() {
-        // Given — an aggregating-provider style snapshot with a note-only section
+    func `hiding every quota keeps them all — there is always something to watch`() {
+        let usage = gemini()
+
+        #expect(usage.hiding(["session", "weekly", "model:gemini-2.0-flash"]) == usage)
+    }
+
+    @Test
+    func `a hidden quota no longer sets the status or the lowest quota`() {
+        let usage = gemini(flashLeft: 10)
+
+        #expect(usage.overallStatus == .critical)
+        #expect(usage.hiding(["model:gemini-2.0-flash"]).overallStatus == .warning)
+        #expect(usage.hiding(["weekly"]).lowestQuota?.quotaType == .modelSpecific("gemini-2.0-flash"))
+    }
+
+    @Test
+    func `hiding works inside a group and keeps note-only sections`() {
         let quotas = [
             UsageQuota(percentRemaining: 90, quotaType: .timeLimit("Codex 5h"), providerId: "omp", group: "Codex"),
             UsageQuota(percentRemaining: 40, quotaType: .timeLimit("Codex 7d"), providerId: "omp", group: "Codex"),
             UsageQuota(percentRemaining: 95, quotaType: .timeLimit("Claude 5h"), providerId: "omp", group: "Claude"),
         ]
-        let metrics = [
-            ExtensionMetric(label: "Copilot", value: "No usage reported", unit: "", group: "Copilot"),
-        ]
+        let metrics = [ExtensionMetric(label: "Copilot", value: "No usage reported", unit: "", group: "Copilot")]
         let snapshot = UsageSnapshot(providerId: "omp", quotas: quotas, capturedAt: Date(), extensionMetrics: metrics)
 
-        // When — hide the 7d window inside the Codex group
-        let groups = snapshot.visibleQuotaGroups(hiding: ["time:Codex 7d"])
+        let groups = snapshot.hiding(["time:Codex 7d"]).quotaGroups
 
-        // Then — other quotas stay in place and the note-only section survives
         #expect(groups.map(\.title) == ["Codex", "Claude", "Copilot"])
         #expect(groups[0].quotas.map(\.quotaType) == [.timeLimit("Codex 5h")])
-        #expect(groups[1].quotas.map(\.quotaType) == [.timeLimit("Claude 5h")])
-        #expect(groups[2].quotas.isEmpty)
         #expect(groups[2].note == "No usage reported")
-    }
-
-    @Test
-    func `visible overall status ignores hidden quotas`() {
-        // Given — the flash model is critical, everything else is healthy
-        let quotas = [
-            UsageQuota(percentRemaining: 80, quotaType: .session, providerId: "gemini"),
-            UsageQuota(percentRemaining: 10, quotaType: .modelSpecific("gemini-2.0-flash"), providerId: "gemini"),
-        ]
-        let snapshot = UsageSnapshot(providerId: "gemini", quotas: quotas, capturedAt: Date())
-
-        // When & Then — hiding the critical quota must not color the status
-        #expect(snapshot.visibleOverallStatus(hiding: ["model:gemini-2.0-flash"]) == .healthy)
-        #expect(snapshot.visibleOverallStatus(hiding: []) == .critical)
-    }
-
-    @Test
-    func `visible pace-aware overall status ignores hidden quotas`() {
-        // Given
-        let quotas = [
-            UsageQuota(percentRemaining: 80, quotaType: .session, providerId: "gemini", resetsAt: Date().addingTimeInterval(3600)),
-            UsageQuota(percentRemaining: 10, quotaType: .modelSpecific("gemini-2.0-flash"), providerId: "gemini", resetsAt: Date().addingTimeInterval(3600)),
-        ]
-        let snapshot = UsageSnapshot(providerId: "gemini", quotas: quotas, capturedAt: Date())
-
-        // When & Then
-        #expect(
-            snapshot.visiblePaceAwareOverallStatus(hiding: ["model:gemini-2.0-flash"], burnRateThreshold: 1.5) == .healthy
-        )
-    }
-
-    @Test
-    func `visible overall status under the policy ignores hidden quotas`() {
-        // Given — 40% left halfway through a 10h window: a 1.2 burn rate is
-        // sustainable (pace-aware reads healthy) but under 50%, so the
-        // absolute policy still warns
-        let quotas = [
-            UsageQuota(
-                percentRemaining: 40,
-                quotaType: .session,
-                providerId: "gemini",
-                resetsAt: Date().addingTimeInterval(5 * 3600),
-                windowDuration: 10 * 3600
-            ),
-        ]
-        let snapshot = UsageSnapshot(providerId: "gemini", quotas: quotas, capturedAt: Date())
-
-        // When & Then — the policy decides warning vs healthy, and hiding the
-        // only quota reads healthy under either
-        let pace = StatusPolicy.paceAware(burnRateThreshold: 1.5)
-        #expect(snapshot.visibleOverallStatus(hiding: [], under: .absolute) == .warning)
-        #expect(snapshot.visibleOverallStatus(hiding: [], under: pace) == .healthy)
-        #expect(snapshot.visibleOverallStatus(hiding: ["session"], under: pace) == .healthy)
-    }
-
-    @Test
-    func `visible lowest quota comes from visible quotas only`() {
-        // Given — the weekly window is the lowest of all
-        let quotas = [
-            UsageQuota(percentRemaining: 80, quotaType: .session, providerId: "gemini"),
-            UsageQuota(percentRemaining: 25, quotaType: .weekly, providerId: "gemini"),
-            UsageQuota(percentRemaining: 60, quotaType: .modelSpecific("gemini-2.0-flash"), providerId: "gemini"),
-        ]
-        let snapshot = UsageSnapshot(providerId: "gemini", quotas: quotas, capturedAt: Date())
-
-        // When & Then — hiding the lowest promotes the next-lowest visible quota
-        let visible = snapshot.visibleLowestQuota(hiding: ["weekly"])
-        #expect(visible?.quotaType == .modelSpecific("gemini-2.0-flash"))
-
-        // And with nothing hidden the old winner stays
-        #expect(snapshot.visibleLowestQuota(hiding: [])?.quotaType == .weekly)
     }
 }

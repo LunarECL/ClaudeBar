@@ -56,10 +56,10 @@ struct ProvidersPane: View {
             }
         }
         .sheet(isPresented: $addingProvider) {
-            AddProviderSheet(monitor: monitor) { addingProvider = false }
+            AddProviderSheet(monitor: monitor) { addingProvider = false }.themedSheet()
         }
         .sheet(item: $importing) { review in
-            ImportProviderSheet(monitor: monitor, review: review.value) { importing = nil }
+            ImportProviderSheet(monitor: monitor, review: review.value) { importing = nil }.themedSheet()
         }
     }
 
@@ -91,7 +91,7 @@ private struct ProviderListRow: View {
     @State private var isHovering = false
 
     private var lowestQuota: UsageQuota? {
-        provider.snapshot?.lowestQuota
+        monitor.usage(of: provider)?.lowestQuota
     }
 
     private var statusText: String {
@@ -221,7 +221,7 @@ private struct ProviderDetailView: View {
                 if provider.isEnabled {
                     configCard
 
-                    QuotaVisibilityCard(provider: provider)
+                    QuotaVisibilityCard(provider: provider, monitor: monitor)
 
                     SettingsCard {
                         SettingsFieldLabel(text: "CUSTOM WEB CARD")
@@ -270,13 +270,14 @@ private struct ProviderDetailView: View {
         case "claude":
             if let claude = (provider as? Account)?.provider {
                 DataSourceSection(provider: claude, monitor: monitor)
+                ProviderAccountsCard(provider: claude, monitor: monitor)
             }
             ClaudeBudgetCard()
         case "codex":
             if let codex = (provider as? Account)?.provider {
                 DataSourceSection(provider: codex, monitor: monitor)
+                ProviderAccountsCard(provider: codex, monitor: monitor)
             }
-            CodexAccountsCard(monitor: monitor)
         case "kimi":
             KimiConfigCard(monitor: monitor)
         case "minimax":
@@ -296,6 +297,9 @@ private struct ProviderDetailView: View {
         default:
             if let custom = (provider as? Account)?.provider, custom.definition.profile.origin == .custom {
                 DataSourceSection(provider: custom, monitor: monitor)
+                if custom.definition.accounts != nil {
+                    ProviderAccountsCard(provider: custom, monitor: monitor)
+                }
                 CustomProviderCard(provider: custom, monitor: monitor, onDeleted: onBack)
             } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
                 ExtensionConfigCard(
@@ -307,25 +311,25 @@ private struct ProviderDetailView: View {
     }
 }
 
-// MARK: - Quota Visibility (issue #140)
+// MARK: - Quotas (issue #140)
 
-/// Per-provider quota visibility: one toggle per quota window in the live
-/// snapshot, so users of multi-quota providers (Gemini CLI, Antigravity, …)
-/// can hide the windows they never use. Hidden windows vanish from the
-/// popover cards and stop driving the menu bar status. Until the provider
-/// has reported data there is nothing to toggle.
+/// *QUOTAS* — one switch per quota the provider reports, so a person can
+/// stop watching the ones they never use (Gemini Flash 2.0, …). A hidden
+/// quota is never shown and never sets a status or an alert, anywhere: the
+/// monitor leaves it out of the usage every surface reads.
 private struct QuotaVisibilityCard: View {
     let provider: any AIProvider
+    let monitor: QuotaMonitor
 
-    @State private var settings = AppSettings.shared
     @Environment(\.appTheme) private var theme
+    @State private var refused: String?
 
     var body: some View {
         SettingsCard {
-            SettingsFieldLabel(text: "VISIBLE QUOTAS")
+            SettingsFieldLabel(text: "QUOTAS")
                 .padding(.bottom, 12)
 
-            if let quotas = provider.snapshot?.quotas, !quotas.isEmpty {
+            if let quotas = provider.snapshot?.quotas, quotas.count > 1 {
                 VStack(spacing: 0) {
                     ForEach(Array(quotas.enumerated()), id: \.element.quotaType) { index, quota in
                         if index > 0 {
@@ -334,8 +338,12 @@ private struct QuotaVisibilityCard: View {
                         toggleRow(quota)
                     }
                 }
+                Text(refused ?? "Turn off a quota you don't use: it disappears everywhere and no longer sets \(provider.name)'s status or alerts.")
+                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(refused == nil ? theme.textTertiary : theme.statusWarning)
+                    .padding(.top, 8)
             } else {
-                Text("No quota data yet — refresh \(provider.name) once, then choose which windows to show.")
+                Text("No quotas to choose from yet. Refresh \(provider.name) once, then pick the ones you watch.")
                     .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
@@ -343,21 +351,13 @@ private struct QuotaVisibilityCard: View {
     }
 
     private func toggleRow(_ quota: UsageQuota) -> some View {
-        let quotaKey = quota.quotaType.quotaKey
-        return SettingsRow(
-            title: quota.compactTitle ?? quota.quotaType.displayName,
-            subtitle: quotaKey
-        ) {
+        let key = quota.quotaType.quotaKey
+        return SettingsRow(title: quota.compactTitle ?? quota.quotaType.displayName, subtitle: nil) {
             SettingsSwitch(isOn: Binding(
-                get: { !settings.hiddenQuotaKeys(forProvider: provider.id).contains(quotaKey) },
-                set: { visible in
-                    var keys = settings.hiddenQuotaKeys(forProvider: provider.id)
-                    if visible {
-                        keys.remove(quotaKey)
-                    } else {
-                        keys.insert(quotaKey)
-                    }
-                    settings.setHiddenQuotaKeys(keys, forProvider: provider.id)
+                get: { !monitor.hiddenQuotaKeys(for: provider).contains(key) },
+                set: { watched in
+                    refused = monitor.setQuota(key, hidden: !watched, for: provider)
+                        ? nil : "Keep at least one quota: \(provider.name) needs something to watch."
                 }
             ))
         }

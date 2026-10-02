@@ -454,26 +454,6 @@ public final class AppSettings {
         }
     }
 
-    // MARK: - Provider Quota Visibility (issue #140)
-
-    /// Observable mirror of the quota keys hidden per provider. Provider-level
-    /// settings are otherwise non-observable; this mirror is what makes the
-    /// popover cards and the menu bar react the moment a toggle flips in the
-    /// Settings window. Ids never set here read through to the repository, so
-    /// keys persisted by earlier sessions or hand-edited settings.json apply.
-    private var hiddenQuotaKeysByProvider: [String: Set<String>] = [:]
-
-    /// The quota keys hidden for a provider (issue #140); empty = show all.
-    public func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
-        hiddenQuotaKeysByProvider[id] ?? repository.hiddenQuotaKeys(forProvider: id)
-    }
-
-    /// Sets the quota keys hidden for a provider (empty set shows all)
-    public func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {
-        hiddenQuotaKeysByProvider[id] = keys
-        repository.setHiddenQuotaKeys(keys, forProvider: id)
-    }
-
     // MARK: - Provider Settings Access
 
     /// Access provider-specific settings for reading/writing in Settings UI.

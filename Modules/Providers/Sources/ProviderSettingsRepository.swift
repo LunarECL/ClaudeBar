@@ -57,6 +57,12 @@ public extension ProviderSettingsRepository {
 
     /// Default for conformers that keep no such setting.
     func setOn(_ on: Bool, _ setting: String, forProvider id: String) {}
+
+    /// Default for conformers that keep no such setting: every quota is watched.
+    func hiddenQuotaKeys(forProvider id: String) -> Set<String> { [] }
+
+    /// Default for conformers that keep no such setting.
+    func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {}
 }
 
 // MARK: - Default Implementation
