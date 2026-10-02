@@ -38,6 +38,9 @@ refreshed**. Its neighbours own the rest:
   "Rename"                          ← …or by the name the person gave it
   "Remove"                          ← forgets it HERE; never signs out the CLI
   "This folder now signs in to someone else" ← identity is checked, and a mismatch fails closed
+  "ACCOUNTS  Personal · Work · Side"   ← (concept) one provider, its logins side by side
+  "Work — Acme is at 18% Opus — causing Warning" ← (concept) the aggregate names its cause
+  "Re-auth"                             ← (concept) a failed fetch is a login to fix, not a quota colour
 ```
 
 The finding: **adding an account never adds code.** Each of the three ways is
@@ -104,6 +107,11 @@ diff:
 | **label** | the name a person gave an account ("work") | the email |
 | **display name** | what the pill says: label, else email, else the provider's name | the menu bar label |
 | **menu bar label** | the shortened text in the 16 px status item — the page's, not the model's | display name |
+| **worst account** | the enabled account whose status is the provider's — the callout's subject | the default account |
+
+*Primary* is deliberately not a word here. The concept used it for "drives
+the menu bar icon", which pins already say, and it would blur with
+*default* (§8).
 
 *Account*, not *connection*: #358 called added logins "connections" in Swift;
 the screen says *Account* and so does CANONICAL. *Connection* stays the word
@@ -138,6 +146,7 @@ Monitor ◆                                  the menu bar's root
          │       ├── isEnabled             pause, not forget
          │       ├── usage? · sync         what we saw · fetch health — kept apart
          │       └── displayName           DERIVED — label ?? email ?? provider.name
+         ├── worstAccount              DERIVED — the enabled account whose status is provider.status
          ├── bound: [Account.ID: [DataSource]]   internal — made ONCE per login from the patched,
          │                                       filled definition, with that login's vault
          └── refresh(account) · add(…) · rename(account, to:) · remove(account)
@@ -286,6 +295,92 @@ Menu bar  → MenuBarLabel(accounts.map(\.displayName))              App — sho
 
 ---
 
+### 3.5 · The screens
+
+The look is
+[`multi-account-ui-design-v1.html`](../../../design-concept/multi-account/multi-account-ui-design-v1.html).
+Below, each part of it is mapped to the model. Where the concept and the
+model disagree, the decision and its reason are in §8.
+
+**Popover: one provider, all its accounts at once.**
+
+```text
+┌──────────────────────────────────────────────┐
+│ ClaudeBar                             ↻  ⚙   │
+│ (Claude) (Codex) (Gemini) (Copilot) (Amp)    │ ← monitor.providers.enabled; selection: Provider.ID
+│ ACCOUNTS  (P Personal●) (W Work●) (S Side●)  │ ← provider.accounts.enabled — a VIEW FILTER (page's)
+│                                              │   shown only when there are 2 or more
+│ P PERSONAL                       [Healthy]   │ ← account.displayName · account.status
+│ ┌ OPUS 72% ────────┐ ┌ SONNET 88% ───────┐   │ ← account.usage.quotas
+│ W WORK — ACME                    [Warning]   │
+│ ┌ OPUS 18% ────────┐ ┌ SONNET 41% ───────┐   │
+│ S SIDE PROJECT                [Re-auth ↻]    │ ← account.sync.lastError — FETCH health:
+│ ┌ OPUS — (72% · 2h ago) ┐                    │   grey, last usage kept, never a Status colour
+│ ⚠ Work — Acme is at 18% Opus — causing the   │ ← provider.worstAccount (DERIVED) — names who
+│   Warning                                    │   makes provider.status what it is
+└──────────────────────────────────────────────┘
+```
+
+- A provider with one account looks exactly like it does today: no
+  ACCOUNTS row and no account headers.
+- The dot on a chip is that account's `status` colour. Grey means its last
+  fetch failed.
+- Clicking a section header opens that account's card, as a pill does today.
+
+**Settings: the Accounts card.** It replaces `CodexAccountsCard`, and every
+provider with an `accounts` block gets it.
+
+```text
+┌ 👥 Accounts · 3 accounts                       [Warning] ┐
+│ ⋮⋮ (P) Personal         henry@personal.dev   ⓜ  ⋯        │ ← ⋮⋮ reorder → settings order
+│ ⋮⋮ (W) Work — Acme Corp henry@acme.com       ⓜ  ⋯        │ ← ⓜ = shown in the menu bar (pin)
+│ ⋮⋮ (S) Side Project     dev@sideproject.io  [Re-auth]    │ ← sync failed: re-run its way to add
+│ ┌ ⊕ Add Account ────────────────────────────────────┐    │ ← only when definition.accounts.add
+│ └───────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────┘
+  ⋯ = Rename · Pause (isEnabled) · Remove (not on the default)
+```
+
+- **The avatar** is the first letter of `displayName`, in a colour from a
+  palette by the account's position. It is the page's choice, not a stored
+  setting.
+- **The email** is the login's own (`usage.accountEmail`, else the one read
+  when the account was added). It is never typed in.
+- **Re-auth** runs the account's way to add again, into the same place:
+  - `signIn`: signs in again into the same folder;
+  - `folder`: explains how to sign in again in that folder;
+  - `form`: edits the key.
+
+  The identity rule still applies: a different person in that folder fails
+  closed.
+
+**Add Account: the concept's five steps, mapped to the model.**
+
+```text
+ 1 ⊕ Add Account
+      │
+ 2 HOW?   ← the cases of definition.accounts.add, nothing else:
+      │      "Sign in with browser" (signIn) · "Choose Signed-in Folder" (folder) · "API key" (form)
+      │      only one case? this step is skipped
+      ▼
+ 3 VERIFY ← each line is one step of DataSourceError, ticked as it passes:
+      │      ✓ Found a login        lookup   — the folder / the key answers
+      │      ✓ Signed in as henry@  identity — the fact that names it; refused if already listed
+      │      ✓ Fetched usage        fetch + mapping — the first Usage
+      │      ✗ on a line: that line's reason and Retry. "Add anyway" ONLY after identity passed
+      ▼
+ 4 NAME   ← optional label, pre-filled with the email. That is the only thing typed
+      ▼
+ 5 DONE   → provider.add(config) → the account appears in the popover with its first usage
+```
+
+The concept's step 2 asked for a label, an email, an organization and a
+colour. Here only the label is typed, and it comes last. The concept's
+step 3 offered "CLI profile / API token" for every provider. Here the choices
+are the cases the definition declares (§8).
+
+---
+
 ## 4 · Invariants — each law, one owner
 
 | Law | Owner |
@@ -304,6 +399,9 @@ Menu bar  → MenuBarLabel(accounts.map(\.displayName))              App — sho
 | a data source whose key lookup ClaudeBar cannot see (`fetch: script`) declares an `identity`, or the definition is refused on load | `ProviderDefinition` validation (`DefinitionError`) |
 | the data source choice is the provider's; a login the patch leaves without it uses the next on the fallback chain, and its usage says which | `Provider` |
 | a menu bar label is shortened for width and never widens to a full email | `MenuBarLabel` (App) |
+| an account is added only once its identity is known; *Add anyway* exists only after that step passed | `AddedAccounts` |
+| accounts keep the order the person gave them; the default is found by `isDefault`, not by position | `Provider.accounts` |
+| the provider's status names the account that causes it | `Provider.worstAccount` |
 
 Two laws #358 put in two places, now one each: the identity check (it ran in
 `DataSource` **and** in `Provider.refresh`'s bridge branch) and display naming
@@ -369,7 +467,8 @@ Each slice one PR, test first, green.
 | 1 | **Claude accounts as data** — #358's `claude.json` block, typed `identity`, identity in lookup only; `ClaudeAccountsTests` | a Claude folder adds; another email in it fails closed; default untouched |
 | 2 | **Rename + display name** — `Account.displayName`, `setLabel` for default and added, `MenuBarLabel` in App | labels survive relaunch; one login shows the product name; collisions number, never widen |
 | 3 | **`accounts.add` sum + `signIn`** — `AccountSignIn` worker, `codex.json`/`claude.json` declare it; `cli.alsoAt` | cancel/timeout/fail leave no folder and no config; env carries only `homeVariable`, `unset` removed; *Remove* of a signed-in account deletes its folder, of a chosen one never — README's *Remove* paragraph updated |
-| 4 | **one Accounts card** — renders `accounts.add`; `CodexAccountsCard` goes | a provider with `accounts: nil` shows no button |
+| 4 | **one Accounts card** (§3.5) — renders `accounts.add`, reorder, menu-bar pin, Rename · Pause · Remove, Re-auth; the 4-step Add Account sheet with VERIFY by step; `CodexAccountsCard` goes | a provider with `accounts: nil` shows no button; *Add anyway* is absent until identity passed; order survives relaunch |
+| 6 | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |
 | 5 | **`form` + `ProviderVault.scoped`** — account-scope settings in the form; custom definitions can declare `accounts` | an added account's missing key is *Key needed*, never the default's |
 | — | legacy providers | gain accounts in TARGET slices 2 and 5, when they become JSON — by adding an `accounts` block, nothing else |
 
@@ -427,6 +526,46 @@ and *who owns the thing?* — never from what is easiest to build.
   That is ClaudeBar's word for the login the CLI already uses. *Rename* works
   on every account. *Remove* is the only command the default refuses, because
   that login belongs to the CLI. (§3.4)
+- ~~**"Primary" account, for the menu bar icon?**~~ **No. The menu bar
+  already says which accounts it shows, through pins.** The concept used
+  *Primary* to mean *"this one drives the icon"*. Today the person picks up
+  to three entries in *Menu Bar* settings, and each account is pinnable. A
+  second word for the same choice gives two answers to *"why is this in my
+  menu bar?"*. The card's ⓜ is that pin. *Primary* would also blur with
+  *default*, which means something else: the login the CLI uses.
+- ~~**Type the email, organization and colour when adding?**~~ **No. Only an
+  optional name is typed, and it comes last.** The email and organization
+  are facts about the login. ClaudeBar reads them, and a typed one could
+  disagree with the login it labels, which is exactly the mistake the
+  identity rule exists to stop. Colour is the page's, by position. So the
+  name step comes after VERIFY, pre-filled with the email that was found.
+- ~~**"CLI profile / API token" as the choice of how to fetch?**~~ **The
+  choices are the definition's ways to add.** `claude --profile` does not
+  exist: a Claude login lives in a config folder. Every provider's honest
+  choices are different, which is why they are data (`accounts.add`). A
+  provider with one way skips the step.
+- ~~**"Add anyway" when verification fails?**~~ **Only after identity
+  passed.** If ClaudeBar knows *who* the login is but the fetch failed
+  (offline, an expired session), the account is real. It is added, and shows
+  *Re-auth* with nothing fetched yet. If no login was found, there is nobody
+  to monitor and nothing to name, so there is no *Add anyway*.
+- ~~**Do the popover's account chips pause monitoring?**~~ **No. They only
+  filter the view.** Pausing stops refreshes and notifications. A chip
+  tapped to tidy the popover must not silence an alert. Pause lives on the
+  Accounts card (*Pause*, `isEnabled`). A hidden account still counts toward
+  the provider's status, and the callout names it, so a hidden account can
+  never be the unexplained cause of a warning.
+- ~~**One pill per account (today), or one per provider with its accounts
+  inside (the concept)?**~~ **One per provider.** People think *"how is my
+  Claude?"* first and *"which login?"* second. With per-account pills, three
+  logins cost three tabs, and the popover never shows them side by side.
+  `Monitor.selection` becomes a `Provider.ID`. `lineup` stays `[Account]`
+  for the menu bar and notifications. CANONICAL §1, §3 and §5 were updated
+  together with this answer. The code follows in slice 6.
+- ~~**Can the person reorder accounts, the default included?**~~ **Yes.**
+  The order is theirs. *Personal* above *Work* is a preference, not a fact
+  about the CLI. The default is found by `isDefault`, never by being first,
+  so it can move like the others.
 - ~~**One Swift adapter so every provider has accounts now?**~~ **No.** It
   builds a second lifecycle and four `switch id` tables, and every line of it
   is deleted when the provider becomes JSON (§ What is wrong today).

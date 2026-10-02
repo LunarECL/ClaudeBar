@@ -81,7 +81,8 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 ├── providers: [Provider]                   the Providers pane's order
 ├── lineup → [Account]                      DERIVED — the enabled accounts of the enabled providers,
 │                                           in that order: the pills, the menu bar, the notifications
-├── selection: Account.ID                   which pill the popover opens on — `codex` · `codex.<acct>`
+├── selection: Provider.ID                  which provider the popover opens on; it shows every enabled
+│                                           account of it side by side (multi-account design §3.5)
 │   │
 │   └── Provider  ◆                         THE PRODUCT — HOW TO FIND OUT, once for all its logins.
 │       │                                   Built in, made by the user, or an extension
@@ -251,7 +252,7 @@ someone made five minutes ago run on the same `DataSource` and the same lifecycl
 | picks DATA SOURCE | `provider.use(_ kind:)` | one data source active at a time |
 | fills API KEY, REGION … | `provider.settings.set(_:to:)` | a secret goes to the vault; the form keeps the reference |
 | *Add Account* · *Remove* | `provider.add(account:)` — fills the form's account scope · `provider.remove(account:)` | never removes the default; removing forgets the account's settings, never its CLI's login files |
-| clicks a pill | `monitor.select(_ account:)` | |
+| clicks a provider pill | `monitor.select(_ provider:)` | the popover shows all its enabled accounts |
 | refreshes | `monitor.refresh(_:kind:)` → `provider.refresh(account, kind)` | interactive or background; one account's fetch |
 | *Add Provider* → *Start from* | `ProviderDefinition.blank(fetch:)` · `definition.copy()` | the picker is `http` · `cli` · `file`; a copy gets a new id and the origin **custom** |
 | *Connect* → *Test Connection* | `dataSource.fetchResponse(for: account)` → a `Response` or a `DataSourceError` | nothing is mapped yet, nothing is saved |
@@ -295,7 +296,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a provider's face is DATA — its symbol and colours ride on the profile, so adding one never edits a `switch id` | `ProviderLook` |
 | a provider has at least one account; the `default` account's id equals the provider id, an added one's is `<provider>.<acct>` — the ids today's settings and menu-bar pins are keyed by | `Provider.accounts` |
 | a provider is the PRODUCT and an account a LOGIN: how to fetch, the data source choice, the look and the provider-scope settings are the provider's, once; who, its values, what we saw and whether the last fetch worked are the account's | `Provider` · `Account` |
-| accounts are SIMULTANEOUS — every enabled login is fetched and shown as its own pill; the popover shows the selected one. (A vendor that allows one live login at a time would add an `active` account; none does today) | `Monitor.selection` |
+| accounts are SIMULTANEOUS — every enabled login is fetched and shown side by side under its provider; the popover shows the selected provider's. (A vendor that allows one live login at a time would add an `active` account; none does today) | `Monitor.selection` |
 | one definition serves every account: the account's values fill `{{account.x}}` when the fetch runs; a data source is never copied per login | `DataSource` |
 | status is QUOTA health, derived from usage; a failed fetch is FETCH health, in `sync` — a key that expired never turns the menu bar red | `Account.status` · `Account.sync` |
 | a disabled account is paused, not forgotten; a provider whose accounts are all disabled reads as disabled | `Account.isEnabled` |
