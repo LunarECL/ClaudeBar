@@ -166,15 +166,15 @@ public enum Recovery: Sendable, Equatable, Codable {
     }
 }
 
-/// Whose credential this must be: `credential[field] == equals`, or the
+/// Whose login this must be: the fact `field` names equals `equals`, or the
 /// session is treated as expired with `hint` — a folder signed in to another
 /// account never reports that account's usage as this one's.
 public struct Identity: Sendable, Equatable, Codable {
-    public let field: String
+    public let field: LoginFact
     public let equals: String
     public let hint: String?
 
-    public init(field: String, equals: String, hint: String? = nil) {
+    public init(field: LoginFact, equals: String, hint: String? = nil) {
         self.field = field
         self.equals = equals
         self.hint = hint

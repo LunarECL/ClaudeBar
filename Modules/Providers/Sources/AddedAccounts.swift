@@ -13,22 +13,24 @@ public enum AddedAccounts {
         _ providerId: String,
         folder: String,
         existing: [ProviderAccountConfig],
-        defaultFolder: String? = nil
+        defaultFolder: String? = nil,
+        makeDataSource: ((DataSourceDefinition) -> DataSource)? = nil
     ) throws -> ProviderAccountConfig {
         let definition = try Providers.builtIn(providerId)
         guard let rule = definition.accounts?.folder else {
             throw UsageError.executionFailed("\(definition.profile.name) has no added accounts.")
         }
+        let make = makeDataSource ?? { DataSources.make($0, providerId: providerId) }
         let home = resolved(folder)
         let defaultHome = (defaultFolder ?? rule.default).map { resolved(DataSources.expandPath($0)) }
         guard home != defaultHome else {
             throw UsageError.executionFailed("This is the default \(definition.profile.name) login, which is already listed.")
         }
-        let facts = try loginFacts(providerId, folder: home, rule: rule)
-        guard let accountId = facts[rule.accountId.fact], !accountId.isEmpty, let email = facts["email"] else {
+        let login = try Login(definition, folder: home, rule: rule, make: make)
+        guard let accountId = login.accountId, let email = login.email else {
             throw UsageError.executionFailed(rule.notSignedIn ?? "No \(definition.profile.name) login found in this folder.")
         }
-        let defaultAccountId = try defaultHome.flatMap { try loginFacts(providerId, folder: $0, rule: rule)[rule.accountId.fact] }
+        let defaultAccountId = try defaultHome.flatMap { try Login(definition, folder: $0, rule: rule, make: make).accountId }
         let listed = existing.contains {
             $0.probeConfig[rule.accountId.savedAs] == accountId
                 || $0.probeConfig[rule.savedAs].map(resolved) == home
@@ -38,25 +40,40 @@ public enum AddedAccounts {
         }
         return ProviderAccountConfig(
             accountId: UUID().uuidString.lowercased(), label: "", email: email,
-            probeConfig: [rule.savedAs: home, rule.accountId.savedAs: accountId]
+            probeConfig: rule.values(for: home).merging([rule.accountId.savedAs: accountId]) { _, id in id }
         )
     }
 
     // MARK: - Private
 
-    /// What the account's data sources would read in `folder` — the non-secret
-    /// values of the first one that looks up a credential.
-    private static func loginFacts(
-        _ providerId: String,
-        folder: String,
-        rule: ProviderDefinition.Accounts.Folder
-    ) throws -> [String: String] {
-        let values = [rule.savedAs: folder, rule.accountId.savedAs: ""]
-        let definition = try Providers.builtIn(providerId)
-        guard let source = try definition.dataSources(forAccount: values).first(where: { $0.credential != nil }) else {
-            return [:]
+    /// What the account's data sources would read in a folder: the first one
+    /// that looks up a credential, filled with the folder. A folder whose key
+    /// does not answer holds no login, whatever else it holds.
+    private struct Login {
+        let accountId: String?
+        let email: String?
+
+        init(
+            _ definition: ProviderDefinition,
+            folder: String,
+            rule: ProviderDefinition.Accounts.Folder,
+            make: (DataSourceDefinition) -> DataSource
+        ) throws {
+            let values = rule.values(for: folder).merging([rule.accountId.savedAs: ""]) { _, empty in empty }
+            guard let source = try definition.dataSources(forAccount: values).first(where: { $0.credential != nil }) else {
+                accountId = nil
+                email = nil
+                return
+            }
+            let live = make(source)
+            guard live.hasKey else {
+                accountId = nil
+                email = nil
+                return
+            }
+            accountId = live.fact(rule.accountId.fact).flatMap { $0.isEmpty ? nil : $0 }
+            email = live.fact(rule.email)
         }
-        return DataSources.make(source, providerId: providerId).credentialFacts()
     }
 
     private static func resolved(_ path: String) -> String {

@@ -228,7 +228,8 @@ public final class Provider {
         while true {
             do {
                 let usage = try await current.fetchUsage()
-                return account.succeed(identified(await withDailyUsage(usage, kind), for: account), from: current.kind)
+                let read = account.isDefault ? await withDailyUsage(usage, kind) : usage
+                return account.succeed(identified(read, for: account), from: current.kind)
             } catch {
                 let reason = Self.reason(of: error)
                 if case .rateLimited? = reason {
@@ -307,6 +308,8 @@ public final class Provider {
         return dataSource(fallback.to, for: account)
     }
 
+    /// Today's usage is read from the default login's local logs, so only
+    /// the default login is shown it.
     private func withDailyUsage(_ usage: UsageSnapshot, _ kind: RefreshKind) async -> UsageSnapshot {
         guard kind != .background,
               let dailyUsage,

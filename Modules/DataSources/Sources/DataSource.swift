@@ -63,17 +63,21 @@ public struct DataSource: Sendable {
     /// *Configured*: the key answers (when one is needed), belongs to the
     /// expected account, and the CLI exists.
     public func isReady() async -> Bool {
+        var credential: Credential?
         if let credentials {
-            guard let found = try? credentials.find(), isExpectedAccount(found.credential) else { return false }
+            guard let found = try? credentials.find() else { return false }
+            credential = found.credential
         }
+        guard isExpectedLogin(credential) else { return false }
         return fetcher.isReady()
     }
 
-    /// The credential's values a page may show — the account id, the email —
-    /// never a token. Empty when nothing answers.
-    public func credentialFacts() -> [String: String] {
-        guard let found = try? credentials?.find() else { return [:] }
-        return Self.withoutSecrets(found.credential.values)
+    /// A fact that names the login — the account id, the email — read from
+    /// the credential or a context file. Never a token; `nil` when nothing
+    /// answers.
+    public func fact(_ fact: LoginFact) -> String? {
+        let credential = (try? credentials?.find())?.credential
+        return value(of: fact, credential: credential.map { Credential(Self.withoutSecrets($0.values)) })
     }
 
     /// Looks up the key and fetches. Nothing is mapped and nothing is saved.
@@ -148,15 +152,22 @@ public struct DataSource: Sendable {
         return values.filter { !secret.contains($0.key) }
     }
 
-    private func isExpectedAccount(_ credential: Credential) -> Bool {
-        guard let identity = definition.identity else { return true }
-        return credential[identity.field] == identity.equals
+    private func value(of fact: LoginFact, credential: Credential?) -> String? {
+        switch fact {
+        case .credential(let name): credential?[name]
+        case .context(let file, let field): contextFiles[file]?.fields()[field]
+        }
     }
 
-    /// Fails closed when the credential now belongs to another account.
+    private func isExpectedLogin(_ credential: Credential?) -> Bool {
+        guard let identity = definition.identity else { return true }
+        return value(of: identity.field, credential: credential) == identity.equals
+    }
+
+    /// Fails closed when the login now belongs to another account.
     private func checkIdentity(_ credential: Credential?) throws {
         guard let identity = definition.identity else { return }
-        guard let credential, isExpectedAccount(credential) else {
+        guard isExpectedLogin(credential) else {
             throw DataSourceError(.lookup, .sessionExpired(hint: identity.hint))
         }
     }

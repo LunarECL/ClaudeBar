@@ -82,7 +82,8 @@ public final class Account: AIProvider {
     public var dashboardURL: URL? { provider.definition.profile.links.dashboard(for: snapshot?.accountTier) }
     public var statusPageURL: URL? { provider.definition.profile.links.status }
     public var backgroundRefreshFloor: Duration? { provider.backgroundRefreshFloor }
-    public var guestPasses: GuestPasses? { provider.guestPasses }
+    /// Guest passes are read with the default login's CLI, so only it has them.
+    public var guestPasses: GuestPasses? { isDefault ? provider.guestPasses : nil }
 
     public func isAvailable() async -> Bool {
         await provider.isAvailable(self)

@@ -1,5 +1,6 @@
 import DataSources
 import Quotas
+import CryptoKit
 import Foundation
 
 /// A provider as data — what ships in `Resources/Providers/<id>.json` for a
@@ -80,13 +81,27 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         /// values; `notSignedIn` is what a folder without a login says.
         public struct Folder: Sendable, Equatable, Codable {
             public struct AccountId: Sendable, Equatable, Codable {
-                /// The credential value that names the login.
-                public let fact: String
+                /// The fact that names the login — a credential value, or a
+                /// field of a context file (`$context.account.email`).
+                public let fact: LoginFact
                 public let savedAs: String
 
-                public init(fact: String, savedAs: String) {
+                public init(fact: LoginFact, savedAs: String) {
                     self.fact = fact
                     self.savedAs = savedAs
+                }
+            }
+
+            /// A value worked out from the chosen folder rather than read from
+            /// it: `prefix` + the first `sha256` hex digits of the folder's
+            /// path — how Claude Code names a config folder's Keychain item.
+            public struct Derived: Sendable, Equatable, Codable {
+                public let prefix: String
+                public let sha256: Int
+
+                public init(prefix: String, sha256: Int) {
+                    self.prefix = prefix
+                    self.sha256 = sha256
                 }
             }
 
@@ -94,13 +109,49 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             /// The default login's folder — never added a second time.
             public let `default`: String?
             public let accountId: AccountId
+            /// Where the login's email is read. A credential's `email` unless
+            /// the definition says otherwise.
+            public let email: LoginFact
+            /// Values saved beside the folder, by name, for `{{account.<name>}}`.
+            public let derived: [String: Derived]
             public let notSignedIn: String?
 
-            public init(savedAs: String, default folder: String? = nil, accountId: AccountId, notSignedIn: String? = nil) {
+            public init(
+                savedAs: String,
+                default folder: String? = nil,
+                accountId: AccountId,
+                email: LoginFact = .credential("email"),
+                derived: [String: Derived] = [:],
+                notSignedIn: String? = nil
+            ) {
                 self.savedAs = savedAs
                 self.default = folder
                 self.accountId = accountId
+                self.email = email
+                self.derived = derived
                 self.notSignedIn = notSignedIn
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                savedAs = try container.decode(String.self, forKey: .savedAs)
+                self.default = try container.decodeIfPresent(String.self, forKey: .default)
+                accountId = try container.decode(AccountId.self, forKey: .accountId)
+                email = try container.decodeIfPresent(LoginFact.self, forKey: .email) ?? .credential("email")
+                derived = try container.decodeIfPresent([String: Derived].self, forKey: .derived) ?? [:]
+                notSignedIn = try container.decodeIfPresent(String.self, forKey: .notSignedIn)
+            }
+
+            /// The account's values for a chosen folder: the folder, and what
+            /// is derived from it.
+            public func values(for folder: String) -> [String: String] {
+                var values = [savedAs: folder]
+                guard !derived.isEmpty else { return values }
+                let hash = SHA256.hash(data: Data(folder.utf8)).map { String(format: "%02x", $0) }.joined()
+                for (name, rule) in derived {
+                    values[name] = rule.prefix + hash.prefix(max(0, rule.sha256))
+                }
+                return values
             }
         }
 

@@ -393,6 +393,7 @@ vendor type:
 | Codex logins in their own folders (#326) | `accounts` (`nameFromEmail`, `folder`), `{{account.x}}`, `identity` (fail closed when a folder signs in to someone else), `requiresFiles` (#216), `verifyBeforeBackground`, JSON-RPC `then` + `environment`, `#jwt.claim` and `$credential.` paths |
 | the usage API's model limits, plan and money | JSON mapping rules, not a script: `each` + `where`, names by `firstWord`/`lowercase`, `unique` (first wins), `overLimit` (negative left), `countdown: "hours"`, `plan.plans` from `$credential.`, and a list of `cost` shapes with `when` and exact `{amount, decimals}` minor units |
 | today's usage and guest passes | `Provider.dailyUsage` (interactive refreshes only) and the `GuestPasses` capability |
+| Claude logins in their own config folders | `accounts.folder` with `email` and `accountId.fact` as a `LoginFact` (`$context.account.email`), `derived` values (the Keychain service, from a sha256 of the folder), `identity` read from a context file; today's usage and guest passes stay with the default login |
 
 ## 9 · Open
 
@@ -406,7 +407,8 @@ vendor type:
   a definition declares how an account is added (`accounts.folder` today, an
   account-scope setting in the form later); the provider owns `[Account]`;
   one definition serves every account, the account's values filled when the
-  fetch runs. Accounts are simultaneous — each is a pill. Claude (slice 7)
-  follows the same shape. **Built** for Codex (#356): `accounts.patch` and
-  `{{account.x}}`, one `Provider` owning its `Account`s.
+  fetch runs. Accounts are simultaneous. **Built** for Codex (#356) and
+  Claude (`claude.json`'s `accounts`): `accounts.patch` and `{{account.x}}`,
+  one `Provider` owning its `Account`s. The rest is designed in
+  [features/multi-account/design.md](../features/multi-account/design.md).
 - **A `command` fetch from the UI** — see [CANONICAL_MODEL §9](CANONICAL_MODEL.md#9--open).
