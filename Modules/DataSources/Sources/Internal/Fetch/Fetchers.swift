@@ -184,6 +184,9 @@ struct CLIFetcher: Fetching {
 
     let call: CLICall
     let makeExecutor: MakeExecutor
+    /// The session this worker runs in — one per worker, and the provider
+    /// makes a worker per login, so each login keeps its own (#132).
+    private let session = SessionMemory()
 
     func isReady() -> Bool {
         makeExecutor(call).locate(call.cli) != nil
@@ -193,14 +196,24 @@ struct CLIFetcher: Fetching {
         let directory = call.workingDirectory == .dedicated ? CLIWorkingDirectory.resolve() : nil
         let result: CLIResult
         do {
-            result = try await makeExecutor(call).execute(
-                binary: call.cli,
-                args: call.args,
-                input: call.input,
-                timeout: call.timeout,
-                workingDirectory: directory,
-                autoResponses: call.autoResponses
-            )
+            if let plan = call.session {
+                result = try await CLISessionRunner(
+                    call: call,
+                    session: plan,
+                    directory: directory,
+                    makeExecutor: makeExecutor,
+                    memory: session
+                ).run()
+            } else {
+                result = try await makeExecutor(call).execute(
+                    binary: call.cli,
+                    args: call.args,
+                    input: call.input,
+                    timeout: call.timeout,
+                    workingDirectory: directory,
+                    autoResponses: call.autoResponses
+                )
+            }
         } catch let error as UsageError {
             throw error
         } catch {

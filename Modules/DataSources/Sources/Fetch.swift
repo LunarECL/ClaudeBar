@@ -203,6 +203,8 @@ public struct CLICall: Sendable, Equatable, Codable {
     public let environment: Environment
     public let readyWhen: [ReadyMarker]
     public let screen: Screen
+    /// Run in one session instead of a fresh one per run (#132).
+    public let session: Session?
 
     public init(
         cli: String,
@@ -213,7 +215,8 @@ public struct CLICall: Sendable, Equatable, Codable {
         autoResponses: [String: String] = [:],
         environment: Environment = Environment(),
         readyWhen: [ReadyMarker] = [],
-        screen: Screen = .raw
+        screen: Screen = .raw,
+        session: Session? = nil
     ) {
         self.cli = cli
         self.args = args
@@ -224,6 +227,7 @@ public struct CLICall: Sendable, Equatable, Codable {
         self.environment = environment
         self.readyWhen = readyWhen
         self.screen = screen
+        self.session = session
     }
 
     public init(from decoder: Decoder) throws {
@@ -237,6 +241,68 @@ public struct CLICall: Sendable, Equatable, Codable {
         environment = try container.decodeIfPresent(Environment.self, forKey: .environment) ?? Environment()
         readyWhen = try container.decodeIfPresent([ReadyMarker].self, forKey: .readyWhen) ?? []
         screen = try container.decodeIfPresent(Screen.self, forKey: .screen) ?? .raw
+        session = try container.decodeIfPresent(Session.self, forKey: .session)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case cli, args, input, timeout, workingDirectory, autoResponses, environment, readyWhen, screen, session
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(cli, forKey: .cli)
+        try container.encode(args, forKey: .args)
+        try container.encodeIfPresent(input, forKey: .input)
+        try container.encode(timeout, forKey: .timeout)
+        try container.encodeIfPresent(workingDirectory, forKey: .workingDirectory)
+        try container.encode(autoResponses, forKey: .autoResponses)
+        try container.encode(environment, forKey: .environment)
+        try container.encode(readyWhen, forKey: .readyWhen)
+        try container.encode(screen, forKey: .screen)
+        try container.encodeIfPresent(session, forKey: .session)
+    }
+}
+
+extension CLICall {
+    /// The one session every run of a call shares (#132) — a poll that starts
+    /// the CLI again and again keeps **one** session instead of leaving a
+    /// fresh, empty one behind per run.
+    ///
+    /// Only the vendor's facts are data: the args that create the session and
+    /// the args that resume it (`{{id}}` is the id), the output that says the
+    /// session is gone, and the output — trusted only on a non-zero exit —
+    /// that says this CLI build refuses the flags, so every later run falls
+    /// back to the call's plain args. Which session a login is in is the
+    /// worker's own memory, never part of a definition.
+    public struct Session: Sendable, Equatable, Codable {
+        /// Args appended to the call that creates the session.
+        public let create: [String]
+        /// Args appended to a run that resumes the session.
+        public let resume: [String]
+        /// Output meaning the session no longer exists — it is created again
+        /// under a fresh id.
+        public let recreateOn: [String]
+        /// Output meaning the CLI rejected the session flags. Only honoured
+        /// when the run also exited non-zero: the words alone can come from a
+        /// prompt or a hook's transcript.
+        public let unsupportedOn: [String]
+
+        public init(create: [String], resume: [String], recreateOn: [String] = [], unsupportedOn: [String] = []) {
+            self.create = create
+            self.resume = resume
+            self.recreateOn = recreateOn
+            self.unsupportedOn = unsupportedOn
+        }
+
+        private enum CodingKeys: String, CodingKey { case create, resume, recreateOn, unsupportedOn }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            create = try container.decode([String].self, forKey: .create)
+            resume = try container.decode([String].self, forKey: .resume)
+            recreateOn = try container.decodeIfPresent([String].self, forKey: .recreateOn) ?? []
+            unsupportedOn = try container.decodeIfPresent([String].self, forKey: .unsupportedOn) ?? []
+        }
     }
 }
 

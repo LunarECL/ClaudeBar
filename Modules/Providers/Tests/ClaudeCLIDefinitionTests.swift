@@ -4,6 +4,7 @@ import Foundation
 import Mockable
 import Providers
 import Testing
+@testable import DataSources
 
 /// How `claude.json` runs the Claude CLI — the `cli` (`/usage`) and `cliCost`
 /// (`/cost`) data sources — and what the old `ClaudeUsageProbeTests` pinned
@@ -102,6 +103,27 @@ struct ClaudeCLIDefinitionTests {
     func `both commands run in the probe directory`() throws {
         #expect(try call("cli").workingDirectory == .dedicated)
         #expect(try call("cliCost").workingDirectory == .dedicated)
+    }
+
+    // MARK: - One shared probe session (issue #132)
+
+    @Test
+    func `both commands run inside a named probe session`() throws {
+        let usage = try call("cli").session
+        let cost = try call("cliCost").session
+
+        // The session contract is the same on both — only the vendor's facts;
+        // which session a login is in is the worker's own memory.
+        for session in [usage, cost] {
+            let session = try #require(session)
+            #expect(session.create == ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"])
+            #expect(session.resume == ["--resume", "{{id}}"])
+            #expect(session.recreateOn == ["no conversation found", "no session found"])
+            #expect(session.unsupportedOn.contains("unknown option '--session-id'"))
+            #expect(session.unsupportedOn.contains("unknown option '--resume'"))
+            #expect(session.unsupportedOn.allSatisfy { $0.hasPrefix("unknown option") || $0.hasPrefix("unexpected argument") })
+        }
+        #expect(usage == cost)
     }
 
     @Test
