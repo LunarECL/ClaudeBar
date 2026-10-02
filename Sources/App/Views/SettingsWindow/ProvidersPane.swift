@@ -346,8 +346,9 @@ private struct QuotaVisibilityCard: View {
         let quotaKey = quota.quotaType.quotaKey
         return SettingsRow(
             title: quota.compactTitle ?? quota.quotaType.displayName,
-            subtitle: quotaKey,
-            trailing: SettingsSwitch(isOn: Binding(
+            subtitle: quotaKey
+        ) {
+            SettingsSwitch(isOn: Binding(
                 get: { !settings.hiddenQuotaKeys(forProvider: provider.id).contains(quotaKey) },
                 set: { visible in
                     var keys = settings.hiddenQuotaKeys(forProvider: provider.id)
@@ -359,7 +360,7 @@ private struct QuotaVisibilityCard: View {
                     settings.setHiddenQuotaKeys(keys, forProvider: provider.id)
                 }
             ))
-        )
+        }
     }
 }
 
