@@ -14,6 +14,8 @@ struct ProvidersPane: View {
     @State private var addingProvider = false
     @State private var importing: IdentifiedReview?
     @State private var importError: String?
+    /// The list's order, taken when it appears — enabled providers first (#141).
+    @State private var listOrder: [String] = []
 
     var body: some View {
         if let providerId = selectedProviderId,
@@ -34,7 +36,7 @@ struct ProvidersPane: View {
             subtitle: "Enable the assistants you use. Click a provider to configure it."
         ) {
             VStack(spacing: 8) {
-                ForEach(monitor.allProviders, id: \.id) { provider in
+                ForEach(listedProviders, id: \.id) { provider in
                     ProviderListRow(monitor: monitor, provider: provider) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             selectedProviderId = provider.id
@@ -55,12 +57,22 @@ struct ProvidersPane: View {
                 .padding(.top, 4)
             }
         }
+        .onAppear {
+            listOrder = ProviderListOrder.listed(monitor.allProviders.map { ($0.id, $0.isEnabled) })
+        }
         .sheet(isPresented: $addingProvider) {
             AddProviderSheet(monitor: monitor) { addingProvider = false }.themedSheet()
         }
         .sheet(item: $importing) { review in
             ImportProviderSheet(monitor: monitor, review: review.value) { importing = nil }.themedSheet()
         }
+    }
+
+    /// Every provider, in the order the list took when it appeared.
+    private var listedProviders: [any AIProvider] {
+        let all = monitor.allProviders
+        let order = ProviderListOrder.keeping(listOrder, current: all.map(\.id))
+        return order.compactMap { id in all.first { $0.id == id } }
     }
 
     /// *Import…*: a shared file is read and reviewed — nothing is saved or run yet.
