@@ -18,6 +18,8 @@ struct PopThemeTests {
         #expect(pop.cardBorderWidth == 2.5)
         #expect(pop.glassBorder == PopTheme.ink)
         #expect(pop.cardShadow == ThemeShadow(color: PopTheme.ink, radius: 0, x: 4, y: 4))
+        // Outlined: Settings draws paper, inked selections and switches for it.
+        #expect(pop.isOutlined)
     }
 
     @Test func `badges on Pop's candy colours are written in ink`() {
@@ -35,5 +37,6 @@ struct PopThemeTests {
         #expect(theme.cardShadow == nil)
         #expect(theme.displayFontName == nil)
         #expect(theme.textOnStatus == .white)
+        #expect(!theme.isOutlined)
     }
 }

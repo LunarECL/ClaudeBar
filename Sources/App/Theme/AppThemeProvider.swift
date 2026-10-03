@@ -172,6 +172,10 @@ public extension AppThemeProvider {
 
     var cardBorderWidth: CGFloat { 1 }
     var cardShadow: ThemeShadow? { nil }
+
+    /// A printed, outlined theme (Pop): opaque paper instead of glass, ink
+    /// outlines, inked selections and switches.
+    var isOutlined: Bool { cardBorderWidth > 1 }
     var displayFontName: String? { nil }
     var textOnStatus: Color { .white }
 

@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Pop theme: cream dotted paper, thick ink outlines, hard shadows, candy-coloured status and chunky numbers. Pick it in Settings → Appearance. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Pop theme: cream dotted paper, thick ink outlines, hard shadows, candy-coloured status and chunky numbers. Pick it in Settings → Appearance. ([#435](https://github.com/tddworks/ClaudeBar/pull/435))
 - Hide account emails: the eye beside the account in the popover, or Settings → Menu Bar → Hide Account Emails, masks emails as s•••@g•••.com in the popover and menu bar, and remembers it. ([#375](https://github.com/tddworks/ClaudeBar/issues/375))
 - Each added Claude account now shows its own today's usage and 30-day chart, read from its own config folder's logs, instead of none. ([#358](https://github.com/tddworks/ClaudeBar/issues/358))
 - A Daily usage — last 30 days chart below today's usage cards shows each day's cost, tokens or cache use, with the 30-day total; hover a bar for its day. Past days are kept, so only today's logs are read. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
