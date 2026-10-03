@@ -103,6 +103,22 @@ struct HTTPStepsTests {
     }
 
     @Test
+    func `a header filled with a value that came out empty is left out`() async throws {
+        let sent = Sent()
+        let source = make(try decode("""
+        {"kind":"api","fetch":{"http":{"steps":[
+           {"name":"usage","request":{"url":"https://acme.test/usage","headers":{"x-csrf-token":"{{csrf}}","Accept":"*/*"}},
+            "dropEmpty":["csrf"]}]}},
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"usage.used"}]}}}
+        """), network: network(["/usage": (200, #"{"used":5}"#)], sent: sent))
+
+        _ = try await source.fetchUsage()
+
+        #expect(sent.header("x-csrf-token", at: "/usage") == nil)
+        #expect(sent.header("Accept", at: "/usage") == "*/*")
+    }
+
+    @Test
     func `a kept value never replaces a credential value`() async throws {
         let sent = Sent()
         let source = make(try decode("""

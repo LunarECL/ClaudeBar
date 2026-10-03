@@ -60,8 +60,8 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 │  ├── ProviderSettingsRepository - base: isEnabled state             │
 │  ├── BedrockSettingsRepository: ProviderSettingsRepository          │
 │  │   └── Bedrock specific: awsProfileName, regions, dailyBudget     │
-│  └── AlibabaSettingsRepository: ProviderSettingsRepository          │
-│      └── Alibaba specific: region, cookie source + API key          │
+│  └── ClaudeSettingsRepository: ProviderSettingsRepository           │
+│      └── Claude specific: probe mode, CLI fallback                  │
 │                                                                      │
 │  Domain Models                                                       │
 │  ├── UsageSnapshot - point-in-time quota data                       │
@@ -172,21 +172,19 @@ public protocol BedrockSettingsRepository: ProviderSettingsRepository {
     func setBedrockRegions(_ regions: [String])
 }
 
-// Alibaba-specific protocol - extends base with config + credentials
-public protocol AlibabaSettingsRepository: ProviderSettingsRepository {
-    func alibabaRegion() -> AlibabaRegion
-    func setAlibabaRegion(_ region: AlibabaRegion)
-    // Credentials (merged per SRP - Alibaba owns its credentials)
-    func saveAlibabaApiKey(_ key: String)
-    func getAlibabaApiKey() -> String?
-    func hasAlibabaApiKey() -> Bool
+// Claude-specific protocol - extends base with Claude's own config
+public protocol ClaudeSettingsRepository: ProviderSettingsRepository {
+    func claudeProbeMode() -> ClaudeProbeMode
+    func setClaudeProbeMode(_ mode: ClaudeProbeMode)
+    func claudeCliFallbackEnabled() -> Bool
+    func setClaudeCliFallbackEnabled(_ enabled: Bool)
 }
 
 // Single infrastructure implementation for all protocols
 public final class JSONSettingsRepository:
     AppSettingsRepository,
     BedrockSettingsRepository,
-    AlibabaSettingsRepository,
+    ClaudeSettingsRepository,
     // ... all other sub-protocols
 {
     // Persists to ~/.claudebar/settings.json via JSONSettingsStore
@@ -198,7 +196,7 @@ public final class JSONSettingsRepository:
 - Each provider depends **only** on its specific interface
 - Simple providers (Claude, Codex, Gemini) use base `ProviderSettingsRepository`
 - Bedrock uses `BedrockSettingsRepository` (AWS profile + regions)
-- Alibaba uses `AlibabaSettingsRepository` (region + credentials)
+- Claude uses `ClaudeSettingsRepository` (probe mode + CLI fallback)
 - No provider sees methods it doesn't need
 
 ### 4. Protocol-Based Dependency Injection
@@ -220,7 +218,7 @@ public init(probe: any UsageProbe, settingsRepository: any ProviderSettingsRepos
 
 // Specialized providers receive their specific repository
 public init(probe: any UsageProbe, settingsRepository: any BedrockSettingsRepository) { ... }
-public init(probe: any UsageProbe, settingsRepository: any AlibabaSettingsRepository) { ... }
+public init(probe: any UsageProbe, settingsRepository: any ClaudeSettingsRepository) { ... }
 ```
 
 ### 5. No ViewModel/AppState Layer

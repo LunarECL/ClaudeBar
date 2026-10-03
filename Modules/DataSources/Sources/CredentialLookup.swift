@@ -79,14 +79,31 @@ public struct SQLiteCredential: Sendable, Equatable, Codable {
 
 /// `match`: a value must match its pattern, or the lookup has no key — a
 /// token is never sent to a host it wasn't meant for. `with`: fixed values
-/// added to what was found; they never replace a found value.
+/// added to what was found; they never replace a found value. `cookies`:
+/// named cookies read out of a Cookie-header token.
 public struct Refinement: Sendable, Equatable, Codable {
     public let match: [String: String]
     public let with: [String: String]
+    /// Cookies read out of a Cookie-header token, each into a value of its
+    /// own name — a console's `sec_token` or CSRF cookie. One the header
+    /// lacks stays unknown.
+    public let cookies: [String]
 
-    public init(match: [String: String] = [:], with: [String: String] = [:]) {
+    public init(match: [String: String] = [:], with: [String: String] = [:], cookies: [String] = []) {
         self.match = match
         self.with = with
+        self.cookies = cookies
+    }
+
+    /// The named cookies' values in a `name=value; …` header.
+    public func cookieValues(in header: String) -> [String: String] {
+        var values: [String: String] = [:]
+        for pair in header.split(separator: ";") {
+            let parts = pair.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)
+            guard parts.count == 2, cookies.contains(String(parts[0])), !parts[1].isEmpty else { continue }
+            values[String(parts[0])] = String(parts[1])
+        }
+        return values
     }
 }
 
@@ -329,8 +346,9 @@ extension CredentialLookup: Codable {
         var refined = base
         let match = try container.decodeIfPresent([String: String].self, forKey: TagKey("match")) ?? [:]
         let with = try container.decodeIfPresent([String: String].self, forKey: TagKey("with")) ?? [:]
-        if !match.isEmpty || !with.isEmpty {
-            refined = .refined(base, Refinement(match: match, with: with))
+        let cookies = try container.decodeIfPresent([String].self, forKey: TagKey("cookies")) ?? []
+        if !match.isEmpty || !with.isEmpty || !cookies.isEmpty {
+            refined = .refined(base, Refinement(match: match, with: with, cookies: cookies))
         }
         if container.contains(TagKey("refresh")) {
             let refresh = try container.nestedContainer(keyedBy: TagKey.self, forKey: TagKey("refresh"))
@@ -363,6 +381,7 @@ extension CredentialLookup: Codable {
             try base.encodeBase(into: &container)
             if !refinement.match.isEmpty { try container.encode(refinement.match, forKey: TagKey("match")) }
             if !refinement.with.isEmpty { try container.encode(refinement.with, forKey: TagKey("with")) }
+            if !refinement.cookies.isEmpty { try container.encode(refinement.cookies, forKey: TagKey("cookies")) }
         case .firstOf(let lookups):
             try container.encode(lookups, forKey: TagKey("firstOf"))
         case .refreshing(let base, let refresh):

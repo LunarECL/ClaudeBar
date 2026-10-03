@@ -66,8 +66,8 @@ struct HTTPStepsFetcher: Fetching {
         }
     }
 
-    /// The request with what came out empty left out: a JSON body key, or a
-    /// URL query item, filled with one of `names` that has no value.
+    /// The request with what came out empty left out: a JSON body key, a URL
+    /// query item, or a header, filled with one of `names` that has no value.
     static func droppingEmpty(_ names: [String], from request: HTTPRequest, values: Credential) -> HTTPRequest {
         let missing = Set(names.filter { values[$0] == nil })
         guard !missing.isEmpty else { return request }
@@ -87,7 +87,8 @@ struct HTTPStepsFetcher: Fetching {
                 body = String(decoding: data, as: UTF8.self)
             }
         }
-        return HTTPRequest(url: url, method: request.method, headers: request.headers, body: body,
+        let headers = request.headers.filter { !isMissing($0.value) }
+        return HTTPRequest(url: url, method: request.method, headers: headers, body: body,
                            timeout: request.timeout, acceptedStatuses: request.acceptedStatuses)
     }
 

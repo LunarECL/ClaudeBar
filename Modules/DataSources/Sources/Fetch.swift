@@ -134,8 +134,9 @@ public struct HTTPStep: Sendable, Equatable, Codable {
     public let unless: String?
     /// Tries again on a network failure or a 5xx, up to this many times in all.
     public let attempts: Int
-    /// Values that may be missing: a JSON body key or a URL query item filled
-    /// with one is left out when it came out empty, instead of failing.
+    /// Values that may be missing: a JSON body key, a URL query item or a
+    /// header filled with one is left out when it came out empty, instead of
+    /// failing.
     public let dropEmpty: [String]
 
     public init(name: String, request: HTTPRequest, keep: [String: Keep] = [:], optional: Bool = false,

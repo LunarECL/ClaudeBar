@@ -295,14 +295,20 @@ struct SettingReader: CredentialFinding {
     }
 }
 
-/// A lookup refined: the `with` values added where nothing was found, then
-/// no key unless each `match` pattern matches its value.
+/// A lookup refined: the named cookies read out of a Cookie-header token and
+/// the `with` values added where nothing was found, then no key unless each
+/// `match` pattern matches its value.
 struct RefinedReader: CredentialFinding {
     let base: any CredentialFinding
     let refinement: Refinement
 
     func find() throws -> FoundCredential? {
         guard var found = try base.find() else { return nil }
+        if let header = found.credential["token"] {
+            for (name, value) in refinement.cookieValues(in: header) where found.credential[name] == nil {
+                found.credential[name] = value
+            }
+        }
         for (name, value) in refinement.with where found.credential[name] == nil {
             found.credential[name] = value
         }

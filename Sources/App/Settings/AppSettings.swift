@@ -478,7 +478,6 @@ public final class AppSettings {
     public var codex: CodexSettingsRepository { repository }
     public var bedrock: BedrockSettingsRepository { repository }
     public var deepseek: DeepSeekSettingsRepository { repository }
-    public var alibaba: AlibabaSettingsRepository { repository }
     public var hook: HookSettingsRepository { repository }
     public var notify: NotifySettingsRepository { repository }
 

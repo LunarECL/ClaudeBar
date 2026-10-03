@@ -1,10 +1,23 @@
+import Providers
+import DataSources
 import Testing
 import Foundation
-@testable import Infrastructure
-@testable import Domain
+import Quotas
+
+/// Alibaba's Coding Plan answer read by `alibaba-quota.js` — the old probe's
+/// fixtures, quota for quota.
+enum AlibabaDefinitionFixtures {
+    static func parse(_ data: Data, providerId: String) throws -> UsageSnapshot {
+        let definition = try Providers.builtIn("alibaba")
+        let source = DataSources.make(definition.dataSource("api")!, providerId: providerId, scripts: Providers.builtInScripts,
+                                      environment: { _ in nil })
+        do { return try source.read(Response(body: data)) }
+        catch let error as DataSourceError { throw error.reason }
+    }
+}
 
 @Suite
-struct AlibabaUsageProbeParsingTests {
+struct AlibabaDefinitionParsingTests {
 
     // MARK: - Sample Data
 
@@ -94,7 +107,7 @@ struct AlibabaUsageProbeParsingTests {
     func `parses three quota windows from full response`() throws {
         let data = Data(Self.sampleFullResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         #expect(snapshot.quotas.count == 3)
     }
@@ -103,7 +116,7 @@ struct AlibabaUsageProbeParsingTests {
     func `maps session quota from 5-hour window`() throws {
         let data = Data(Self.sampleFullResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         let sessionQuota = snapshot.quota(for: .session)
         #expect(sessionQuota != nil)
@@ -115,7 +128,7 @@ struct AlibabaUsageProbeParsingTests {
     func `maps weekly quota from week window`() throws {
         let data = Data(Self.sampleFullResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         let weeklyQuota = snapshot.quota(for: .weekly)
         #expect(weeklyQuota != nil)
@@ -127,7 +140,7 @@ struct AlibabaUsageProbeParsingTests {
     func `maps monthly quota as timeLimit`() throws {
         let data = Data(Self.sampleFullResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         let monthlyQuota = snapshot.quota(for: .timeLimit("Monthly"))
         #expect(monthlyQuota != nil)
@@ -139,7 +152,7 @@ struct AlibabaUsageProbeParsingTests {
     func `parses reset times from ISO-8601 dates`() throws {
         let data = Data(Self.sampleFullResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         let sessionQuota = snapshot.quota(for: .session)
         #expect(sessionQuota?.resetsAt != nil)
@@ -155,7 +168,7 @@ struct AlibabaUsageProbeParsingTests {
     func `extracts plan name as loginMethod`() throws {
         let data = Data(Self.sampleFullResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         #expect(snapshot.loginMethod == "Alibaba Coding Plan Pro")
     }
@@ -164,7 +177,7 @@ struct AlibabaUsageProbeParsingTests {
     func `sets providerId correctly`() throws {
         let data = Data(Self.sampleFullResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         #expect(snapshot.providerId == "alibaba")
         #expect(snapshot.quotas.allSatisfy { $0.providerId == "alibaba" })
@@ -176,7 +189,7 @@ struct AlibabaUsageProbeParsingTests {
     func `parses nested DataV2 console RPC response`() throws {
         let data = Data(Self.sampleConsoleRPCResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         #expect(snapshot.quotas.count == 3)
 
@@ -191,7 +204,7 @@ struct AlibabaUsageProbeParsingTests {
     func `handles response with only 5-hour window`() throws {
         let data = Data(Self.samplePartialResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         #expect(snapshot.quotas.count == 1)
         let sessionQuota = snapshot.quota(for: .session)
@@ -222,7 +235,7 @@ struct AlibabaUsageProbeParsingTests {
         """
         let data = Data(response.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         #expect(snapshot.quota(for: .session)?.percentRemaining == 100.0)
     }
@@ -248,7 +261,7 @@ struct AlibabaUsageProbeParsingTests {
         """
         let data = Data(response.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         #expect(snapshot.quota(for: .session)?.percentRemaining == 0.0)
     }
@@ -257,7 +270,7 @@ struct AlibabaUsageProbeParsingTests {
     func `generates reset text from used and total`() throws {
         let data = Data(Self.sampleFullResponse.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         let sessionQuota = snapshot.quota(for: .session)
         #expect(sessionQuota?.resetText == "8 / 100 used")
@@ -270,7 +283,7 @@ struct AlibabaUsageProbeParsingTests {
         let data = Data("not json".utf8)
 
         #expect(throws: UsageError.self) {
-            try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+            try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
         }
     }
 
@@ -279,7 +292,7 @@ struct AlibabaUsageProbeParsingTests {
         let data = Data("{}".utf8)
 
         #expect(throws: UsageError.self) {
-            try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+            try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
         }
     }
 
@@ -294,7 +307,7 @@ struct AlibabaUsageProbeParsingTests {
         let data = Data(response.utf8)
 
         #expect(throws: UsageError.sessionExpired()) {
-            try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+            try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
         }
     }
 
@@ -309,7 +322,7 @@ struct AlibabaUsageProbeParsingTests {
         let data = Data(response.utf8)
 
         #expect(throws: UsageError.authenticationRequired) {
-            try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+            try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
         }
     }
 
@@ -343,7 +356,7 @@ struct AlibabaUsageProbeParsingTests {
         """
         let data = Data(response.utf8)
 
-        let snapshot = try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
+        let snapshot = try AlibabaDefinitionFixtures.parse(data, providerId: "alibaba")
 
         #expect(snapshot.loginMethod == "Active Plan")
         #expect(snapshot.quota(for: .session)?.percentRemaining == 90.0)

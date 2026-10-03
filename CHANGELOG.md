@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Appearance → Native menu bar icons gives every provider account a monochrome mark that follows light and dark menu bars, while keeping quota colors. Off by default. ([#380](https://github.com/tddworks/ClaudeBar/pull/380))
 
 ### Changed
+- Alibaba supports separate accounts, each with its own API key or console cookie and region. A pasted cookie is tried before the browser's, and the monthly window is the real billing month. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
 - Copilot supports separate accounts, each with its own token. An unlimited plan shows its plan instead of a made-up 100% card, and an organization seat's entered usage is used only while GitHub reports none. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
 - Kimi supports separate accounts: a session token and region on the API, or a separate signed-in folder on the CLI. A signed-out CLI now asks you to sign in, and a plan with no stated period or limit no longer shows a made-up weekly 100%. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
 - Z.ai supports separate accounts, each with its own key and platform, and a saved key can go to Zhipu as well as Z.ai. Claude Code no longer needs to be installed, and a key in Claude Code's settings is only used when it points at Z.ai. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))

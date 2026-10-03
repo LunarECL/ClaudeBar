@@ -4,7 +4,7 @@ import Domain
 /// Legacy/test UserDefaults implementation of provider settings protocols.
 /// Production app persistence uses `JSONSettingsRepository`; this implementation
 /// supports legacy migration and isolated tests with injected UserDefaults suites.
-public final class UserDefaultsProviderSettingsRepository: BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, DeepSeekSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -202,54 +202,6 @@ public final class UserDefaultsProviderSettingsRepository: BedrockSettingsReposi
         userDefaults.object(forKey: Keys.deepseekApiKey) != nil
     }
 
-    // MARK: - AlibabaSettingsRepository
-
-    public func alibabaRegion() -> AlibabaRegion {
-        guard let rawValue = userDefaults.string(forKey: Keys.alibabaRegion) else {
-            return .international
-        }
-        return AlibabaRegion(rawValue: rawValue) ?? .international
-    }
-
-    public func setAlibabaRegion(_ region: AlibabaRegion) {
-        userDefaults.set(region.rawValue, forKey: Keys.alibabaRegion)
-    }
-
-    public func alibabaCookieSource() -> AlibabaCookieSource {
-        guard let rawValue = userDefaults.string(forKey: Keys.alibabaCookieSource) else {
-            return .auto
-        }
-        return AlibabaCookieSource(rawValue: rawValue) ?? .auto
-    }
-
-    public func setAlibabaCookieSource(_ source: AlibabaCookieSource) {
-        userDefaults.set(source.rawValue, forKey: Keys.alibabaCookieSource)
-    }
-
-    public func saveAlibabaManualCookie(_ cookie: String) {
-        userDefaults.set(cookie, forKey: Keys.alibabaManualCookie)
-    }
-
-    public func getAlibabaManualCookie() -> String? {
-        userDefaults.string(forKey: Keys.alibabaManualCookie)
-    }
-
-    public func saveAlibabaApiKey(_ key: String) {
-        userDefaults.set(key, forKey: Keys.alibabaApiKey)
-    }
-
-    public func getAlibabaApiKey() -> String? {
-        userDefaults.string(forKey: Keys.alibabaApiKey)
-    }
-
-    public func deleteAlibabaApiKey() {
-        userDefaults.removeObject(forKey: Keys.alibabaApiKey)
-    }
-
-    public func hasAlibabaApiKey() -> Bool {
-        userDefaults.object(forKey: Keys.alibabaApiKey) != nil
-    }
-
     // MARK: - HookSettingsRepository
 
     public func isHookEnabled() -> Bool {
@@ -291,11 +243,6 @@ public final class UserDefaultsProviderSettingsRepository: BedrockSettingsReposi
         // DeepSeek settings
         static let deepseekAuthEnvVar = "providerConfig.deepseekAuthEnvVar"
         static let deepseekApiKey = "com.claudebar.credentials.deepseek-api-key"
-        // Alibaba settings
-        static let alibabaRegion = "providerConfig.alibabaRegion"
-        static let alibabaCookieSource = "providerConfig.alibabaCookieSource"
-        static let alibabaManualCookie = "com.claudebar.credentials.alibaba-manual-cookie"
-        static let alibabaApiKey = "com.claudebar.credentials.alibaba-api-key"
         // Credentials (kept compatible with old UserDefaultsCredentialRepository keys)
     }
 

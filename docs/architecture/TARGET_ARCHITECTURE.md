@@ -388,6 +388,7 @@ vendor type:
 | a TUI screen and human reset dates no rule can say | `Mapping.script` — a JavaScript file in JavaScriptCore, no I/O, host `humanDate()`; the scripts ship beside the definition. `values` hands it settings (`{{setting.x}}`); a blank one isn't there, and the script never writes one back |
 | Claude Code's Keychain item | `CredentialLookup.keychain(service, fields)` via `security`, hex-decoded, written back as compact JSON |
 | expiry in milliseconds, a JSON refresh body with `scope` | `OAuth2Refresh.dueWhen`, `bodyFormat`, `scope`; values keep their JSON type on write-back; a failed refresh re-reads the store |
+| a console session: one cookie read out of the Cookie header (`sec_token`, a CSRF cookie), a header left out when its value is missing | `"cookies"` on a credential lookup; `dropEmpty` covers headers |
 | `env`, ready markers and a rendered screen for the CLI; a TUI that discards input typed during its startup paint | `CLICall.environment`, `readyWhen`, `screen`, `inputDelay` |
 | `/cost` only for API-billed accounts; API→CLI only while a setting allows | `fallbackOn` (hand-off by failure) and `fallback.enabledBySetting`; the provider follows the chain and reports the first real failure |
 | 15-minute cache, a remembered 429 | `cache.ttl` (also the background floor) and rate-limit memory on `DataSource` |

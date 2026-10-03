@@ -39,6 +39,8 @@ public struct ProviderVault: SecretVault, @unchecked Sendable {
         "provider.vercel-gateway.apiKey": ("com.claudebar.credentials.vercel-api-key", CredentialKey.vercelApiKey),
         "provider.zai.apiKey": ("com.claudebar.credentials.zai-api-key", CredentialKey.zaiApiKey),
         "provider.copilot.token": ("com.claudebar.credentials.github-copilot-token", CredentialKey.githubToken),
+        "provider.alibaba.apiKey": ("com.claudebar.credentials.alibaba-api-key", nil),
+        "provider.alibaba.cookie": ("com.claudebar.credentials.alibaba-manual-cookie", nil),
     ]
 
     static func key(_ name: String, provider: String) -> String {
