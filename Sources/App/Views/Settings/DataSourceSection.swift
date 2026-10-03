@@ -24,7 +24,7 @@ struct DataSourceSection: View {
     @State private var cliPath = ""
     @State private var cliPathError: String?
 
-    private var text: DataSourceSectionText { DataSourceSectionText(definition: provider.definition) }
+    private var text: DataSourceSectionText { DataSourceSectionText(definition: provider.definitionAsRun) }
 
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {

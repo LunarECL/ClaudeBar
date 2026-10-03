@@ -160,6 +160,16 @@ public final class Provider {
         for account in accounts { bind(account) }
     }
 
+    /// The definition as the default login runs it — the CLI at its chosen
+    /// location and every `{{setting.x}}` filled — so Settings prints
+    /// `$MINIMAX_API_KEY`, not the template.
+    public var definitionAsRun: ProviderDefinition {
+        let sources = (try? sources(for: [:], isDefault: true)) ?? running.dataSources
+        return ProviderDefinition(profile: running.profile, cli: running.cli, enabledByDefault: running.enabledByDefault,
+                                  dataSources: sources, defaultDataSource: running.defaultDataSource,
+                                  accounts: running.accounts, settings: running.settings)
+    }
+
     /// Every `{{setting.x}}` a login's data sources are filled with.
     func settingFills(for account: Account) -> [String: String] {
         settingFills(values: account.isDefault ? [:] : account.values)

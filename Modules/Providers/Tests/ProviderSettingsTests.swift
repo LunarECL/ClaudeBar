@@ -125,6 +125,18 @@ struct ProviderSettingsTests {
     }
 
     @Test
+    func `Settings is shown the definition as the default login runs it`() throws {
+        let acme = try provider()
+        try acme.set("region", to: "international")
+
+        guard case .http(let request)? = acme.definitionAsRun.dataSource("api")?.fetch else {
+            Issue.record("Expected an http fetch")
+            return
+        }
+        #expect(request.url == "https://api.acme.com/usage")
+    }
+
+    @Test
     func `import lists the host of every region a key may go to`() throws {
         let definition = try ProviderDefinition.parse(Data(Self.acme.utf8))
         #expect(definition.keyDestinations == ["api.acme.cn", "api.acme.com"])
