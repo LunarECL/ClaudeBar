@@ -1,4 +1,5 @@
 import SwiftUI
+import Domain
 import CoreText
 
 // MARK: - Pop Theme
@@ -27,6 +28,8 @@ public struct PopTheme: AppThemeProvider {
     static let butter = Color(red: 1.0, green: 0.851, blue: 0.4)       // #FFD966
     static let coral = Color(red: 1.0, green: 0.478, blue: 0.4)        // #FF7A66
     static let coralDeep = Color(red: 0.851, green: 0.227, blue: 0.169) // #D93A2B
+    static let mintDeep = Color(red: 0.184, green: 0.659, blue: 0.400)  // #2FA866
+    static let amber = Color(red: 0.718, green: 0.475, blue: 0.122)     // #B7791F
     static let grape = Color(red: 0.545, green: 0.361, blue: 0.965)    // #8B5CF6
     static let sky = Color(red: 0.561, green: 0.827, blue: 1.0)        // #8FD3FF
 
@@ -73,6 +76,16 @@ public struct PopTheme: AppThemeProvider {
     public var statusDepleted: Color { Self.coralDeep }
     /// Ink reads on every candy colour; white wouldn't on mint or butter.
     public var textOnStatus: Color { Self.ink }
+
+    /// Candy pastels vanish on a light menu bar: there, deeper versions.
+    public func menuBarStatusColor(for status: QuotaStatus, darkMenuBar: Bool) -> Color {
+        guard !darkMenuBar else { return statusColor(for: status) }
+        return switch status {
+        case .healthy: Self.mintDeep
+        case .warning: Self.amber
+        case .critical, .depleted: Self.coralDeep
+        }
+    }
 
     // MARK: - Accents (flat: Pop has no gradients)
 
