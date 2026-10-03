@@ -23,6 +23,7 @@ extension Fetch {
         case .file(let call): call
         case .localServer(let call): call
         case .cloudWatch(let call): call
+        case .directory(let call): call
         }
     }
 
@@ -58,6 +59,11 @@ extension LocalServerCall: Connection {
 
 extension CloudWatchCall: Connection {
     /// The cloud's own SDK, signed with the person's profile — no key of ours.
+    public var urls: [String] { [] }
+    public var commands: [[String]] { [] }
+}
+
+extension DirectoryCall: Connection {
     public var urls: [String] { [] }
     public var commands: [[String]] { [] }
 }

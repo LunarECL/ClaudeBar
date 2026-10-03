@@ -119,6 +119,8 @@ struct ClaudeBarApp: App {
         // (#190 keeps loopback inference free).
         let usageHistory = UsageHistory(logs: [
             "claude": ClaudeDailyUsageAnalyzer(isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }),
+            // Mistral has no meter: its Vibe session logs are all it reports.
+            "mistral": VibeSessionLogAnalyzer(),
         ])
         self.usageHistory = usageHistory
         // Codex is data: Modules/Providers/Resources/Providers/codex.json — the
@@ -159,6 +161,7 @@ struct ClaudeBarApp: App {
             }
         }()
         let omp = Self.builtIn("omp", settings: settingsRepository)
+        let mistral = Self.builtIn("mistral", settings: settingsRepository)
         let kimi = Self.builtIn("kimi", settings: settingsRepository,
                                 accounts: settingsRepository.accounts(forProvider: "kimi"), secrets: vault)
         let openCodeGo = Self.builtIn("opencode-go", settings: settingsRepository,
@@ -204,10 +207,7 @@ struct ClaudeBarApp: App {
             deepseek.defaultAccount,
             vercel.defaultAccount,
             alibaba.defaultAccount,
-            MistralProvider(
-                probe: MistralUsageProbe(),
-                settingsRepository: settingsRepository
-            ),
+            mistral.defaultAccount,
             openCodeGo.defaultAccount,
             omp.defaultAccount,
             grok.defaultAccount,

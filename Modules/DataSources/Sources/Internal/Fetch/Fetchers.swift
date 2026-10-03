@@ -359,6 +359,32 @@ extension WorkingDirectory {
 }
 
 /// `file` — reads a file some tool keeps up to date. Ready while it exists.
+/// `directory` — the matching names in a folder, sorted.
+struct DirectoryFetcher: Fetching {
+    let call: DirectoryCall
+    let homeDirectory: URL
+    let environment: @Sendable (String) -> String?
+
+    private var path: String {
+        Paths.expand(call.path, homeDirectory: homeDirectory, environment: environment)
+    }
+
+    func isReady() -> Bool {
+        var isFolder: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isFolder) && isFolder.boolValue
+    }
+
+    func fetch(with credential: Credential?) async throws -> Response {
+        guard isReady(), let names = try? FileManager.default.contentsOfDirectory(atPath: path) else {
+            throw UsageError.executionFailed("No folder at \(call.path)")
+        }
+        let entries = names.filter { name in
+            !name.hasPrefix(".") && (call.match.map { name.range(of: $0, options: .regularExpression) != nil } ?? true)
+        }.sorted()
+        return Response(body: try JSONSerialization.data(withJSONObject: ["entries": entries]))
+    }
+}
+
 struct FileFetcher: Fetching {
     let call: FileCall
     let homeDirectory: URL

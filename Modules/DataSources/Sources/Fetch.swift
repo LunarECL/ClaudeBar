@@ -22,6 +22,21 @@ public enum Fetch: Sendable, Equatable {
     case localServer(LocalServerCall)
     /// A cloud's metrics, summed per dimension value — through `CloudWatchClient`.
     case cloudWatch(CloudWatchCall)
+    /// A folder some tool fills — the names in it.
+    case directory(DirectoryCall)
+}
+
+/// `"directory": { "path": "~/.tool/logs", "match": "^session_" }` — the
+/// names of the entries in a folder, sorted; ready while the folder exists.
+public struct DirectoryCall: Sendable, Equatable, Codable {
+    public let path: String
+    /// A pattern an entry's name must match; every entry when absent.
+    public let match: String?
+
+    public init(path: String, match: String? = nil) {
+        self.path = path
+        self.match = match
+    }
 }
 
 /// `"cloudWatch": {…}` — today's sums of `metrics` in `namespace`, one row per
@@ -598,7 +613,7 @@ extension CLICall {
 // MARK: - JSON
 
 extension Fetch: Codable {
-    private static let tags = ["http", "jsonRpc", "cli", "command", "file", "localServer", "cloudWatch"]
+    private static let tags = ["http", "jsonRpc", "cli", "command", "file", "localServer", "cloudWatch", "directory"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
@@ -613,6 +628,7 @@ extension Fetch: Codable {
         case "command": self = .command(try container.decode(CommandCall.self, forKey: TagKey("command")))
         case "localServer": self = .localServer(try container.decode(LocalServerCall.self, forKey: TagKey("localServer")))
         case "cloudWatch": self = .cloudWatch(try container.decode(CloudWatchCall.self, forKey: TagKey("cloudWatch")))
+        case "directory": self = .directory(try container.decode(DirectoryCall.self, forKey: TagKey("directory")))
         default: self = .cli(try container.decode(CLICall.self, forKey: TagKey("cli")))
         }
     }
@@ -628,6 +644,7 @@ extension Fetch: Codable {
         case .file(let call): try container.encode(call, forKey: TagKey("file"))
         case .localServer(let call): try container.encode(call, forKey: TagKey("localServer"))
         case .cloudWatch(let call): try container.encode(call, forKey: TagKey("cloudWatch"))
+        case .directory(let call): try container.encode(call, forKey: TagKey("directory"))
         }
     }
 }
