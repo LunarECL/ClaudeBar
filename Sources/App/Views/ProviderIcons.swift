@@ -92,7 +92,6 @@ struct ProviderIconView: View {
         case "gemini": return "sparkles"
         case "zai": return "z.square.fill"
         case "copilot": return "chevron.left.forwardslash.chevron.right"
-        case "opencode-go": return "square.stack.3d.up.fill"
         case "omp": return "terminal.fill"
         default: return ProviderVisualIdentityLookup.symbolIcon(for: providerId)
         }

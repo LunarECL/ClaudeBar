@@ -261,34 +261,6 @@ extension MistralProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - OpenCodeProvider Visual Identity
-
-extension OpenCodeProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "square.stack.3d.up.fill" }
-
-    public var iconAssetName: String { "OpenCodeIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // OpenCode brand purple
-        scheme == .dark
-            ? Color(red: 0.52, green: 0.36, blue: 1.0)
-            : Color(red: 0.42, green: 0.28, blue: 1.0)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.36, green: 0.20, blue: 0.90)
-                    : Color(red: 0.30, green: 0.15, blue: 0.80)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - OmpProvider Visual Identity
 
 extension OmpProvider: ProviderVisualIdentity {
@@ -436,10 +408,6 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.55, blue: 0.0)
                 : Color(red: 0.90, green: 0.45, blue: 0.0)
-        case "opencode-go":
-            return scheme == .dark
-                ? Color(red: 0.52, green: 0.36, blue: 1.0)
-                : Color(red: 0.42, green: 0.28, blue: 1.0)
         case "omp":
             return scheme == .dark
                 ? Color(red: 0.30, green: 0.85, blue: 0.55)
@@ -484,10 +452,6 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.35, blue: 0.10)
                 : Color(red: 0.75, green: 0.25, blue: 0.05)
-        case "opencode-go":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.36, green: 0.20, blue: 0.90)
-                : Color(red: 0.30, green: 0.15, blue: 0.80)
         case "omp":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.16, green: 0.62, blue: 0.42)
@@ -518,7 +482,6 @@ enum ProviderVisualIdentityLookup {
         case "bedrock": return "BedrockIcon"
         case "kimi": return "KimiIcon"
         case "mistral": return "MistralIcon"
-        case "opencode-go": return "OpenCodeIcon"
         case "omp": return "OmpIcon"
         default: return "QuestionIcon"
         }
@@ -535,7 +498,6 @@ enum ProviderVisualIdentityLookup {
         case "bedrock": return "AWS Bedrock"
         case "kimi": return "Kimi"
         case "mistral": return "Mistral"
-        case "opencode-go": return "OpenCode Go"
         case "omp": return "Oh My Pi"
         default: return providerId.capitalized
         }
@@ -552,7 +514,6 @@ enum ProviderVisualIdentityLookup {
         case "bedrock": return "cloud.fill"
         case "kimi": return "k.square.fill"
         case "mistral": return "cat.fill"
-        case "opencode-go": return "square.stack.3d.up.fill"
         case "omp": return "terminal.fill"
         default:
             return extensionSymbols.withLock { $0[providerId] } ?? "questionmark.circle.fill"
