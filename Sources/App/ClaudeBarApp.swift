@@ -141,6 +141,8 @@ struct ClaudeBarApp: App {
                                   accounts: settingsRepository.accounts(forProvider: "cursor"), secrets: vault)
         let grok = Self.builtIn("grok", settings: settingsRepository,
                                 accounts: settingsRepository.accounts(forProvider: "grok"), secrets: vault)
+        let openCodeGo = Self.builtIn("opencode-go", settings: settingsRepository,
+                                      accounts: settingsRepository.accounts(forProvider: "opencode-go"), secrets: vault)
 
         // Keep the existing default login's configurable environment name until
         // provider settings forms move to definitions. Added logins use only
@@ -193,10 +195,7 @@ struct ClaudeBarApp: App {
                 probe: MistralUsageProbe(),
                 settingsRepository: settingsRepository
             ),
-            OpenCodeProvider(
-                probe: OpenCodeAPIUsageProbe(fallback: OpenCodeUsageProbe()),
-                settingsRepository: settingsRepository
-            ),
+            openCodeGo.defaultAccount,
             OmpProvider(
                 probe: OmpUsageProbe(),
                 settingsRepository: settingsRepository
@@ -205,7 +204,7 @@ struct ClaudeBarApp: App {
             commandCode.defaultAccount,
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts + openCodeGo.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after
