@@ -107,4 +107,12 @@ struct AccountsCardTextTests {
         #expect(text.removeMessage(for: provider.accounts[1]) == "Removes Work from ClaudeBar. Its login and folder stay where they are.")
         #expect(text.reauthHelp(for: provider.accounts[1]) == "Sign in again in /tmp/work profile with your CLI, then refresh.")
     }
+
+    @Test func `the default login's re-sign-in help is its key lookup's own hint`() throws {
+        let json = #"{"profile":{"id":"example","name":"Example"},"defaultDataSource":"api","dataSources":[{"kind":"api","credential":{"sqlite":{"path":"~/example.db","query":"SELECT 1","fields":{},"hint":"Sign in again in Example, then refresh."}},"fetch":{"http":{"url":"https://example.test"}},"mapping":{"json":{"quotas":[]}}}]}"#
+        let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)))
+        let provider = Providers.make(try ProviderDefinition.parse(Data(json.utf8)), settings: settings)
+
+        #expect(AccountsCardText(provider: provider).reauthHelp(for: provider.defaultAccount) == "Sign in again in Example, then refresh.")
+    }
 }

@@ -136,6 +136,12 @@ public final class Provider {
         value(of: setting, values: account.isDefault ? [:] : account.values)
     }
 
+    /// What to do when the active data source's key lookup finds no key —
+    /// the lookup's own hint, when it has one.
+    public var keyHint: String? {
+        definition.dataSource(activeKind)?.credential?.hint
+    }
+
     /// Whether a value of this setting is saved for a login — a key in the
     /// vault, or a value in settings — never the value itself, so Settings
     /// can say *Saved* without showing a key.
