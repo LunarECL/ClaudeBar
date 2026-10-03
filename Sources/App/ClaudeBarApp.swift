@@ -139,6 +139,8 @@ struct ClaudeBarApp: App {
                                 accounts: settingsRepository.accounts(forProvider: "kiro"), secrets: vault)
         let cursor = Self.builtIn("cursor", settings: settingsRepository,
                                   accounts: settingsRepository.accounts(forProvider: "cursor"), secrets: vault)
+        let grok = Self.builtIn("grok", settings: settingsRepository,
+                                accounts: settingsRepository.accounts(forProvider: "grok"), secrets: vault)
 
         // Keep the existing default login's configurable environment name until
         // provider settings forms move to definitions. Added logins use only
@@ -199,14 +201,11 @@ struct ClaudeBarApp: App {
                 probe: OmpUsageProbe(),
                 settingsRepository: settingsRepository
             ),
-            GrokProvider(
-                probe: GrokUsageProbe(),
-                settingsRepository: settingsRepository
-            ),
+            grok.defaultAccount,
             commandCode.defaultAccount,
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after

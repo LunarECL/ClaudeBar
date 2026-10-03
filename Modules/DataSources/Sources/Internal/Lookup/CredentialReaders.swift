@@ -27,10 +27,46 @@ struct JSONFileReader: CredentialFinding {
 
     func find() throws -> FoundCredential? {
         guard let document = readDocument() else { return nil }
+        if let record = file.record {
+            return chosen(record, in: document)
+        }
         let values = CredentialDocument.values(file.fields, in: document)
         guard values["token"] != nil else { return nil }
         let reader = self
-        return FoundCredential(credential: Credential(values), save: { reader.write($0) })
+        return FoundCredential(credential: Credential(file.defaults.merging(values) { _, own in own }), save: { reader.write($0) })
+    }
+
+    /// The record the rule picks, its values filled out with the defaults; a
+    /// refreshed token is written back into that record only.
+    private func chosen(_ rule: JSONFileCredential.Record, in document: [String: Any]) -> FoundCredential? {
+        let candidates = document.compactMap { key, value -> (key: String, values: [String: String])? in
+            guard let record = value as? [String: Any] else { return nil }
+            let values = CredentialDocument.values(file.fields, in: record)
+            return values["token"] == nil ? nil : (key, values)
+        }
+        func rank(_ values: [String: String]) -> (Int, Date) {
+            let preferred = rule.prefer.map { values[$0] != nil ? 1 : 0 } ?? 0
+            let latest = rule.latest.flatMap { values[$0] }.flatMap(Self.instant) ?? .distantFuture
+            return (preferred, latest)
+        }
+        guard let best = candidates.max(by: { rank($0.values) < rank($1.values) }) else { return nil }
+        let reader = self
+        let key = best.key
+        let own = Set(best.values.keys)
+        return FoundCredential(credential: Credential(file.defaults.merging(best.values) { _, value in value }),
+                               save: { reader.write($0.values.filter { own.contains($0.key) || !reader.file.defaults.keys.contains($0.key) }, into: key) })
+    }
+
+    /// An instant written as seconds, or as ISO 8601 with any fraction.
+    static func instant(_ text: String) -> Date? {
+        if let seconds = Double(text) { return Date(timeIntervalSince1970: seconds) }
+        return ISO8601Instant.parse(text)
+    }
+
+    private func write(_ values: [String: String], into key: String) {
+        guard var document = readDocument(), let record = document[key] as? [String: Any] else { return }
+        document[key] = CredentialDocument.updated(record, with: Credential(values), fields: file.fields)
+        save(document)
     }
 
     /// The fields without requiring a token — what a context file supplies.
@@ -40,7 +76,12 @@ struct JSONFileReader: CredentialFinding {
 
     func write(_ credential: Credential) {
         guard let document = readDocument() else { return }
-        let updated = CredentialDocument.updated(document, with: credential, fields: file.fields)
+        // A default the file lacked is never written into it.
+        let own = credential.values.filter { file.defaults[$0.key] == nil || $0.value != file.defaults[$0.key] }
+        save(CredentialDocument.updated(document, with: Credential(own), fields: file.fields))
+    }
+
+    private func save(_ updated: [String: Any]) {
         do {
             let data = try JSONSerialization.data(withJSONObject: updated, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: url, options: .atomic)

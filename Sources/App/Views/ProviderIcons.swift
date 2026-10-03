@@ -94,7 +94,6 @@ struct ProviderIconView: View {
         case "copilot": return "chevron.left.forwardslash.chevron.right"
         case "opencode-go": return "square.stack.3d.up.fill"
         case "omp": return "terminal.fill"
-        case "grok": return "line.diagonal"
         default: return ProviderVisualIdentityLookup.symbolIcon(for: providerId)
         }
     }
