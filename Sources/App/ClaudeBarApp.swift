@@ -147,6 +147,7 @@ struct ClaudeBarApp: App {
                                    accounts: settingsRepository.accounts(forProvider: "alibaba"), secrets: vault)
         let gemini = Self.builtIn("gemini", settings: settingsRepository,
                                   accounts: settingsRepository.accounts(forProvider: "gemini"))
+        let antigravity = Self.builtIn("antigravity", settings: settingsRepository)
         let kimi = Self.builtIn("kimi", settings: settingsRepository,
                                 accounts: settingsRepository.accounts(forProvider: "kimi"), secrets: vault)
         let openCodeGo = Self.builtIn("opencode-go", settings: settingsRepository,
@@ -180,7 +181,7 @@ struct ClaudeBarApp: App {
             claude.defaultAccount,
             codex.defaultAccount,
             gemini.defaultAccount,
-            AntigravityProvider(probe: AntigravityUsageProbe(), settingsRepository: settingsRepository),
+            antigravity.defaultAccount,
             zai.defaultAccount,
             copilot.defaultAccount,
             BedrockProvider(

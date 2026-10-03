@@ -62,6 +62,7 @@ public enum DataSources {
         browserCookies: any BrowserCookieReading = SystemBrowserCookies(),
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
+        processPaths: @escaping @Sendable () -> [String] = { [] },
         now: @escaping @Sendable () -> Date
     ) -> DataSource {
         make(
@@ -70,6 +71,8 @@ public enum DataSources {
             makeCLIExecutor: { _ in cliExecutor },
             makeCommandExecutor: { _ in cliExecutor },
             network: network,
+            localNetwork: network,
+            processPaths: processPaths,
             makeTransport: makeTransport,
             security: security,
             scripts: scripts,
@@ -87,6 +90,8 @@ public enum DataSources {
         makeCLIExecutor: @escaping CLIFetcher.MakeExecutor,
         makeCommandExecutor: @escaping CommandFetcher.MakeExecutor,
         network: any NetworkClient,
+        localNetwork: any NetworkClient = InsecureLocalhostNetworkClient(),
+        processPaths: @escaping @Sendable () -> [String] = RunningProcesses.system,
         makeTransport: @escaping TransportFactory,
         security: @escaping KeychainReader.Security,
         scripts: @escaping ScriptSource,
@@ -109,6 +114,9 @@ public enum DataSources {
             CommandFetcher(call: call, makeExecutor: makeCommandExecutor)
         case .file(let call):
             FileFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
+        case .localServer(let call):
+            LocalServerFetcher(call: call, commands: makeCommandExecutor(ProcessEnvironment()), network: localNetwork,
+                               processPaths: processPaths)
         }
 
         let mapper: any Reading = switch definition.mapping {
