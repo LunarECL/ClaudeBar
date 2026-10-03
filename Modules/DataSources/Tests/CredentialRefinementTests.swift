@@ -95,6 +95,37 @@ struct CredentialRefinementTests {
     }
 
     @Test
+    func `named cookies are read out of a Cookie header into their own values`() async throws {
+        let refined = try lookup(#"{"environment":"ACME_COOKIE","cookies":["sec_token","csrf"]}"#)
+        let definition = DataSourceDefinition(kind: "api", credential: refined,
+                                              fetch: .http(HTTPRequest(url: "https://acme.test/usage?t={{sec_token}}", headers: ["x-csrf": "{{csrf}}", "Cookie": "{{token}}"])),
+                                              mapping: .script(ScriptMapping(file: "none.js")))
+        let network = MockNetworkClient()
+        let seen = Seen()
+        given(network).request(.any).willProduce { request in
+            seen.request = request
+            return (Data(), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        let source = DataSources.make(definition, providerId: "acme", cliExecutor: MockCLIExecutor(), network: network,
+                                      makeTransport: { _, _, _, _ in MockRPCTransport() },
+                                      environment: { $0 == "ACME_COOKIE" ? "a=1; sec_token=s-9; csrf=c=2" : nil },
+                                      homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
+
+        _ = try await source.fetchResponse()
+
+        #expect(seen.request?.url?.absoluteString == "https://acme.test/usage?t=s-9")
+        #expect(seen.request?.value(forHTTPHeaderField: "x-csrf") == "c=2")
+        #expect(seen.request?.value(forHTTPHeaderField: "Cookie") == "a=1; sec_token=s-9; csrf=c=2")
+    }
+
+    @Test
+    func `a cookie the header lacks stays unknown`() throws {
+        let refinement = Refinement(cookies: ["sec_token"])
+        #expect(refinement.cookieValues(in: "a=1; b=2").isEmpty)
+        #expect(try lookup(#"{"setting":"cookie","cookies":["sec_token"]}"#) == .refined(.setting("cookie"), refinement))
+    }
+
+    @Test
     func `match and with round-trip as written`() throws {
         let refined = try lookup(acmeConfig)
         let again = try JSONDecoder().decode(CredentialLookup.self, from: JSONEncoder().encode(refined))

@@ -96,7 +96,6 @@ public final class NotificationAlerter: QuotaAlerter, @unchecked Sendable {
         case "gemini": return "Gemini"
         case "antigravity": return "Antigravity"
         case "bedrock": return "AWS Bedrock"
-        case "alibaba": return "Alibaba"
         case "omp": return "Oh My Pi"
         default: return providerId.capitalized
         }
