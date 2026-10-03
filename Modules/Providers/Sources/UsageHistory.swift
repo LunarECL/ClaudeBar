@@ -1,0 +1,27 @@
+import Foundation
+import Observation
+import Quotas
+
+/// *TODAY'S USAGE* — what one login used, day by day, read from its tool's
+/// own logs on this Mac. Not a meter: nothing is left or judged, and the
+/// monitor never refreshes it; it is read when the popover opens. The login
+/// owns it, as `account.usageHistory` (CANONICAL §2.1).
+@MainActor
+@Observable
+public final class UsageHistory {
+    /// Today's and yesterday's usage, once read and when either holds any.
+    public private(set) var report: DailyUsageReport?
+
+    private let analyzer: any DailyUsageAnalyzing
+
+    public init(analyzer: any DailyUsageAnalyzing) {
+        self.analyzer = analyzer
+    }
+
+    /// Reads the logs again. A day with nothing on either side is kept as
+    /// none; logs that can't be read leave the last report.
+    public func read() async {
+        guard let report = try? await analyzer.analyzeToday() else { return }
+        self.report = report.today.isEmpty && report.previous.isEmpty ? nil : report
+    }
+}
