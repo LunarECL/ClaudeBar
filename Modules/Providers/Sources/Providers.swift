@@ -72,6 +72,7 @@ public enum Providers {
         accounts: [ProviderAccountConfig] = [],
         secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil,
+        usageHistory: UsageHistory? = nil,
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
         cloudWatch: (any CloudWatchClient)? = nil,
         priceCatalog: (any PriceCatalog)? = nil
@@ -85,6 +86,7 @@ public enum Providers {
                                  environment: environment, cloudWatch: cloudWatch, priceCatalog: priceCatalog)
             },
             guestPasses: guestPasses,
+            usageHistory: usageHistory,
             vault: secrets
         )
     }
@@ -97,11 +99,13 @@ public enum Providers {
         accounts: [ProviderAccountConfig] = [],
         secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil,
+        usageHistory: UsageHistory? = nil,
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
         cloudWatch: (any CloudWatchClient)? = nil,
         priceCatalog: (any PriceCatalog)? = nil
     ) throws -> Provider {
-        make(try builtIn(id), settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses, environment: environment,
+        make(try builtIn(id), settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses,
+             usageHistory: usageHistory, environment: environment,
              cloudWatch: cloudWatch, priceCatalog: priceCatalog)
     }
 }

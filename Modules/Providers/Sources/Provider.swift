@@ -26,6 +26,8 @@ public final class Provider {
 
     /// *Share Claude Code*, for a provider whose plan can issue guest passes.
     public let guestPasses: GuestPasses?
+    /// *TODAY'S USAGE*, read from the default login's own logs.
+    public let usageHistory: UsageHistory?
 
     let settings: any MultiAccountSettingsRepository
     /// Makes a definition live for one login, by its lineup id — so its
@@ -55,6 +57,7 @@ public final class Provider {
         accounts: [ProviderAccountConfig] = [],
         makeDataSource: @escaping (DataSourceDefinition, String) -> DataSource,
         guestPasses: GuestPasses? = nil,
+        usageHistory: UsageHistory? = nil,
         folders: any LoginFolders = DiskLoginFolders(),
         vault: (any SecretVault)? = nil,
         paths: any PathChecking = DiskPaths(),
@@ -76,6 +79,7 @@ public final class Provider {
         self.settings = settings
         self.makeDataSource = makeDataSource
         self.guestPasses = guestPasses
+        self.usageHistory = usageHistory
         let label = settings.defaultAccountLabel(forProvider: definition.id) ?? ""
         self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: label), values: [:])]
         bind(self.accounts[0])
