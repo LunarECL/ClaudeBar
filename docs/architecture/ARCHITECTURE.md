@@ -78,7 +78,6 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 │  CLI Probes (Sources/Infrastructure/)                               │
 │  ├── ClaudeUsageProbe - probes `claude /usage` (CLI + API)          │
 │  ├── CodexUsageProbe - probes Codex via RPC/TTY (RPC + API)         │
-│  ├── GeminiUsageProbe - probes Gemini CLI + API                     │
 │  ├── AntigravityUsageProbe - probes local Antigravity server        │
 │  ├── BedrockUsageProbe - probes AWS Bedrock API                     │
 │  └── AmpCodeUsageProbe - probes Amp Code CLI                        │

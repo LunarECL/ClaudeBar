@@ -93,7 +93,6 @@ public final class NotificationAlerter: QuotaAlerter, @unchecked Sendable {
             return definition.profile.name
         }
         switch providerId {
-        case "gemini": return "Gemini"
         case "antigravity": return "Antigravity"
         case "bedrock": return "AWS Bedrock"
         case "omp": return "Oh My Pi"
