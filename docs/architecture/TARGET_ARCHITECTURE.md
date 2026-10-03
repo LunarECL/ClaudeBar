@@ -666,8 +666,8 @@ one answer**: the last two days, and the last thirty. So the model is a
 **series of days**, and a view is a range the page asks for:
 
 ```swift
-usageHistory.days(for: "claude", in: .last(2))    // TODAY'S USAGE
-usageHistory.days(for: "claude", in: .last(30))   // the chart; every date present, empty days included
+account.usageHistory?.days(in: .last(2))    // TODAY'S USAGE
+account.usageHistory?.days(in: .last(30))   // the chart; every date present, empty days included
 ```
 
 A `Day` holds what every view needs: tokens by kind, a `Cost` with a line per
@@ -686,18 +686,18 @@ hard-codes the same five jobs:
 | the day | local midnight; a 30-minute pause starts a session | local midnight; a file is a session | one aggregator |
 
 None of these is a vendor's behaviour; each is a value. So, as for usage
-(§2), **a tool's history is a definition and one engine runs it**: a new
+(§2), **a tool's usage history is a definition and one engine runs it**: a new
 tool's logs, a new model's price or a new view never edit a vendor's Swift
 (OCP).
 
-### 10.2 · The definition: `history` beside `dataSources`
+### 10.2 · The definition: `usageHistory` beside `dataSources`
 
 Record fields use **the mapping's path language** (§3: `$.a.b`, a list is the
 first that answers, `where`), so there is one way to point into JSON.
 
 ```jsonc
 // claude.json
-"history": {
+"usageHistory": {
   "records": {
     "files": "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
     "format": "jsonLines",                       // jsonLines (append-only, read incrementally) · json (one record per file)
@@ -717,12 +717,12 @@ first that answers, `where`), so there is one way to point into JSON.
                                    "url": ["$.env.ANTHROPIC_BASE_URL", "$.providers.0.base_url"] } },
   "sessionGap": 1800
 },
-"accounts": { "patch": { "history": { "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" } } } }
+"accounts": { "patch": { "usageHistory": { "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" } } } }
 ```
 
 ```jsonc
 // mistral.json
-"history": {
+"usageHistory": {
   "records": {
     "files": "~/.vibe/logs/session/session_*/meta.json",
     "format": "json",
@@ -748,12 +748,12 @@ first that answers, `where`), so there is one way to point into JSON.
 ```
 
 - **One price port.** `PriceCatalog` (DataSources, #417) is how Bedrock's
-  cost is priced; history uses the same port, with a second implementation
+  cost is priced; usage history uses the same port, with a second implementation
   that reads a price file. A tool that writes its own cost needs neither.
-- **Per login, like data sources.** The default login reads `history`; an
-  added login gets `accounts.patch.history` merged in and its values filled
+- **Per login, like data sources.** The default login reads `usageHistory`; an
+  added login gets `accounts.patch.usageHistory` merged in and its values filled
   (`{{account.configDirectory}}`), so an added Claude login has its own
-  history for the first time. A definition without `history` has none.
+  usage history for the first time. A definition without `usageHistory` has none.
 - **Money stays exact.** Prices are decimal texts; cost is
   tokens × price ÷ `per` in `Decimal`, shown as an estimate unless the record
   gave its own `cost`.
@@ -769,24 +769,24 @@ natural unit to keep:
 - **A day closes** a fixed while after its midnight (late lines from a
   session that ran past midnight still land). A closed day is summed once
   and kept in a **`DayLedger`** — per login, one small JSON file under
-  `~/.claudebar/history/`, a few hundred bytes a day.
+  `~/.claudebar/usage-history/`, a few hundred bytes a day.
 - **Open days** (today, and yesterday until it closes) are read from the logs
   every time — incrementally, as today, so a popover open reads only what
   was appended.
 - **Dedupe stays exact**: a record's identity only has to be remembered
   while its day is open.
 - **A ledger is a cache, not a record**: deleting it re-reads the logs; a
-  change to the definition (`history` or the prices) invalidates it.
+  change to the definition (`usageHistory` or the prices) invalidates it.
 
 ### 10.4 · The engine: `Modules/UsageHistory`
 
-**Where it lives.** The provider *declares* its history; `Modules/UsageHistory`
+**Where it lives.** The provider *declares* its usage history; `Modules/UsageHistory`
 *runs* it — the same split as `dataSources` (data in the definition) and
 `DataSources` (the work). `Providers` imports `UsageHistory` only to decode
-`history` into a `UsageLog` and fill it per login (`provider.history(for:
-account)`); `UsageHistory` imports `DataSources` (the path language,
-`PriceCatalog`, path expansion) and `Quotas` (`Cost`), never `Providers`. Each login carries its handle, `account.history` — `nil` when the definition has no `history` — and a page reads `account.history?.days(in:)` (CANONICAL §2.1), never a dictionary keyed by provider ids.
-Not in `Provider` itself: history is not a meter, is read on its own cadence
+`usageHistory` into a `UsageLog`, fill it per login and hand each login its
+`UsageHistory`; `UsageHistory` imports `DataSources` (the path language,
+`PriceCatalog`, path expansion) and `Quotas` (`Cost`), never `Providers`. Each login carries it as `account.usageHistory` — `nil` when the definition has no `usageHistory` — and a page reads `account.usageHistory?.days(in:)` (CANONICAL §2.1), never a dictionary keyed by provider ids. There is no app-wide registry of logs: what logins share (the ledger's store, the log cache) is the module's internals.
+Not in `Provider` itself: usage history is not a meter, is read on its own cadence
 (popover open, never the background poll) and keeps its own store — another
 question, another context.
 
@@ -798,7 +798,7 @@ question, another context.
 | `PriceCatalog` (+ a file implementation) | the record's own cost, else the catalog (exact → prefix → family → free → otherwise); `freeWhen` | `ModelPricing`, `ClaudeLocalInferenceDetector` |
 | `DayAggregator` | dedupe by `id` (last wins), split by local day, sessions by `sessionGap` (a record is a session without one), working time, cache savings, a cost line per model | both analyzers' `aggregate` |
 | `DayLedger` | closed days kept per login; open days delegated to the readers | — (new) |
-| `UsageHistory` (@Observable) | `days(for:in:)` per login, every date present | `Domain/UsageHistory` (two days only) |
+| `UsageHistory` (@Observable, one per login) | `days(in:)`, every date present | `Domain/UsageHistory` (one object for all logins, two days only) |
 | `Day` | the answer; `DailyUsageStat` until the words land | `Quotas` |
 
 Ports: the file system (a `@Mockable` `LogFiles`: list a glob with
@@ -813,10 +813,10 @@ a vendor; the readers are named for formats. The page owns the views:
 |---|---|
 | a *Last 30 days* chart, a week view, a month total | the page only: another range of `days` |
 | a new model's price, or a price cut | `claude-prices.json` |
-| *TODAY'S USAGE* for another tool that logs JSON | that tool's definition: a `history` block |
-| Codex's history (`~/.codex/sessions/**/rollout-*.jsonl`, whose `token_count` events carry a session's **running total**) | `codex.json`'s `history`, plus one reader option, `"cumulative": true` (the last record per session counts), with a neutral test |
+| *TODAY'S USAGE* for another tool that logs JSON | that tool's definition: a `usageHistory` block |
+| Codex's usage history (`~/.codex/sessions/**/rollout-*.jsonl`, whose `token_count` events carry a session's **running total**) | `codex.json`'s `usageHistory`, plus one reader option, `"cumulative": true` (the last record per session counts), with a neutral test |
 | a binary log format | one new reader, named for the format |
-| an added login's own history | nothing: `accounts.patch.history` |
+| an added login's own usage history | nothing: `accounts.patch.usageHistory` |
 
 ### 10.6 · The rest of `Infrastructure/Claude`
 
@@ -835,10 +835,10 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | # | Slice | Done when |
 |---|---|---|
 | UH1 | **Carve** `Modules/UsageHistory`: `UsageHistory`, `DailyUsageAnalyzing`, `DailyUsageReport`/`Stat` move in (typealiases keep call sites) | `Domain/UsageHistory` is empty; no visible change |
-| UH2 | **Claude as data**: `UsageLog`, `JSONLinesReader`, a file `PriceCatalog` + `claude-prices.json`, `DayAggregator`, `days(in:)`; claude.json's `history`. Golden tests: today's `ClaudeDailyUsageAnalyzerTests`, `SessionJSONLParserTests`, `SessionLogCacheTests`, `ModelPricingTests` fixtures through the definition | `ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector` deleted; the same two-day numbers |
-| UH3 | **Mistral as data**: `JSONFileReader`, `at.fromPath`; mistral.json's `history`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
+| UH2 | **Claude as data**: `UsageLog`, `JSONLinesReader`, a file `PriceCatalog` + `claude-prices.json`, `DayAggregator`, `days(in:)`; claude.json's `usageHistory`. Golden tests: today's `ClaudeDailyUsageAnalyzerTests`, `SessionJSONLParserTests`, `SessionLogCacheTests`, `ModelPricingTests` fixtures through the definition | `ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector` deleted; the same two-day numbers |
+| UH3 | **Mistral as data**: `JSONFileReader`, `at.fromPath`; mistral.json's `usageHistory`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
 | UH4 | **The ledger**: `DayLedger`, closed days kept, invalidated by a definition change | 30 days read in the time 2 take today |
 | UH5 | **The chart**: *Daily usage — last 30 days* (tokens by kind, two axes; cost by model) on the provider's page | visible |
-| UH6 | **Per login**: `accounts.patch.history`; `account.history` on every login | an added Claude login shows its own history (visible) |
+| UH6 | **Per login**: `accounts.patch.usageHistory`; `account.usageHistory` on every login | an added Claude login shows its own usage history (visible) |
 | GP | **Guest passes as data**: `cli.clipboard`, claude.json's `guestPasses` + `claude-passes.js`; `ClaudeGuestPassSourceTests` fixtures | `Infrastructure/Claude` deleted |
 | — | the words: `Day`, `DayLedger`; the typealiases go | with §8 slice 7 |
