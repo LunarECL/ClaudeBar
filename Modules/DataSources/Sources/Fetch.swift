@@ -67,7 +67,8 @@ public struct HTTPRequest: Sendable, Equatable, Codable {
 }
 
 /// `"http": { "steps": […] }` — call A, then B with something A said. The
-/// last step that runs answers; at most eight steps.
+/// response is every step's answer by name — `{ "whoami": …, "credits": … }`
+/// — so the mapping and *Test Connection* see them all; at most eight steps.
 public struct HTTPSteps: Sendable, Equatable, Codable {
     public static let limit = 8
 
@@ -95,8 +96,8 @@ public struct HTTPSteps: Sendable, Equatable, Codable {
 public struct HTTPStep: Sendable, Equatable, Codable {
     /// A value read from a step's response, for later steps' `{{name}}`.
     public enum Keep: Sendable, Equatable, Codable {
-        /// `"$.path"` in a JSON body.
-        case path(String)
+        /// `"$.path"` in a JSON body, or a list of them — the first that answers.
+        case paths([String])
         /// `{ "pattern": "…" }` over the body's text; the first group.
         case pattern(String)
 
@@ -104,7 +105,9 @@ public struct HTTPStep: Sendable, Equatable, Codable {
 
         public init(from decoder: Decoder) throws {
             if let path = try? decoder.singleValueContainer().decode(String.self) {
-                self = .path(path)
+                self = .paths([path])
+            } else if let paths = try? decoder.singleValueContainer().decode([String].self) {
+                self = .paths(paths)
             } else {
                 self = .pattern(try decoder.container(keyedBy: Keys.self).decode(String.self, forKey: .pattern))
             }
@@ -112,9 +115,9 @@ public struct HTTPStep: Sendable, Equatable, Codable {
 
         public func encode(to encoder: Encoder) throws {
             switch self {
-            case .path(let path):
+            case .paths(let paths):
                 var container = encoder.singleValueContainer()
-                try container.encode(path)
+                if paths.count == 1 { try container.encode(paths[0]) } else { try container.encode(paths) }
             case .pattern(let pattern):
                 var container = encoder.container(keyedBy: Keys.self)
                 try container.encode(pattern, forKey: .pattern)
@@ -131,7 +134,8 @@ public struct HTTPStep: Sendable, Equatable, Codable {
     public let unless: String?
     /// Tries again on a network failure or a 5xx, up to this many times in all.
     public let attempts: Int
-    /// JSON body keys left out when their value came out empty.
+    /// Values that may be missing: a JSON body key or a URL query item filled
+    /// with one is left out when it came out empty, instead of failing.
     public let dropEmpty: [String]
 
     public init(name: String, request: HTTPRequest, keep: [String: Keep] = [:], optional: Bool = false,

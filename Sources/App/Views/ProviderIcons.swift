@@ -95,7 +95,6 @@ struct ProviderIconView: View {
         case "opencode-go": return "square.stack.3d.up.fill"
         case "omp": return "terminal.fill"
         case "grok": return "line.diagonal"
-        case "commandcode": return "command"
         default: return ProviderVisualIdentityLookup.symbolIcon(for: providerId)
         }
     }

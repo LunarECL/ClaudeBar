@@ -4,7 +4,7 @@ import Foundation
 
 /// `http.steps` — the requests in order, each filled with the credential and
 /// the values earlier steps kept. A kept value never replaces a credential
-/// value. The last step that ran is the response.
+/// value. The response is every answer, by step name.
 struct HTTPStepsFetcher: Fetching {
     let steps: HTTPSteps
     let network: any NetworkClient
@@ -14,6 +14,7 @@ struct HTTPStepsFetcher: Fetching {
 
     func fetch(with credential: Credential?) async throws -> Response {
         var values = credential ?? Credential([:])
+        var answers: [String: Any] = [:]
         var last: Response?
         for step in steps.steps {
             if let known = step.unless, values[known] != nil {
@@ -25,6 +26,7 @@ struct HTTPStepsFetcher: Fetching {
                 for (name, value) in Self.kept(step.keep, from: response) where values[name] == nil {
                     values[name] = value
                 }
+                answers[step.name] = (try? JSONSerialization.jsonObject(with: response.body, options: [.fragmentsAllowed])) ?? response.text
                 last = response
             } catch {
                 // A refused key or a rate limit is the whole data source's
@@ -34,14 +36,15 @@ struct HTTPStepsFetcher: Fetching {
             }
         }
         guard let last else { throw UsageError.noData }
-        return last
+        return Response(status: last.status, headers: last.headers,
+                        body: try JSONSerialization.data(withJSONObject: answers, options: [.sortedKeys]))
     }
 
     /// One step, tried again on a network failure or a 5xx.
     private func send(_ step: HTTPStep, with values: Credential) async throws -> Response {
         var filled = values
         for name in step.dropEmpty where filled[name] == nil { filled[name] = "" }
-        let request = Self.droppingEmpty(step.dropEmpty, from: step.request, values: filled)
+        let request = Self.droppingEmpty(step.dropEmpty, from: step.request, values: values)
         let fetcher = HTTPFetcher(request: request, network: network, now: now)
         var attempt = 1
         while true {
@@ -63,21 +66,29 @@ struct HTTPStepsFetcher: Fetching {
         }
     }
 
-    /// The request with each JSON body key in `names` removed when its value
-    /// is empty — `{"project": "{{project}}"}` becomes `{}` without a project.
+    /// The request with what came out empty left out: a JSON body key, or a
+    /// URL query item, filled with one of `names` that has no value.
     static func droppingEmpty(_ names: [String], from request: HTTPRequest, values: Credential) -> HTTPRequest {
-        guard !names.isEmpty, let body = request.body,
-              let filled = Template.fill(body, with: values),
-              var object = (try? JSONSerialization.jsonObject(with: Data(filled.utf8))) as? [String: Any] else {
-            return request
+        let missing = Set(names.filter { values[$0] == nil })
+        guard !missing.isEmpty else { return request }
+        func isMissing(_ template: String?) -> Bool {
+            guard let template, template.hasPrefix("{{"), template.hasSuffix("}}") else { return false }
+            return missing.contains(String(template.dropFirst(2).dropLast(2)).trimmingCharacters(in: .whitespaces))
         }
-        for name in names where (object[name] as? String)?.isEmpty == true {
-            object.removeValue(forKey: name)
+        var url = request.url
+        if var components = URLComponents(string: request.url), let items = components.queryItems {
+            components.queryItems = items.filter { !isMissing($0.value) }
+            url = components.string ?? request.url
         }
-        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else { return request }
-        return HTTPRequest(url: request.url, method: request.method, headers: request.headers,
-                           body: String(decoding: data, as: UTF8.self), timeout: request.timeout,
-                           acceptedStatuses: request.acceptedStatuses)
+        var body = request.body
+        if let text = request.body, var object = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any] {
+            for (key, value) in object where isMissing(value as? String) { object.removeValue(forKey: key) }
+            if let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) {
+                body = String(decoding: data, as: UTF8.self)
+            }
+        }
+        return HTTPRequest(url: url, method: request.method, headers: request.headers, body: body,
+                           timeout: request.timeout, acceptedStatuses: request.acceptedStatuses)
     }
 
     /// The values a step keeps from its response; one that is absent is left out.
@@ -86,8 +97,9 @@ struct HTTPStepsFetcher: Fetching {
         var values: [String: String] = [:]
         for (name, rule) in keep {
             switch rule {
-            case .path(let path):
-                if let value = JSONPath.string(JSONPath.walk(json, JSONPath.components(path))), !value.isEmpty {
+            case .paths(let paths):
+                if let value = paths.lazy.compactMap({ JSONPath.string(JSONPath.walk(json, JSONPath.components($0))) })
+                    .first(where: { !$0.isEmpty }) {
                     values[name] = value
                 }
             case .pattern(let pattern):

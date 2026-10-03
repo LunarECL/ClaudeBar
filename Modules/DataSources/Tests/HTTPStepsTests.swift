@@ -39,7 +39,7 @@ struct HTTPStepsTests {
        {"name":"project","request":{"url":"https://acme.test/project","headers":{"Authorization":"Bearer {{token}}"}},
         "keep":{"project":"$.project.id"}},
        {"name":"usage","request":{"url":"https://acme.test/usage/{{project}}"}}]}},
-     "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"used"}]}}}
+     "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"usage.used"}]}}}
     """
 
     @Test
@@ -57,6 +57,52 @@ struct HTTPStepsTests {
     }
 
     @Test
+    func `the response is every step's answer, by name`() async throws {
+        let source = make(try decode(twoSteps), network: network([
+            "/project": (200, #"{"project":{"id":"p-7"}}"#),
+            "/usage/p-7": (200, #"{"used":40}"#),
+        ], sent: Sent()), environment: ["KEY": "k"])
+
+        let response = try await source.fetchResponse()
+        let answers = try #require(try JSONSerialization.jsonObject(with: response.body) as? [String: Any])
+
+        #expect((answers["project"] as? [String: Any])?["project"] != nil)
+        #expect((answers["usage"] as? [String: Any])?["used"] as? Int == 40)
+        #expect(response.status == 200)
+    }
+
+    @Test
+    func `a value is kept from the first path that answers`() async throws {
+        let sent = Sent()
+        let source = make(try decode("""
+        {"kind":"api","fetch":{"http":{"steps":[
+           {"name":"who","request":{"url":"https://acme.test/who"},"keep":{"org":["$.data.org.id","$.org.id"]}},
+           {"name":"usage","request":{"url":"https://acme.test/usage?org={{org}}"}}]}},
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"usage.used"}]}}}
+        """), network: network(["/who": (200, #"{"org":{"id":42}}"#), "/usage": (200, #"{"used":5}"#)], sent: sent))
+
+        _ = try await source.fetchUsage()
+
+        #expect(sent.query("org", at: "/usage") == "42")
+    }
+
+    @Test
+    func `a query value that came out empty is left out of the URL`() async throws {
+        let sent = Sent()
+        let source = make(try decode("""
+        {"kind":"api","fetch":{"http":{"steps":[
+           {"name":"who","request":{"url":"https://acme.test/who"},"keep":{"org":"$.org.id"}},
+           {"name":"usage","request":{"url":"https://acme.test/usage?org={{org}}&v=1"},"dropEmpty":["org"]}]}},
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"usage.used"}]}}}
+        """), network: network(["/who": (200, "{}"), "/usage": (200, #"{"used":5}"#)], sent: sent))
+
+        _ = try await source.fetchUsage()
+
+        #expect(sent.query("org", at: "/usage") == nil)
+        #expect(sent.query("v", at: "/usage") == "1")
+    }
+
+    @Test
     func `a kept value never replaces a credential value`() async throws {
         let sent = Sent()
         let source = make(try decode("""
@@ -64,7 +110,7 @@ struct HTTPStepsTests {
          "fetch":{"http":{"steps":[
            {"name":"a","request":{"url":"https://acme.test/a"},"keep":{"token":"$.token"}},
            {"name":"b","request":{"url":"https://acme.test/b","headers":{"Authorization":"Bearer {{token}}"}}}]}},
-         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"used"}]}}}
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"b.used"}]}}}
         """), network: network(["/a": (200, #"{"token":"stolen"}"#), "/b": (200, #"{"used":1}"#)], sent: sent),
             environment: ["KEY": "mine"])
 
@@ -81,7 +127,7 @@ struct HTTPStepsTests {
            {"name":"project","request":{"url":"https://acme.test/project"},"optional":true,"keep":{"project":"$.id"}},
            {"name":"usage","request":{"url":"https://acme.test/usage","method":"POST","body":"{\\"project\\":\\"{{project}}\\"}"},
             "dropEmpty":["project"]}]}},
-         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"used"}]}}}
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"usage.used"}]}}}
         """), network: network(["/project": (500, ""), "/usage": (200, #"{"used":10}"#)], sent: sent))
 
         let usage = try await source.fetchUsage()
@@ -96,7 +142,7 @@ struct HTTPStepsTests {
         {"kind":"api","fetch":{"http":{"steps":[
            {"name":"project","request":{"url":"https://acme.test/project"},"optional":true},
            {"name":"usage","request":{"url":"https://acme.test/usage"}}]}},
-         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"used"}]}}}
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"usage.used"}]}}}
         """), network: network(["/project": (status, ""), "/usage": (200, #"{"used":10}"#)], sent: Sent()))
 
         await #expect { try await source.fetchUsage() } throws: { ($0 as? DataSourceError)?.reason.tag == tag }
@@ -110,7 +156,7 @@ struct HTTPStepsTests {
          "fetch":{"http":{"steps":[
            {"name":"token","request":{"url":"https://acme.test/token"},"unless":"token","keep":{"token":"$.t"}},
            {"name":"usage","request":{"url":"https://acme.test/usage"}}]}},
-         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"used"}]}}}
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"usage.used"}]}}}
         """), network: network(["/usage": (200, #"{"used":5}"#)], sent: sent), environment: ["KEY": "known"])
 
         _ = try await source.fetchUsage()
@@ -125,7 +171,7 @@ struct HTTPStepsTests {
         {"kind":"api","fetch":{"http":{"steps":[
            {"name":"page","request":{"url":"https://acme.test/page"},"keep":{"csrf":{"pattern":"csrf=\\"([a-z0-9]+)\\""}}},
            {"name":"usage","request":{"url":"https://acme.test/usage","headers":{"X-CSRF":"{{csrf}}"}}}]}},
-         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"used"}]}}}
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"usage.used"}]}}}
         """), network: network(["/page": (200, #"<meta csrf="ab12">"#), "/usage": (200, #"{"used":5}"#)], sent: sent))
 
         _ = try await source.fetchUsage()
@@ -145,7 +191,7 @@ struct HTTPStepsTests {
         let source = make(try decode("""
         {"kind":"api","fetch":{"http":{"steps":[
            {"name":"usage","request":{"url":"https://acme.test/usage"},"attempts":2}]}},
-         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"used"}]}}}
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"usage.used"}]}}}
         """), network: network)
 
         let usage = try await source.fetchUsage()
@@ -194,6 +240,13 @@ final class Sent: @unchecked Sendable {
 
     func header(_ name: String, at path: String) -> String? {
         lock.withLock { requests.last { $0.url?.path == path }?.value(forHTTPHeaderField: name) }
+    }
+
+    func query(_ name: String, at path: String) -> String? {
+        lock.withLock {
+            requests.last { $0.url?.path == path }.flatMap { URLComponents(url: $0.url!, resolvingAgainstBaseURL: false) }?
+                .queryItems?.first { $0.name == name }?.value
+        }
     }
 
     func body(at path: String) -> String? {
