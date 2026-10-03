@@ -24,12 +24,15 @@ struct CopilotDefinitionTests {
     private func make(mode: String? = nil, body: String? = nil, status: Int = 200, username: String? = "octocat",
                       limit: String? = nil, manual: String? = nil, envVar: String? = nil,
                       vault: MemoryVault = MemoryVault(["copilot.token": "saved"]), environment: [String: String] = [:],
-                      seen: Seen = Seen()) throws -> Provider {
+                      ghLogin: String? = nil, refuse: Set<String> = [], seen: Seen = Seen()) throws -> Provider {
         let network = MockNetworkClient()
         let answer = body ?? (mode == "copilotAPI" ? Self.user : Self.billing())
+        let userAnswer = mode == "copilotAPI" ? answer : Self.user
         given(network).request(.any).willProduce { @Sendable request in
             seen.url = request.url?.absoluteString
             seen.authorization = request.value(forHTTPHeaderField: "Authorization")
+            if let key = seen.authorization, refuse.contains(key) { return (Data(), StubbedProvider.response(401)) }
+            if request.url?.path == "/copilot_internal/user" { return (Data(userAnswer.utf8), StubbedProvider.response(status)) }
             return (Data(answer.utf8), StubbedProvider.response(status))
         }
         let settings = InMemoryProviderSettings()
@@ -41,7 +44,13 @@ struct CopilotDefinitionTests {
         let definition = try Providers.builtIn("copilot")
         return Provider(definition: definition, settings: settings, accounts: settings.accounts(forProvider: "copilot"), makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: network,
-                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: Providers.builtInScripts,
+                             makeTransport: { _, _, _, _ in MockRPCTransport() },
+                             security: { arguments in
+                                 // The GitHub CLI's login, as go-keyring stores it.
+                                 guard arguments.contains("gh:github.com"), let ghLogin else { return (44, "") }
+                                 return (0, "go-keyring-base64:" + Data(ghLogin.utf8).base64EncodedString())
+                             },
+                             scripts: Providers.builtInScripts,
                              secrets: vault.scoped(to: login), environment: { environment[$0] },
                              homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)
@@ -108,9 +117,14 @@ struct CopilotDefinitionTests {
         #expect(quota.resetText == "15/50 AI credits")
     }
 
-    @Test func `billing without a username is not ready`() async throws {
-        let account = try make(username: nil).defaultAccount
-        #expect(await account.isAvailable() == false)
+    @Test func `billing without a username hands over to the Copilot API`() async throws {
+        let seen = Seen()
+        _ = try await make(username: nil, seen: seen).defaultAccount.refresh()
+        #expect(seen.url == "https://api.github.com/copilot_internal/user")
+    }
+
+    @Test func `nothing anywhere is not ready`() async throws {
+        #expect(await (try make(username: nil, vault: MemoryVault())).defaultAccount.isAvailable() == false)
     }
 
     @Test func `the token is read from the environment variable the person named`() async throws {
@@ -163,6 +177,27 @@ struct CopilotDefinitionTests {
         let account = try make(mode: "copilotAPI", body: body).defaultAccount
         let snapshot = try? await account.refresh()
         #expect(snapshot?.quotas.isEmpty ?? true)
+    }
+
+    @Test func `with no token saved, the GitHub CLI's login reads the Copilot API`() async throws {
+        let seen = Seen()
+        let snapshot = try await make(mode: "copilotAPI", vault: MemoryVault(), ghLogin: "gho_cli", seen: seen).defaultAccount.refresh()
+        #expect(seen.authorization == "Bearer gho_cli")
+        #expect(snapshot.quotas.first?.resetText == "2/300 AI credits")
+    }
+
+    @Test func `the Copilot API names the login it read`() async throws {
+        let body = #"{"login":"octocat","copilot_plan":"individual","quota_snapshots":{"premium_interactions":{"entitlement":1500,"remaining":1487,"percent_remaining":99.1}}}"#
+        let snapshot = try await make(mode: "copilotAPI", body: body).defaultAccount.refresh()
+        #expect(snapshot.accountEmail == "octocat")
+        #expect(snapshot.accountTier == .custom("individual"))
+    }
+
+    @Test func `billing with no key hands over to the Copilot API and the GitHub CLI's login`() async throws {
+        let seen = Seen()
+        let snapshot = try await make(vault: MemoryVault(), ghLogin: "gho_cli", seen: seen).defaultAccount.refresh()
+        #expect(seen.url == "https://api.github.com/copilot_internal/user")
+        #expect(snapshot.quotas.first?.resetText == "2/300 AI credits")
     }
 
     // MARK: - Accounts

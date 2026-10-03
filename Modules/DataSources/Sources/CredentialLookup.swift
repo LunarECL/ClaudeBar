@@ -128,20 +128,35 @@ public struct Credential: Sendable, Equatable {
 
 /// A Keychain item and where in its JSON password each credential value lives.
 public struct KeychainCredential: Sendable, Equatable, Codable {
+    /// How a password is stored, when not as itself.
+    public enum Encoding: String, Sendable, Equatable, Codable {
+        /// go-keyring's `go-keyring-base64:<base64>` — the GitHub CLI's, for one.
+        case goKeyringBase64
+    }
+
     public let service: String
+    /// The item's account, when several logins share a service.
+    public let account: String?
+    public let encoding: Encoding?
     /// Credential name → JSON path in the password. `token` is required.
     public let fields: [String: String]
 
-    public init(service: String, fields: [String: String]) {
+    private static let reserved: Set<String> = ["service", "account", "encoding"]
+
+    public init(service: String, account: String? = nil, encoding: Encoding? = nil, fields: [String: String]) {
         self.service = service
+        self.account = account
+        self.encoding = encoding
         self.fields = fields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
         service = try container.decode(String.self, forKey: TagKey("service"))
+        account = try container.decodeIfPresent(String.self, forKey: TagKey("account"))
+        encoding = try container.decodeIfPresent(Encoding.self, forKey: TagKey("encoding"))
         var fields: [String: String] = [:]
-        for key in container.allKeys where key.stringValue != "service" {
+        for key in container.allKeys where !Self.reserved.contains(key.stringValue) {
             fields[key.stringValue] = try container.decode(String.self, forKey: key)
         }
         self.fields = fields
@@ -150,9 +165,19 @@ public struct KeychainCredential: Sendable, Equatable, Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: TagKey.self)
         try container.encode(service, forKey: TagKey("service"))
+        try container.encodeIfPresent(account, forKey: TagKey("account"))
+        try container.encodeIfPresent(encoding, forKey: TagKey("encoding"))
         for (name, path) in fields {
             try container.encode(path, forKey: TagKey(name))
         }
+    }
+
+    /// The password as stored, read as what it encodes.
+    func decoded(_ password: String) -> String {
+        guard encoding == .goKeyringBase64, password.hasPrefix("go-keyring-base64:"),
+              let data = Data(base64Encoded: String(password.dropFirst("go-keyring-base64:".count))),
+              let text = String(data: data, encoding: .utf8) else { return password }
+        return text
     }
 }
 
