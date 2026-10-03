@@ -254,13 +254,14 @@ struct DataSourceSection: View {
     @ViewBuilder
     private func fallbackRow(_ sentence: String) -> some View {
         if text.fallbackIsSwitchable(for: kind) {
-            Toggle(isOn: $fallbackOn) {
+            HStack(spacing: 8) {
                 Text(sentence)
                     .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
+                Spacer(minLength: 8)
+                SettingsSwitch(isOn: $fallbackOn)
+                    .accessibilityLabel(sentence)
             }
-            .toggleStyle(.switch)
-            .tint(theme.accentPrimary)
             .onChange(of: fallbackOn) { _, newValue in
                 provider.setFallbackEnabled(newValue, from: kind)
             }

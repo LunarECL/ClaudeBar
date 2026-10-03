@@ -87,11 +87,8 @@ struct ClaudeBudgetCard: View {
 
             Spacer()
 
-            Toggle("", isOn: $settings.claudeApiBudgetEnabled)
-                .toggleStyle(.switch)
-                .tint(theme.accentPrimary)
-                .scaleEffect(0.8)
-                .labelsHidden()
+            SettingsSwitch(isOn: $settings.claudeApiBudgetEnabled)
+                .accessibilityLabel("Claude API Budget")
         }
     }
 

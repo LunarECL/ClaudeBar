@@ -362,25 +362,29 @@ struct MenuContentView: View {
     private var statusBadge: some View {
         let statusColor = selectedProviderBadge.badgeColor(theme)
 
+        // An outlined theme fills the badge with its status colour, inked.
+        let outlined = theme.isOutlined
         return HStack(spacing: 6) {
             // Animated pulse dot
             PulsingStatusDot(
-                color: statusColor,
+                color: outlined ? theme.textOnStatus : statusColor,
                 isSyncing: isSelectedProviderSyncing
             )
 
             Text(statusText)
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
-                .foregroundStyle(theme.textPrimary)
+                .font(.system(size: 11, weight: outlined ? .heavy : .medium, design: theme.fontDesign))
+                .foregroundStyle(outlined ? theme.textOnStatus : theme.textPrimary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                .fill(theme.glassBackground)
+                .fill(outlined ? statusColor : theme.glassBackground)
+                .themeShadow(theme, scale: 0.5)
                 .overlay(
                     RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                        .stroke(statusColor.opacity(0.5), lineWidth: 1)
+                        .stroke(outlined ? theme.glassBorder : statusColor.opacity(0.5),
+                                lineWidth: outlined ? theme.cardBorderWidth * 0.8 : 1)
                 )
         )
     }
@@ -424,6 +428,11 @@ struct MenuContentView: View {
                     .help(index < 9 ? "\(settings.shown(tab.name)) (⌘\(index + 1))" : settings.shown(tab.name))
                 }
             }
+            // A scroll view clips at its edges: leave room for an outlined
+            // theme's thick outline and hard shadow.
+            .padding(.vertical, theme.isOutlined ? 5 : 0)
+            .padding(.leading, theme.isOutlined ? 2 : 0)
+            .padding(.trailing, theme.isOutlined ? 5 : 0)
             .background(HorizontalScrollBooster())
             .overlay {
                 GeometryReader { geo in
@@ -1134,16 +1143,24 @@ struct ProviderPill: View {
             .background(
                 ZStack {
                     if isSelected {
-                        RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                            .fill(theme.accentGradient)
-                            .shadow(color: theme.accentPrimary.opacity(0.3), radius: 6, y: 2)
+                        if theme.isOutlined {
+                            // Printed: an inked chip with a hard shadow, no glow.
+                            RoundedRectangle(cornerRadius: theme.pillCornerRadius)
+                                .fill(theme.accentGradient)
+                                .themeShadow(theme, scale: 0.5)
+                        } else {
+                            RoundedRectangle(cornerRadius: theme.pillCornerRadius)
+                                .fill(theme.accentGradient)
+                                .shadow(color: theme.accentPrimary.opacity(0.3), radius: 6, y: 2)
+                        }
                     } else {
                         RoundedRectangle(cornerRadius: theme.pillCornerRadius)
                             .fill(isHovering ? theme.hoverOverlay : theme.glassBackground)
                     }
 
                     RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                        .stroke(isSelected ? theme.accentPrimary.opacity(0.5) : theme.glassBorder, lineWidth: theme.cardBorderWidth)
+                        .stroke(isSelected && !theme.isOutlined ? theme.accentPrimary.opacity(0.5) : theme.glassBorder,
+                                lineWidth: theme.cardBorderWidth)
                 }
             )
         }

@@ -159,17 +159,14 @@ struct ExtensionConfigCard: View {
     }
 
     private func toggleView(for field: ConfigField) -> some View {
-        Toggle(isOn: Binding(
+        SettingsSwitch(isOn: Binding(
             get: {
                 readValue(for: field) == "true"
             },
             set: { newValue in
                 writeValue(newValue ? "true" : "false", for: field)
             }
-        )) {
-            EmptyView()
-        }
-        .toggleStyle(.switch)
+        ))
         .tint(theme.accentPrimary)
     }
 
