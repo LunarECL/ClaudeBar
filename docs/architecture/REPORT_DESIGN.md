@@ -42,13 +42,12 @@ public struct UsageSnapshot {
 
 ### 2. Analyzer Injected into Provider
 
-The analyzer (protocol) is injected into the provider that owns the data source. The provider calls the analyzer during `refresh()` and attaches the result to the snapshot.
+The provider's definition declares how its logs read (`usageHistory`); each login owns the result, read when the popover opens — never attached to the snapshot.
 
 ```
-ClaudeProvider
-├── cliProbe: UsageProbe          → quotas
-├── apiProbe: UsageProbe          → quotas
-└── dailyUsageAnalyzer: DailyUsageAnalyzing  → dailyUsageReport
+Account (a login)
+├── usage                 ← its data sources → quotas
+└── usageHistory          ← UsageLog, built from the definition's usageHistory → days
 ```
 
 ### 3. Infrastructure is Provider-Scoped
@@ -134,7 +133,6 @@ The first report card implementation analyzes Claude Code session JSONL files to
 |-----------|----------|---------|
 | `DailyUsageStat` | `Domain/DailyUsage/` | One day's metrics with formatting |
 | `DailyUsageReport` | `Domain/DailyUsage/` | Today vs yesterday with deltas |
-| `DailyUsageAnalyzing` | `Domain/DailyUsage/` | `@Mockable` protocol |
 | `usageHistory` + `claude-prices.json` | `Modules/Providers/Resources/Providers/` | Where Claude's logs are, how a record reads, what a token costs |
 | `UsageLog`, `JSONLinesReader`, `PriceList`, `DayAggregator` | `Modules/DataSources` | Reads, prices and sums any tool's logs into days |
 | `UsageHistory` | `Modules/Providers` | One per login, `account.usageHistory` |

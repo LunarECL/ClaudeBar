@@ -151,9 +151,7 @@ struct ClaudeBarApp: App {
             }
         }()
         let omp = Self.builtIn("omp", settings: settingsRepository)
-        // Mistral has no meter: its Vibe session logs are all it reports.
-        let mistral = Self.builtIn("mistral", settings: settingsRepository,
-                                   usageHistory: UsageHistory(analyzer: VibeSessionLogAnalyzer()))
+        let mistral = Self.builtIn("mistral", settings: settingsRepository)
         let kimi = Self.builtIn("kimi", settings: settingsRepository,
                                 accounts: settingsRepository.accounts(forProvider: "kimi"), secrets: vault)
         let openCodeGo = Self.builtIn("opencode-go", settings: settingsRepository,

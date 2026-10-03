@@ -20,5 +20,14 @@
       "fetch": { "directory": { "path": "~/.vibe/logs/session", "match": "^session_" } },
       "mapping": { "script": { "file": "mistral-logs.js" } }
     }
-  ]
+  ],
+  "usageHistory": {
+    "records": {
+      "files": "~/.vibe/logs/session/session_*/meta.json",
+      "format": "json",
+      "at": { "fromPath": "session_(\\d{8}_\\d{6})", "format": "yyyyMMdd_HHmmss", "timeZone": "UTC" },
+      "tokens": { "total": "$.stats.session_total_llm_tokens" },
+      "cost": "$.stats.session_cost"
+    }
+  }
 }

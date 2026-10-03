@@ -275,9 +275,8 @@ files move. When an old target is empty it is deleted.
 **M0 moved the kernel as it is.** `Quotas` holds today's types unchanged —
 and, because `UsageSnapshot` carries them, a few that belong elsewhere:
 `DailyUsageReport`/`Stat` (→ `Day`, staying in `Quotas`), `UsageDisplayMode` (→ the App),
-`ExtensionMetric` (→ out of the kernel); `BedrockModels` has left (#417: a `Cost` with lines). `RefreshKind` and
-`DailyUsageAnalyzing` sit in `Providers` until `Monitoring` exists and
-Usage History moves (M4). Each type carries a `- Note: Interim` naming its final shape; reshaping
+`ExtensionMetric` (→ out of the kernel); `BedrockModels` has left (#417: a `Cost` with lines). `RefreshKind` sits in `Providers` until `Monitoring` exists
+(`DailyUsageAnalyzing` left with UH3). Each type carries a `- Note: Interim` naming its final shape; reshaping
 the kernel follows [CANONICAL_MODEL §8](CANONICAL_MODEL.md#8--build-truth-node-by-node)'s
 order of work, one step per PR, because it touches every provider and view:
 **`Left` and `Window` first** (the two kernel laws), **then the words**

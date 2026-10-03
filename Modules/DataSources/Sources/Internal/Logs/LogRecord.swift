@@ -78,12 +78,12 @@ struct RecordShape: Sendable {
         return [Array("\"\(text)\"".utf8)]
     }
 
-    /// The record in `json`, or `nil` when it doesn't match, has no time or
-    /// declared model, or says nothing about usage.
-    func record(from json: Any) -> LogRecord? {
+    /// The record in `json`, read from the file at `path`, or `nil` when it
+    /// doesn't match, has no time or declared model, or says nothing about usage.
+    func record(from json: Any, path: String = "") -> LogRecord? {
         let scope = JSONScope(root: json)
         if let condition = records.where, !JSONMapper.holds(condition, in: scope) { return nil }
-        guard let at = Self.date(scope.value(records.at)) else { return nil }
+        guard let at = time(in: scope, path: path) else { return nil }
         var model: String?
         if let path = records.model {
             guard let name = scope.string(path) else { return nil }
@@ -100,6 +100,25 @@ struct RecordShape: Sendable {
         return LogRecord(at: at, id: id, model: model,
                          input: counts[0] ?? 0, output: counts[1] ?? 0, cacheWrite: counts[2] ?? 0,
                          cacheRead: counts[3] ?? 0, total: counts[4], cost: cost)
+    }
+
+    private func time(in scope: JSONScope, path: String) -> Date? {
+        switch records.at {
+        case .field(let field): Self.date(scope.value(field))
+        case .fromPath(let rule): Self.date(inPath: path, rule)
+        }
+    }
+
+    /// The first capture of the rule's pattern in `path`, read with its format.
+    static func date(inPath path: String, _ rule: UsageLog.At.FromPath) -> Date? {
+        guard let regex = try? NSRegularExpression(pattern: rule.pattern),
+              let match = regex.firstMatch(in: path, range: NSRange(path.startIndex..., in: path)),
+              match.numberOfRanges > 1, let range = Range(match.range(at: 1), in: path) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = rule.format
+        formatter.timeZone = rule.timeZone.flatMap(TimeZone.init(identifier:)) ?? .current
+        return formatter.date(from: String(path[range]))
     }
 
     /// ISO 8601 text, or epoch seconds.
