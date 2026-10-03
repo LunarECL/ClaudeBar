@@ -29,6 +29,17 @@ struct ScriptMoneyTests {
     }
 
     @Test
+    func `a cost carries its lines, each exact, against the user's budget`() throws {
+        let usage = try read(#"{quotas:[],cost:{used:'4.10',limit:'10',lines:[{label:'Claude Sonnet 4',used:'3.70',detail:'1.2M tokens'},{label:'Nova Pro',used:'0.40'}]}}"#)
+        let cost = try #require(usage.costUsage)
+        #expect(cost.totalCost == Decimal(string: "4.10")!)
+        #expect(cost.budget == 10)
+        #expect(cost.lines == [CostLine(label: "Claude Sonnet 4", amount: Decimal(string: "3.70")!, detail: "1.2M tokens"),
+                               CostLine(label: "Nova Pro", amount: Decimal(string: "0.40")!)])
+        #expect(usage.quotas.isEmpty)
+    }
+
+    @Test
     func `existing percentage scripts keep working`() throws {
         let usage = try read(#"{quotas:[{type:'session',percentRemaining:37}]}"#)
         #expect(usage.quotas.first?.left == .share(37))

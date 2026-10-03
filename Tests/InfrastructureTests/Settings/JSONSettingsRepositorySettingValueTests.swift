@@ -57,6 +57,15 @@ struct JSONSettingsRepositorySettingValueTests {
     }
 
     @Test
+    func `a list an old card saved reads as comma-separated text`() {
+        let (store, repository, directory) = make()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        store.write(value: ["us-east-1", "eu-west-1"], key: "bedrock.regions")
+
+        #expect(repository.value("regions", forProvider: "bedrock") == "us-east-1, eu-west-1")
+    }
+
+    @Test
     func `a number an old card saved reads as text`() {
         let (store, repository, directory) = make()
         defer { try? FileManager.default.removeItem(at: directory) }

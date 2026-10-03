@@ -72,14 +72,17 @@ public enum Providers {
         accounts: [ProviderAccountConfig] = [],
         secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        cloudWatch: (any CloudWatchClient)? = nil,
+        priceCatalog: (any PriceCatalog)? = nil
     ) -> Provider {
         Provider(
             definition: definition,
             settings: settings,
             accounts: accounts,
             makeDataSource: { source, login in
-                DataSources.make(source, providerId: definition.id, scripts: builtInScripts, secrets: secrets?.scoped(to: login), environment: environment)
+                DataSources.make(source, providerId: definition.id, scripts: builtInScripts, secrets: secrets?.scoped(to: login),
+                                 environment: environment, cloudWatch: cloudWatch, priceCatalog: priceCatalog)
             },
             guestPasses: guestPasses,
             vault: secrets
@@ -94,8 +97,11 @@ public enum Providers {
         accounts: [ProviderAccountConfig] = [],
         secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        cloudWatch: (any CloudWatchClient)? = nil,
+        priceCatalog: (any PriceCatalog)? = nil
     ) throws -> Provider {
-        make(try builtIn(id), settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses, environment: environment)
+        make(try builtIn(id), settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses, environment: environment,
+             cloudWatch: cloudWatch, priceCatalog: priceCatalog)
     }
 }

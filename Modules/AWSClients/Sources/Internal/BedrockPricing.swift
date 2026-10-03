@@ -1,14 +1,13 @@
 import Foundation
 import AWSPricing
-import Mockable
-import Domain
+import DataSources
+import Diagnostics
 
 // MARK: - BedrockPricingService Protocol
 
 /// Protocol for fetching Bedrock model pricing.
 /// Abstracted for testability - production uses AWS Pricing API with caching.
-@Mockable
-public protocol BedrockPricingService: Sendable {
+protocol BedrockPricingService: Sendable {
     /// Gets pricing information for a Bedrock model
     /// - Parameter modelId: The AWS Bedrock model ID (e.g., "anthropic.claude-opus-4-5-20251101-v1:0")
     /// - Returns: BedrockModel with pricing information
@@ -18,7 +17,7 @@ public protocol BedrockPricingService: Sendable {
 // MARK: - Default Implementation
 
 /// Production implementation with AWS Pricing API and fallback to bundled defaults
-public final class AWSBedrockPricingService: BedrockPricingService, @unchecked Sendable {
+final class AWSBedrockPricingService: BedrockPricingService, @unchecked Sendable {
 
     /// Cache for model pricing - refreshed daily
     private var cache: [String: BedrockModel] = [:]
@@ -28,9 +27,9 @@ public final class AWSBedrockPricingService: BedrockPricingService, @unchecked S
     /// Lock for thread-safe cache access
     private let lock = NSLock()
 
-    public init() {}
+    init() {}
 
-    public func getModelPricing(modelId: String) async throws -> BedrockModel {
+    func getModelPricing(modelId: String) async throws -> BedrockModel {
         // Check cache first
         if let cached = getCachedModel(modelId) {
             return cached
@@ -253,10 +252,10 @@ enum PricingError: Error {
 
 /// Bundled default pricing for common Bedrock models
 /// Updated periodically - serves as fallback when Pricing API is unavailable
-public enum DefaultBedrockPricing {
+enum DefaultBedrockPricing {
 
     /// Returns bundled pricing for known models, nil for unknown models
-    public static func model(for modelId: String) -> BedrockModel? {
+    static func model(for modelId: String) -> BedrockModel? {
         // Normalize model ID: strip regional prefix (us., eu., ap., etc.) for cross-region inference
         // CloudWatch returns "us.anthropic.claude-..." but pricing uses "anthropic.claude-..."
         let normalizedId = modelId.replacingOccurrences(
@@ -454,4 +453,14 @@ public enum DefaultBedrockPricing {
             outputPricePer1M: 0.70
         ),
     ]
+}
+
+
+/// A Bedrock model's prices, per million tokens.
+struct BedrockModel: Sendable, Equatable {
+    let id: String
+    let displayName: String
+    let vendor: String
+    let inputPricePer1M: Decimal
+    let outputPricePer1M: Decimal
 }

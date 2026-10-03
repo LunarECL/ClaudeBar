@@ -35,7 +35,6 @@ Each report belongs to a specific provider and lives on `UsageSnapshot`, not `Qu
 public struct UsageSnapshot {
     public let quotas: [UsageQuota]           // Quota cards
     public let costUsage: CostUsage?          // API cost card
-    public let bedrockUsage: BedrockUsageSummary?  // Bedrock card
     public let dailyUsageReport: DailyUsageReport? // Daily usage cards
     // Future: weeklyReport, modelBreakdownReport, etc.
 }

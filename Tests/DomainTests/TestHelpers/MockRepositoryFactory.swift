@@ -4,7 +4,7 @@ import Mockable
 @testable import Infrastructure
 
 /// Shared test helper factory for creating mock/test repositories
-/// Eliminates duplication across provider tests (BedrockProvider, etc.)
+/// Eliminates duplication across provider tests (stub providers)
 struct MockRepositoryFactory {
 
     /// Creates a mock settings repository for provider tests (base ProviderSettingsRepository)

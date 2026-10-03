@@ -2,7 +2,7 @@
 
 Rules for AI coding agents (Claude Code, Codex, Cursor, …) in this repo. This is the only agent-instructions file; there is no `CLAUDE.md`. Everything else is one link away: [docs index](docs/README.md) · [architecture](docs/architecture/ARCHITECTURE.md) · [contributing](CONTRIBUTING.md) · [docs design](docs/documentation-design/README.md).
 
-ClaudeBar is a macOS menu bar app that shows AI coding quotas. It reads them from CLIs, APIs and local files for 20 built-in providers, registered in `ClaudeBarApp.init()`, plus user extensions from `~/.claudebar/extensions/`. The code is moving from three layers to modules ([MODULAR_DESIGN.md](docs/architecture/MODULAR_DESIGN.md)): Claude, Codex, DeepSeek, MiniMax, Vercel Gateway, Command Code, Amp, Kiro, Cursor, Grok, OpenCode Go, Z.ai, Kimi, Copilot, Alibaba, Gemini and Antigravity are already JSON definitions in `Modules/Providers/Resources/Providers/`, run by one generic `Provider`; the other providers are still a folder each in `Sources/Domain/Provider/`.
+ClaudeBar is a macOS menu bar app that shows AI coding quotas. It reads them from CLIs, APIs and local files for 20 built-in providers, registered in `ClaudeBarApp.init()`, plus user extensions from `~/.claudebar/extensions/`. The code is moving from three layers to modules ([MODULAR_DESIGN.md](docs/architecture/MODULAR_DESIGN.md)): Claude, Codex, DeepSeek, MiniMax, Vercel Gateway, Command Code, Amp, Kiro, Cursor, Grok, OpenCode Go, Z.ai, Kimi, Copilot, Alibaba, Gemini, Antigravity and AWS Bedrock are already JSON definitions in `Modules/Providers/Resources/Providers/`, run by one generic `Provider`; the other providers are still a folder each in `Sources/Domain/Provider/`.
 
 ## Build & test
 
@@ -25,6 +25,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 | `Modules/Quotas` | the usage model: `UsageSnapshot`, `UsageQuota`, `UsageError` (interim shapes, each marked with its final one). Imports nothing |
 | `Modules/DataSources` | `DataSource` (credential lookup → fetch → mapping) and its workers: OAuth, HTTP, JSON-RPC, CLI, JSON/text/script mapping |
 | `Modules/Providers` | the one `Provider` lifecycle, `ProviderDefinition`, added accounts, settings contracts; `Resources/Providers/<id>.json` |
+| `Modules/AWSClients` | the AWS SDK (CloudWatch, Bedrock pricing) behind DataSources' `CloudWatchClient` and `PriceCatalog` ports; the only module that links AWS |
 | `Modules/Diagnostics` | `AppLog` |
 | `Sources/Domain` | `QuotaMonitor`, the legacy `XxxProvider`s, Notify!, sessions. Re-exports the modules |
 | `Sources/Infrastructure` | the legacy `XxxUsageProbe`s, storage, notifications, hooks |

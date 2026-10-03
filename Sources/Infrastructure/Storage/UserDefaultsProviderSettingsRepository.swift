@@ -4,7 +4,7 @@ import Domain
 /// Legacy/test UserDefaults implementation of provider settings protocols.
 /// Production app persistence uses `JSONSettingsRepository`; this implementation
 /// supports legacy migration and isolated tests with injected UserDefaults suites.
-public final class UserDefaultsProviderSettingsRepository: BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, DeepSeekSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: ClaudeSettingsRepository, CodexSettingsRepository, DeepSeekSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -143,39 +143,6 @@ public final class UserDefaultsProviderSettingsRepository: BedrockSettingsReposi
         userDefaults.set(verified, forKey: Keys.codexVerifiedAtLeastOnce)
     }
 
-    // MARK: - BedrockSettingsRepository
-
-    public func awsProfileName() -> String {
-        userDefaults.string(forKey: Keys.awsProfileName) ?? ""
-    }
-
-    public func setAWSProfileName(_ name: String) {
-        userDefaults.set(name, forKey: Keys.awsProfileName)
-    }
-
-    public func bedrockRegions() -> [String] {
-        userDefaults.stringArray(forKey: Keys.bedrockRegions) ?? ["us-east-1"]
-    }
-
-    public func setBedrockRegions(_ regions: [String]) {
-        userDefaults.set(regions, forKey: Keys.bedrockRegions)
-    }
-
-    public func bedrockDailyBudget() -> Decimal? {
-        guard let doubleValue = userDefaults.object(forKey: Keys.bedrockDailyBudget) as? Double else {
-            return nil
-        }
-        return Decimal(doubleValue)
-    }
-
-    public func setBedrockDailyBudget(_ amount: Decimal?) {
-        if let amount {
-            userDefaults.set(NSDecimalNumber(decimal: amount).doubleValue, forKey: Keys.bedrockDailyBudget)
-        } else {
-            userDefaults.removeObject(forKey: Keys.bedrockDailyBudget)
-        }
-    }
-
     // MARK: - DeepSeekSettingsRepository
 
     public func deepseekAuthEnvVar() -> String {
@@ -236,10 +203,6 @@ public final class UserDefaultsProviderSettingsRepository: BedrockSettingsReposi
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
         static let codexVerifiedAtLeastOnce = "providerConfig.codexVerifiedAtLeastOnce"
-        // Bedrock settings
-        static let awsProfileName = "providerConfig.awsProfileName"
-        static let bedrockRegions = "providerConfig.bedrockRegions"
-        static let bedrockDailyBudget = "providerConfig.bedrockDailyBudget"
         // DeepSeek settings
         static let deepseekAuthEnvVar = "providerConfig.deepseekAuthEnvVar"
         static let deepseekApiKey = "com.claudebar.credentials.deepseek-api-key"

@@ -311,7 +311,6 @@ private struct ProviderDetailView: View {
         switch id {
         case "claude": AnyView(ClaudeBudgetCard())
         case "deepseek": AnyView(DeepSeekConfigCard(monitor: monitor))
-        case "bedrock": AnyView(BedrockConfigCard(monitor: monitor))
         default: nil
         }
     }

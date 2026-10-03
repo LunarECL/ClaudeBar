@@ -441,8 +441,9 @@ Each step ships green and changes no behaviour a user can see, until the last.
   mapping cannot say (Codex's free plan with no limits; Claude's PTY screen),
   the answer is a mapping FEATURE every provider gets — never a vendor
   escape hatch. Which features, is found provider by provider.
-- **Cost lines.** Bedrock reports cost per model, and an extension can report
-  metrics. Is that one `Cost` with lines, or a third kind of `Left`?
+- ~~**Cost lines.**~~ — **answered**: one `Cost` with lines. Bedrock's
+  per-model spend is a line each (`CostLine`), judged as a whole by the
+  account's budget; never a quota, never a third kind of `Left`.
 - ~~**A custom provider with accounts.**~~ — **answered**: the provider's.
   The form has two scopes; an account fills the ACCOUNT scope (one API key
   each, as a reference), and *Add Account* is that form. One definition
