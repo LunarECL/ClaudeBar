@@ -4,35 +4,6 @@ import Foundation
 import Mockable
 import Providers
 
-/// Z.ai-specific settings repository, extending base ProviderSettingsRepository.
-/// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.
-/// App uses UserDefaultsProviderSettingsRepository.
-public protocol ZaiSettingsRepository: ProviderSettingsRepository {
-    /// Gets the custom config path for Z.ai (empty string = use default)
-    func zaiConfigPath() -> String
-
-    /// Sets the custom config path for Z.ai
-    func setZaiConfigPath(_ path: String)
-
-    /// Gets the environment variable name for GLM auth token (empty = no env fallback)
-    func glmAuthEnvVar() -> String
-
-    /// Sets the environment variable name for GLM auth token
-    func setGlmAuthEnvVar(_ envVar: String)
-
-    /// Saves the Z.ai GLM API key (for Settings UI input)
-    func saveZaiApiKey(_ key: String)
-
-    /// Retrieves the Z.ai GLM API key
-    func getZaiApiKey() -> String?
-
-    /// Deletes the Z.ai GLM API key
-    func deleteZaiApiKey()
-
-    /// Checks if a Z.ai GLM API key is saved
-    func hasZaiApiKey() -> Bool
-}
-
 /// Copilot-specific settings repository, extending base ProviderSettingsRepository.
 /// Includes both configuration and credentials for GitHub Copilot.
 /// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.

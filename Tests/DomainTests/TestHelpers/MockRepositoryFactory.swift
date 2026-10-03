@@ -4,7 +4,7 @@ import Mockable
 @testable import Infrastructure
 
 /// Shared test helper factory for creating mock/test repositories
-/// Eliminates duplication across provider tests (CopilotProvider, ZaiProvider, etc.)
+/// Eliminates duplication across provider tests (CopilotProvider, BedrockProvider, etc.)
 struct MockRepositoryFactory {
 
     /// Creates a mock settings repository for provider tests (base ProviderSettingsRepository)
@@ -18,29 +18,6 @@ struct MockRepositoryFactory {
         given(mock).customCardURL(forProvider: .any).willReturn(nil)
         given(mock).setCustomCardURL(.any, forProvider: .any).willReturn()
         return mock
-    }
-
-    /// Creates a Z.ai settings repository for tests using isolated UserDefaults
-    /// - Parameter enabled: Whether the provider is enabled (defaults to true)
-    /// - Parameter zaiConfigPath: The Z.ai config path
-    /// - Parameter glmAuthEnvVar: The GLM auth env var
-    /// - Returns: A UserDefaultsProviderSettingsRepository with test suite
-    static func makeZaiSettingsRepository(
-        enabled: Bool = true,
-        zaiConfigPath: String = "",
-        glmAuthEnvVar: String = ""
-    ) -> UserDefaultsProviderSettingsRepository {
-        let suiteName = "com.claudebar.test.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        let repo = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-        repo.setEnabled(enabled, forProvider: "zai")
-        if !zaiConfigPath.isEmpty {
-            repo.setZaiConfigPath(zaiConfigPath)
-        }
-        if !glmAuthEnvVar.isEmpty {
-            repo.setGlmAuthEnvVar(glmAuthEnvVar)
-        }
-        return repo
     }
 
     /// Creates a Copilot settings repository for tests using isolated UserDefaults

@@ -147,6 +147,16 @@ struct ClaudeBarApp: App {
         // Keep the existing default login's configurable environment name until
         // provider settings forms move to definitions. Added logins use only
         // their own saved key, as deepseek.json's accounts.patch declares.
+        // A variable the person named for Z.ai is also read from their login
+        // shell (#170). Z.ai reads it last, after the saved key and Claude
+        // Code's settings, and no one else's lookup waits for a shell.
+        let shellEnvironment = ShellEnvironment()
+        let zai = Self.builtIn("zai", settings: settingsRepository,
+                               accounts: settingsRepository.accounts(forProvider: "zai"), secrets: vault,
+                               environment: { name in
+            let named = settingsRepository.value("glmAuthEnvVar", forProvider: "zai")
+            return name == named ? shellEnvironment.value(name) : ProcessInfo.processInfo.environment[name]
+        })
         let deepseek = Self.builtIn("deepseek", settings: settingsRepository,
                                    accounts: settingsRepository.accounts(forProvider: "deepseek"), secrets: vault,
                                    environment: { name in
@@ -163,10 +173,7 @@ struct ClaudeBarApp: App {
             codex.defaultAccount,
             GeminiProvider(probe: GeminiUsageProbe(), settingsRepository: settingsRepository),
             AntigravityProvider(probe: AntigravityUsageProbe(), settingsRepository: settingsRepository),
-            ZaiProvider(
-                probe: ZaiUsageProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
+            zai.defaultAccount,
             CopilotProvider(
                 billingProbe: CopilotUsageProbe(settingsRepository: settingsRepository),
                 internalProbe: CopilotInternalAPIProbe(settingsRepository: settingsRepository),
@@ -204,7 +211,7 @@ struct ClaudeBarApp: App {
             commandCode.defaultAccount,
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts + openCodeGo.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts + openCodeGo.accounts + zai.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after

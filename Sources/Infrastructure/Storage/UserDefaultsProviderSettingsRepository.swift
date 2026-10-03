@@ -4,7 +4,7 @@ import Domain
 /// Legacy/test UserDefaults implementation of provider settings protocols.
 /// Production app persistence uses `JSONSettingsRepository`; this implementation
 /// supports legacy migration and isolated tests with injected UserDefaults suites.
-public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -12,14 +12,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
     private let userDefaults: UserDefaults
     private let secureCredentials: any CredentialRepository
 
-    private var zaiCredentials: SecureCredentialMigration {
-        SecureCredentialMigration(
-            secureStore: secureCredentials,
-            legacyStore: userDefaults,
-            secureKey: CredentialKey.zaiApiKey,
-            legacyKey: Keys.zaiApiKey
-        )
-    }
 
     /// Creates a repository with settings in UserDefaults and secrets in Keychain.
     /// - Parameters:
@@ -107,40 +99,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         } else {
             userDefaults.set(keys.sorted(), forKey: key)
         }
-    }
-
-    // MARK: - ZaiSettingsRepository
-
-    public func zaiConfigPath() -> String {
-        userDefaults.string(forKey: Keys.zaiConfigPath) ?? ""
-    }
-
-    public func setZaiConfigPath(_ path: String) {
-        userDefaults.set(path, forKey: Keys.zaiConfigPath)
-    }
-
-    public func glmAuthEnvVar() -> String {
-        userDefaults.string(forKey: Keys.glmAuthEnvVar) ?? ""
-    }
-
-    public func setGlmAuthEnvVar(_ envVar: String) {
-        userDefaults.set(envVar, forKey: Keys.glmAuthEnvVar)
-    }
-
-    public func saveZaiApiKey(_ key: String) {
-        zaiCredentials.save(key)
-    }
-
-    public func getZaiApiKey() -> String? {
-        zaiCredentials.get()
-    }
-
-    public func deleteZaiApiKey() {
-        zaiCredentials.delete()
-    }
-
-    public func hasZaiApiKey() -> Bool {
-        zaiCredentials.exists()
     }
 
     // MARK: - CopilotSettingsRepository (Probe Mode)
@@ -483,9 +441,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         // Kimi settings
         static let kimiProbeMode = "providerConfig.kimiProbeMode"
         static let kimiRegion = "providerConfig.kimiRegion"
-        static let zaiConfigPath = "providerConfig.zaiConfigPath"
-        static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
-        static let zaiApiKey = "com.claudebar.credentials.zai-api-key"
         static let copilotProbeMode = "providerConfig.copilotProbeMode"
         static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"
         static let copilotMonthlyLimit = "providerConfig.copilotMonthlyLimit"

@@ -10,7 +10,6 @@ import Domain
 /// credentials remain in UserDefaults pending their own migrations.
 public final class JSONSettingsRepository:
     AppSettingsRepository,
-    ZaiSettingsRepository,
     CopilotSettingsRepository,
     BedrockSettingsRepository,
     ClaudeSettingsRepository,
@@ -29,14 +28,6 @@ public final class JSONSettingsRepository:
     private let secureCredentials: any CredentialRepository
 
 
-    private var zaiCredentials: SecureCredentialMigration {
-        SecureCredentialMigration(
-            secureStore: secureCredentials,
-            legacyStore: credentials,
-            secureKey: CredentialKey.zaiApiKey,
-            legacyKey: Self.legacyZaiApiKeyKey
-        )
-    }
 
     public init(
         store: JSONSettingsStore,
@@ -447,42 +438,6 @@ public final class JSONSettingsRepository:
         store.write(value: region.rawValue, key: "kimi.region")
     }
 
-    // MARK: - ZaiSettingsRepository
-
-    public func zaiConfigPath() -> String {
-        store.read(key: "zai.configPath") ?? ""
-    }
-
-    public func setZaiConfigPath(_ path: String) {
-        store.write(value: path, key: "zai.configPath")
-    }
-
-    public func glmAuthEnvVar() -> String {
-        store.read(key: "zai.glmAuthEnvVar") ?? ""
-    }
-
-    public func setGlmAuthEnvVar(_ envVar: String) {
-        store.write(value: envVar, key: "zai.glmAuthEnvVar")
-    }
-
-    // Z.ai Credentials (Keychain with legacy UserDefaults migration)
-
-    public func saveZaiApiKey(_ key: String) {
-        zaiCredentials.save(key)
-    }
-
-    public func getZaiApiKey() -> String? {
-        zaiCredentials.get()
-    }
-
-    public func deleteZaiApiKey() {
-        zaiCredentials.delete()
-    }
-
-    public func hasZaiApiKey() -> Bool {
-        zaiCredentials.exists()
-    }
-
     // MARK: - CopilotSettingsRepository
 
     public func copilotProbeMode() -> CopilotProbeMode {
@@ -843,7 +798,6 @@ public final class JSONSettingsRepository:
         store.write(value: screenWidgetId, key: "notify.screenWidgetId")
     }
 
-    private static let legacyZaiApiKeyKey = "com.claudebar.credentials.zai-api-key"
 }
 
 // MARK: - DeepSeekSettingsRepository

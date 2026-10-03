@@ -58,8 +58,8 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 │                                                                      │
 │  Repository Protocols (ISP - Interface Segregation Principle)        │
 │  ├── ProviderSettingsRepository - base: isEnabled state             │
-│  ├── ZaiSettingsRepository: ProviderSettingsRepository              │
-│  │   └── Z.ai specific: configPath, glmAuthEnvVar                   │
+│  ├── BedrockSettingsRepository: ProviderSettingsRepository          │
+│  │   └── Bedrock specific: awsProfileName, regions, dailyBudget     │
 │  └── CopilotSettingsRepository: ProviderSettingsRepository          │
 │      └── Copilot specific: authEnvVar + credentials (token/user)    │
 │                                                                      │
@@ -81,7 +81,6 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 │  ├── GeminiUsageProbe - probes Gemini CLI + API                     │
 │  ├── CopilotUsageProbe - probes GitHub API with token               │
 │  ├── AntigravityUsageProbe - probes local Antigravity server        │
-│  ├── ZaiUsageProbe - probes Z.ai API via Claude config              │
 │  ├── BedrockUsageProbe - probes AWS Bedrock API                     │
 │  ├── AmpCodeUsageProbe - probes Amp Code CLI                        │
 │  ├── KimiCLIUsageProbe - probes `kimi` CLI with /usage (CLI mode)   │
@@ -168,12 +167,12 @@ public protocol ProviderSettingsRepository: Sendable {
     func setEnabled(_ enabled: Bool, forProvider id: String)
 }
 
-// Z.ai-specific protocol - extends base with Z.ai config
-public protocol ZaiSettingsRepository: ProviderSettingsRepository {
-    func zaiConfigPath() -> String
-    func setZaiConfigPath(_ path: String)
-    func glmAuthEnvVar() -> String
-    func setGlmAuthEnvVar(_ envVar: String)
+// Bedrock-specific protocol - extends base with AWS config
+public protocol BedrockSettingsRepository: ProviderSettingsRepository {
+    func awsProfileName() -> String
+    func setAWSProfileName(_ name: String)
+    func bedrockRegions() -> [String]
+    func setBedrockRegions(_ regions: [String])
 }
 
 // Copilot-specific protocol - extends base with config + credentials
@@ -191,7 +190,7 @@ public protocol CopilotSettingsRepository: ProviderSettingsRepository {
 // Single infrastructure implementation for all protocols
 public final class JSONSettingsRepository:
     AppSettingsRepository,
-    ZaiSettingsRepository,
+    BedrockSettingsRepository,
     CopilotSettingsRepository,
     // ... all other sub-protocols
 {
@@ -203,7 +202,7 @@ public final class JSONSettingsRepository:
 **Why ISP?**
 - Each provider depends **only** on its specific interface
 - Simple providers (Claude, Codex, Gemini) use base `ProviderSettingsRepository`
-- Z.ai uses `ZaiSettingsRepository` (config path + env var)
+- Bedrock uses `BedrockSettingsRepository` (AWS profile + regions)
 - Copilot uses `CopilotSettingsRepository` (env var + credentials)
 - No provider sees methods it doesn't need
 
@@ -225,7 +224,7 @@ public init(probe: any UsageProbe, settingsRepository: any ProviderSettingsRepos
 }
 
 // Specialized providers receive their specific repository
-public init(probe: any UsageProbe, settingsRepository: any ZaiSettingsRepository) { ... }
+public init(probe: any UsageProbe, settingsRepository: any BedrockSettingsRepository) { ... }
 public init(probe: any UsageProbe, settingsRepository: any CopilotSettingsRepository) { ... }
 ```
 
@@ -327,7 +326,7 @@ Sources/
 │   │   ├── AIProviders.swift        # Repository protocol
 │   │   ├── ClaudeProvider.swift     # Rich domain model
 │   │   ├── CopilotProvider.swift    # Uses CopilotSettingsRepository
-│   │   ├── ZaiProvider.swift        # Uses ZaiSettingsRepository
+│   │   ├── BedrockProvider.swift    # Uses BedrockSettingsRepository
 │   │   ├── ProviderSettingsRepository.swift  # ISP protocols hierarchy
 │   │   ├── UsageProbe.swift
 │   │   ├── UsageQuota.swift

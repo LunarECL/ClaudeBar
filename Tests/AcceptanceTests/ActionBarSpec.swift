@@ -75,11 +75,11 @@ struct ActionBarSpec {
         }
 
         @Test
-        func `Zai dashboard URL is Z.ai subscribe`() {
+        func `Zai dashboard URL is Z.ai subscribe`() throws {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let zai = ZaiProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let zai = try Providers.make("zai", settings: settings).defaultAccount
             #expect(zai.dashboardURL?.absoluteString == "https://z.ai/subscribe")
         }
     }

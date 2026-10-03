@@ -340,8 +340,7 @@ the case that would otherwise have been guessed wrong in both directions.
 ### Provenance plumbing
 
 `ClaudeLocalInferenceDetector` reads `~/.claude.json` — `env.ANTHROPIC_BASE_URL`, or the
-`providers` array when that key is absent, the same file and shapes `ZaiUsageProbe`
-already parses — and reports whether the active base URL resolves to a loopback host
+`providers` array when that key is absent — and reports whether the active base URL resolves to a loopback host
 (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `*.localhost`). `ClaudeBarApp` passes
 `isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }` into
 `ClaudeDailyUsageAnalyzer`; the analyzer's default is `{ false }` so tests never read

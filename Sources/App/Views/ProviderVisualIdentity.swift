@@ -149,34 +149,6 @@ extension AntigravityProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - ZaiProvider Visual Identity
-
-extension ZaiProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "z.square.fill" }
-
-    public var iconAssetName: String { "ZaiIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Blue color matching Z.ai branding
-        scheme == .dark
-            ? Color(red: 0.35, green: 0.60, blue: 1.0)
-            : Color(red: 0.23, green: 0.51, blue: 0.96)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.30, green: 0.45, blue: 0.85)
-                    : Color(red: 0.20, green: 0.35, blue: 0.75)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - BedrockProvider Visual Identity
 
 extension BedrockProvider: ProviderVisualIdentity {
@@ -392,10 +364,6 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 0.72, green: 0.35, blue: 0.85)
                 : Color(red: 0.58, green: 0.22, blue: 0.72)
-        case "zai":
-            return scheme == .dark
-                ? Color(red: 0.35, green: 0.60, blue: 1.0)
-                : Color(red: 0.23, green: 0.51, blue: 0.96)
         case "bedrock":
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.6, blue: 0.2)
@@ -436,10 +404,6 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.45, green: 0.25, blue: 0.75)
                 : Color(red: 0.35, green: 0.15, blue: 0.65)
-        case "zai":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.30, green: 0.45, blue: 0.85)
-                : Color(red: 0.20, green: 0.35, blue: 0.75)
         case "bedrock":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.45, blue: 0.15)
@@ -478,7 +442,6 @@ enum ProviderVisualIdentityLookup {
         case "gemini": return "GeminiIcon"
         case "copilot": return "CopilotIcon"
         case "antigravity": return "AntigravityIcon"
-        case "zai": return "ZaiIcon"
         case "bedrock": return "BedrockIcon"
         case "kimi": return "KimiIcon"
         case "mistral": return "MistralIcon"
@@ -494,7 +457,6 @@ enum ProviderVisualIdentityLookup {
         case "gemini": return "Gemini"
         case "copilot": return "GitHub Copilot"
         case "antigravity": return "Antigravity"
-        case "zai": return "Z.ai"
         case "bedrock": return "AWS Bedrock"
         case "kimi": return "Kimi"
         case "mistral": return "Mistral"
@@ -510,7 +472,6 @@ enum ProviderVisualIdentityLookup {
         case "gemini": return "sparkles"
         case "copilot": return "chevron.left.forwardslash.chevron.right"
         case "antigravity": return "wand.and.stars"
-        case "zai": return "z.square.fill"
         case "bedrock": return "cloud.fill"
         case "kimi": return "k.square.fill"
         case "mistral": return "cat.fill"

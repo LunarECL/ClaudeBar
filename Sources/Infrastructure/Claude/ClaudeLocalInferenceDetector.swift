@@ -8,7 +8,7 @@ import Foundation
 /// this is the fact the cost estimator needs and the model name cannot supply —
 /// a local server may serve a model we have never heard of, under any name.
 ///
-/// Read from `~/.claude.json`, the same file `ZaiUsageProbe` inspects:
+/// Read from `~/.claude.json`:
 /// `env.ANTHROPIC_BASE_URL` — Claude Code's own setting, and the route it will
 /// actually take — and, only when that key is absent, the `providers` array. A
 /// missing, unreadable or remote URL simply means "not local".
@@ -65,7 +65,7 @@ public enum ClaudeLocalInferenceDetector {
         for provider in root["providers"] as? [[String: Any]] ?? [] {
             if let baseURL = provider["base_url"] as? String { urls.append(baseURL) }
             // Speculative: unlike `providers[].base_url`, this nested shape is one
-            // `ZaiUsageProbe` does not parse and no observed config exhibits. Kept
+            // Z.ai's definition does not read and no observed config exhibits. Kept
             // only so it cannot cost us a true positive; it is never consulted when
             // `env` names a route.
             if let env = provider["env"] as? [String: Any],

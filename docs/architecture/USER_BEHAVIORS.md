@@ -530,10 +530,8 @@ Scenario: No config and no env var
 ```
 
 ### Inner TDD Tests (existing)
-- `ZaiUsageProbeTests.*`
-- `ZaiUsageProbeParsingTests.*`
-- `ZaiUsageProbeEnvVarFallbackTests.*`
-- `ZaiProviderTests.*`
+- `ZaiDefinitionTests.*`
+- `ZaiExecutionTests.*`
 
 ---
 
