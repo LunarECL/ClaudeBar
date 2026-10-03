@@ -117,12 +117,13 @@ struct KeychainReader: CredentialFinding {
     let security: Security
 
     func find() throws -> FoundCredential? {
-        let (status, output) = security(["find-generic-password", "-s", item.service, "-w"])
+        let account = item.account.map { ["-a", $0] } ?? []
+        let (status, output) = security(["find-generic-password", "-s", item.service] + account + ["-w"])
         guard status == 0 else {
             AppLog.credentials.error("Keychain read of '\(item.service)' failed: security exited \(status)")
             return nil
         }
-        let password = Credential.trimmed(output)
+        let password = item.decoded(Credential.trimmed(output))
         guard !password.isEmpty else { return nil }
 
         let values: [String: String]
@@ -142,7 +143,8 @@ struct KeychainReader: CredentialFinding {
     }
 
     func write(_ credential: Credential, over password: String) {
-        guard let data = Self.decode(password),
+        // An encoded item belongs to another tool's library; never rewritten.
+        guard item.encoding == nil, let data = Self.decode(password),
               let document = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return }
         let updated = CredentialDocument.updated(document, with: credential, fields: item.fields)
         guard let compact = try? JSONSerialization.data(withJSONObject: updated),
