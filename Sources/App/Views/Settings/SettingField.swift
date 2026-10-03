@@ -7,6 +7,8 @@ import Providers
 struct SettingField: View {
     let setting: Setting
     @Binding var value: String
+    /// What an empty secret field says — *Saved in Keychain* once a key is kept.
+    var secretPlaceholder: String?
     @Environment(\.appTheme) private var theme
 
     var body: some View {
@@ -19,7 +21,7 @@ struct SettingField: View {
                 }
                 .labelsHidden()
             case .secret:
-                SecureField(setting.label, text: $value)
+                SecureField(secretPlaceholder ?? setting.label, text: $value)
                     .textFieldStyle(.roundedBorder)
             case .text, .path:
                 TextField(setting.default ?? setting.label, text: $value)

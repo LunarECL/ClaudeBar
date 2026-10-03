@@ -88,6 +88,20 @@ struct ProviderSettingsTests {
     }
 
     @Test
+    func `Settings can tell a key is saved without ever showing it`() throws {
+        let acme = try provider()
+        let key = try #require(acme.definition.setting("apiKey"))
+        #expect(acme.hasSaved(key, for: acme.defaultAccount) == false)
+
+        try acme.set("apiKey", to: "sk-default")
+        #expect(acme.hasSaved(key, for: acme.defaultAccount))
+        #expect(acme.value(of: key, for: acme.defaultAccount) == nil)
+
+        try acme.set("apiKey", to: nil)
+        #expect(acme.hasSaved(key, for: acme.defaultAccount) == false)
+    }
+
+    @Test
     func `a choice that isn't one of its options is refused`() throws {
         let acme = try provider()
         #expect(throws: UsageError.executionFailed("Choose a Region from the list.")) {

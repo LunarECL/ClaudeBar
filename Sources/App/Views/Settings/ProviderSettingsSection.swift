@@ -21,10 +21,17 @@ struct ProviderSettingsSection: View {
                 Spacer()
             }
             ForEach(provider.definition.settings) { setting in
-                SettingField(setting: setting, value: Binding(
-                    get: { entered[setting.id] ?? provider.value(of: setting, for: provider.defaultAccount) ?? "" },
-                    set: { entered[setting.id] = $0; saved = false }
-                ))
+                let kept = provider.hasSaved(setting, for: provider.defaultAccount)
+                HStack(alignment: .bottom, spacing: 8) {
+                    SettingField(setting: setting, value: Binding(
+                        get: { entered[setting.id] ?? provider.value(of: setting, for: provider.defaultAccount) ?? "" },
+                        set: { entered[setting.id] = $0; saved = false }
+                    ), secretPlaceholder: kept ? "Saved in Keychain — type to replace" : nil)
+                    if kept {
+                        // Forgets what is saved: a key leaves the vault, a value goes back to its default.
+                        Button("Clear") { clear(setting) }
+                    }
+                }
             }
             if let problem {
                 Text(problem).font(.caption).foregroundStyle(theme.statusCritical)
@@ -38,6 +45,16 @@ struct ProviderSettingsSection: View {
         .padding(14)
         .background(RoundedRectangle(cornerRadius: theme.cardCornerRadius).fill(theme.cardGradient))
         .overlay(RoundedRectangle(cornerRadius: theme.cardCornerRadius).stroke(theme.glassBorder, lineWidth: 1))
+    }
+
+    private func clear(_ setting: Setting) {
+        do {
+            try provider.set(setting.id, to: nil)
+            entered[setting.id] = nil
+            problem = nil
+        } catch {
+            problem = error.localizedDescription
+        }
     }
 
     private func save() {
