@@ -125,14 +125,16 @@ struct ClaudeBarApp: App {
         let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
 
         let vault = ProviderVault()
-        // MiniMax, Vercel and Command Code are data: their keys, regions and
-        // environment variables are settings in their JSON, so nothing here is theirs.
+        // These are data: their keys, regions and environment variables are
+        // settings in their JSON, so nothing here is theirs.
         let minimax = Self.builtIn("minimax", settings: settingsRepository,
                                    accounts: settingsRepository.accounts(forProvider: "minimax"), secrets: vault)
         let vercel = Self.builtIn("vercel-gateway", settings: settingsRepository,
                                   accounts: settingsRepository.accounts(forProvider: "vercel-gateway"), secrets: vault)
         let commandCode = Self.builtIn("commandcode", settings: settingsRepository,
                                        accounts: settingsRepository.accounts(forProvider: "commandcode"), secrets: vault)
+        let amp = Self.builtIn("ampcode", settings: settingsRepository,
+                               accounts: settingsRepository.accounts(forProvider: "ampcode"), secrets: vault)
 
         // Keep the existing default login's configurable environment name until
         // provider settings forms move to definitions. Added logins use only
@@ -166,7 +168,7 @@ struct ClaudeBarApp: App {
                 probe: BedrockUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
-            AmpCodeProvider(probe: AmpCodeUsageProbe(), settingsRepository: settingsRepository),
+            amp.defaultAccount,
             KimiProvider(
                 cliProbe: KimiCLIUsageProbe(),
                 apiProbe: KimiUsageProbe(settingsRepository: settingsRepository),
@@ -200,7 +202,7 @@ struct ClaudeBarApp: App {
             commandCode.defaultAccount,
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after
