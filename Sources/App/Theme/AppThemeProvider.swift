@@ -151,6 +151,10 @@ public protocol AppThemeProvider {
     /// Returns the appropriate status color for a given quota status
     func statusColor(for status: QuotaStatus) -> Color
 
+    /// The status colour of menu-bar text — on the system's light or dark
+    /// strip, which the theme doesn't paint. Defaults to `statusColor(for:)`.
+    func menuBarStatusColor(for status: QuotaStatus, darkMenuBar: Bool) -> Color
+
     /// Returns the appropriate progress gradient for a given percentage
     func progressGradient(for percent: Double) -> LinearGradient
 }
@@ -194,6 +198,10 @@ public extension AppThemeProvider {
         case .critical: statusCritical
         case .depleted: statusDepleted
         }
+    }
+
+    func menuBarStatusColor(for status: QuotaStatus, darkMenuBar: Bool) -> Color {
+        statusColor(for: status)
     }
 
     /// Default progress gradient based on percentage

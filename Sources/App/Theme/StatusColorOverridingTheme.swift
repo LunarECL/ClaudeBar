@@ -55,6 +55,12 @@ struct StatusColorOverridingTheme: AppThemeProvider {
     var statusCritical: Color { resolved(.critical) ?? base.statusCritical }
     var statusDepleted: Color { resolved(.depleted) ?? base.statusDepleted }
 
+    /// A colour the person chose wins in the menu bar too; otherwise the
+    /// theme's own menu-bar colour.
+    func menuBarStatusColor(for status: QuotaStatus, darkMenuBar: Bool) -> Color {
+        resolved(status) ?? base.menuBarStatusColor(for: status, darkMenuBar: darkMenuBar)
+    }
+
     private func resolved(_ status: QuotaStatus) -> Color? {
         policy.color(for: status, appearance: appearance).map { Color($0) }
     }

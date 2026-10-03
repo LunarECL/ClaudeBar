@@ -334,40 +334,40 @@ final class StatusItemLabelDriver {
 
         if let label = content.label {
             parts.append(quotaImage(label, stacked: content.stacked, size: content.stackedSize,
-                                    colonVisible: content.colonVisible, theme: theme))
+                                    colonVisible: content.colonVisible, theme: theme, dark: content.isDarkAppearance))
         } else {
             let symbolName = theme.statusBarIconName ?? fallbackIconName(for: content.fallbackStatus)
             parts.append(symbolImage(
                 symbolName,
-                color: NSColor(theme.statusColor(for: content.fallbackStatus))
+                color: NSColor(theme.menuBarStatusColor(for: content.fallbackStatus, darkMenuBar: content.isDarkAppearance))
             ))
         }
 
         for label in content.additionalLabels {
             parts.append(StatusBarPercentageImageRenderer.image(
-                text: " | ", color: theme.statusColor(for: label.status)
+                text: " | ", color: theme.menuBarStatusColor(for: label.status, darkMenuBar: content.isDarkAppearance)
             ))
             parts.append(providerIcon(for: label.providerId, native: content.nativeMenuBarIconsEnabled, dark: content.isDarkAppearance))
             if let name = content.accountNames[label.providerId] {
                 parts.append(StatusBarPercentageImageRenderer.image(text: name, color: .primary))
             }
             parts.append(quotaImage(label.label, stacked: label.stacked, size: label.stackedSize,
-                                    colonVisible: content.colonVisible, theme: theme))
+                                    colonVisible: content.colonVisible, theme: theme, dark: content.isDarkAppearance))
         }
         return hStack(parts, spacing: 3)
     }
 
     private static func quotaImage(_ label: MenuBarLabel, stacked: Bool, size: MenuBarStackedSize,
-                                   colonVisible: Bool, theme: any AppThemeProvider) -> NSImage {
+                                   colonVisible: Bool, theme: any AppThemeProvider, dark: Bool) -> NSImage {
         if stacked, label.segments.count == 2 {
             return StatusBarStackedImageRenderer.image(
-                top: (label.segments[0].text, theme.statusColor(for: label.segments[0].status)),
-                bottom: (label.segments[1].text, theme.statusColor(for: label.segments[1].status)),
+                top: (label.segments[0].text, theme.menuBarStatusColor(for: label.segments[0].status, darkMenuBar: dark)),
+                bottom: (label.segments[1].text, theme.menuBarStatusColor(for: label.segments[1].status, darkMenuBar: dark)),
                 size: size, colonVisible: colonVisible
             )
         }
         return StatusBarPercentageImageRenderer.image(
-            text: label.text, color: theme.statusColor(for: label.status), colonVisible: colonVisible
+            text: label.text, color: theme.menuBarStatusColor(for: label.status, darkMenuBar: dark), colonVisible: colonVisible
         )
     }
 
