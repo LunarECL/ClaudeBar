@@ -780,6 +780,17 @@ natural unit to keep:
 
 ### 10.4 · The engine: `Modules/UsageHistory`
 
+**Where it lives.** The provider *declares* its history; `Modules/UsageHistory`
+*runs* it — the same split as `dataSources` (data in the definition) and
+`DataSources` (the work). `Providers` imports `UsageHistory` only to decode
+`history` into a `UsageLog` and fill it per login (`provider.history(for:
+account)`); `UsageHistory` imports `DataSources` (the path language,
+`PriceCatalog`, path expansion) and `Quotas` (`Cost`), never `Providers`. The
+App builds one `UsageHistory` from every provider's logins, as it does today.
+Not in `Provider` itself: history is not a meter, is read on its own cadence
+(popover open, never the background poll) and keeps its own store — another
+question, another context.
+
 | Piece | Job | From today's |
 |---|---|---|
 | `UsageLog` | the JSON, `Codable`, no behaviour | the constants in both analyzers |

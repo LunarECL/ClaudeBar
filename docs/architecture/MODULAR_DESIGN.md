@@ -73,7 +73,7 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 | `Monitoring` | Monitoring · conductor | `QuotaMonitor`, `MonitoringEvent`, `RefreshInterval`, `RefreshKind`, `Clock`, `PowerStateProvider` | `SystemClock`, `SystemPowerStateProvider`, `SingleFlightCache` |
 | `Alerting` | Alerting | `QuotaAlerter`, Notify! values, `NotifySettingsRepository` | `NotificationAlerter`, `SystemAlertSender`, `NotifyGatewayClient` |
 | `Activity` | Activity | `ClaudeSession`, `SessionEvent`, `SessionMonitor`, `NotchActivity`, `HookSettingsRepository` | `HookHTTPServer`, `HookInstaller`, `PortDiscovery`, `SessionEventParser` |
-| `UsageHistory` | Usage History | `DailyUsageReport`, `DailyUsageStat`, `DailyUsageAnalyzing` | the JSONL analyzer, `SessionJSONLParser`, `ModelPricing` |
+| `UsageHistory` | Usage History | `UsageHistory` (`days(for:in:)`), `UsageLog` (a definition's `history`, decoded by `Providers`), `Day` — today `DailyUsageReport`/`Stat`, `DailyUsageAnalyzing` | the readers per log format, the day aggregator, the file `PriceCatalog`, the `DayLedger` of closed days (TARGET_ARCHITECTURE §10) |
 | `Storage` | Vault & Settings · generic | `Storage.makeSettings()`, `Storage.makeVault()`, `AppSettingsRepository` | `JSONSettingsRepository`, `JSONSettingsStore`, `KeychainCredentialRepository`, `UserDefaults…`, `SecureCredentialMigration` |
 | `Diagnostics` | — cross-cutting | `AppLog` and its categories | `AppLogger`, `FileLogger` |
 | `ClaudeBar` (App) | — the composition root | SwiftUI views, themes, menu-bar label, page state, the Add Provider sheet | — |
@@ -82,14 +82,16 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 
 ```text
                          ClaudeBar (App)
-       ┌────────┬────────┬────┴─────┬──────────┬──────────┐
-       ▼        ▼        ▼          ▼          ▼          ▼
-  Monitoring Alerting Activity AWSClients  Storage   UsageHistory
+       ┌────────┬────────┬────┴─────┬──────────┐
+       ▼        ▼        ▼          ▼          ▼
+  Monitoring Alerting Activity AWSClients  Storage
        │        │                   │          │
        ▼        │                   ▼          ▼
    Providers ───┼──────────────▶ DataSources ◀─┘ (implements its ports)
-       │        │                   │
-       ▼        ▼                   ▼
+       │        │                   ▲
+       └────────┼──▶ UsageHistory ──┘
+                │         │
+                ▼         ▼
    ┌──────────────── Quotas ────────────┐   (+ Diagnostics, which anyone may import)
 ```
 

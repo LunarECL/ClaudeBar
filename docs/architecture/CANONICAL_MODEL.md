@@ -403,12 +403,12 @@ enforces it. Across a fence the same word may mean something else, as long as
                       Quota                    the shared kernel — knows nobody
                     ▲   ▲   ▲
           ┌─────────┘   │   └──────────┐
-    DataSources     UsageHistory    Alerting ◀──┐
-          ▲                                     │
-          │                                     │
+    DataSources ◀── UsageHistory    Alerting ◀──┐
+          ▲             ▲                       │
+          │             │                       │
           │◀── AWSClients (the SDK)               │
-          │                                     │
-    Providers ◀──────────── Monitoring ─────────┘        Activity
+          │             │                       │
+    Providers ──────────┘◀──── Monitoring ──────┘        Activity
           ▲                      ▲                      (on its own:
           │                      │                       no Quota, no Provider)
           └──────── App ─────────┘
@@ -419,6 +419,15 @@ enforces it. Across a fence the same word may mean something else, as long as
 Arrows point at the **supplier**. Nothing points back: the kernel cannot name a
 provider, Data Sources cannot name the Monitor, no module names a vendor, and
 the AWS SDK links into `AWSClients` and nowhere else.
+
+**Usage History is declared by the provider and run by its own context** —
+as a data source is. A definition's `history` block is the provider's data
+(the logs are the product's, and each login's); `Providers` decodes it with
+`UsageHistory`'s `UsageLog` type and fills it per login, the way it fills a
+`DataSourceDefinition`. `UsageHistory` runs it: the readers, the day
+aggregator, the ledger of closed days. It reuses `DataSources`' path language
+and `PriceCatalog`, and never imports `Providers` — it is handed one
+`UsageLog` per login id, so it knows nothing of accounts or settings.
 
 **Packaging.** One Tuist framework target per context under `Modules/`, each
 with `Sources/` and `Tests/`. The `**` globs keep working per module; a context's tests link only that
