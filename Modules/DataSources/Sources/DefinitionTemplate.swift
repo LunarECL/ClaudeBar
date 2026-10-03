@@ -2,19 +2,25 @@ import Foundation
 
 /// A definition adapted to one login, as data: an RFC 7396 merge patch for
 /// what differs, then the login's values for `{{account.x}}`. The definition
-/// is written once; nothing is copied per login.
-extension DataSourceDefinition {
+/// is written once; nothing is copied per login. A data source and a usage
+/// history are both adapted this way.
+public protocol DefinitionTemplate: Codable {}
+
+extension DataSourceDefinition: DefinitionTemplate {}
+extension UsageLog.Definition: DefinitionTemplate {}
+
+extension DefinitionTemplate {
     /// The definition with `patch` merged in (RFC 7396): an object merges key
     /// by key, `null` removes a field, anything else replaces it.
-    public func patched(with patch: JSONValue) throws -> DataSourceDefinition {
+    public func patched(with patch: JSONValue) throws -> Self {
         try Self.decoded(json().merged(with: patch))
     }
 
     /// The definition with every `{{<scope>.<name>}}` in its strings replaced
     /// by `values[name]`. Other placeholders — `{{token}}` — are left for the
     /// fetch; a name the values lack stays, and `unfilled(scope:)` reports it.
-    public func filled(_ values: [String: String], scope: String) throws -> DataSourceDefinition {
-        try Self.decoded(json().mapStrings { Self.fill($0, values, scope: scope) })
+    public func filled(_ values: [String: String], scope: String) throws -> Self {
+        try Self.decoded(json().mapStrings { Placeholders.fill($0, values, scope: scope) })
     }
 
     /// The `{{<scope>.<name>}}` names still in the definition, sorted.
@@ -22,25 +28,26 @@ extension DataSourceDefinition {
         guard let json = try? json() else { return [] }
         var names = Set<String>()
         _ = json.mapStrings { text in
-            names.formUnion(Self.placeholders(in: text, scope: scope))
+            names.formUnion(Placeholders.names(in: text, scope: scope))
             return text
         }
         return names.sorted()
     }
 
-    // MARK: - Private
-
     private func json() throws -> JSONValue {
         try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(self))
     }
 
-    private static func decoded(_ json: JSONValue) throws -> DataSourceDefinition {
-        try JSONDecoder().decode(DataSourceDefinition.self, from: JSONEncoder().encode(json))
+    private static func decoded(_ json: JSONValue) throws -> Self {
+        try JSONDecoder().decode(Self.self, from: JSONEncoder().encode(json))
     }
+}
 
-    private static func fill(_ text: String, _ values: [String: String], scope: String) -> String {
+/// `{{<scope>.<name>}}` in a definition's strings.
+enum Placeholders {
+    static func fill(_ text: String, _ values: [String: String], scope: String) -> String {
         var text = text
-        for name in placeholders(in: text, scope: scope) {
+        for name in names(in: text, scope: scope) {
             if let value = values[name] {
                 text = text.replacingOccurrences(of: "{{\(scope).\(name)}}", with: value)
             }
@@ -48,7 +55,7 @@ extension DataSourceDefinition {
         return text
     }
 
-    private static func placeholders(in text: String, scope: String) -> [String] {
+    static func names(in text: String, scope: String) -> [String] {
         let opening = "{{\(scope)."
         var names: [String] = []
         var rest = text[...]

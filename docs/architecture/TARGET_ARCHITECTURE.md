@@ -966,6 +966,6 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | UH3 ✅ | **Mistral as data**: `JSONLogReader`, `at.fromPath`; mistral.json's `usageHistory`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
 | UH4 ✅ | **The ledger**: `DayLedger`, closed days kept, invalidated by a definition change | 30 days read in the time 2 take today |
 | UH5 ✅ | **The chart**: *Daily usage — last 30 days* (tokens by kind, two axes; cost by model) on the provider's page | visible |
-| UH6 | **Per login**: `accounts.patch.usageHistory`; `account.usageHistory` on every login | an added Claude login shows its own usage history (visible) |
+| UH6 ✅ | **Per login**: `accounts.patch.usageHistory`; `account.usageHistory` on every login | an added Claude login shows its own usage history (visible) |
 | GP | **Guest passes as data**: `cli.clipboard`, claude.json's `guestPasses` + `claude-passes.js`; `ClaudeGuestPassSourceTests` fixtures | `Infrastructure/Claude` deleted |
 | — | the words: `Day`, `DayLedger`; the typealiases go | with §8 slice 7 |

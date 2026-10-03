@@ -350,6 +350,17 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         }
     }
 
+    /// The usage history an added login reads: `accounts.patch.usageHistory`
+    /// merged in and `{{account.<name>}}` filled from its values. `nil` when
+    /// the patch doesn't say where the login's own logs are — it would read
+    /// the default login's — or a value is missing.
+    public func usageHistory(forAccount values: [String: String]) -> UsageLog.Definition? {
+        guard let usageHistory, let patch = accounts?.patch["usageHistory"], patch != .null,
+              let adapted = try? usageHistory.patched(with: patch).filled(values, scope: "account"),
+              adapted.unfilled(scope: "account").isEmpty else { return nil }
+        return adapted
+    }
+
     public func validate() throws {
         guard !dataSources.isEmpty else { throw DefinitionError.noDataSources(id) }
         var kinds = Set<String>()

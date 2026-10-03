@@ -388,6 +388,10 @@
       "notSignedIn": "No Claude login found in this folder. Run `CLAUDE_CONFIG_DIR=<folder> claude` and sign in, then choose the folder again."
     },
     "patch": {
+      "usageHistory": {
+        "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" },
+        "freeWhen": { "localEndpoint": { "file": "{{account.configDirectory}}/.claude.json" } }
+      },
       "cli": {
         "fetch": {
           "cli": {

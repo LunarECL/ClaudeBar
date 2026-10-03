@@ -28,6 +28,11 @@ public final class Provider {
     public let guestPasses: GuestPasses?
     /// *TODAY'S USAGE*, read from the default login's own logs.
     public let usageHistory: UsageHistory?
+    /// Makes an added login's usage history from its adapted definition and
+    /// lineup id — `nil` when added logins have none.
+    private let makeUsageHistory: ((UsageLog.Definition, String) -> UsageHistory)?
+    /// Each added login's own usage history, by lineup id.
+    @ObservationIgnored private var usageHistories: [String: UsageHistory] = [:]
 
     let settings: any MultiAccountSettingsRepository
     /// Makes a definition live for one login, by its lineup id — so its
@@ -58,6 +63,7 @@ public final class Provider {
         makeDataSource: @escaping (DataSourceDefinition, String) -> DataSource,
         guestPasses: GuestPasses? = nil,
         usageHistory: UsageHistory? = nil,
+        makeUsageHistory: ((UsageLog.Definition, String) -> UsageHistory)? = nil,
         folders: any LoginFolders = DiskLoginFolders(),
         vault: (any SecretVault)? = nil,
         paths: any PathChecking = DiskPaths(),
@@ -80,6 +86,7 @@ public final class Provider {
         self.makeDataSource = makeDataSource
         self.guestPasses = guestPasses
         self.usageHistory = usageHistory
+        self.makeUsageHistory = makeUsageHistory
         let label = settings.defaultAccountLabel(forProvider: definition.id) ?? ""
         self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: label), values: [:])]
         bind(self.accounts[0])
@@ -272,7 +279,15 @@ public final class Provider {
         }
         let account = Account(provider: self, login: login, values: config.probeConfig, madeBy: config.madeBy)
         accounts.append(account)
+        if let makeUsageHistory, let own = definition.usageHistory(forAccount: config.probeConfig) {
+            usageHistories[login.id] = makeUsageHistory(own, login.id)
+        }
         return account
+    }
+
+    /// A login's usage history: the default's, or an added login's own.
+    func usageHistory(for account: Account) -> UsageHistory? {
+        account.isDefault ? usageHistory : usageHistories[account.id]
     }
 
     /// *Remove* — forgets the login here and its saved settings, and deletes
@@ -289,6 +304,7 @@ public final class Provider {
         }
         accounts.removeAll { $0.id == account.id }
         bound[account.id] = nil
+        usageHistories[account.id] = nil
         refreshTasks[account.id]?.cancel()
         refreshTasks[account.id] = nil
         settings.removeAccount(accountId: account.accountId, forProvider: id)
