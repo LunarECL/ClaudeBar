@@ -13,6 +13,9 @@ import Quotas
 public final class UsageHistory {
     /// Today's and yesterday's usage, once read and when either holds any.
     public private(set) var report: DailyUsageReport?
+    /// *DAILY USAGE — LAST 30 DAYS*: the thirty days ending today, oldest
+    /// first, once read and when any of them holds usage.
+    public private(set) var lastThirtyDays: [DailyUsageStat] = []
 
     private let log: UsageLog
     private let ledger: DayLedger?
@@ -50,12 +53,16 @@ public final class UsageHistory {
         return before + read
     }
 
-    /// Reads the logs again: today against yesterday. Two days with nothing
-    /// are kept as none.
+    /// Reads the logs again: today against yesterday first, for the cards,
+    /// then the last thirty days, for the chart — closed days from the
+    /// ledger. Days with nothing are kept as none.
     public func read() async {
         let days = await days(in: .last(2, endingOn: log.currentTime, calendar: log.calendar))
         guard days.count == 2 else { return }
         let report = DailyUsageReport(today: days[1], previous: days[0])
         self.report = report.today.isEmpty && report.previous.isEmpty ? nil : report
+
+        let month = await self.days(in: .last(30, endingOn: log.currentTime, calendar: log.calendar))
+        lastThirtyDays = month.allSatisfy(\.isEmpty) ? [] : month
     }
 }
