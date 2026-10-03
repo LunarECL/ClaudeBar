@@ -33,6 +33,11 @@ struct MenuBarPane: View {
                     SettingsSwitch(isOn: $settings.menuBarDurationEnabled)
                 }
                 SettingsRowDivider()
+                SettingsRow(title: "Show Provider Logo", subtitle: "Start the readout with the provider's logo, even when it's the only one.") {
+                    SettingsSwitch(isOn: $settings.menuBarProviderLogoEnabled)
+                        .accessibilityLabel("Show Provider Logo")
+                }
+                SettingsRowDivider()
                 SettingsRow(title: "Show Account Labels in Menu Bar", subtitle: "Show account names or emails beside provider icons. Hover to see account details when hidden.") {
                     SettingsSwitch(isOn: $settings.menuBarAccountLabelsEnabled)
                         .accessibilityLabel("Show Account Labels in Menu Bar")
