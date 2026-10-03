@@ -263,6 +263,51 @@ does all five jobs for one vendor.
 The three differ only in *where the file is*. Codex, DeepSeek and a provider
 someone made five minutes ago run on the same `DataSource` and the same lifecycle.
 
+## 2.1 · What a provider OWNS, what it OFFERS, and what it isn't
+
+A provider is **the product you pay for, under one or more logins**. Its
+abilities fall in three groups, and a new ability is placed by asking which
+question it answers for the person.
+
+**Owned** — rules only the provider can keep, because only it sees every login:
+
+| Ability | The rule it keeps |
+|---|---|
+| identity — name, look, links | the id is stable forever; its face and links are data |
+| its logins — add (form · folder · sign-in), remove, rename, reorder | never empty; the default login's id is the provider's; no two logins share a folder |
+| its settings | a kind owns its rule; an account's own value beats the provider's; a change rebinds the logins |
+| how it finds out — data source choice, fallback, refresh per login, *Test Connection* | the last usage survives a failure; the failed step is named; a 429 is a rate limit; a fallback is never silent |
+| derived reads — status, best and worst account | the worst account's status; the one with the most left |
+
+**Offered** — CAPABILITIES. Each answers *another* question, on its own
+cadence and often with its own store, so the provider only **declares** it in
+its definition and **hands it out per login**; its own context runs it:
+
+| Capability | The person's question | Declared as | Run by | Reached as |
+|---|---|---|---|---|
+| Usage History | *how much did I use, day by day?* | `history` | `UsageHistory` | `account.history` → `days(in:)` |
+| Guest passes | *can I share a trial?* | `guestPasses` | the data-source machinery | `account.guestPasses` |
+| Budget | *am I spending more than I meant to?* | an account-scope setting on the cost | the cost judges it | `account.budget` |
+| Sign-in | *add another login* | `accounts.signIn` | `AccountSignIn` | `provider.signIn` |
+
+To check history, the person picks a login and the page asks
+`account.history?.days(in: .last(30))`: the provider filled that login's
+`history` with its own values (its folder), and Usage History answers from
+its ledger and that login's logs. Two logins show two histories, never summed.
+
+**The rule that keeps it open (OCP):** *how much is left?* is a data source in
+the definition — the provider does not change. Any other question is a
+capability: a block in the definition, a context that runs it, and an
+optional handle on `Account` that is `nil` when the definition does not
+declare it. A page asks the handle — `account.history?` — never the
+provider's id, and never `definition.history != nil` (tell, don't ask). A
+capability is never chosen in Swift by a provider's name.
+
+**Not the provider's**: the lineup, the selection, the status policy and
+alerts (Monitoring, Alerting); menu-bar text and card titles (the page);
+Claude Code sessions (Activity); where settings and secrets are kept
+(Storage — the provider uses its ports).
+
 ## 3 · The commands, and the node each lands on
 
 | The user does | The node is told | Notes |
@@ -358,6 +403,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a day closes a fixed while after it ends; a closed day is summed once, kept, and never read from the logs again. Today, and the day before until it closes, are read every time | `DayLedger` |
 | a day's spend is a `Cost` with a line per model — the log's own cost wins; otherwise it is ESTIMATED from the price catalog, and says so. A model served on this Mac costs nothing; an unknown model gets the catalog's fallback price, never zero by omission | `Day.cost` · `PriceCatalog` |
 | history is per login: an added login reads its own folder's logs; two logins' days are never summed | `UsageHistory.logs` |
+| a capability is declared by the definition and reached through the login's handle (`account.history`, `account.guestPasses`), `nil` when not declared — never chosen in Swift by a provider's id | `Account` |
 | history is read when the popover opens, never in the background, and never carried on `Usage` | `UsageHistory` |
 | a day with nothing is an empty day, not a missing one — a series has every date in its range | `UsageHistory.days` |
 
@@ -447,6 +493,7 @@ context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
 | `Window` | **built** (slice 4): the kernel no longer guesses — pace uses only a stated `window.length`. Legacy probes state what the guess used to give (`conventionalWindow`, named as a convention; Bedrock's daily budget now 1 day; Cursor's monthly card none, as it chose); Claude's script and JSON and Codex's JSON state their windows, the response's word first | the conventions become each definition's word as providers migrate |
 | `Usage` | `UsageSnapshot` with `bedrockUsage`, `extensionMetrics`, `dailyUsageReport` | kernel fields only; the rest moves to their contexts |
 | `UsageHistory` · `UsageLog` · `Day` · `DayLedger` | `UsageHistory` in `Domain` keyed by login, fed by two vendor-named analyzers in `Infrastructure` — `ClaudeDailyUsageAnalyzer` (JSONL under `~/.claude/projects`, `ModelPricing` as a Swift table, `ClaudeLocalInferenceDetector`, `SessionLogCache`) and `VibeSessionLogAnalyzer` (`meta.json` per session folder); the report types (`DailyUsageReport`/`Stat`) sit in `Quotas`; only today and yesterday exist, re-read from the logs on every popover open | `Modules/UsageHistory`: `UsageLog` read from each definition's `history`, one reader per format, prices through `PriceCatalog`, one aggregator, `days(in:)` over a `DayLedger` of closed days; both analyzers and `Infrastructure/Claude`, `Infrastructure/Mistral` deleted (TARGET_ARCHITECTURE §10) |
+| capabilities | guest passes chosen in Swift by name (`builtIn("claude", guestPasses: GuestPasses(source: ClaudeGuestPassSource()))`); history keyed by hard-coded ids (`UsageHistory(logs: ["claude": …, "mistral": …])`) | each declared in the definition and reached as `account.guestPasses` / `account.history` (TARGET_ARCHITECTURE §10) |
 | `Plan` | `AccountTier` with Claude cases | a name and a badge |
 | `StatusPolicy` | **built** (#357): `StatusPolicy` in `Quotas` with `quota.status(under:)` / `usage.overallStatus(under:)`; `QuotaMonitor.statusPolicy` read live from the burn-rate settings; alerts, pills, cards, Touch Bars, status export and Notify! all read under it. Left: `menuBarLabel(…)` still takes the two burn-rate values instead of the policy, and pace falls back to `quotaType.duration` when no window is known | the menu-bar label takes the policy; the `Window` law removes the guess; `StatusColorPolicy` (colours, high contrast) moves to the App |
 | `Account.budget` | two one-off settings: `app.claudeApiBudget` (+ `…Enabled`, edited in Claude's card) and `bedrock.dailyBudget`; Bedrock turns its budget into a fake `Daily Budget` quota | a `Budget` beside the account's `Cost`, judged as `BudgetStatus`, never a quota; the old keys read as the default account's budget |
