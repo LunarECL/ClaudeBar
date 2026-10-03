@@ -233,34 +233,6 @@ extension KimiProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - KiroProvider Visual Identity
-
-extension KiroProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "wand.and.stars.inverse" }
-
-    public var iconAssetName: String { "KiroIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Purple/magenta color matching Kiro branding
-        scheme == .dark
-            ? Color(red: 0.55, green: 0.35, blue: 0.85)
-            : Color(red: 0.45, green: 0.25, blue: 0.75)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.70, green: 0.45, blue: 0.95)
-                    : Color(red: 0.60, green: 0.35, blue: 0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - CursorProvider Visual Identity
 
 extension CursorProvider: ProviderVisualIdentity {
@@ -488,10 +460,6 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 0.30, green: 0.65, blue: 0.95)
                 : Color(red: 0.20, green: 0.55, blue: 0.85)
-        case "kiro":
-            return scheme == .dark
-                ? Color(red: 0.55, green: 0.35, blue: 0.85)
-                : Color(red: 0.45, green: 0.25, blue: 0.75)
         case "cursor":
             return scheme == .dark
                 ? Color(red: 0.20, green: 0.78, blue: 0.82)
@@ -548,10 +516,6 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.20, green: 0.50, blue: 0.80)
                 : Color(red: 0.10, green: 0.40, blue: 0.70)
-        case "kiro":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.70, green: 0.45, blue: 0.95)
-                : Color(red: 0.60, green: 0.35, blue: 0.85)
         case "cursor":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.15, green: 0.55, blue: 0.75)
@@ -597,7 +561,6 @@ enum ProviderVisualIdentityLookup {
         case "zai": return "ZaiIcon"
         case "bedrock": return "BedrockIcon"
         case "kimi": return "KimiIcon"
-        case "kiro": return "KiroIcon"
         case "cursor": return "CursorIcon"
         case "mistral": return "MistralIcon"
         case "opencode-go": return "OpenCodeIcon"
@@ -617,7 +580,6 @@ enum ProviderVisualIdentityLookup {
         case "zai": return "Z.ai"
         case "bedrock": return "AWS Bedrock"
         case "kimi": return "Kimi"
-        case "kiro": return "Kiro"
         case "cursor": return "Cursor"
         case "mistral": return "Mistral"
         case "opencode-go": return "OpenCode Go"
@@ -637,7 +599,6 @@ enum ProviderVisualIdentityLookup {
         case "zai": return "z.square.fill"
         case "bedrock": return "cloud.fill"
         case "kimi": return "k.square.fill"
-        case "kiro": return "wand.and.stars.inverse"
         case "cursor": return "cursorarrow.rays"
         case "mistral": return "cat.fill"
         case "opencode-go": return "square.stack.3d.up.fill"

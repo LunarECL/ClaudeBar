@@ -285,7 +285,7 @@ private struct ProviderDetailView: View {
         if let product = (provider as? Account)?.provider {
             let legacy = legacyCard(for: product.id)
             DataSourceSection(provider: product, monitor: monitor)
-            if legacy == nil, !product.definition.settings.isEmpty {
+            if legacy == nil, !product.definition.defaultLoginSettings.isEmpty {
                 ProviderSettingsSection(provider: product)
             }
             if product.definition.accounts != nil {

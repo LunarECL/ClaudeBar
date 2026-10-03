@@ -142,6 +142,13 @@ public struct Setting: Sendable, Equatable, Codable, Identifiable {
         return self.default ?? options.first?.id ?? ""
     }
 
+    /// The folder a login's values name for this setting — only a path
+    /// setting names one. *Sign in again in <folder>*, *the folder stays*.
+    public func path(in values: [String: String]) -> String? {
+        guard case .path = kind else { return nil }
+        return values[id]
+    }
+
     /// Whether two logins' values are the same place — only a path can be;
     /// two spellings of one folder are.
     public func isSamePlace(_ value: String, as other: String, paths: any PathChecking) -> Bool {

@@ -20,7 +20,7 @@ struct ProviderSettingsSection: View {
                 Text("Settings").font(.headline).foregroundStyle(theme.textPrimary)
                 Spacer()
             }
-            ForEach(provider.definition.settings) { setting in
+            ForEach(provider.definition.defaultLoginSettings) { setting in
                 let kept = provider.hasSaved(setting, for: provider.defaultAccount)
                 HStack(alignment: .bottom, spacing: 8) {
                     SettingField(setting: setting, value: Binding(

@@ -212,7 +212,7 @@ struct CommandFetcher: Fetching {
             result = try await executor.execute(
                 binary: call.cli,
                 args: call.args,
-                input: nil,
+                input: call.input,
                 timeout: call.timeout,
                 workingDirectory: call.workingDirectory?.url,
                 autoResponses: [:]

@@ -63,6 +63,13 @@ struct SettingTests {
     }
 
     @Test
+    func `a path setting tells its own value among a login's values`() throws {
+        let folder = try decode(#"{"id":"home","label":"Folder","scope":"account","kind":"path"}"#)
+        #expect(folder.path(in: ["home": "/Users/me/work"]) == "/Users/me/work")
+        #expect(try decode(region).path(in: ["region": "china"]) == nil)
+    }
+
+    @Test
     func `only a path can be the same place as another login's`() throws {
         let paths = FakePaths(folders: [], aliases: ["~/.acme": "/Users/me/.acme"])
         let folder = try decode(#"{"id":"home","label":"Folder","kind":"path"}"#)

@@ -66,7 +66,7 @@ extension CommandCall: Connection {
     public var commands: [[String]] { [[cli] + args] }
 
     func running(_ binary: String) -> CommandCall {
-        CommandCall(cli: binary, args: args, timeout: timeout, workingDirectory: workingDirectory, environment: environment)
+        CommandCall(cli: binary, args: args, input: input, timeout: timeout, workingDirectory: workingDirectory, environment: environment)
     }
 }
 
