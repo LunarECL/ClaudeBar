@@ -29,13 +29,13 @@ struct QuotaMonitorProviderOrderTests {
     }
 
     /// Registration order [claude, codex, gemini], as ClaudeBarApp registers them.
-    /// Claude and Codex are definition-driven since #329, so these tests use the
+    /// Every provider is definition-driven since #329, so these tests use the
     /// shared id/name stubs; only the monitor's ordering matters here.
     private func makeProviders(settings: any ProviderSettingsRepository) -> AIProviders {
         AIProviders(providers: [
             StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings),
             StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings),
-            GeminiProvider(probe: MockUsageProbe(), settingsRepository: settings),
+            StubIDProvider(id: "gemini", probe: MockUsageProbe()),
         ])
     }
 
