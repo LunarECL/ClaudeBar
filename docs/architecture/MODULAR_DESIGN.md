@@ -66,15 +66,14 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 
 | Module | Context ([model §7](CANONICAL_MODEL.md#7--the-contexts-and-the-modules-that-implement-them)) | Public (the domain) | `Internal/` (the implementation) |
 |---|---|---|---|
-| `Quotas` | Quota · shared kernel | `UsageSnapshot`, `UsageQuota`, `QuotaType`, `QuotaStatus`, `UsagePace`, `CostUsage`, `BudgetStatus`, `AccountTier`, `UsageError` — today's shapes; the final kernel is the model's `Usage`, `Quota`, `Left`, `Window`, `Status`, `Pace`, `Cost`, `Budget`, `Plan` (§9) | — none: pure values, no I/O |
-| `DataSources` | Data Sources | `DataSource`, `DataSourceDefinition`, `Response`, `DataSourceError`, the closed sums `CredentialLookup` · `Fetch` · `Mapping`, `ConfigField`; the ports `CLIExecutor`, `NetworkClient`, `RPCTransport`, `SecretStore`, `CloudWatchClient`, `PriceCatalog`; the factory `DataSources.make(_:providerId:…)` | the workers — `Lookup/`, `Fetch/`, `Mapping/` — and the implementations of its own ports — `Process/`, `Network/` (§5) |
+| `Quotas` | Quota · shared kernel | `UsageSnapshot`, `UsageQuota`, `QuotaType`, `QuotaStatus`, `UsagePace`, `CostUsage`, `BudgetStatus`, `AccountTier`, `UsageError`, `Day` (a day of usage history — today `DailyUsageReport`/`Stat`) — today's shapes; the final kernel is the model's `Usage`, `Quota`, `Left`, `Window`, `Status`, `Pace`, `Cost`, `Budget`, `Plan` (§9) | — none: pure values, no I/O |
+| `DataSources` | Data Sources | `DataSource`, `DataSourceDefinition`, `Response`, `DataSourceError`, the closed sums `CredentialLookup` · `Fetch` · `Mapping`, `ConfigField`; `UsageLog` and `UsageLog.Definition` (how a login's usage history is extracted from its logs); the ports `CLIExecutor`, `NetworkClient`, `RPCTransport`, `SecretStore`, `CloudWatchClient`, `PriceCatalog`; the factory `DataSources.make(_:providerId:…)` | the workers — `Lookup/`, `Fetch/`, `Mapping/`, `Logs/` — and the implementations of its own ports — `Process/`, `Network/` (§5) |
 | `AWSClients` | Data Sources (SDK-backed) | `AWSClients.makeCloudWatch()` → `any CloudWatchClient`, `AWSClients.makePriceCatalog()` → `any PriceCatalog` | the CloudWatch client and the AWS Price List reader; the only module that links AWS |
-| `Providers` | Providers · core | `Provider` (the product), `Account` (a login — today `ProviderAccount`) and its capability handles `usageHistory` · `guestPasses` (nil when the definition doesn't offer them), `AIProvider` (until it folds in), `ProviderDefinition`, `ProviderCatalog`, `ProviderSettingsRepository`, `CredentialRepository` | definition-file reading — it decodes a definition's `usageHistory` block into a `UsageLog` and hands it to `UsageHistory`; `ExtensionDirectoryScanner`, `AIProviders` |
+| `Providers` | Providers · core | `Provider` (the product), `Account` (a login — today `ProviderAccount`) and its capability handles `usageHistory: UsageHistory?` · `guestPasses` (nil when the definition doesn't offer them), `UsageHistory` (`days(in:)`), `AIProvider` (until it folds in), `ProviderDefinition`, `ProviderCatalog`, `ProviderSettingsRepository`, `CredentialRepository` | definition-file reading, `DayLedger` (closed days, under `~/.claudebar/usage-history/`), `ExtensionDirectoryScanner`, `AIProviders` |
 | `Providers/Resources/Providers/` | — | **the built-in definitions**: `codex.json`, `deepseek.json`, … | |
 | `Monitoring` | Monitoring · conductor | `QuotaMonitor`, `MonitoringEvent`, `RefreshInterval`, `RefreshKind`, `Clock`, `PowerStateProvider` | `SystemClock`, `SystemPowerStateProvider`, `SingleFlightCache` |
 | `Alerting` | Alerting | `QuotaAlerter`, Notify! values, `NotifySettingsRepository` | `NotificationAlerter`, `SystemAlertSender`, `NotifyGatewayClient` |
 | `Activity` | Activity | `ClaudeSession`, `SessionEvent`, `SessionMonitor`, `NotchActivity`, `HookSettingsRepository` | `HookHTTPServer`, `HookInstaller`, `PortDiscovery`, `SessionEventParser` |
-| `UsageHistories` | Usage History | `UsageHistory` (one per login, `days(in:)`, reached as `account.usageHistory`), `UsageLog` (a definition's `usageHistory`, decoded by `Providers`), `Day` — today `DailyUsageReport`/`Stat`, `DailyUsageAnalyzing` | the readers per log format, the day aggregator, the file `PriceCatalog`, the `DayLedger` of closed days (TARGET_ARCHITECTURE §10) |
 | `Storage` | Vault & Settings · generic | `Storage.makeSettings()`, `Storage.makeVault()`, `AppSettingsRepository` | `JSONSettingsRepository`, `JSONSettingsStore`, `KeychainCredentialRepository`, `UserDefaults…`, `SecureCredentialMigration` |
 | `Diagnostics` | — cross-cutting | `AppLog` and its categories | `AppLogger`, `FileLogger` |
 | `ClaudeBar` (App) | — the composition root | SwiftUI views, themes, menu-bar label, page state, the Add Provider sheet | — |
@@ -89,10 +88,8 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
        │        │                   │          │
        ▼        │                   ▼          ▼
    Providers ───┼──────────────▶ DataSources ◀─┘ (implements its ports)
-       │        │                   ▲
-       └────────┼─▶ UsageHistories ─┘
-                │         │
-                ▼         ▼
+       │        │                   │
+       ▼        ▼                   ▼
    ┌──────────────── Quotas ────────────┐   (+ Diagnostics, which anyone may import)
 ```
 
@@ -144,7 +141,11 @@ Modules/DataSources/
 │   ├── RPCTransport.swift            port, @Mockable
 │   ├── SecretStore.swift             port, @Mockable — implemented in Storage
 │   │   (Fetch.swift also declares the ports CloudWatchClient · PriceCatalog, @Mockable —
-│   │    implemented in AWSClients; a file PriceCatalog lives in UsageHistories)
+│   │    implemented in AWSClients; a file PriceCatalog is in Internal/Logs)
+│   ├── UsageLog.swift                ◆ days(from:to:) for one login · ◇ UsageLog.Definition —
+│   │                                   files · format · where · at · id · model · tokens · cost ·
+│   │                                   prices · freeWhen · sessionGap
+│   ├── LogFiles.swift                port, @Mockable — the files a glob names, and their bytes
 │   ├── DataSources.swift             the factory: make(_:providerId:…)
 │   └── Internal/
 │       ├── Lookup/    EnvironmentReader · SettingReader · JSONFileReader · KeychainReader ·
@@ -155,6 +156,8 @@ Modules/DataSources/
 │       │              CloudWatchFetcher
 │       ├── Mapping/   JSONMapper (+ the path dialect) · TextMapper · ScriptMapper ·
 │       │              DecimalScript · HumanDate
+│       ├── Logs/      JSONLinesReader · JSONLogReader (a reader per log format) ·
+│       │              DayAggregator · FilePriceCatalog · SystemLogFiles
 │       ├── Process/   DefaultCLIExecutor · ProcessRPCTransport · InteractiveRunner ·
 │       │              BinaryLocator · LoginShellEnvironment · RunningProcesses ·
 │       │              TerminalRenderer
@@ -170,6 +173,9 @@ Modules/Providers/
 ├── Sources/
 │   ├── Provider.swift                  ◆ the lifecycle, and the fallback between data sources
 │   ├── Account.swift                   ◆ a login: refresh() · usageHistory? · guestPasses?
+│   ├── UsageHistory.swift              ◆ one per login: days(in: DateRange) → [Day], over its
+│   │                                     UsageLog and its ledger
+│   ├── LedgerStore.swift               port, @Mockable — where closed days are kept
 │   ├── ProviderDefinition.swift        ◇ the definition and its laws; its optional blocks
 │   │                                     usageHistory · guestPasses are the capabilities
 │   ├── ProviderCatalog.swift           built in · custom · extension; add · import · export
@@ -177,33 +183,14 @@ Modules/Providers/
 │   ├── CredentialRepository.swift      port, @Mockable
 │   ├── Providers.swift                 the factory: makeCatalog(settings:vault:cloudWatch:priceCatalog:)
 │   └── Internal/
-│       └── DefinitionFiles.swift       reads *.json from Bundle.module or a folder
+│       ├── DefinitionFiles.swift       reads *.json from Bundle.module or a folder
+│       └── DayLedger · FileLedgerStore closed days kept in ~/.claudebar/usage-history/
 ├── Resources/Providers/                codex.json · claude.json · claude-*.js ·
 │                                       claude-prices.json · …   — the vendors
 └── Tests/
     ├── ProviderTests.swift
     ├── CatalogTests.swift              every bundled definition decodes
     └── Golden/codex/                   recorded responses → expected snapshots
-```
-
-```text
-Modules/UsageHistories/                 imports DataSources (PriceCatalog), Quotas — never Providers
-├── Sources/
-│   ├── UsageHistory.swift              ◆ one per login: days(in: DateRange) → [Day]
-│   ├── UsageLog.swift                  ◇ records: files · format · where · at · id · model ·
-│   │                                     tokens · cost; prices; freeWhen; sessionGap — Codable
-│   ├── Day.swift                       ◇ date · tokens · cost (a line per model) · sessions ·
-│   │                                     workingTime · cacheSavings
-│   ├── LogFiles.swift                  port, @Mockable — the files a glob names, and their bytes
-│   ├── LedgerStore.swift               port, @Mockable — where closed days are kept
-│   ├── UsageHistories.swift            the factory: make(_ log: UsageLog, login:)
-│   └── Internal/
-│       ├── Read/      JSONLinesReader · JSONFileReader — a reader per log format
-│       ├── DayAggregator                records → Days, priced, sessions split by sessionGap
-│       ├── FilePriceCatalog             prices from the definition's prices file
-│       ├── DayLedger                    closed days kept in ~/.claudebar/usage-history/
-│       └── SystemLogFiles · FileLedgerStore
-└── Tests/                              fixture logs → expected Days; no vendor names
 ```
 
 ## 6 · Ports: as many as the requirement, and no more
@@ -218,9 +205,10 @@ for that thing, is `@Mockable`, and has its implementation in an `Internal/`.
 | `NetworkClient` | DataSources | an HTTP endpoint | `DataSources/Internal/Network` |
 | `RPCTransport` | DataSources | a JSON-RPC pipe to a process | `DataSources/Internal/Process` |
 | `CloudWatchClient` | DataSources | AWS CloudWatch | `AWSClients` |
-| `PriceCatalog` | DataSources | a price list — AWS's, or a prices file a definition ships | `AWSClients`; `UsageHistories/Internal` (file) |
+| `PriceCatalog` | DataSources | a price list — AWS's, or a prices file a definition ships | `AWSClients`; `DataSources/Internal/Logs` (file) |
 | `SecretStore` | DataSources | the Keychain, for secrets a login saved | `Storage` |
-| `LogFiles` · `LedgerStore` | UsageHistories | the local logs a CLI writes; `~/.claudebar/usage-history/` | `UsageHistories/Internal` |
+| `LogFiles` | DataSources | the local logs a CLI writes | `DataSources/Internal/Logs` |
+| `LedgerStore` | Providers | `~/.claudebar/usage-history/` | `Providers/Internal` (→ `Storage`) |
 | `Clipboard` | DataSources | the pasteboard, read after a `cli` run with `"clipboard": true` | `DataSources/Internal/Process` |
 | `ProviderSettingsRepository` · `CredentialRepository` | Providers | `settings.json`, the Keychain | `Storage` |
 | `Clock` · `PowerStateProvider` | Monitoring | time, the battery | `Monitoring/Internal` |
@@ -261,8 +249,8 @@ testability" alone.
 | `Domain/Monitor/` | `Monitoring` (`QuotaAlerter` → `Alerting`) |
 | `Domain/Notify/`, `Infrastructure/Notifications/`, `Notify/` | `Alerting` |
 | `Domain/Session/`, `Domain/Notch/`, `Infrastructure/Hooks/` | `Activity` (`NSScreen+NotchMetrics` → App) |
-| `Domain/UsageHistory/` (`DailyUsageReport`/`Stat`, the view's ranges) | `UsageHistories` (`Day`, `DateRange`) |
-| `Infrastructure/Claude/` (`ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector`) | **deleted** — the paths, fields and `freeWhen` move into `claude.json`'s `usageHistory`, the prices into `claude-prices.json`; parsing, caching and pricing become `UsageHistory/Internal` readers, `DayLedger` and the file `PriceCatalog` in `UsageHistories/Internal` |
+| `Domain/UsageHistory/` (`DailyUsageReport`/`Stat`, the view's ranges) | `UsageHistory` → `Providers`; `Day`, `DateRange` → `Quotas` |
+| `Infrastructure/Claude/` (`ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector`) | **deleted** — the paths, fields and `freeWhen` move into `claude.json`'s `usageHistory`, the prices into `claude-prices.json`; parsing, caching and pricing become `UsageHistory/Internal` readers, aggregator and file `PriceCatalog` in `DataSources/Internal/Logs`, `DayLedger` in `Providers/Internal` |
 | `Infrastructure/Claude/ClaudeGuestPassSource` | **deleted** — `claude.json`'s `guestPasses` block: a `cli` fetch and `claude-passes.js` |
 | `Infrastructure/Mistral/` (`VibeSessionLogAnalyzer`) | **deleted** — `mistral.json`'s `usageHistory` (a `json` log format) |
 | `Domain/Settings/`, `Infrastructure/Storage/` | `Storage` (`StatusColorPolicy`, `MenuBarProviderSettings` → App; `AIProviders` → `Providers`) |
@@ -282,16 +270,16 @@ files move. When an old target is empty it is deleted.
 | **M1** ✅ | `DataSources` — the ports and their implementations move in; `DataSource`, the closed sums and the workers Codex needs are written test-first | none |
 | **M2** ✅ | `Providers` — `Provider`, the definition, the catalog; `codex.json` with golden tests; the App builds Codex from it; `CodexProvider` and every `Codex*` type in `Infrastructure/Codex` deleted. **Slice 1 of the target architecture** | none |
 | **M3** ✅ | one group of providers per PR (target §8), through #419; `AWSClients` carved from `Infrastructure/Bedrock` (#417) | none |
-| M4 | `UsageHistories` — slices UH1–UH6 and GP of [TARGET §10](TARGET_ARCHITECTURE.md#10--usage-history-as-data); `Infrastructure/Claude` and `Infrastructure/Mistral` deleted | the 30-day chart; Mistral's history beside Claude's |
+| M4 | Usage History — no new module: `UsageHistory` into `Providers`, `UsageLog` into `DataSources`, `Day` into `Quotas`; slices UH1–UH6 and GP of [TARGET §10](TARGET_ARCHITECTURE.md#10--usage-history-as-data); `Infrastructure/Claude` and `Infrastructure/Mistral` deleted | the 30-day chart; Mistral's history beside Claude's |
 | M5… | `Monitoring`, `Alerting`, `Activity`, `Storage` | none |
 | last | `Domain` and `Infrastructure` are empty and removed from `Project.swift` | none |
 
 **M0 moved the kernel as it is.** `Quotas` holds today's types unchanged —
 and, because `UsageSnapshot` carries them, a few that belong elsewhere:
-`DailyUsageReport`/`Stat` (→ `UsageHistories`), `UsageDisplayMode` (→ the App),
+`DailyUsageReport`/`Stat` (→ `Day`, staying in `Quotas`), `UsageDisplayMode` (→ the App),
 `ExtensionMetric` (→ out of the kernel); `BedrockModels` has left (#417: a `Cost` with lines). `RefreshKind` and
-`DailyUsageAnalyzing` sit in `Providers` until `Monitoring` and `UsageHistories`
-exist. Each type carries a `- Note: Interim` naming its final shape; reshaping
+`DailyUsageAnalyzing` sit in `Providers` until `Monitoring` exists and
+Usage History moves (M4). Each type carries a `- Note: Interim` naming its final shape; reshaping
 the kernel follows [CANONICAL_MODEL §8](CANONICAL_MODEL.md#8--build-truth-node-by-node)'s
 order of work, one step per PR, because it touches every provider and view:
 **`Left` and `Window` first** (the two kernel laws), **then the words**
@@ -309,8 +297,10 @@ in `DataSources` before Codex's code can be deleted.
   `settings.json` is one file many contexts write, so one owner today.
 - **One module per heavy SDK.** AWS is the only one today; the next gets its
   own `…Clients` module behind its own port in `DataSources`.
-- **`PriceCatalog` in `DataSources` or in `Quotas`?** Both Bedrock's cost and
-  Usage History price tokens; it sits in `DataSources` today so
-  `UsageHistories` imports one supplier, not a new kernel word.
+- **Usage History as its own module, later?** Not now: `Providers` is its
+  only consumer and its work is `DataSources`' (files, the path language,
+  `PriceCatalog`). It earns a module when it needs its own SDK (a binary or
+  SQLite log) or a second consumer; keeping `Internal/Logs/` and
+  `UsageHistory.swift` in their own files keeps that carve cheap.
 - **`AIProvider` beside `Provider`** until the last provider moves — then the
   protocol folds in.

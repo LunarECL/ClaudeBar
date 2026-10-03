@@ -129,7 +129,7 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │                                   never a copy per login
 │       ├── capabilities  ◇                 WHAT ELSE IT OFFERS (§2.1) — declared in the definition, run
 │       │                                   by their own context, handed to each login filled with its
-│       │                                   values: `usageHistory` (a UsageLog) · `guestPasses` · `accounts.signIn`
+│       │                                   values: `usageHistory` (a UsageLog.Definition) · `guestPasses` · `accounts.signIn`
 │       ├── accounts: [Account]  ◆          NEVER EMPTY. One account is the "default" — the plain login
 │       │   └── Account  ◆                  A LOGIN YOU PAY FOR — who, and what we last saw. No behaviour
 │       │       ├── id: Account.ID          `<provider>` for the default, `<provider>.<acct>` for an added one
@@ -152,8 +152,14 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │                       tool's own logs on this Mac. Not a meter: nothing is left,
 │       │       │   │                       refills or is judged, and the monitor never refreshes it.
 │       │       │   │                       `nil` when the definition declares no `usageHistory`
-│       │       │   ├── log: UsageLog  ◇    THE JSON — the definition's `usageHistory`, filled with
-│       │       │   │   │                   this login's values (its folder), no behaviour:
+│       │       │   ├── days(in: DateRange) → [Day]   THE ONE READ — every view is a range of it:
+│       │       │   │                       TODAY'S USAGE is the last two, the chart the last thirty
+│       │       │   ├── ledger: DayLedger  ◇   PAST DAYS, KEPT — a closed day is summed once and kept
+│       │       │   │                       on this Mac; only the open days are read from the log
+│       │       │   ├── log: UsageLog  ◆    HOW TO EXTRACT IT — the only part that differs per
+│       │       │   │   │                   provider. Built by DataSources from the definition's
+│       │       │   │   │                   `usageHistory` (a UsageLog.Definition) filled with this
+│       │       │   │   │                   login's values (its folder); days(from:to:) reads them:
 │       │       │   │   ├── records         WHERE AND HOW — files (a glob) · format (a JSON object per
 │       │       │   │   │                   line, or per file) · the fields of one record in the
 │       │       │   │   │                   mapping's path language: when, which model, tokens by
@@ -161,10 +167,6 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │   ├── prices: PriceCatalog   WHAT A TOKEN COSTS — the same port Bedrock uses:
 │       │       │   │   │                   a price file beside the definition, or a cloud's price list
 │       │       │   │   └── sessionGap: seconds?   a pause longer than this starts a working session
-│       │       │   ├── days(in: DateRange) → [Day]   THE ONE READ — every view is a range of it:
-│       │       │   │                       TODAY'S USAGE is the last two, the chart the last thirty
-│       │       │   ├── ledger: DayLedger  ◇   PAST DAYS, KEPT — a closed day is summed once and kept
-│       │       │   │                       on this Mac; only the open days are read from the logs
 │       │       │   └── Day  ◇              ONE DAY — date (local) · tokens: input · output · cache
 │       │       │                           write · cache read · cost: Cost (lines per model,
 │       │       │                           ESTIMATED unless the log states it) · sessions ·
@@ -292,7 +294,7 @@ its definition and **hands it out per login**; its own context runs it:
 
 | Capability | The person's question | Declared as | Run by | Reached as |
 |---|---|---|---|---|
-| Usage History | *how much did I use, day by day?* | `usageHistory` | the Usage History context | `account.usageHistory` → `days(in:)` |
+| Usage History | *how much did I use, day by day?* | `usageHistory` | the login's `UsageHistory`, over a `UsageLog` the data-source machinery runs | `account.usageHistory` → `days(in:)` |
 | Guest passes | *can I share a trial?* | `guestPasses` | the data-source machinery | `account.guestPasses` |
 | Budget | *am I spending more than I meant to?* | an account-scope setting on the cost | the cost judges it | `account.budget` |
 | Sign-in | *add another login* | `accounts.signIn` | `AccountSignIn` | `provider.signIn` |
@@ -304,7 +306,7 @@ ledger and that login's logs. Two logins show two histories, never summed.
 
 **The rule that keeps it open (OCP):** *how much is left?* is a data source in
 the definition — the provider does not change. Any other question is a
-capability: a block in the definition, a context that runs it, and an
+capability: a block in the definition, the machinery that runs it, and an
 optional handle on `Account` that is `nil` when the definition does not
 declare it. A page asks the handle — `account.usageHistory?` — never the
 provider's id, and never `definition.usageHistory != nil` (tell, don't ask). A
@@ -403,7 +405,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | an import says where a key will be sent, and shows any CLI command it will run, before it asks for a key or saves | `ProviderCatalog.import` |
 | an error names the step that failed — lookup, fetch or mapping — and never carries the secret or the response body | `DataSourceError` |
 | a usage says which data source produced it; a fallback is never silent | `Usage.source` |
-| a tool's usage history is DATA: where its logs are, how to read a record and what a token costs live in its definition; a new tool's logs, or a price change, never edit Swift | `UsageLog` |
+| a tool's usage history is DATA: where its logs are, how to read a record and what a token costs live in its definition; a new tool's logs, or a price change, never edit Swift | `UsageLog.Definition` |
 | usage history is a SERIES OF DAYS; every view — today against yesterday, the last thirty days, a chart — is a range of it, chosen by the page | `UsageHistory.days(in:)` |
 | a day is the local calendar day; a record counts on the day its own timestamp falls in — a timestamp written in UTC (a file name) is converted, never read as local | `Day` |
 | a record written twice counts once — the last copy wins (a streamed message is logged as it grows) | `UsageLog.records` |
@@ -448,20 +450,19 @@ enforces it. Across a fence the same word may mean something else, as long as
 | **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* | `Modules/Monitoring` |
 | **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export | `Modules/Alerting` |
 | **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch | `Modules/Activity` |
-| **Usage History** | supporting | *what did I use today, against yesterday?* | `Modules/UsageHistories` |
+| **Usage History** | supporting | *what did I use, day by day?* | no module of its own: `UsageHistory` in `Modules/Providers` (the login owns it), `UsageLog` in `Modules/DataSources` (how it is extracted), `Day` in `Modules/Quotas` |
 | **Vault & Settings** | generic | *where is it kept?* — `settings.json`, secrets | `Modules/Storage` |
 | SDK clients | — (anti-corruption layers) | *what does this SDK say?* — a client that needs a heavy SDK gets its own module, behind a port, so only it links the SDK | `Modules/AWSClients` |
 
 ```text
                       Quota                    the shared kernel — knows nobody
-                    ▲   ▲   ▲
-          ┌─────────┘   │   └──────────┐
-    DataSources ◀── UsageHistories  Alerting ◀──┐
-          ▲             ▲                       │
-          │             │                       │
-          │◀── AWSClients (the SDK)               │
-          │             │                       │
-    Providers ──────────┘◀──── Monitoring ──────┘        Activity
+                    ▲            ▲
+          ┌─────────┘            └───────────┐
+    DataSources                           Alerting ◀──┐
+          ▲                                           │
+          │◀── AWSClients (the SDK)                    │
+          │                                           │
+    Providers ◀─────────────── Monitoring ────────────┘   Activity
           ▲                      ▲                      (on its own:
           │                      │                       no Quota, no Provider)
           └──────── App ─────────┘
@@ -473,14 +474,18 @@ Arrows point at the **supplier**. Nothing points back: the kernel cannot name a
 provider, Data Sources cannot name the Monitor, no module names a vendor, and
 the AWS SDK links into `AWSClients` and nowhere else.
 
-**Usage History is declared by the provider and run by its own context** —
-as a data source is. A definition's `usageHistory` block is the provider's data
-(the logs are the product's, and each login's); `Providers` decodes it with
-`UsageHistories`' `UsageLog` type and fills it per login, the way it fills a
-`DataSourceDefinition`, and hands each login its `UsageHistory`. The
-context runs it: the readers, the day aggregator, the ledger of closed days. It reuses `DataSources`' path language
-and `PriceCatalog`, and never imports `Providers` — it is handed one
-`UsageLog` per login id, so it knows nothing of accounts or settings.
+**Usage History has no module of its own** — it splits along the line every
+provider already has. What the person asks for is the login's: `Account`
+owns its `UsageHistory` (in `Providers`), which answers `days(in:)` from its
+ledger of closed days. What differs per provider is only **how to extract
+it** — where the logs are, how a record reads, what a token costs — and that
+is data, run by the same machinery as a data source: the definition's
+`usageHistory` block is a `UsageLog.Definition`, `DataSources` builds a
+`UsageLog` from it (filled with the login's values) and reads days with its
+path language, its file access and `PriceCatalog`. `Day` is a value in the
+kernel, beside `Cost`. No new arrow: `Providers → DataSources → Quota`
+already exists. A module is carved when something needs its own SDK or a
+second consumer — usage history has neither.
 
 **Packaging.** One Tuist framework target per context under `Modules/`, each
 with `Sources/` and `Tests/`. The `**` globs keep working per module; a context's tests link only that
@@ -499,7 +504,7 @@ context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
 | `Quota.left` | **built** (slice 4): `Left` = `share` · `money(Money, of: Money?)` on every `UsageQuota`; status, pace, the lowest quota and the menu bar follow it, so a balance shows its money and has no pace. Legacy probes still write `100` + `dollarRemaining`, which reads as a balance; a JSON mapping writes `left: { money, of }` | `percentRemaining` leaves the call sites as providers migrate |
 | `Window` | **built** (slice 4): the kernel no longer guesses — pace uses only a stated `window.length`. Legacy probes state what the guess used to give (`conventionalWindow`, named as a convention; Bedrock's daily budget now 1 day; Cursor's monthly card none, as it chose); Claude's script and JSON and Codex's JSON state their windows, the response's word first | the conventions become each definition's word as providers migrate |
 | `Usage` | `UsageSnapshot` with `bedrockUsage`, `extensionMetrics`, `dailyUsageReport` | kernel fields only; the rest moves to their contexts |
-| `UsageHistory` · `UsageLog` · `Day` · `DayLedger` | `UsageHistory` in `Domain` keyed by login, fed by two vendor-named analyzers in `Infrastructure` — `ClaudeDailyUsageAnalyzer` (JSONL under `~/.claude/projects`, `ModelPricing` as a Swift table, `ClaudeLocalInferenceDetector`, `SessionLogCache`) and `VibeSessionLogAnalyzer` (`meta.json` per session folder); the report types (`DailyUsageReport`/`Stat`) sit in `Quotas`; only today and yesterday exist, re-read from the logs on every popover open | `Modules/UsageHistory`: `UsageLog` read from each definition's `usageHistory`, one reader per format, prices through `PriceCatalog`, one aggregator, `days(in:)` over a `DayLedger` of closed days; both analyzers and `Infrastructure/Claude`, `Infrastructure/Mistral` deleted (TARGET_ARCHITECTURE §10) |
+| `UsageHistory` · `UsageLog` · `Day` · `DayLedger` | `UsageHistory` in `Domain` keyed by login, fed by two vendor-named analyzers in `Infrastructure` — `ClaudeDailyUsageAnalyzer` (JSONL under `~/.claude/projects`, `ModelPricing` as a Swift table, `ClaudeLocalInferenceDetector`, `SessionLogCache`) and `VibeSessionLogAnalyzer` (`meta.json` per session folder); the report types (`DailyUsageReport`/`Stat`) sit in `Quotas`; only today and yesterday exist, re-read from the logs on every popover open | `UsageHistory` + `DayLedger` in `Providers`, reached as `account.usageHistory`; `UsageLog` in `DataSources`, built from each definition's `usageHistory`, one reader per format, prices through `PriceCatalog`, one aggregator; `Day` in `Quotas`; both analyzers and `Infrastructure/Claude`, `Infrastructure/Mistral` deleted (TARGET_ARCHITECTURE §10) |
 | capabilities | guest passes chosen in Swift by name (`builtIn("claude", guestPasses: GuestPasses(source: ClaudeGuestPassSource()))`); usage history keyed by hard-coded ids (`UsageHistory(logs: ["claude": …, "mistral": …])`) | each declared in the definition and reached as `account.guestPasses` / `account.usageHistory` (TARGET_ARCHITECTURE §10) |
 | `Plan` | `AccountTier` with Claude cases | a name and a badge |
 | `StatusPolicy` | **built** (#357): `StatusPolicy` in `Quotas` with `quota.status(under:)` / `usage.overallStatus(under:)`; `QuotaMonitor.statusPolicy` read live from the burn-rate settings; alerts, pills, cards, Touch Bars, status export and Notify! all read under it. Left: `menuBarLabel(…)` still takes the two burn-rate values instead of the policy, and pace falls back to `quotaType.duration` when no window is known | the menu-bar label takes the policy; the `Window` law removes the guess; `StatusColorPolicy` (colours, high contrast) moves to the App |
