@@ -59,6 +59,19 @@ struct CredentialRefinementTests {
     }
 
     @Test
+    func `a value with adds must fit match too — a setting left blank gives no key`() async throws {
+        let (home, cleanUp) = try config("{}")
+        defer { cleanUp() }
+        let filled = try lookup(#"{"environment":"ACME_KEY","with":{"baseURL":"https://api.acme.test"},"match":{"baseURL":"acme\\.test"}}"#)
+        let blank = try lookup(#"{"environment":"ACME_KEY","with":{"baseURL":"https://{{setting.host}}"},"match":{"baseURL":"acme\\.test"}}"#)
+
+        _ = try await reader(filled, home: home, environment: ["ACME_KEY": "k"]).fetchResponse()
+        await #expect { try await reader(blank, home: home, environment: ["ACME_KEY": "k"]).fetchResponse() } throws: {
+            ($0 as? DataSourceError)?.reason == .authenticationRequired
+        }
+    }
+
+    @Test
     func `with adds fixed values, never replacing what was found`() async throws {
         let refined = try lookup(#"{"environment":"ACME_KEY","with":{"baseURL":"https://api.acme.test/v1","token":"not-this"}}"#)
         #expect(refined.lookupOrder == ["$ACME_KEY"])

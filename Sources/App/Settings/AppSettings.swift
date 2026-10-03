@@ -476,7 +476,6 @@ public final class AppSettings {
     public var provider: ProviderSettingsRepository { repository }
     public var claude: ClaudeSettingsRepository { repository }
     public var codex: CodexSettingsRepository { repository }
-    public var copilot: CopilotSettingsRepository { repository }
     public var bedrock: BedrockSettingsRepository { repository }
     public var deepseek: DeepSeekSettingsRepository { repository }
     public var alibaba: AlibabaSettingsRepository { repository }

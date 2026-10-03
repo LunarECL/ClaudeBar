@@ -10,7 +10,6 @@ import Domain
 /// credentials remain in UserDefaults pending their own migrations.
 public final class JSONSettingsRepository:
     AppSettingsRepository,
-    CopilotSettingsRepository,
     BedrockSettingsRepository,
     ClaudeSettingsRepository,
     CodexSettingsRepository,
@@ -326,20 +325,35 @@ public final class JSONSettingsRepository:
     /// there, and moves the first time it is saved.
     public func value(_ setting: String, forProvider id: String) -> String? {
         let key = "\(id).\(setting)"
-        if let value: String = store.read(key: key) { return value }
-        return Self.legacySettingKeys[key].flatMap { store.read(key: $0) }
+        if let value = text(at: key) { return value }
+        if let legacy = Self.legacySettingKeys[key], let value = text(at: legacy) { return value }
+        return Self.legacyDefaultsKeys[key].flatMap { credentials.string(forKey: $0) }
     }
 
     public func setValue(_ value: String?, _ setting: String, forProvider id: String) {
         let key = "\(id).\(setting)"
         store.write(value: value, key: key)
         if let legacy = Self.legacySettingKeys[key] { store.write(value: nil, key: legacy) }
+        if let legacy = Self.legacyDefaultsKeys[key] { credentials.removeObject(forKey: legacy) }
+    }
+
+    /// A value as text — an old card may have saved a number.
+    private func text(at key: String) -> String? {
+        if let value: String = store.read(key: key) { return value }
+        if let number: NSNumber = store.read(key: key), CFGetTypeID(number) != CFBooleanGetTypeID() { return number.stringValue }
+        return nil
     }
 
     /// Settings a provider's card kept under a key that isn't `<id>.<setting>`.
     /// A migrating provider adds a row here, never a branch.
     private static let legacySettingKeys = [
         "vercel-gateway.authEnvVar": "vercel.authEnvVar",
+    ]
+
+    /// Settings a provider's card kept in UserDefaults; they move to
+    /// settings.json the first time they are saved.
+    private static let legacyDefaultsKeys = [
+        "copilot.username": "com.claudebar.credentials.github-username",
     ]
 
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
@@ -409,111 +423,6 @@ public final class JSONSettingsRepository:
 
     public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
         store.write(value: verified, key: "codex.verifiedAtLeastOnce")
-    }
-
-    // MARK: - CopilotSettingsRepository
-
-    public func copilotProbeMode() -> CopilotProbeMode {
-        guard let raw: String = store.read(key: "copilot.probeMode"),
-              let mode = CopilotProbeMode(rawValue: raw) else {
-            return .billing
-        }
-        return mode
-    }
-
-    public func setCopilotProbeMode(_ mode: CopilotProbeMode) {
-        store.write(value: mode.rawValue, key: "copilot.probeMode")
-    }
-
-    public func copilotAuthEnvVar() -> String {
-        store.read(key: "copilot.authEnvVar") ?? ""
-    }
-
-    public func setCopilotAuthEnvVar(_ envVar: String) {
-        store.write(value: envVar, key: "copilot.authEnvVar")
-    }
-
-    public func copilotMonthlyLimit() -> Int? {
-        store.read(key: "copilot.monthlyLimit")
-    }
-
-    public func setCopilotMonthlyLimit(_ limit: Int?) {
-        store.write(value: limit, key: "copilot.monthlyLimit")
-    }
-
-    public func copilotManualUsageValue() -> Double? {
-        store.read(key: "copilot.manualUsageValue")
-    }
-
-    public func setCopilotManualUsageValue(_ value: Double?) {
-        store.write(value: value, key: "copilot.manualUsageValue")
-    }
-
-    public func copilotManualUsageIsPercent() -> Bool {
-        store.read(key: "copilot.manualUsageIsPercent") ?? false
-    }
-
-    public func setCopilotManualUsageIsPercent(_ isPercent: Bool) {
-        store.write(value: isPercent, key: "copilot.manualUsageIsPercent")
-    }
-
-    public func copilotManualOverrideEnabled() -> Bool {
-        store.read(key: "copilot.manualOverrideEnabled") ?? false
-    }
-
-    public func setCopilotManualOverrideEnabled(_ enabled: Bool) {
-        store.write(value: enabled, key: "copilot.manualOverrideEnabled")
-    }
-
-    public func copilotApiReturnedEmpty() -> Bool {
-        store.read(key: "copilot.apiReturnedEmpty") ?? false
-    }
-
-    public func setCopilotApiReturnedEmpty(_ empty: Bool) {
-        store.write(value: empty, key: "copilot.apiReturnedEmpty")
-    }
-
-    public func copilotLastUsagePeriodMonth() -> Int? {
-        store.read(key: "copilot.lastUsagePeriodMonth")
-    }
-
-    public func copilotLastUsagePeriodYear() -> Int? {
-        store.read(key: "copilot.lastUsagePeriodYear")
-    }
-
-    public func setCopilotLastUsagePeriod(month: Int, year: Int) {
-        store.write(value: month, key: "copilot.lastUsagePeriodMonth")
-        store.write(value: year, key: "copilot.lastUsagePeriodYear")
-    }
-
-    // Credentials (UserDefaults for now, Keychain migration later)
-
-    public func saveGithubToken(_ token: String) {
-        credentials.set(token, forKey: "com.claudebar.credentials.github-copilot-token")
-    }
-
-    public func getGithubToken() -> String? {
-        credentials.string(forKey: "com.claudebar.credentials.github-copilot-token")
-    }
-
-    public func deleteGithubToken() {
-        credentials.removeObject(forKey: "com.claudebar.credentials.github-copilot-token")
-    }
-
-    public func hasGithubToken() -> Bool {
-        getGithubToken() != nil
-    }
-
-    public func saveGithubUsername(_ username: String) {
-        credentials.set(username, forKey: "com.claudebar.credentials.github-username")
-    }
-
-    public func getGithubUsername() -> String? {
-        credentials.string(forKey: "com.claudebar.credentials.github-username")
-    }
-
-    public func deleteGithubUsername() {
-        credentials.removeObject(forKey: "com.claudebar.credentials.github-username")
     }
 
     // MARK: - BedrockSettingsRepository

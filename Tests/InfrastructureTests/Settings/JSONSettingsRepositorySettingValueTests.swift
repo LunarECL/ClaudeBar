@@ -55,4 +55,29 @@ struct JSONSettingsRepositorySettingValueTests {
         #expect(store.read(key: "vercel-gateway.authEnvVar") as String? == "OTHER_KEY")
         #expect(store.read(key: "vercel.authEnvVar") as String? == nil)
     }
+
+    @Test
+    func `a number an old card saved reads as text`() {
+        let (store, repository, directory) = make()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        store.write(value: 300, key: "copilot.monthlyLimit")
+
+        #expect(repository.value("monthlyLimit", forProvider: "copilot") == "300")
+    }
+
+    @Test
+    func `a value an old card kept in UserDefaults is read, and moves when saved`() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("claudebar-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = JSONSettingsStore(fileURL: directory.appendingPathComponent("settings.json"))
+        let defaults = UserDefaults(suiteName: "claudebar-test-\(UUID().uuidString)")!
+        defaults.set("octocat", forKey: "com.claudebar.credentials.github-username")
+        let repository = JSONSettingsRepository(store: store, credentials: defaults)
+
+        #expect(repository.value("username", forProvider: "copilot") == "octocat")
+
+        repository.setValue("hubot", "username", forProvider: "copilot")
+        #expect(store.read(key: "copilot.username") as String? == "hubot")
+        #expect(defaults.string(forKey: "com.claudebar.credentials.github-username") == nil)
+    }
 }
