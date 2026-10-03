@@ -223,8 +223,12 @@ final class StatusItemLabelDriver {
             (monitor.enabledProviders.first { $0.id == id } as? Account)
                 .flatMap { $0.provider.hasSeveralAccounts ? (id, settings.shown($0.displayName)) : nil }
         }))
-        let primaryProviderName = !showsQuota || (additionalLabels.isEmpty && accountNames[settings.menuBarPercentageProviderId] == nil)
-            ? nil : primaryProvider.map { settings.shown($0.name) }
+        let primaryProviderName = Self.showsPrimaryLogo(
+            showsQuota: showsQuota,
+            hasOtherReadouts: !additionalLabels.isEmpty,
+            hasAccountName: accountNames[settings.menuBarPercentageProviderId] != nil,
+            logoAlways: settings.menuBarProviderLogoEnabled
+        ) ? primaryProvider.map { settings.shown($0.name) } : nil
 
         return LabelContent(
             label: label,
@@ -306,6 +310,13 @@ final class StatusItemLabelDriver {
             systemColorScheme: content.isDarkAppearance ? .dark : .light,
             statusColors: content.statusColors
         )
+    }
+
+    /// Whether the primary readout starts with its provider's logo: when
+    /// there are readouts to tell apart — another provider, or an account
+    /// name — or when the person asked for it always. Never without a readout.
+    static func showsPrimaryLogo(showsQuota: Bool, hasOtherReadouts: Bool, hasAccountName: Bool, logoAlways: Bool) -> Bool {
+        showsQuota && (hasOtherReadouts || hasAccountName || logoAlways)
     }
 
     // MARK: - Image Composition

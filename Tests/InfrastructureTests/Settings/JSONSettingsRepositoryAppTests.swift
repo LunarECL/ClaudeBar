@@ -252,6 +252,16 @@ struct JSONSettingsRepositoryAppTests {
     }
 
     @Test
+    func `a single readout's logo is off until asked for, and stays on`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.menuBarProviderLogoEnabled() == false)
+        repo.setMenuBarProviderLogoEnabled(true)
+        #expect(repo.menuBarProviderLogoEnabled() == true)
+    }
+
+    @Test
     func `account emails show until hidden, and stay hidden`() {
         let (repo, dir) = makeRepository()
         defer { cleanup(dir) }

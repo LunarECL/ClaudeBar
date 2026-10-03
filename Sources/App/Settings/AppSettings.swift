@@ -58,6 +58,14 @@ public final class AppSettings {
         }
     }
 
+    /// Whether a single readout also starts with its provider's logo. Several
+    /// readouts, or several accounts, always show theirs.
+    public var menuBarProviderLogoEnabled: Bool {
+        didSet {
+            repository.setMenuBarProviderLogoEnabled(menuBarProviderLogoEnabled)
+        }
+    }
+
     /// Whether account labels appear beside provider icons in the menu bar.
     /// Tooltip and accessibility descriptions keep the account identity.
     public var menuBarAccountLabelsEnabled: Bool {
@@ -431,6 +439,7 @@ public final class AppSettings {
         self.menuBarPercentageEnabled = repository.menuBarPercentageEnabled()
         self.menuBarDurationEnabled = repository.menuBarDurationEnabled()
         self.menuBarAccountLabelsEnabled = repository.menuBarAccountLabelsEnabled()
+        self.menuBarProviderLogoEnabled = repository.menuBarProviderLogoEnabled()
         self.menuBarStackedEnabled = repository.menuBarStackedEnabled()
         // The stored size decodes through the Domain fallback so an unknown
         // raw value (from a newer build's settings file) renders small

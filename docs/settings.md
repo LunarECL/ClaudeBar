@@ -46,6 +46,7 @@ A few `app.*` keys worth knowing:
 |---|---|
 | `app.themeMode` | `system` (default), `light`, `dark`, `cli`, `christmas`, or `imported-<name>` |
 | `app.usageDisplayMode` | `remaining` (default), `used`, `pace` |
+| `app.menuBarProviderLogoEnabled` | `false` (default) shows a single readout without a logo; `true` starts it with the provider's logo. Several providers or accounts always show logos |
 | `app.menuBarAccountLabelsEnabled` | `true` (default) shows account labels; `false` hides their menu bar text while retaining hover details |
 | `app.hideAccountEmail` | `false` (default) shows account emails; `true` masks them as `s•••@g•••.com` in the menu bar, its tooltip and the popover. The eye beside the account toggles it ([#375](https://github.com/tddworks/ClaudeBar/issues/375)) |
 | `app.menuBarProviderSettings` | Per-provider menu bar choices: `{ "codex": { "primaryQuotaKey": "session", "secondaryQuotaKey": "weekly", "stacked": false, "stackedSize": "small" } }` |

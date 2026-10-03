@@ -33,6 +33,11 @@ public protocol AppSettingsRepository: Sendable {
     func menuBarAccountLabelsEnabled() -> Bool
     func setMenuBarAccountLabelsEnabled(_ enabled: Bool)
 
+    /// The provider's logo even when it's the only readout (off: only when
+    /// readouts need telling apart).
+    func menuBarProviderLogoEnabled() -> Bool
+    func setMenuBarProviderLogoEnabled(_ enabled: Bool)
+
     func menuBarStackedEnabled() -> Bool
     func setMenuBarStackedEnabled(_ enabled: Bool)
 
