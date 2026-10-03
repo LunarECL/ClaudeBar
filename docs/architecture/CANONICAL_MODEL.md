@@ -181,23 +181,28 @@ Response  ◇                                 "Response" — WHAT CAME BACK, bef
 
     DELIBERATELY OUTSIDE THE MONITOR
 Activity  ◆                                 Claude Code sessions seen through hooks — the notch
-UsageHistory  ◆                             "TODAY'S USAGE" — WHAT YOU USED, from a tool's own logs on
-│                                           this Mac. Not a meter: nothing here is left, refills or is judged
+UsageHistory  ◆                             "TODAY'S USAGE" · "DAILY USAGE — LAST 30 DAYS" — WHAT YOU USED,
+│                                           DAY BY DAY, from a tool's own logs on this Mac. Not a meter:
+│                                           nothing here is left, refills or is judged
 ├── logs: [Account.ID: UsageLog]            one per login whose tool writes logs — keyed by the login,
 │   │                                       never summed across logins
 │   └── UsageLog  ◇                         THE JSON — the definition's `history`, no behaviour:
-│       ├── records: RecordSource           WHERE AND HOW — files (a glob) · format (one JSON object per
-│       │                                   line, or one per file) · the fields of one record: when,
-│       │                                   which model, tokens by kind, its own cost, its identity
-│       ├── prices: PriceList?              WHAT A TOKEN COSTS — per model, per kind of token, as data
-│       │                                   beside the definition; a model served on this Mac is free
+│       ├── records                         WHERE AND HOW — files (a glob) · format (a JSON object per
+│       │                                   line, or per file) · the fields of one record in the
+│       │                                   mapping's path language: when, which model, tokens by
+│       │                                   kind, its own cost, its identity
+│       ├── prices: PriceCatalog            WHAT A TOKEN COSTS — the same port Bedrock uses: a price
+│       │                                   file beside the definition, or a cloud's price list
 │       └── sessionGap: seconds?            a pause longer than this starts a new working session
-├── read(for: Account.ID)                   "TODAY'S USAGE" — asked when the popover opens, never
-│                                           by the background poll (#204)
-└── report(for: Account.ID) → DayComparison ◇   TODAY against the day before
-    └── Day  ◇                              date · cost: Money (ESTIMATED unless the log states it) ·
-                                            tokens (input · output · cache write · cache read) ·
-                                            sessions · working time · cache savings
+├── days(for: Account.ID, in: DateRange) → [Day]   THE ONE READ — every view is a range of it:
+│                                           TODAY'S USAGE is the last two, the chart the last thirty
+├── ledger: DayLedger  ◇                    PAST DAYS, KEPT — a day that has closed is summed once
+│                                           and kept on this Mac, so thirty days never mean re-reading
+│                                           thirty days of logs; only the open days are read again
+└── Day  ◇                                  ONE DAY — date (local) · tokens: input · output · cache
+                                            write · cache read · cost: Cost (lines per model,
+                                            ESTIMATED unless the log states it) · sessions ·
+                                            working time · cache savings
 Destinations                                notifications · Notify! · live activity · status export
 
     NOT IN THE MODEL (the page's)
@@ -347,12 +352,14 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | an error names the step that failed — lookup, fetch or mapping — and never carries the secret or the response body | `DataSourceError` |
 | a usage says which data source produced it; a fallback is never silent | `Usage.source` |
 | a tool's history is DATA: where its logs are, how to read a record and what a token costs live in its definition; a new tool's logs, or a price change, never edit Swift | `UsageLog` |
-| a day is the local calendar day; a record counts on the day its own timestamp falls in — a timestamp written in UTC (a file name) is converted, never read as local | `DayComparison` |
+| history is a SERIES OF DAYS; every view — today against yesterday, the last thirty days, a chart — is a range of it, chosen by the page | `UsageHistory.days` |
+| a day is the local calendar day; a record counts on the day its own timestamp falls in — a timestamp written in UTC (a file name) is converted, never read as local | `Day` |
 | a record written twice counts once — the last copy wins (a streamed message is logged as it grows) | `UsageLog.records` |
-| the log's own cost wins; otherwise the cost is ESTIMATED from the price list, and says so. A model served on this Mac costs nothing; an unknown model gets the list's fallback price, never zero by omission | `PriceList` |
+| a day closes a fixed while after it ends; a closed day is summed once, kept, and never read from the logs again. Today, and the day before until it closes, are read every time | `DayLedger` |
+| a day's spend is a `Cost` with a line per model — the log's own cost wins; otherwise it is ESTIMATED from the price catalog, and says so. A model served on this Mac costs nothing; an unknown model gets the catalog's fallback price, never zero by omission | `Day.cost` · `PriceCatalog` |
 | history is per login: an added login reads its own folder's logs; two logins' days are never summed | `UsageHistory.logs` |
 | history is read when the popover opens, never in the background, and never carried on `Usage` | `UsageHistory` |
-| a day with nothing on either side is no report — never "$0 today, $0 yesterday" | `DayComparison` |
+| a day with nothing is an empty day, not a missing one — a series has every date in its range | `UsageHistory.days` |
 
 ## 6 · What is deliberately NOT in the tree
 
@@ -370,7 +377,8 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | `QuotaType.duration` guessing 7 days for a model quota or 30 for "Monthly" | see the law on `Window` |
 | a ViewModel or AppState | unchanged: views read the tree |
 | Claude Code sessions in the Monitor | a different question with a different *Session* — Activity's |
-| a `XxxDailyUsageAnalyzer` per tool, a Swift price table | a tool's logs and prices are data in its definition; one reader per log FORMAT, one pricer, one day aggregator |
+| a `XxxDailyUsageAnalyzer` per tool, a Swift price table | a tool's logs and prices are data in its definition; one reader per log FORMAT, one `PriceCatalog` port, one day aggregator |
+| "today and yesterday" as a type | a view, not a fact: the page asks for a range of days |
 | `dailyUsageReport` on the usage | Usage History is another context's answer, read on its own (§9) |
 
 ## 7 · The contexts, and the modules that implement them
@@ -429,7 +437,7 @@ context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
 | `Quota.left` | **built** (slice 4): `Left` = `share` · `money(Money, of: Money?)` on every `UsageQuota`; status, pace, the lowest quota and the menu bar follow it, so a balance shows its money and has no pace. Legacy probes still write `100` + `dollarRemaining`, which reads as a balance; a JSON mapping writes `left: { money, of }` | `percentRemaining` leaves the call sites as providers migrate |
 | `Window` | **built** (slice 4): the kernel no longer guesses — pace uses only a stated `window.length`. Legacy probes state what the guess used to give (`conventionalWindow`, named as a convention; Bedrock's daily budget now 1 day; Cursor's monthly card none, as it chose); Claude's script and JSON and Codex's JSON state their windows, the response's word first | the conventions become each definition's word as providers migrate |
 | `Usage` | `UsageSnapshot` with `bedrockUsage`, `extensionMetrics`, `dailyUsageReport` | kernel fields only; the rest moves to their contexts |
-| `UsageHistory` · `UsageLog` · `DayComparison` | `UsageHistory` in `Domain` keyed by login, fed by two vendor-named analyzers in `Infrastructure` — `ClaudeDailyUsageAnalyzer` (JSONL under `~/.claude/projects`, `ModelPricing` as a Swift table, `ClaudeLocalInferenceDetector`, `SessionLogCache`) and `VibeSessionLogAnalyzer` (`meta.json` per session folder); the report types (`DailyUsageReport`/`Stat`) sit in `Quotas` | `Modules/UsageHistory`: `UsageLog` read from each definition's `history`, one reader per format, one pricer over a price list beside the definition, one aggregator; both analyzers and `Infrastructure/Claude`, `Infrastructure/Mistral` deleted (TARGET_ARCHITECTURE §10) |
+| `UsageHistory` · `UsageLog` · `Day` · `DayLedger` | `UsageHistory` in `Domain` keyed by login, fed by two vendor-named analyzers in `Infrastructure` — `ClaudeDailyUsageAnalyzer` (JSONL under `~/.claude/projects`, `ModelPricing` as a Swift table, `ClaudeLocalInferenceDetector`, `SessionLogCache`) and `VibeSessionLogAnalyzer` (`meta.json` per session folder); the report types (`DailyUsageReport`/`Stat`) sit in `Quotas`; only today and yesterday exist, re-read from the logs on every popover open | `Modules/UsageHistory`: `UsageLog` read from each definition's `history`, one reader per format, prices through `PriceCatalog`, one aggregator, `days(in:)` over a `DayLedger` of closed days; both analyzers and `Infrastructure/Claude`, `Infrastructure/Mistral` deleted (TARGET_ARCHITECTURE §10) |
 | `Plan` | `AccountTier` with Claude cases | a name and a badge |
 | `StatusPolicy` | **built** (#357): `StatusPolicy` in `Quotas` with `quota.status(under:)` / `usage.overallStatus(under:)`; `QuotaMonitor.statusPolicy` read live from the burn-rate settings; alerts, pills, cards, Touch Bars, status export and Notify! all read under it. Left: `menuBarLabel(…)` still takes the two burn-rate values instead of the policy, and pace falls back to `quotaType.duration` when no window is known | the menu-bar label takes the policy; the `Window` law removes the guess; `StatusColorPolicy` (colours, high contrast) moves to the App |
 | `Account.budget` | two one-off settings: `app.claudeApiBudget` (+ `…Enabled`, edited in Claude's card) and `bedrock.dailyBudget`; Bedrock turns its budget into a fake `Daily Budget` quota | a `Budget` beside the account's `Cost`, judged as `BudgetStatus`, never a quota; the old keys read as the default account's budget |
@@ -461,9 +469,9 @@ Each step ships green and changes no behaviour a user can see, until the last.
 ## 9 · Open
 
 - ~~**Usage History on the usage.**~~ — **answered**: a second read the
-  popover asks for. `UsageHistory` holds one `UsageLog` per login and reads
-  it when the popover opens; `Usage` carries no daily report (Mistral #419
-  already works this way).
+  popover asks for. `UsageHistory` holds one `UsageLog` per login and answers
+  `days(in:)` when the popover opens; `Usage` carries no daily report
+  (Mistral #419 already works this way).
 - **The mapping's reach.** When a vendor's response needs a rule the JSON
   mapping cannot say (Codex's free plan with no limits; Claude's PTY screen),
   the answer is a mapping FEATURE every provider gets — never a vendor
