@@ -54,7 +54,20 @@ final class StatusItemLabelDriver {
     private var lastImage: NSImage?
     private var lastContent: LabelContent?
     private var lastLabelSelection: [String]?
+    /// The tooltip text of the last write that reached the button. The blink
+    /// never changes it, and re-setting an identical string still crosses into
+    /// the system's status-item service, so identical strings skip the write
+    /// (issue #281).
+    private var lastTooltip: String?
+    private var hasAppliedTooltip = false
     private var imageWipeObservation: NSKeyValueObservation?
+
+    /// Coalesces renders into actual button writes: at most one per
+    /// `minimumWriteInterval`, plus the trailing flush. Everything the pixels
+    /// depend on — image, position, tooltip, accessibility — goes through it,
+    /// so no render can push more than one update per interval into the
+    /// system's status-item service (issue #281).
+    private var writeGate: StatusItemWriteGate<LabelContent>?
 
     init(monitor: QuotaMonitor, settings: AppSettings, sessionMonitor: SessionMonitor) {
         self.monitor = monitor
@@ -127,6 +140,14 @@ final class StatusItemLabelDriver {
         hasLoggedMissingButton = false
         self.statusItem = statusItem
         labelSync?.stop()
+
+        // A fresh gate per attachment: its writes resolve `statusItem?.button`
+        // at write time, so a flush left over from the previous item lands on
+        // the button we actually hold now.
+        writeGate = StatusItemWriteGate(
+            minimumInterval: Self.minimumWriteInterval,
+            write: { [weak self] content in self?.applyToButton(content) }
+        )
 
         let sync = ObservationRenderSync(
             read: { [self] in currentLabelContent() },
@@ -262,7 +283,7 @@ final class StatusItemLabelDriver {
     }
 
     private func render(_ content: LabelContent) {
-        guard let button = statusItem?.button else {
+        guard statusItem?.button != nil else {
             // Loud but once: the symptom is a menu bar item that is invisible
             // and unclickable, which otherwise leaves no trace in the log.
             if !hasLoggedMissingButton {
@@ -273,9 +294,20 @@ final class StatusItemLabelDriver {
         }
         // Skip when nothing changed and our image is still in place —
         // re-setting an identical image redraws the button and can flicker.
-        if content == lastContent, let lastImage, button.image === lastImage {
+        if content == lastContent, let lastImage, statusItem?.button?.image === lastImage {
             return
         }
+        // Everything past this point is a write into the system's status-item
+        // service. Coalesce instead of pushing every render straight through:
+        // macOS 26 aborts under a rapid stream of such writes (issue #281),
+        // and the blink tick alone rendered twice a second.
+        writeGate?.submit(content)
+    }
+
+    /// The write gate's single sink: one actual write into the button. Runs at
+    /// most once per `minimumWriteInterval`, plus the trailing flush.
+    private func applyToButton(_ content: LabelContent) {
+        guard let button = statusItem?.button else { return }
         let image = Self.compose(content, theme: resolvedTheme(for: content))
         lastContent = content
         lastImage = image
@@ -286,6 +318,12 @@ final class StatusItemLabelDriver {
         }
         let tooltip = ([primaryText].compactMap { $0 } + content.additionalLabels.map(\.text))
             .joined(separator: " | ")
+        // The blink never changes the tooltip text; re-setting an identical
+        // string would still round-trip into the system service, so apply the
+        // string properties only when the text actually changed (issue #281).
+        guard !hasAppliedTooltip || tooltip != lastTooltip else { return }
+        hasAppliedTooltip = true
+        lastTooltip = tooltip
         button.toolTip = tooltip.isEmpty ? nil : tooltip
         button.setAccessibilityLabel(tooltip.isEmpty ? "ClaudeBar" : tooltip)
     }
@@ -502,10 +540,24 @@ final class StatusItemLabelDriver {
 
     // MARK: - Countdown Tick
 
-    /// Half a second on, half a second off — the cadence a digital clock blinks
-    /// its separator at. Also the rate the label re-reads the wall clock, so a
-    /// countdown advances within half a second of the true minute boundary.
-    private static let blinkInterval: TimeInterval = 0.5
+    /// One second on, one second off — half the cadence a digital clock
+    /// blinks its separator at, so the pulse reads as a slow 1 Hz beat. Also
+    /// the rate the label re-reads the wall clock, so a countdown advances
+    /// within about a second of the true minute boundary.
+    ///
+    /// Deliberately equal to `minimumWriteInterval`, and never fired early by
+    /// the runloop: a 0.5s tick under the 1s write gate would replace the
+    /// bright phase with the dim one inside every window, leaving the colon
+    /// permanently dimmed (the pulse would die). At 1s each phase lands on the
+    /// window boundary and writes alternate cleanly.
+    private static let blinkInterval: TimeInterval = 1.0
+
+    /// Minimum spacing between actual status-item writes. The tick runs at the
+    /// same rate (see `blinkInterval`), but probe refreshes, hook events and
+    /// wake repaints can still render between ticks, and macOS 26's Control
+    /// Center status-items XPC service aborts under a rapid stream of updates
+    /// (issue #281) — so every render is coalesced through the gate.
+    private static let minimumWriteInterval: TimeInterval = 1.0
 
     /// Starts watching whether a duration is shown at all, running the
     /// countdown tick only while one is. Sibling of `startMonitoringLifecycle`.
