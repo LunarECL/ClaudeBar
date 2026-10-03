@@ -66,34 +66,6 @@ extension ProviderLook {
     }
 }
 
-// MARK: - MistralProvider Visual Identity
-
-extension MistralProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "cat.fill" }
-
-    public var iconAssetName: String { "MistralIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Mistral brand orange
-        scheme == .dark
-            ? Color(red: 1.0, green: 0.55, blue: 0.0)
-            : Color(red: 0.90, green: 0.45, blue: 0.0)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.85, green: 0.35, blue: 0.10)
-                    : Color(red: 0.75, green: 0.25, blue: 0.05)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - ExtensionProvider Visual Identity
 
 extension ExtensionProvider: ProviderVisualIdentity {
@@ -185,10 +157,6 @@ enum ProviderVisualIdentityLookup {
     static func color(for providerId: String, scheme: ColorScheme) -> Color {
         if let color = look(for: providerId)?.color { return color.color(for: scheme) }
         switch providerId {
-        case "mistral":
-            return scheme == .dark
-                ? Color(red: 1.0, green: 0.55, blue: 0.0)
-                : Color(red: 0.90, green: 0.45, blue: 0.0)
         default:
             return BaseTheme.purpleVibrant
         }
@@ -201,10 +169,6 @@ enum ProviderVisualIdentityLookup {
         let secondaryColor: Color
 
         switch providerId {
-        case "mistral":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.85, green: 0.35, blue: 0.10)
-                : Color(red: 0.75, green: 0.25, blue: 0.05)
         default:
             return LinearGradient(
                 colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
@@ -224,7 +188,6 @@ enum ProviderVisualIdentityLookup {
     static func iconAssetName(for providerId: String) -> String {
         if let icon = look(for: providerId)?.icon { return icon }
         switch providerId {
-        case "mistral": return "MistralIcon"
         default: return "QuestionIcon"
         }
     }
@@ -233,7 +196,6 @@ enum ProviderVisualIdentityLookup {
     static func name(for providerId: String) -> String {
         if let definition = Providers.definition(forLineupId: providerId) { return definition.profile.name }
         switch providerId {
-        case "mistral": return "Mistral"
         default: return providerId.capitalized
         }
     }
@@ -242,7 +204,6 @@ enum ProviderVisualIdentityLookup {
     static func symbolIcon(for providerId: String) -> String {
         if let symbol = look(for: providerId)?.symbol { return symbol }
         switch providerId {
-        case "mistral": return "cat.fill"
         default:
             return extensionSymbols.withLock { $0[providerId] } ?? "questionmark.circle.fill"
         }

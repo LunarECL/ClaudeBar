@@ -129,6 +129,8 @@ public enum DataSources {
                                processPaths: processPaths)
         case .cloudWatch(let call):
             CloudWatchFetcher(call: call, client: cloudWatch, catalog: priceCatalog, now: now)
+        case .directory(let call):
+            DirectoryFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
         }
 
         let mapper: any Reading = switch definition.mapping {
