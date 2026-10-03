@@ -404,10 +404,28 @@ enum AppTheme {
 
 struct AdaptiveGlassCardStyle: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.appTheme) private var theme
     var cornerRadius: CGFloat = 16
     var padding: CGFloat = 12
 
     func body(content: Content) -> some View {
+        if theme.isOutlined {
+            // A printed theme has no glass: its paper card, outline and shadow.
+            content
+                .padding(padding)
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(theme.cardGradient)
+                        .themeShadow(theme)
+                        .overlay(RoundedRectangle(cornerRadius: cornerRadius)
+                            .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
+                )
+        } else {
+            glass(content)
+        }
+    }
+
+    private func glass(_ content: Content) -> some View {
         content
             .padding(padding)
             .background(
