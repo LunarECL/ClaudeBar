@@ -76,4 +76,26 @@ struct HTTPFetcherTests {
         #expect(missing?.reason == .rateLimited(retryAt: Self.now.addingTimeInterval(300)))
         #expect(zero?.reason == .rateLimited(retryAt: Self.now.addingTimeInterval(300)))
     }
+
+    // MARK: - Filling a URL
+
+    @Test
+    func `a value filled into a URL is percent-encoded`() async throws {
+        let network = MockNetworkClient()
+        let seen = URLBox()
+        given(network).request(.any).willProduce { request in
+            seen.url = request.url
+            return (Data("{}".utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        let fetcher = HTTPFetcher(request: HTTPRequest(url: "https://acme.test/usage?org={{org}}"), network: network, now: { Self.now })
+
+        _ = try await fetcher.fetch(with: Credential(["org": "team & org"]))
+
+        let items = URLComponents(url: try #require(seen.url), resolvingAgainstBaseURL: false)?.queryItems
+        #expect(items == [URLQueryItem(name: "org", value: "team & org")])
+    }
+}
+
+private final class URLBox: @unchecked Sendable {
+    var url: URL?
 }

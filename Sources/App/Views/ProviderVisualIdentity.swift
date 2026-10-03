@@ -545,11 +545,6 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(white: 0.92)
                 : Color(white: 0.12)
-        case "commandcode":
-            // Command Code brand: Burple-foreground #546BF3 / monochrome black
-            return scheme == .dark
-                ? Color(red: 0.33, green: 0.42, blue: 0.95)
-                : Color(red: 0.07, green: 0.07, blue: 0.07)
         default:
             return BaseTheme.purpleVibrant
         }
@@ -614,11 +609,6 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(white: 0.60)
                 : Color(white: 0.40)
-        case "commandcode":
-            // Command Code Burple-background #2E1B9C
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.18, green: 0.11, blue: 0.61)
-                : Color(red: 0.25, green: 0.25, blue: 0.25)
         default:
             return LinearGradient(
                 colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
@@ -651,7 +641,6 @@ enum ProviderVisualIdentityLookup {
         case "opencode-go": return "OpenCodeIcon"
         case "omp": return "OmpIcon"
         case "grok": return "GrokIcon"
-        case "commandcode": return "CommandCodeIcon"
         default: return "QuestionIcon"
         }
     }
@@ -673,7 +662,6 @@ enum ProviderVisualIdentityLookup {
         case "opencode-go": return "OpenCode Go"
         case "omp": return "Oh My Pi"
         case "grok": return "Grok"
-        case "commandcode": return "Command Code"
         default: return providerId.capitalized
         }
     }
@@ -695,7 +683,6 @@ enum ProviderVisualIdentityLookup {
         case "opencode-go": return "square.stack.3d.up.fill"
         case "omp": return "terminal.fill"
         case "grok": return "line.diagonal"
-        case "commandcode": return "command"
         default:
             return extensionSymbols.withLock { $0[providerId] } ?? "questionmark.circle.fill"
         }

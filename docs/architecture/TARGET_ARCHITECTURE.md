@@ -512,15 +512,19 @@ JSON-RPC already says this with `then`. HTTP says it the same way:
 ```
 
 - **What a step can do.** `keep` names values from a step's response, by JSON
-  path or by a `pattern` over text. `optional` lets a step fail without ending
-  the fetch. `unless` skips a step when a value is already known, such as a
-  `sec_token` already in the cookie.
-- **The last step answers.** Its response is the one that gets mapped, and
-  the one *Test Connection* shows.
+  path — or a list of paths, the first that answers — or by a `pattern` over
+  text. `optional` lets a step fail without ending the fetch, though a
+  refused key or a rate limit still ends it. `unless` skips a step when a
+  value is already known, such as a `sec_token` already in the cookie.
+- **Every step answers.** The response is each step's answer by name —
+  `{ "whoami": {…}, "credits": {…} }`, text where it wasn't JSON — so the
+  mapping reads what any step said and *Test Connection* shows them all.
 - **A kept value never replaces a credential value.** A step's answer cannot
-  swap the key a later step sends.
+  swap the key a later step sends. A value filled into a URL is
+  percent-encoded, so it can never add a query item.
 - **`attempts`** (1 to 3) tries a step again after a network failure or a 5xx.
-  **`dropEmpty`** leaves a JSON body key out when its value came out empty.
+  **`dropEmpty`** leaves out a JSON body key or URL query item whose value is
+  missing — `?orgId={{orgId}}` goes without `orgId` when no step found one.
 - **Import lists every host.**
 
 This replaces the JS planner (`httpFlow`), as well as `commandPlan` and

@@ -20,6 +20,16 @@ enum Template {
     }
 }
 
+extension Credential {
+    /// The values as they go into a URL: `team & org` becomes `team%20%26%20org`,
+    /// so a value can never add a query item or end the URL.
+    var percentEncodedForURL: Credential {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+?#")
+        return Credential(values.mapValues { $0.addingPercentEncoding(withAllowedCharacters: allowed) ?? $0 })
+    }
+}
+
 /// `http` — one HTTP request. 2xx answers with the response; anything else
 /// becomes the `UsageError` a provider reports, keeping its status so a
 /// refresh-and-retry can be tried.
@@ -33,7 +43,7 @@ struct HTTPFetcher: Fetching {
     func isReady() -> Bool { true }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        guard let urlText = Template.fill(request.url, with: credential), let url = URL(string: urlText) else {
+        guard let urlText = Template.fill(request.url, with: credential?.percentEncodedForURL), let url = URL(string: urlText) else {
             throw UsageError.executionFailed("Invalid URL")
         }
         var urlRequest = URLRequest(url: url)
