@@ -125,21 +125,44 @@ public struct KeychainCredential: Sendable, Equatable, Codable {
 /// A JSON file and where in it each credential value lives. `path` may start
 /// with `~/` or `${VARIABLE:-~}/`.
 public struct JSONFileCredential: Sendable, Equatable, Codable {
+    /// A file holding several logins — one object per key. The record that
+    /// has `prefer` answers before one that hasn't, then the `latest` by
+    /// that value (a missing one counts as never ending). Field paths are
+    /// read inside the record, and a refreshed token is written back into it.
+    public struct Record: Sendable, Equatable, Codable {
+        public let prefer: String?
+        public let latest: String?
+
+        public init(prefer: String? = nil, latest: String? = nil) {
+            self.prefer = prefer
+            self.latest = latest
+        }
+    }
+
     /// `~` expands to the home directory.
     public let path: String
     /// Credential name → JSON path in the file. `token` is required.
     public let fields: [String: String]
+    public let record: Record?
+    /// Values for fields the file lacks — never written back to it.
+    public let defaults: [String: String]
 
-    public init(path: String, fields: [String: String]) {
+    private static let reserved: Set = ["path", "record", "defaults"]
+
+    public init(path: String, fields: [String: String], record: Record? = nil, defaults: [String: String] = [:]) {
         self.path = path
         self.fields = fields
+        self.record = record
+        self.defaults = defaults
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
         path = try container.decode(String.self, forKey: TagKey("path"))
+        record = try container.decodeIfPresent(Record.self, forKey: TagKey("record"))
+        defaults = try container.decodeIfPresent([String: String].self, forKey: TagKey("defaults")) ?? [:]
         var fields: [String: String] = [:]
-        for key in container.allKeys where key.stringValue != "path" {
+        for key in container.allKeys where !Self.reserved.contains(key.stringValue) {
             fields[key.stringValue] = try container.decode(String.self, forKey: key)
         }
         self.fields = fields
@@ -148,6 +171,8 @@ public struct JSONFileCredential: Sendable, Equatable, Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: TagKey.self)
         try container.encode(path, forKey: TagKey("path"))
+        try container.encodeIfPresent(record, forKey: TagKey("record"))
+        if !defaults.isEmpty { try container.encode(defaults, forKey: TagKey("defaults")) }
         for (name, path) in fields {
             try container.encode(path, forKey: TagKey(name))
         }
@@ -179,21 +204,26 @@ public struct OAuth2Refresh: Sendable, Equatable, Codable {
     }
 
     /// When a token expires: the credential value holding the instant, its
-    /// unit, and how early to refresh. A missing value means "refresh now".
+    /// unit, and how early to refresh. A missing value means "refresh now",
+    /// unless `missingIsDue` is off — a key that never expires.
     public struct Expiry: Sendable, Equatable, Codable {
         public enum Unit: String, Sendable, Equatable, Codable {
             case seconds
             case milliseconds
+            /// `2026-07-26T21:03:09.138930Z`, any fraction of a second.
+            case iso8601
         }
 
         public let expiresAt: String
         public let unit: Unit
         public let skew: TimeInterval
+        public let missingIsDue: Bool
 
-        public init(expiresAt: String = "expiresAt", unit: Unit = .seconds, skew: TimeInterval = 0) {
+        public init(expiresAt: String = "expiresAt", unit: Unit = .seconds, skew: TimeInterval = 0, missingIsDue: Bool = true) {
             self.expiresAt = expiresAt
             self.unit = unit
             self.skew = skew
+            self.missingIsDue = missingIsDue
         }
 
         public init(from decoder: Decoder) throws {
@@ -201,6 +231,7 @@ public struct OAuth2Refresh: Sendable, Equatable, Codable {
             expiresAt = try container.decodeIfPresent(String.self, forKey: .expiresAt) ?? "expiresAt"
             unit = try container.decodeIfPresent(Unit.self, forKey: .unit) ?? .seconds
             skew = try container.decodeIfPresent(TimeInterval.self, forKey: .skew) ?? 0
+            missingIsDue = try container.decodeIfPresent(Bool.self, forKey: .missingIsDue) ?? true
         }
     }
 
