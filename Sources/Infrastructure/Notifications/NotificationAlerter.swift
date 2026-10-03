@@ -94,7 +94,6 @@ public final class NotificationAlerter: QuotaAlerter, @unchecked Sendable {
         }
         switch providerId {
         case "gemini": return "Gemini"
-        case "copilot": return "GitHub Copilot"
         case "antigravity": return "Antigravity"
         case "bedrock": return "AWS Bedrock"
         case "alibaba": return "Alibaba"

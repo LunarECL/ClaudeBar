@@ -8,9 +8,10 @@ import JavaScriptCore
 /// The script defines `read(response, context)`:
 ///
 /// - `response` — `{ status, headers, text, json }` (`json` is the parsed body, or `null`)
-/// - `context` — `{ now, timeZone, credential, ...files }`: epoch seconds, the
-///   current zone's identifier, the credential values the definition lets it
-///   see, and each declared context file's fields
+/// - `context` — `{ now, timeZone, credential, values, ...files }`: epoch
+///   seconds, the current zone's identifier, the credential values the
+///   definition lets it see, the settings it hands over (`values`), and each
+///   declared context file's fields
 ///
 /// and returns `{ quotas, plan, cost, account }` or `{ error }`. It may call
 /// `humanDate(text)` for an epoch-seconds reset time, or `null`;
@@ -23,6 +24,7 @@ import JavaScriptCore
 struct ScriptMapper: Reading {
     let file: String
     let source: String?
+    var values: [String: String] = [:]
     let now: @Sendable () -> Date
 
     func read(_ response: Response, facts: MappingFacts, providerId: String) throws -> UsageSnapshot {
@@ -43,7 +45,7 @@ struct ScriptMapper: Reading {
             HumanDate.parse(text, now: clock()).map { $0.timeIntervalSince1970 } ?? NSNull()
         }
         context.setObject(humanDate, forKeyedSubscript: "humanDate" as NSString)
-        context.setObject(try Self.inputJSON(response, facts: facts, now: now()), forKeyedSubscript: "__input" as NSString)
+        context.setObject(try Self.inputJSON(response, facts: facts, values: values, now: now()), forKeyedSubscript: "__input" as NSString)
 
         context.evaluateScript(DecimalScript.source)
         context.evaluateScript(source)
@@ -69,11 +71,13 @@ struct ScriptMapper: Reading {
         return try result.snapshot(providerId: providerId, capturedAt: now())
     }
 
-    private static func inputJSON(_ response: Response, facts: MappingFacts, now: Date) throws -> String {
+    private static func inputJSON(_ response: Response, facts: MappingFacts, values: [String: String], now: Date) throws -> String {
         var context: [String: Any] = [
             "now": now.timeIntervalSince1970,
             "timeZone": TimeZone.current.identifier,
             "credential": facts.credential,
+            // A blank setting never filled its template.
+            "values": values.filter { !$0.value.contains("{{") },
         ]
         for (name, fields) in facts.context {
             context[name] = fields

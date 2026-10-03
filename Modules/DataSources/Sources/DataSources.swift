@@ -114,7 +114,7 @@ public enum DataSources {
         let mapper: any Reading = switch definition.mapping {
         case .json(let mapping): JSONMapper(mapping: mapping, now: now)
         case .text(let mapping): TextMapper(mapping: mapping, now: now)
-        case .script(let mapping): ScriptMapper(file: mapping.file, source: scripts(mapping.file), now: now)
+        case .script(let mapping): ScriptMapper(file: mapping.file, source: scripts(mapping.file), values: mapping.values, now: now)
         }
 
         var refresher: (any CredentialRefreshing)?

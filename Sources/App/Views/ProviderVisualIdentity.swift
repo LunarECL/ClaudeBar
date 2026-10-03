@@ -93,34 +93,6 @@ extension GeminiProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - CopilotProvider Visual Identity
-
-extension CopilotProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "chevron.left.forwardslash.chevron.right" }
-
-    public var iconAssetName: String { "CopilotIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // GitHub's blue color
-        scheme == .dark
-            ? Color(red: 0.38, green: 0.55, blue: 0.93)
-            : Color(red: 0.26, green: 0.43, blue: 0.82)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.55, green: 0.40, blue: 0.90)
-                    : Color(red: 0.45, green: 0.30, blue: 0.80)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - AntigravityProvider Visual Identity
 
 extension AntigravityProvider: ProviderVisualIdentity {
@@ -328,10 +300,6 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? BaseTheme.goldenGlow
                 : Color(red: 0.92, green: 0.72, blue: 0.28)
-        case "copilot":
-            return scheme == .dark
-                ? Color(red: 0.38, green: 0.55, blue: 0.93)
-                : Color(red: 0.26, green: 0.43, blue: 0.82)
         case "antigravity":
             return scheme == .dark
                 ? Color(red: 0.72, green: 0.35, blue: 0.85)
@@ -364,10 +332,6 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.95, green: 0.55, blue: 0.35)
                 : Color(red: 0.85, green: 0.45, blue: 0.25)
-        case "copilot":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.55, green: 0.40, blue: 0.90)
-                : Color(red: 0.45, green: 0.30, blue: 0.80)
         case "antigravity":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.45, green: 0.25, blue: 0.75)
@@ -404,7 +368,6 @@ enum ProviderVisualIdentityLookup {
         if let icon = look(for: providerId)?.icon { return icon }
         switch providerId {
         case "gemini": return "GeminiIcon"
-        case "copilot": return "CopilotIcon"
         case "antigravity": return "AntigravityIcon"
         case "bedrock": return "BedrockIcon"
         case "mistral": return "MistralIcon"
@@ -418,7 +381,6 @@ enum ProviderVisualIdentityLookup {
         if let definition = Providers.definition(forLineupId: providerId) { return definition.profile.name }
         switch providerId {
         case "gemini": return "Gemini"
-        case "copilot": return "GitHub Copilot"
         case "antigravity": return "Antigravity"
         case "bedrock": return "AWS Bedrock"
         case "mistral": return "Mistral"
@@ -432,7 +394,6 @@ enum ProviderVisualIdentityLookup {
         if let symbol = look(for: providerId)?.symbol { return symbol }
         switch providerId {
         case "gemini": return "sparkles"
-        case "copilot": return "chevron.left.forwardslash.chevron.right"
         case "antigravity": return "wand.and.stars"
         case "bedrock": return "cloud.fill"
         case "mistral": return "cat.fill"

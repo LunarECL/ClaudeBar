@@ -51,11 +51,11 @@ struct ActionBarSpec {
         }
 
         @Test
-        func `Copilot dashboard URL is GitHub features page`() {
+        func `Copilot dashboard URL is GitHub features page`() throws {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let copilot = CopilotProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let copilot = try Providers.make("copilot", settings: settings).defaultAccount
             #expect(copilot.dashboardURL?.absoluteString == "https://github.com/settings/copilot/features")
         }
 

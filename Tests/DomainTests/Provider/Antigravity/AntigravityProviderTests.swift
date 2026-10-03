@@ -269,15 +269,13 @@ struct AntigravityProviderTests {
     @Test
     func `antigravity provider has unique id compared to other providers`() {
         let settings = makeSettingsRepository()
-        let copilotSettings = MockRepositoryFactory.makeCopilotSettingsRepository()
         let mockProbe = MockUsageProbe()
         let antigravity = AntigravityProvider(probe: mockProbe, settingsRepository: settings)
         let claude = StubClaudeProvider(probe: mockProbe, settingsRepository: settings)
         let codex = StubCodexProvider(probe: mockProbe, settingsRepository: settings)
         let gemini = GeminiProvider(probe: mockProbe, settingsRepository: settings)
-        let copilot = CopilotProvider(probe: mockProbe, settingsRepository: copilotSettings)
 
-        let ids = Set([antigravity.id, claude.id, codex.id, gemini.id, copilot.id])
-        #expect(ids.count == 5) // All unique
+        let ids = Set([antigravity.id, claude.id, codex.id, gemini.id])
+        #expect(ids.count == 4) // All unique
     }
 }

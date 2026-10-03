@@ -234,50 +234,6 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.codexVerifiedAtLeastOnce() == false)
     }
 
-    // MARK: - Copilot Settings
-
-    @Test
-    func `copilotProbeMode defaults to billing`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.copilotProbeMode() == .billing)
-    }
-
-    @Test
-    func `setCopilotProbeMode persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setCopilotProbeMode(.copilotAPI)
-        #expect(repo.copilotProbeMode() == .copilotAPI)
-    }
-
-    @Test
-    func `copilotAuthEnvVar defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.copilotAuthEnvVar() == "")
-    }
-
-    @Test
-    func `copilotMonthlyLimit defaults to nil`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.copilotMonthlyLimit() == nil)
-    }
-
-    @Test
-    func `setCopilotMonthlyLimit persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setCopilotMonthlyLimit(100)
-        #expect(repo.copilotMonthlyLimit() == 100)
-    }
-
     // MARK: - Bedrock Settings
 
     @Test

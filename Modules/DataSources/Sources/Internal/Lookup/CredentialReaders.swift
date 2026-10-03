@@ -295,22 +295,23 @@ struct SettingReader: CredentialFinding {
     }
 }
 
-/// A lookup refined: no key unless each `match` pattern matches its value,
-/// and the `with` values added where nothing was found.
+/// A lookup refined: the `with` values added where nothing was found, then
+/// no key unless each `match` pattern matches its value.
 struct RefinedReader: CredentialFinding {
     let base: any CredentialFinding
     let refinement: Refinement
 
     func find() throws -> FoundCredential? {
         guard var found = try base.find() else { return nil }
+        for (name, value) in refinement.with where found.credential[name] == nil {
+            found.credential[name] = value
+        }
+        // Checked after `with`, so a value a setting added must fit too.
         for (name, pattern) in refinement.match {
             guard let value = found.credential[name], value.range(of: pattern, options: .regularExpression) != nil else {
                 AppLog.credentials.info("A key was found but its \(name) isn't one this provider uses; not using it")
                 return nil
             }
-        }
-        for (name, value) in refinement.with where found.credential[name] == nil {
-            found.credential[name] = value
         }
         return found
     }
