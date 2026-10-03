@@ -783,6 +783,65 @@ screens) never learns which tool wrote it.
 | a record no path can say (a field to compute, a list to add up) | `"script": "x-log.js"` — `read(record, context)` returns one `LogRecord`, the escape hatch a mapping already has (built when a tool first needs it) | no |
 | a file of another kind (SQLite, binary) | a new `format` case and its reader, named for the format, with a test that names no tool | once |
 
+**A script, by example.** Say a tool logs one line per turn, in an
+OpenAI-style shape no path can turn into a record: the time in epoch
+milliseconds, cached tokens *included* in the input count, and one usage
+entry per model in a list.
+
+```jsonc
+// a line of ~/.example/history/2026-10-03.jsonl
+{"kind":"turn","ts":1759500000123,"turn":"t_81","usage":[
+  {"model":"gpt-5","prompt_tokens":12000,"cached_tokens":9000,"completion_tokens":800},
+  {"model":"gpt-5-mini","prompt_tokens":3000,"cached_tokens":0,"completion_tokens":200}]}
+```
+
+The definition keeps what paths can say — the files, the format, the
+filter — and hands each record to a script instead of naming its fields:
+
+```jsonc
+// example.json
+"usageHistory": {
+  "records": {
+    "files": "~/.example/history/*.jsonl",
+    "format": "jsonLines",
+    "where": { "path": "$.kind", "equals": "turn" },   // still the byte prefilter: the script sees only these
+    "script": "example-log.js"                         // in place of at · id · model · tokens · cost
+  },
+  "prices": { "file": "example-prices.json" },
+  "sessionGap": 1800
+}
+```
+
+```js
+// example-log.js — read(record, context) → a LogRecord, a list of them, or null to skip
+function read(record, context) {
+  if (!Array.isArray(record.usage)) return null;
+  return record.usage.map(function (u, i) {
+    return {
+      at: record.ts / 1000,                          // epoch seconds
+      id: record.turn + "#" + i,                     // one record per model in the turn
+      model: u.model,
+      tokens: {
+        input: u.prompt_tokens - u.cached_tokens,    // the log counts cached tokens as input
+        cacheRead: u.cached_tokens,
+        output: u.completion_tokens
+      }
+      // cost: "0.0123" — when the log states it; a decimal text stays exact
+    };
+  });
+}
+```
+
+That line becomes two records — `gpt-5` with 3,000 input, 9,000 cache read
+and 800 output tokens, `gpt-5-mini` with 3,000 and 200 — priced, deduped and
+summed into days exactly like Claude's. The rules are a mapping script's
+(§2): it runs in JavaScriptCore with no file, network or process access;
+`context` holds `now`, `timeZone`, the file's `path` and the definition's
+`values`; money helpers (`jsonDecimal`, `decimalAdd`) keep a stated cost
+exact; and it turns one record into records, nothing else. A script is
+slower than paths, so `where` filters first, and a tool whose fields paths
+*can* reach never needs one.
+
 `format` is a closed sum like `Fetch`: the engine stays closed, a new tool is
 data. The reading rules every format shares:
 
