@@ -13,7 +13,8 @@ struct JSONLinesReaderTests {
         id: ["$.reply.id", "$.request"],
         model: "$.reply.model",
         tokens: UsageLog.Tokens(input: "$.reply.usage.in", output: "$.reply.usage.out",
-                                cacheWrite: "$.reply.usage.cacheIn", cacheRead: "$.reply.usage.cacheHit")
+                                cacheWrite: "$.reply.usage.cacheIn", cacheWrite1h: "$.reply.usage.split.hour",
+                                cacheRead: "$.reply.usage.cacheHit")
     ))
 
     static func line(_ model: String, id: String = UUID().uuidString, at: String = "2026-03-11T10:00:00.000Z") -> String {
@@ -65,6 +66,13 @@ struct JSONLinesReaderTests {
         {"kind":"progress","data":{"kind":"hook"},"at":"2026-03-11T10:00:02.000Z"}
         """
         #expect(reader().read(content: content).map(\.model) == ["m-large"])
+    }
+
+    @Test func `the hour-long part of the cache writes is read beside their total`() {
+        let line = #"{"kind":"reply","reply":{"model":"m-large","usage":{"cacheIn":200,"split":{"hour":150}}},"at":"2026-03-11T10:00:00.000Z"}"#
+        let record = reader().read(content: line).first
+        #expect(record?.cacheWrite == 200)
+        #expect(record?.cacheWrite1h == 150)
     }
 
     @Test func `a missing token kind counts zero`() {

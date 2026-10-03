@@ -709,6 +709,7 @@ first that answers, `where`), so there is one way to point into JSON.
       "input": "$.message.usage.input_tokens",
       "output": "$.message.usage.output_tokens",
       "cacheWrite": "$.message.usage.cache_creation_input_tokens",
+      "cacheWrite1h": "$.message.usage.cache_creation.ephemeral_1h_input_tokens",   // the part kept an hour, priced apart
       "cacheRead": "$.message.usage.cache_read_input_tokens"
     }
   },

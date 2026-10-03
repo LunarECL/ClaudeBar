@@ -131,6 +131,15 @@ struct ClaudeUsageHistoryTests {
         #expect(try await report().today.totalCost == Decimal(string: "7.1"))
     }
 
+    @Test func `cache writes kept an hour cost the hour price`() async throws {
+        let line = #"{"type":"assistant","message":{"model":"claude-opus-5-5","usage":{"input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":1000000,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":100000,"ephemeral_1h_input_tokens":900000}}},"timestamp":"\#(Self.stamp())"}"#
+        try write(line)
+        let today = try await report().today
+        // Opus 5.5: 0.1M × $5 + 0.9M × $8 of writes, $0.004 in, $0.01 out.
+        #expect(today.totalCost == Decimal(string: "7.714"))
+        #expect(today.cacheCreationTokens == 1_000_000)
+    }
+
     // MARK: - Local inference costs nothing (#190)
 
     @Test func `an open-weight model costs nothing, its cache reads saving nothing`() async throws {

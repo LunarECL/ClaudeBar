@@ -10,7 +10,7 @@ struct PriceListTests {
     {
       "per": 1000000,
       "models": [
-        { "id": "m-large-2", "input": "5", "output": "25", "cacheWrite": "6.25", "cacheRead": "0.50" },
+        { "id": "m-large-2", "input": "5", "output": "25", "cacheWrite": "6.25", "cacheWrite1h": "10", "cacheRead": "0.50" },
         { "id": "m-medium-2", "input": "3", "output": "15", "cacheWrite": "3.75", "cacheRead": "0.30" },
         { "id": "m-small-1", "input": "1", "output": "5", "cacheWrite": "1.25", "cacheRead": "0.10" }
       ],
@@ -69,6 +69,17 @@ struct PriceListTests {
         let reads = LogRecord(at: Date(), model: "m-large-2", cacheRead: 2_000_000)
         #expect(prices.savings(of: reads) == 9)
         #expect(prices.savings(of: LogRecord(at: Date(), model: "m-large-2", input: 1_000_000)) == 0)
+    }
+
+    @Test func `a write kept an hour has its own price; the rest the five-minute one`() {
+        let writes = LogRecord(at: Date(), model: "m-large-2", cacheWrite: 1_000_000, cacheWrite1h: 600_000)
+        // 0.4M × $6.25 + 0.6M × $10.
+        #expect(prices.cost(of: writes) == Decimal(string: "8.5"))
+    }
+
+    @Test func `without an hour price, every write costs the five-minute price`() {
+        let writes = LogRecord(at: Date(), model: "m-medium-2", cacheWrite: 1_000_000, cacheWrite1h: 600_000)
+        #expect(prices.cost(of: writes) == Decimal(string: "3.75"))
     }
 
     @Test func `a missing or malformed file is no price list`() {
