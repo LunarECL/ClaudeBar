@@ -86,13 +86,19 @@ public enum Providers {
                                  environment: environment, cloudWatch: cloudWatch, priceCatalog: priceCatalog)
             },
             guestPasses: guestPasses,
-            // The definition says how to read the default login's logs.
-            usageHistory: usageHistory ?? definition.usageHistory.map {
-                UsageHistory(log: DataSources.makeUsageLog($0, scripts: builtInScripts, environment: environment),
-                             ledger: DayLedger(store: FileLedgerStore(), key: definition.id))
-            },
+            // The definition says how to read each login's logs.
+            usageHistory: usageHistory ?? definition.usageHistory.map { history($0, login: definition.id, environment: environment) },
+            makeUsageHistory: { history($0, login: $1, environment: environment) },
             vault: secrets
         )
+    }
+
+    /// A login's usage history on this Mac, its closed days kept under its lineup id.
+    @MainActor
+    private static func history(_ definition: UsageLog.Definition, login: String,
+                                environment: @escaping @Sendable (String) -> String?) -> UsageHistory {
+        UsageHistory(log: DataSources.makeUsageLog(definition, scripts: builtInScripts, environment: environment),
+                     ledger: DayLedger(store: FileLedgerStore(), key: login))
     }
 
     /// A built-in provider by id — `Providers.make("codex", settings:)`.

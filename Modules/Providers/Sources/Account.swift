@@ -100,9 +100,10 @@ public final class Account: AIProvider {
     public var backgroundRefreshFloor: Duration? { provider.backgroundRefreshFloor }
     /// Guest passes are read with the default login's CLI, so only it has them.
     public var guestPasses: GuestPasses? { isDefault ? provider.guestPasses : nil }
-    /// What this login used, day by day — `nil` when the provider offers no
-    /// usage history or this login's logs aren't read (only the default's are).
-    public var usageHistory: UsageHistory? { isDefault ? provider.usageHistory : nil }
+    /// What this login used, day by day, from its own logs — `nil` when the
+    /// provider offers no usage history, or doesn't say where an added
+    /// login's logs are.
+    public var usageHistory: UsageHistory? { provider.usageHistory(for: self) }
 
     public func isAvailable() async -> Bool {
         await provider.isAvailable(self)

@@ -177,14 +177,68 @@ struct ClaudeUsageHistoryTests {
         #expect(report.previous.totalTokens == 1500)
     }
 
-    // MARK: - The login owns it
+    // MARK: - Each login reads its own folder
 
-    @Test func `Claude's default login has a usage history; an added login's logs aren't read yet`() throws {
-        let provider = try Providers.make("claude", settings: InMemoryProviderSettings(), accounts: [
-            ProviderAccountConfig(accountId: "work", label: "", email: "work@example.com",
-                                  probeConfig: ["configDirectory": "/tmp/work", "loginEmail": "work@example.com"]),
-        ])
-        #expect(provider.defaultAccount.usageHistory != nil)
-        #expect(provider.accounts.first { !$0.isDefault }?.usageHistory == nil)
+    /// Claude with one added login in `work`, every history over `home`.
+    private func provider(work: URL) throws -> Provider {
+        let definition = try Providers.builtIn("claude")
+        let make = { (history: UsageLog.Definition) in
+            UsageHistory(log: DataSources.makeUsageLog(history, scripts: Providers.builtInScripts,
+                                                       environment: { _ in nil }, homeDirectory: self.home))
+        }
+        return Provider(
+            definition: definition, settings: InMemoryProviderSettings(),
+            accounts: [ProviderAccountConfig(accountId: "work", label: "", email: "work@example.com",
+                                             probeConfig: ["configDirectory": work.path, "loginEmail": "work@example.com", "credentialService": "fixture-work"])],
+            makeDataSource: { source, _ in DataSources.make(source, providerId: "claude") },
+            usageHistory: definition.usageHistory.map(make),
+            makeUsageHistory: { history, _ in make(history) }
+        )
+    }
+
+    @Test func `an added login reads its own config folder's logs, never the default's`() async throws {
+        let work = home.appendingPathComponent("work-claude")
+        try FileManager.default.createDirectory(at: work.appendingPathComponent("projects/p"), withIntermediateDirectories: true)
+        try Self.line(input: 2000, output: 1000).write(to: work.appendingPathComponent("projects/p/s.jsonl"), atomically: true, encoding: .utf8)
+        try write(Self.line())
+        let provider = try provider(work: work)
+        let added = try #require(provider.accounts.first { !$0.isDefault })
+
+        await provider.defaultAccount.usageHistory?.read()
+        await added.usageHistory?.read()
+
+        #expect(provider.defaultAccount.usageHistory?.report?.today.totalTokens == 1500)
+        #expect(added.usageHistory?.report?.today.totalTokens == 3000)
+        #expect(added.usageHistory !== provider.defaultAccount.usageHistory)
+    }
+
+    @Test func `an added login's local route is its own folder's`() async throws {
+        let work = home.appendingPathComponent("work-claude")
+        try FileManager.default.createDirectory(at: work.appendingPathComponent("projects/p"), withIntermediateDirectories: true)
+        try Self.line("acme-internal-7b").write(to: work.appendingPathComponent("projects/p/s.jsonl"), atomically: true, encoding: .utf8)
+        try #"{"env":{"ANTHROPIC_BASE_URL":"http://localhost:11434"}}"#.write(to: work.appendingPathComponent(".claude.json"), atomically: true, encoding: .utf8)
+        let added = try #require(try provider(work: work).accounts.first { !$0.isDefault })
+
+        await added.usageHistory?.read()
+
+        #expect(added.usageHistory?.report?.today.totalCost == 0)
+    }
+
+    @Test func `an added login's usage history goes with it`() throws {
+        let provider = try provider(work: home.appendingPathComponent("work-claude"))
+        let added = try #require(provider.accounts.first { !$0.isDefault })
+        #expect(added.usageHistory != nil)
+
+        provider.remove(added)
+
+        #expect(added.usageHistory == nil)
+    }
+
+    @Test func `the patch fills the folder into where the logs and the route are`() throws {
+        let own = try #require(try Providers.builtIn("claude").usageHistory(forAccount: ["configDirectory": "/tmp/work"]))
+        #expect(own.records.files == "/tmp/work/projects/**/*.jsonl")
+        #expect(own.freeWhen?.localEndpoint?.file == "/tmp/work/.claude.json")
+        #expect(own.freeWhen?.localEndpoint?.url.count == 2)
+        #expect(try Providers.builtIn("claude").usageHistory(forAccount: [:]) == nil)
     }
 }
