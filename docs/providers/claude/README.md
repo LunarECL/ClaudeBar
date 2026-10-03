@@ -21,6 +21,12 @@ Shows your Claude Code 5-hour session and weekly limits, any model-specific week
 
 Each mode falls back to the other when it fails. In API mode, **CLI fallback** (on by default) controls whether `claude /usage` runs when the API can't answer; turn it off if running the CLI causes prompts (e.g. SSH key prompts) and you'd rather see the error. A rate-limit error never triggers the fallback, because the CLI hits the same backend.
 
+## CLI location
+
+If ClaudeBar can't find the `claude` program, or finds a different one than you use, set **Settings → Providers → Claude → Configuration → CLI location**. Use **Choose…** to pick the program, or type its full path and press Return. The change takes effect immediately, for every account and for Add Account's sign-in. **Reset** goes back to finding `claude` on its own.
+
+A shell alias or function (`alias c=…`) can't be used: ClaudeBar starts a program, not a shell. Run `which c` (or `type c`) in a terminal to see what the alias runs, and choose that. An alias that only points `claude` at another config folder is a second account, not a different program: add that folder in **Accounts → Add Account**.
+
 ## Permissions
 
 - **Keychain.** On macOS, `claude login` stores its token only in the Keychain item `Claude Code-credentials`. API mode reads it through Apple's `/usr/bin/security` tool, so it normally doesn't show a Keychain prompt. When ClaudeBar refreshes an expired token it writes the new one back to the same place.
@@ -28,6 +34,7 @@ Each mode falls back to the other when it fails. In API mode, **CLI fallback** (
 
 ## Gotchas
 
+- **One session named "ClaudeBar Probe".** The CLI probe reuses a single Claude session instead of creating a new empty one on every refresh, so `~/.claude/projects` and the `/resume` picker stay clean. If you delete that session, the next refresh simply recreates it.
 - **`claude setup-token` alone isn't enough.** The `CLAUDE_CODE_OAUTH_TOKEN` it creates can only be used for inference and can't read quota. ClaudeBar uses a full `claude login` credential when one exists, and removes that variable when it runs the CLI.
 - **Slow SessionStart hooks can make Claude look unavailable.** ClaudeBar's probe runs `claude /usage` and waits up to 20 seconds for the Usage screen. It opens only after Claude Code has finished its own startup, so hooks that take longer than that (or a very busy machine) make the probe time out even though you're working in Claude fine. ClaudeBar then falls back to the usage API, so you only see "Claude Unavailable" if that fails too. Run `claude` in a terminal and watch for `(running SessionStart hooks… N/M)`; if that counter is still climbing after ~15 seconds, that is the cause. Speeding up or trimming those hooks fixes it, and API probe mode skips the CLI entirely.
 - **API mode refreshes at most every 15 minutes.** Anthropic throttles its usage endpoint hard (after a 429 it can refuse requests for up to an hour), so results are cached for 15 minutes and background refresh can't go faster than that. After a 429, ClaudeBar waits for the `Retry-After` time (5 minutes if none is given) and shows "Rate limited. Retrying …".

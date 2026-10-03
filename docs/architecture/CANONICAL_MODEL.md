@@ -111,8 +111,8 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │                       browserCookie(domain) — and how it stays fresh:
 │       │       │   │                       refresh: oauth2(tokenURL, clientId, every, on 401)
 │       │       │   ├── fetch: Fetch        HOW TO GET THE BYTES — "Data fetching method". A closed sum:
-│       │       │   │                       http(request) · jsonRpc(cli, handshake, call) · cli(args) ·
-│       │       │   │                       terminal(cli, keys) · file(path) · script(path)
+│       │       │   │                       http(request | steps) · jsonRpc(cli, handshake, call) ·
+│       │       │   │                       cli(a TUI, keys) · command(args) · file(path) · script(path)
 │       │       │   ├── mapping: Mapping    WHAT THE BYTES SAY — a closed sum:
 │       │       │   │                       json(paths, each, used|left, resets) · text(patterns) ·
 │       │       │   │                       script(file) — JavaScript in JavaScriptCore, no I/O,
@@ -217,7 +217,7 @@ format, never for a vendor:
 | Closed sum | Its cases' workers (`internal`) |
 |---|---|
 | `CredentialLookup` | `EnvironmentReader` · `SettingReader` · `JSONFileReader` · `KeychainReader` · `BrowserCookieReader` · `OAuth2Refresher` |
-| `Fetch` | `HTTPFetcher` · `JSONRPCFetcher` · `CLIFetcher` · `TerminalFetcher` · `FileFetcher` · `ScriptFetcher` |
+| `Fetch` | `HTTPFetcher` · `HTTPStepsFetcher` · `JSONRPCFetcher` · `CLIFetcher` (a TUI in a terminal) · `CommandFetcher` (pipes) · `FileFetcher` · `ScriptFetcher` |
 | `Mapping` | `JSONMapper` · `TextMapper` · `ScriptMapper` (JavaScriptCore; host `humanDate()`) |
 
 **Why closed sums.** The JSON decoder must know every tag, and the *Add
@@ -317,6 +317,11 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a data source's definition is DATA; the code behind it is one worker per case, with ONE job, named for a protocol or format — never a vendor | `DataSource` |
 | a data source is handed only the connection its fetch needs — an HTTP fetch never holds a CLI | `DataSources` (the factory) |
 | a new provider is never a code change; a new protocol or format is one new case and one worker | `Fetch` · `Mapping` · `CredentialLookup` |
+| a case answers for itself — where it sends a key, what it runs, where its CLI lives; nothing outside it switches over the cases but the factory. Tell, don't ask: no caller reads a node's state to decide what the node could decide | `Fetch` (each case's `Connection`) |
+| a setting's kind owns its rule — a secret has no default and lives in the vault, a choice takes only its options, a path can be required to exist; the setting says what a blank means | `Setting.kind` |
+| a choice's options carry their values (*China → kimi.com*), used by name — `{{setting.region.site}}` — wherever a fetch needs them; an account's own value wins over the provider's | `Setting` |
+| two logins of a provider never share a path setting — the default login's included | `Provider.accounts` |
+| a worker reports a fact (a status, an exit code, a missing CLI) and the definition's `errors` says what it means, in a reason the screen prints — never from the response body or a secret; a 429 stays a rate limit | `DataSource` · `DataSourceError` |
 | a credential is looked up in the order the definition gives; the first that answers wins, and a refreshed token is written back where it was found | `CredentialLookup` |
 | when the active data source fails, its `fallback` is tried once; what the popover shows says which one answered | `Provider` |
 | a definition is valid before it is saved: a fetch, a mapping that produced at least one quota or a cost on Test, and every required setting filled | `ProviderDefinition` |

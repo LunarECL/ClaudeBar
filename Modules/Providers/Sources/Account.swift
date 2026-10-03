@@ -93,7 +93,9 @@ public final class Account: AIProvider {
 
     public var cliCommand: String { provider.definition.cli ?? "" }
     /// The dashboard for the plan the last usage reported (#328).
-    public var dashboardURL: URL? { provider.definition.profile.links.dashboard(for: snapshot?.accountTier) }
+    public var dashboardURL: URL? {
+        provider.definition.profile.links.dashboard(for: snapshot?.accountTier, settings: provider.settingFills(for: self))
+    }
     public var statusPageURL: URL? { provider.definition.profile.links.status }
     public var backgroundRefreshFloor: Duration? { provider.backgroundRefreshFloor }
     /// Guest passes are read with the default login's CLI, so only it has them.

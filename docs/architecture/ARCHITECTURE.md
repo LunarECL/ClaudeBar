@@ -10,6 +10,13 @@ ClaudeBar follows a **layered architecture** with clear separation of concerns:
 - **Infrastructure Layer** - Technical implementations (CLI, network, storage)
 - **App Layer** - SwiftUI views that consume domain directly
 
+Claude, Codex and DeepSeek now run as bundled JSON definitions under
+`Modules/Providers/Resources/Providers/`, using one generic `Provider` and
+`DataSource` pipeline. Their account rules live in those definitions; their
+Swift provider and probe classes are gone. See [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md)
+and [DeepSeek's migration](../providers/deepseek/design.md). The remaining
+providers still use the legacy layers described below.
+
 The key principle is **QuotaMonitor as Single Source of Truth** - all provider state flows through this central actor.
 
 ## Architecture Diagram
@@ -51,10 +58,10 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 │                                                                      │
 │  Repository Protocols (ISP - Interface Segregation Principle)        │
 │  ├── ProviderSettingsRepository - base: isEnabled state             │
-│  ├── ZaiSettingsRepository: ProviderSettingsRepository              │
-│  │   └── Z.ai specific: configPath, glmAuthEnvVar                   │
-│  └── CopilotSettingsRepository: ProviderSettingsRepository          │
-│      └── Copilot specific: authEnvVar + credentials (token/user)    │
+│  ├── BedrockSettingsRepository: ProviderSettingsRepository          │
+│  │   └── Bedrock specific: awsProfileName, regions, dailyBudget     │
+│  └── AlibabaSettingsRepository: ProviderSettingsRepository          │
+│      └── Alibaba specific: region, cookie source + API key          │
 │                                                                      │
 │  Domain Models                                                       │
 │  ├── UsageSnapshot - point-in-time quota data                       │
@@ -72,13 +79,9 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 │  ├── ClaudeUsageProbe - probes `claude /usage` (CLI + API)          │
 │  ├── CodexUsageProbe - probes Codex via RPC/TTY (RPC + API)         │
 │  ├── GeminiUsageProbe - probes Gemini CLI + API                     │
-│  ├── CopilotUsageProbe - probes GitHub API with token               │
 │  ├── AntigravityUsageProbe - probes local Antigravity server        │
-│  ├── ZaiUsageProbe - probes Z.ai API via Claude config              │
 │  ├── BedrockUsageProbe - probes AWS Bedrock API                     │
-│  ├── AmpCodeUsageProbe - probes Amp Code CLI                        │
-│  ├── KimiCLIUsageProbe - probes `kimi` CLI with /usage (CLI mode)   │
-│  └── KimiUsageProbe - probes Kimi HTTP API (API mode)               │
+│  └── AmpCodeUsageProbe - probes Amp Code CLI                        │
 │                                                                      │
 │  Storage (Sources/Infrastructure/Storage/)                          │
 │  ├── AIProviders - implements AIProviderRepository                  │
@@ -161,31 +164,29 @@ public protocol ProviderSettingsRepository: Sendable {
     func setEnabled(_ enabled: Bool, forProvider id: String)
 }
 
-// Z.ai-specific protocol - extends base with Z.ai config
-public protocol ZaiSettingsRepository: ProviderSettingsRepository {
-    func zaiConfigPath() -> String
-    func setZaiConfigPath(_ path: String)
-    func glmAuthEnvVar() -> String
-    func setGlmAuthEnvVar(_ envVar: String)
+// Bedrock-specific protocol - extends base with AWS config
+public protocol BedrockSettingsRepository: ProviderSettingsRepository {
+    func awsProfileName() -> String
+    func setAWSProfileName(_ name: String)
+    func bedrockRegions() -> [String]
+    func setBedrockRegions(_ regions: [String])
 }
 
-// Copilot-specific protocol - extends base with config + credentials
-public protocol CopilotSettingsRepository: ProviderSettingsRepository {
-    func copilotAuthEnvVar() -> String
-    func setCopilotAuthEnvVar(_ envVar: String)
-    // Credentials (merged per SRP - Copilot owns its credentials)
-    func saveGithubToken(_ token: String)
-    func getGithubToken() -> String?
-    func hasGithubToken() -> Bool
-    func saveGithubUsername(_ username: String)
-    func getGithubUsername() -> String?
+// Alibaba-specific protocol - extends base with config + credentials
+public protocol AlibabaSettingsRepository: ProviderSettingsRepository {
+    func alibabaRegion() -> AlibabaRegion
+    func setAlibabaRegion(_ region: AlibabaRegion)
+    // Credentials (merged per SRP - Alibaba owns its credentials)
+    func saveAlibabaApiKey(_ key: String)
+    func getAlibabaApiKey() -> String?
+    func hasAlibabaApiKey() -> Bool
 }
 
 // Single infrastructure implementation for all protocols
 public final class JSONSettingsRepository:
     AppSettingsRepository,
-    ZaiSettingsRepository,
-    CopilotSettingsRepository,
+    BedrockSettingsRepository,
+    AlibabaSettingsRepository,
     // ... all other sub-protocols
 {
     // Persists to ~/.claudebar/settings.json via JSONSettingsStore
@@ -196,8 +197,8 @@ public final class JSONSettingsRepository:
 **Why ISP?**
 - Each provider depends **only** on its specific interface
 - Simple providers (Claude, Codex, Gemini) use base `ProviderSettingsRepository`
-- Z.ai uses `ZaiSettingsRepository` (config path + env var)
-- Copilot uses `CopilotSettingsRepository` (env var + credentials)
+- Bedrock uses `BedrockSettingsRepository` (AWS profile + regions)
+- Alibaba uses `AlibabaSettingsRepository` (region + credentials)
 - No provider sees methods it doesn't need
 
 ### 4. Protocol-Based Dependency Injection
@@ -218,8 +219,8 @@ public init(probe: any UsageProbe, settingsRepository: any ProviderSettingsRepos
 }
 
 // Specialized providers receive their specific repository
-public init(probe: any UsageProbe, settingsRepository: any ZaiSettingsRepository) { ... }
-public init(probe: any UsageProbe, settingsRepository: any CopilotSettingsRepository) { ... }
+public init(probe: any UsageProbe, settingsRepository: any BedrockSettingsRepository) { ... }
+public init(probe: any UsageProbe, settingsRepository: any AlibabaSettingsRepository) { ... }
 ```
 
 ### 5. No ViewModel/AppState Layer
@@ -319,8 +320,7 @@ Sources/
 │   │   ├── AIProvider.swift         # Protocol
 │   │   ├── AIProviders.swift        # Repository protocol
 │   │   ├── ClaudeProvider.swift     # Rich domain model
-│   │   ├── CopilotProvider.swift    # Uses CopilotSettingsRepository
-│   │   ├── ZaiProvider.swift        # Uses ZaiSettingsRepository
+│   │   ├── BedrockProvider.swift    # Uses BedrockSettingsRepository
 │   │   ├── ProviderSettingsRepository.swift  # ISP protocols hierarchy
 │   │   ├── UsageProbe.swift
 │   │   ├── UsageQuota.swift

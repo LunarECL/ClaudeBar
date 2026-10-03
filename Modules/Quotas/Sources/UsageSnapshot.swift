@@ -138,6 +138,23 @@ public struct UsageSnapshot: Sendable, Equatable {
         }
     }
 
+    /// The same usage without the quotas a person hid (#140), keyed by
+    /// `QuotaType.quotaKey` — so every reading of it (status, lowest quota,
+    /// groups) leaves them out. Keys no longer reported match nothing. Hiding
+    /// every quota hides none: there is always something to watch.
+    public func hiding(_ keys: Set<String>) -> UsageSnapshot {
+        guard !keys.isEmpty else { return self }
+        let watched = quotas.filter { !keys.contains($0.quotaType.quotaKey) }
+        guard !watched.isEmpty, watched.count < quotas.count else { return self }
+        return UsageSnapshot(
+            providerId: providerId, quotas: watched, capturedAt: capturedAt,
+            accountEmail: accountEmail, accountOrganization: accountOrganization,
+            loginMethod: loginMethod, accountTier: accountTier, costUsage: costUsage,
+            bedrockUsage: bedrockUsage, dailyUsageReport: dailyUsageReport,
+            extensionMetrics: extensionMetrics
+        )
+    }
+
     /// The overall status is the worst status among all quotas.
     /// This is a domain rule: overall health reflects the most critical issue.
     public var overallStatus: QuotaStatus {

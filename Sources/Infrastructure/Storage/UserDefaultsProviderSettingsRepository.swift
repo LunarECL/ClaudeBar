@@ -4,7 +4,7 @@ import Domain
 /// Legacy/test UserDefaults implementation of provider settings protocols.
 /// Production app persistence uses `JSONSettingsRepository`; this implementation
 /// supports legacy migration and isolated tests with injected UserDefaults suites.
-public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, MiniMaxSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, VercelSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -12,23 +12,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
     private let userDefaults: UserDefaults
     private let secureCredentials: any CredentialRepository
 
-    private var vercelCredentials: SecureCredentialMigration {
-        SecureCredentialMigration(
-            secureStore: secureCredentials,
-            legacyStore: userDefaults,
-            secureKey: CredentialKey.vercelApiKey,
-            legacyKey: Keys.vercelApiKey
-        )
-    }
-
-    private var zaiCredentials: SecureCredentialMigration {
-        SecureCredentialMigration(
-            secureStore: secureCredentials,
-            legacyStore: userDefaults,
-            secureKey: CredentialKey.zaiApiKey,
-            legacyKey: Keys.zaiApiKey
-        )
-    }
 
     /// Creates a repository with settings in UserDefaults and secrets in Keychain.
     /// - Parameters:
@@ -61,6 +44,14 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(kind, forKey: "providerConfig.\(id)ProbeMode")
     }
 
+    public func cliPath(forProvider id: String) -> String? {
+        userDefaults.string(forKey: "providerConfig.\(id).cliPath")
+    }
+
+    public func setCLIPath(_ path: String?, forProvider id: String) {
+        userDefaults.set(path, forKey: "providerConfig.\(id).cliPath")
+    }
+
     /// `providerConfig.<id><Setting>` — e.g. `providerConfig.claudeCliFallbackEnabled`.
     public func isOn(_ setting: String, forProvider id: String) -> Bool? {
         let key = "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())"
@@ -69,6 +60,15 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
 
     public func setOn(_ on: Bool, _ setting: String, forProvider id: String) {
         userDefaults.set(on, forKey: "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())")
+    }
+
+    /// `providerConfig.<id><Setting>` — e.g. `providerConfig.kimiRegion`.
+    public func value(_ setting: String, forProvider id: String) -> String? {
+        userDefaults.string(forKey: "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())")
+    }
+
+    public func setValue(_ value: String?, _ setting: String, forProvider id: String) {
+        userDefaults.set(value, forKey: "providerConfig.\(id)\(setting.prefix(1).uppercased())\(setting.dropFirst())")
     }
 
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
@@ -101,166 +101,17 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         }
     }
 
-    // MARK: - ZaiSettingsRepository
-
-    public func zaiConfigPath() -> String {
-        userDefaults.string(forKey: Keys.zaiConfigPath) ?? ""
+    public func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
+        Set(userDefaults.stringArray(forKey: Self.hiddenQuotaKeysKey(forProvider: id)) ?? [])
     }
 
-    public func setZaiConfigPath(_ path: String) {
-        userDefaults.set(path, forKey: Keys.zaiConfigPath)
-    }
-
-    public func glmAuthEnvVar() -> String {
-        userDefaults.string(forKey: Keys.glmAuthEnvVar) ?? ""
-    }
-
-    public func setGlmAuthEnvVar(_ envVar: String) {
-        userDefaults.set(envVar, forKey: Keys.glmAuthEnvVar)
-    }
-
-    public func saveZaiApiKey(_ key: String) {
-        zaiCredentials.save(key)
-    }
-
-    public func getZaiApiKey() -> String? {
-        zaiCredentials.get()
-    }
-
-    public func deleteZaiApiKey() {
-        zaiCredentials.delete()
-    }
-
-    public func hasZaiApiKey() -> Bool {
-        zaiCredentials.exists()
-    }
-
-    // MARK: - CopilotSettingsRepository (Probe Mode)
-
-    public func copilotProbeMode() -> CopilotProbeMode {
-        guard let rawValue = userDefaults.string(forKey: Keys.copilotProbeMode) else {
-            return .billing // Default to Billing API mode
-        }
-        return CopilotProbeMode(rawValue: rawValue) ?? .billing
-    }
-
-    public func setCopilotProbeMode(_ mode: CopilotProbeMode) {
-        userDefaults.set(mode.rawValue, forKey: Keys.copilotProbeMode)
-    }
-
-    // MARK: - CopilotSettingsRepository (Configuration)
-
-    public func copilotAuthEnvVar() -> String {
-        userDefaults.string(forKey: Keys.copilotAuthEnvVar) ?? ""
-    }
-
-    public func setCopilotAuthEnvVar(_ envVar: String) {
-        userDefaults.set(envVar, forKey: Keys.copilotAuthEnvVar)
-    }
-
-    public func copilotMonthlyLimit() -> Int? {
-        guard let intValue = userDefaults.object(forKey: Keys.copilotMonthlyLimit) as? Int else {
-            return nil
-        }
-        return intValue
-    }
-
-    public func setCopilotMonthlyLimit(_ limit: Int?) {
-        if let limit {
-            userDefaults.set(limit, forKey: Keys.copilotMonthlyLimit)
+    public func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {
+        let key = Self.hiddenQuotaKeysKey(forProvider: id)
+        if keys.isEmpty {
+            userDefaults.removeObject(forKey: key)
         } else {
-            userDefaults.removeObject(forKey: Keys.copilotMonthlyLimit)
+            userDefaults.set(keys.sorted(), forKey: key)
         }
-    }
-
-    public func copilotManualUsageValue() -> Double? {
-        guard userDefaults.object(forKey: Keys.copilotManualUsageValue) != nil else {
-            return nil
-        }
-        return userDefaults.double(forKey: Keys.copilotManualUsageValue)
-    }
-
-    public func setCopilotManualUsageValue(_ value: Double?) {
-        if let value {
-            userDefaults.set(value, forKey: Keys.copilotManualUsageValue)
-        } else {
-            userDefaults.removeObject(forKey: Keys.copilotManualUsageValue)
-        }
-    }
-
-    public func copilotManualUsageIsPercent() -> Bool {
-        userDefaults.bool(forKey: Keys.copilotManualUsageIsPercent)
-    }
-
-    public func setCopilotManualUsageIsPercent(_ isPercent: Bool) {
-        userDefaults.set(isPercent, forKey: Keys.copilotManualUsageIsPercent)
-    }
-
-    public func copilotManualOverrideEnabled() -> Bool {
-        userDefaults.bool(forKey: Keys.copilotManualOverrideEnabled)
-    }
-
-    public func setCopilotManualOverrideEnabled(_ enabled: Bool) {
-        userDefaults.set(enabled, forKey: Keys.copilotManualOverrideEnabled)
-    }
-
-    public func copilotApiReturnedEmpty() -> Bool {
-        userDefaults.bool(forKey: Keys.copilotApiReturnedEmpty)
-    }
-
-    public func setCopilotApiReturnedEmpty(_ empty: Bool) {
-        userDefaults.set(empty, forKey: Keys.copilotApiReturnedEmpty)
-    }
-
-    // MARK: - CopilotSettingsRepository (Usage Period)
-
-    public func copilotLastUsagePeriodMonth() -> Int? {
-        guard userDefaults.object(forKey: Keys.copilotLastUsagePeriodMonth) != nil else {
-            return nil
-        }
-        return userDefaults.integer(forKey: Keys.copilotLastUsagePeriodMonth)
-    }
-
-    public func copilotLastUsagePeriodYear() -> Int? {
-        guard userDefaults.object(forKey: Keys.copilotLastUsagePeriodYear) != nil else {
-            return nil
-        }
-        return userDefaults.integer(forKey: Keys.copilotLastUsagePeriodYear)
-    }
-
-    public func setCopilotLastUsagePeriod(month: Int, year: Int) {
-        userDefaults.set(month, forKey: Keys.copilotLastUsagePeriodMonth)
-        userDefaults.set(year, forKey: Keys.copilotLastUsagePeriodYear)
-    }
-
-    // MARK: - CopilotSettingsRepository (Credentials)
-
-    public func saveGithubToken(_ token: String) {
-        userDefaults.set(token, forKey: Keys.githubToken)
-    }
-
-    public func getGithubToken() -> String? {
-        userDefaults.string(forKey: Keys.githubToken)
-    }
-
-    public func deleteGithubToken() {
-        userDefaults.removeObject(forKey: Keys.githubToken)
-    }
-
-    public func hasGithubToken() -> Bool {
-        userDefaults.object(forKey: Keys.githubToken) != nil
-    }
-
-    public func saveGithubUsername(_ username: String) {
-        userDefaults.set(username, forKey: Keys.githubUsername)
-    }
-
-    public func getGithubUsername() -> String? {
-        userDefaults.string(forKey: Keys.githubUsername)
-    }
-
-    public func deleteGithubUsername() {
-        userDefaults.removeObject(forKey: Keys.githubUsername)
     }
 
     // MARK: - ClaudeSettingsRepository
@@ -305,32 +156,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(verified, forKey: Keys.codexVerifiedAtLeastOnce)
     }
 
-    // MARK: - KimiSettingsRepository
-
-    public func kimiProbeMode() -> KimiProbeMode {
-        guard let rawValue = userDefaults.string(forKey: Keys.kimiProbeMode) else {
-            return .cli // Default to CLI mode
-        }
-        return KimiProbeMode(rawValue: rawValue) ?? .cli
-    }
-
-    public func setKimiProbeMode(_ mode: KimiProbeMode) {
-        userDefaults.set(mode.rawValue, forKey: Keys.kimiProbeMode)
-    }
-
-    public func kimiRegion() -> KimiRegion {
-        // Legacy compatibility: key absent means user upgraded from a pre-region
-        // version, which only supported the China platform (kimi.com).
-        guard let rawValue = userDefaults.string(forKey: Keys.kimiRegion) else {
-            return .china
-        }
-        return KimiRegion(rawValue: rawValue) ?? .china
-    }
-
-    public func setKimiRegion(_ region: KimiRegion) {
-        userDefaults.set(region.rawValue, forKey: Keys.kimiRegion)
-    }
-
     // MARK: - BedrockSettingsRepository
 
     public func awsProfileName() -> String {
@@ -364,45 +189,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         }
     }
 
-    // MARK: - MiniMaxSettingsRepository
-
-    public func minimaxRegion() -> MiniMaxRegion {
-        // Legacy compatibility: key absent means user upgraded from pre-region version,
-        // which only supported china (minimaxi.com). (兼容旧版：无 key 则默认中国区)
-        guard let rawValue = userDefaults.string(forKey: Keys.minimaxRegion) else {
-            return .china
-        }
-        return MiniMaxRegion(rawValue: rawValue) ?? .china
-    }
-
-    public func setMinimaxRegion(_ region: MiniMaxRegion) {
-        userDefaults.set(region.rawValue, forKey: Keys.minimaxRegion)
-    }
-
-    public func minimaxAuthEnvVar() -> String {
-        userDefaults.string(forKey: Keys.minimaxiAuthEnvVar) ?? ""
-    }
-
-    public func setMinimaxAuthEnvVar(_ envVar: String) {
-        userDefaults.set(envVar, forKey: Keys.minimaxiAuthEnvVar)
-    }
-
-    public func saveMinimaxApiKey(_ key: String) {
-        userDefaults.set(key, forKey: Keys.minimaxiApiKey)
-    }
-
-    public func getMinimaxApiKey() -> String? {
-        userDefaults.string(forKey: Keys.minimaxiApiKey)
-    }
-
-    public func deleteMinimaxApiKey() {
-        userDefaults.removeObject(forKey: Keys.minimaxiApiKey)
-    }
-
-    public func hasMinimaxApiKey() -> Bool {
-        userDefaults.object(forKey: Keys.minimaxiApiKey) != nil
-    }
-
     // MARK: - DeepSeekSettingsRepository
 
     public func deepseekAuthEnvVar() -> String {
@@ -427,33 +213,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
 
     public func hasDeepSeekApiKey() -> Bool {
         userDefaults.object(forKey: Keys.deepseekApiKey) != nil
-    }
-
-    // MARK: - VercelSettingsRepository
-
-    public func vercelAuthEnvVar() -> String {
-        userDefaults.string(forKey: Keys.vercelAuthEnvVar) ?? ""
-    }
-
-    public func setVercelAuthEnvVar(_ envVar: String) {
-        userDefaults.set(envVar, forKey: Keys.vercelAuthEnvVar)
-    }
-
-    public func saveVercelApiKey(_ key: String) {
-        vercelCredentials.save(key)
-    }
-
-    public func getVercelApiKey() -> String? {
-        vercelCredentials.get()
-    }
-
-    @discardableResult
-    public func deleteVercelApiKey() -> Bool {
-        vercelCredentials.delete()
-    }
-
-    public func hasVercelApiKey() -> Bool {
-        vercelCredentials.exists()
     }
 
     // MARK: - AlibabaSettingsRepository
@@ -540,48 +299,29 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
         static let codexVerifiedAtLeastOnce = "providerConfig.codexVerifiedAtLeastOnce"
-        // Kimi settings
-        static let kimiProbeMode = "providerConfig.kimiProbeMode"
-        static let kimiRegion = "providerConfig.kimiRegion"
-        static let zaiConfigPath = "providerConfig.zaiConfigPath"
-        static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
-        static let zaiApiKey = "com.claudebar.credentials.zai-api-key"
-        static let copilotProbeMode = "providerConfig.copilotProbeMode"
-        static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"
-        static let copilotMonthlyLimit = "providerConfig.copilotMonthlyLimit"
-        static let copilotManualUsageValue = "providerConfig.copilotManualUsageValue"
-        static let copilotManualUsageIsPercent = "providerConfig.copilotManualUsageIsPercent"
-        static let copilotManualOverrideEnabled = "providerConfig.copilotManualOverrideEnabled"
-        static let copilotApiReturnedEmpty = "providerConfig.copilotApiReturnedEmpty"
-        static let copilotLastUsagePeriodMonth = "providerConfig.copilotLastUsagePeriodMonth"
-        static let copilotLastUsagePeriodYear = "providerConfig.copilotLastUsagePeriodYear"
         // Bedrock settings
         static let awsProfileName = "providerConfig.awsProfileName"
         static let bedrockRegions = "providerConfig.bedrockRegions"
         static let bedrockDailyBudget = "providerConfig.bedrockDailyBudget"
-        // MiniMax settings (key strings kept for backward compatibility 保持向后兼容)
-        static let minimaxRegion = "providerConfig.minimaxRegion"
-        static let minimaxiAuthEnvVar = "providerConfig.minimaxiAuthEnvVar"
-        static let minimaxiApiKey = "com.claudebar.credentials.minimaxi-api-key"
         // DeepSeek settings
         static let deepseekAuthEnvVar = "providerConfig.deepseekAuthEnvVar"
         static let deepseekApiKey = "com.claudebar.credentials.deepseek-api-key"
-        // Vercel AI Gateway settings
-        static let vercelAuthEnvVar = "providerConfig.vercelAuthEnvVar"
-        static let vercelApiKey = "com.claudebar.credentials.vercel-api-key"
         // Alibaba settings
         static let alibabaRegion = "providerConfig.alibabaRegion"
         static let alibabaCookieSource = "providerConfig.alibabaCookieSource"
         static let alibabaManualCookie = "com.claudebar.credentials.alibaba-manual-cookie"
         static let alibabaApiKey = "com.claudebar.credentials.alibaba-api-key"
         // Credentials (kept compatible with old UserDefaultsCredentialRepository keys)
-        static let githubToken = "com.claudebar.credentials.github-copilot-token"
-        static let githubUsername = "com.claudebar.credentials.github-username"
     }
 
     /// Generates the UserDefaults key for a provider's enabled state
     private static func enabledKey(forProvider id: String) -> String {
         "provider.\(id).isEnabled"
+    }
+
+    /// Generates the UserDefaults key for a provider's hidden quota keys
+    private static func hiddenQuotaKeysKey(forProvider id: String) -> String {
+        "provider.\(id).hiddenQuotaKeys"
     }
 }
 

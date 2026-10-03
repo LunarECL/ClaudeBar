@@ -119,8 +119,9 @@ struct AddProviderTests {
         let source = try #require(try draft.definition(id: "custom-mytool").dataSources.first)
 
         #expect(source.kind == "cli")
-        guard case .cli(let call) = source.fetch else {
-            Issue.record("Expected a cli fetch")
+        // A command a person types runs over pipes; only a TUI needs a terminal.
+        guard case .command(let call) = source.fetch else {
+            Issue.record("Expected a command fetch")
             return
         }
         #expect(call.cli == "mytool")

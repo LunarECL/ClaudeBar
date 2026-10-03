@@ -4,7 +4,7 @@
 **Date:** 2026-06-09
 **Issue:** [#207](https://github.com/tddworks/ClaudeBar/issues/207) — Daily Usage cost & token cards overcount ~4×
 **Follow-up:** [#190](https://github.com/tddworks/ClaudeBar/issues/190) — locally served models billed at Anthropic rates (§11)
-**Affected code:** `Sources/Infrastructure/Claude/SessionJSONLParser.swift`, `Sources/Infrastructure/Claude/ClaudeDailyUsageAnalyzer.swift`, `Sources/Infrastructure/Claude/ModelPricing.swift`, `Sources/Infrastructure/Claude/ClaudeLocalInferenceDetector.swift`
+**Affected code:** `Sources/Infrastructure/Claude/SessionJSONLParser.swift`, `Sources/Infrastructure/Claude/SessionLogCache.swift`, `Sources/Infrastructure/Claude/ClaudeDailyUsageAnalyzer.swift`, `Sources/Infrastructure/Claude/ModelPricing.swift`, `Sources/Infrastructure/Claude/ClaudeLocalInferenceDetector.swift`
 
 ---
 
@@ -340,8 +340,7 @@ the case that would otherwise have been guessed wrong in both directions.
 ### Provenance plumbing
 
 `ClaudeLocalInferenceDetector` reads `~/.claude.json` — `env.ANTHROPIC_BASE_URL`, or the
-`providers` array when that key is absent, the same file and shapes `ZaiUsageProbe`
-already parses — and reports whether the active base URL resolves to a loopback host
+`providers` array when that key is absent — and reports whether the active base URL resolves to a loopback host
 (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `*.localhost`). `ClaudeBarApp` passes
 `isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }` into
 `ClaudeDailyUsageAnalyzer`; the analyzer's default is `{ false }` so tests never read
@@ -395,6 +394,47 @@ the developer's own config, matching `ClaudeUsageProbe`'s no-op resolver.
 | analyzer over a private-fine-tune JSONL, loopback | cost and savings 0; same JSONL remote, both > 0 |
 | detector | loopback hosts true, gateway/LAN/unparseable false, `providers[]` shapes |
 | detector | a `localhost` entry in `providers[]` does not override a remote `env` route, and vice versa |
+
+---
+
+## 12. Reading Only What Changed
+
+Every popover open scans each JSONL file modified since yesterday. A heavy user
+has hundreds of them (one measured machine: 629 files, 272 MB), and only the files
+of live sessions change between opens, almost always by appending.
+
+`SessionLogCache` (an actor the analyzer owns) keeps each file's parsed records
+with a stamp of `(inode, size, mtime, ctime)` and the byte offset after its last
+complete line:
+
+| On the next scan | Action |
+|---|---|
+| Stamp identical | Reuse the records; the file is not opened |
+| Same inode, larger, prefix guard matches | Parse from the saved offset; append the new records |
+| Anything else (new inode, shrink, guard mismatch, whole-second `ctime`) | Parse the whole file |
+
+- **Prefix guard**: a hash of the first and last 64 KB of the bytes already read.
+  It catches a file truncated and rewritten, or changed at either edge, without
+  re-reading it. It does not catch a same-length edit in the middle of a prefix
+  over 128 KB; the cache relies on Claude Code only appending, and anything else
+  is out of scope.
+- **Unterminated last line**: its record counts, but the offset stays before it and
+  the next read parses it again. Unkeyed records are never deduplicated (§3), so
+  resuming inside the line or counting it twice would both corrupt the totals.
+- **Stamp before parse**: lines written while a file is being parsed change the stamp,
+  so the next scan picks them up instead of matching a stamp taken after them.
+- **Eviction**: files no longer in the two-day window are dropped from the cache.
+- **Overlapping scans** (popover open, refresh, tab refresh) queue on the actor; the
+  later ones find the earlier one's work already cached.
+
+The parser also streams each file in 1 MB reads and skips any line that doesn't
+contain both `"usage"` and `"assistant"` before decoding it. Both strings appear
+unescaped only as JSON tokens, so no usage-bearing line is skipped; most user and
+tool-result lines never reach `JSONSerialization`.
+
+The append-only assumption matches the one in
+[c9watch](https://github.com/minchenlee/c9watch)'s transcript cache, which uses the
+same stamp-plus-guard checks.
 
 ---
 

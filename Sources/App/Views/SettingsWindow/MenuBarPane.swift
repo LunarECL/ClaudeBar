@@ -32,6 +32,11 @@ struct MenuBarPane: View {
                 SettingsRow(title: "Show Duration in Menu Bar", subtitle: "Time until each quota window resets.") {
                     SettingsSwitch(isOn: $settings.menuBarDurationEnabled)
                 }
+                SettingsRowDivider()
+                SettingsRow(title: "Show Account Labels in Menu Bar", subtitle: "Show account names or emails beside provider icons. Hover to see account details when hidden.") {
+                    SettingsSwitch(isOn: $settings.menuBarAccountLabelsEnabled)
+                        .accessibilityLabel("Show Account Labels in Menu Bar")
+                }
             }
 
             if settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled {

@@ -32,6 +32,8 @@ A key that's missing means "use the default", so a fresh install starts with an 
 | `app.*` | App-wide preferences: theme, menu bar readout, refresh, burn rate, status colors, notch, Touch Bar | `"app": { "burnRateWarningEnabled": true, "burnRateThreshold": 1.5 }` |
 | `providers.<id>.*` | Per-provider switches, keyed by the provider id | `"providers": { "gemini": { "isEnabled": false } }` |
 | `providers.order` | Your provider display order — the popover pills, the overview and ⌘1–⌘9 follow it; unset means registration order | `"providers": { "order": ["codex", "claude"] }` |
+| `providers.<id>.cliPath` | The *CLI location* a person chose for a provider that runs a CLI; absent means "find it as usual" (#210) | `"providers": { "claude": { "cliPath": "/opt/tools/bin/claude" } }` |
+| `providers.<id>.hiddenQuotaKeys` | Quotas a person stopped watching for a product, by quota key (`model:gemini-2.0-flash`); shared by its accounts. A key no longer reported is ignored, and hiding every quota hides none (#140) | `"providers": { "gemini": { "hiddenQuotaKeys": ["model:gemini-2.0-flash"] } }` |
 | `<provider>.*` | Settings only one provider has: probe mode, env var name, region, config path | `"kimi": { "probeMode": "api", "region": "international" }` |
 | `hook.*` | [Session hooks](features/session-hooks/README.md) | `"hook": { "enabled": true }` |
 | `notify.*` | [Notify!](features/notify/README.md) device link and surfaces | `"notify": { "enabled": true, "widgetEnabled": true }` |
@@ -45,7 +47,9 @@ A few `app.*` keys worth knowing:
 |---|---|
 | `app.themeMode` | `system` (default), `light`, `dark`, `cli`, `christmas`, or `imported-<name>` |
 | `app.usageDisplayMode` | `remaining` (default), `used`, `pace` |
+| `app.menuBarAccountLabelsEnabled` | `true` (default) shows account labels; `false` hides their menu bar text while retaining hover details |
 | `app.menuBarProviderSettings` | Per-provider menu bar choices: `{ "codex": { "primaryQuotaKey": "session", "secondaryQuotaKey": "weekly", "stacked": false, "stackedSize": "small" } }` |
+| `app.nativeMenuBarIconsEnabled` | `false` (default) keeps brand colors; `true` uses monochrome provider marks for every menu bar account, adapting to the bar’s appearance |
 | `app.statusColorOverrides` | `{ "warning": "#F2BF33" }`; only the levels you set |
 
 The full list is the code: every key is read and written in [`JSONSettingsRepository.swift`](../Sources/Infrastructure/Storage/JSONSettingsRepository.swift), and extension fields in [`JSONExtensionConfigStore.swift`](../Sources/Infrastructure/Extension/JSONExtensionConfigStore.swift).
@@ -65,7 +69,8 @@ Deleting the file resets every setting to its default. Secrets stay where they a
 | Vercel AI Gateway API key | Keychain |
 | Notify! device token | Keychain, or the app credential store on builds the Keychain refuses (see below) |
 | GitHub token and username (Copilot) | App credential store |
-| MiniMax, DeepSeek and Alibaba API keys, Alibaba manual cookie | App credential store |
+| DeepSeek API keys (default and added accounts) | Keychain-backed provider vault; existing default keys migrate from UserDefaults after a verified write |
+| MiniMax and Alibaba API keys, Alibaba manual cookie | App credential store |
 | Secret fields of user extensions | App credential store |
 | Your provider sign-ins (Claude Code, Codex, Gemini, Grok, Cursor…) | Where that provider's own CLI or app keeps them. ClaudeBar reads them there; see each [provider doc](providers/) |
 

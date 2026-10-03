@@ -35,6 +35,15 @@ public final class Provider {
     private let vault: (any SecretVault)?
     /// Where added logins' folders are made and deleted.
     private let folders: any LoginFolders
+    /// What a path setting asks of this Mac.
+    private let paths: any PathChecking
+    /// Whether a path is a program the CLI location may point at.
+    private let isExecutable: @Sendable (String) -> Bool
+    /// The definition as it runs here: the CLI at the person's location.
+    @ObservationIgnored private var running: ProviderDefinition
+    /// *CLI location* — where this provider's CLI lives on this Mac, when the
+    /// person chose one (#210). `nil` finds it as usual.
+    public private(set) var cliPath: String?
     @ObservationIgnored private var bound: [String: [DataSource]] = [:]
     @ObservationIgnored private var refreshTasks: [String: Task<UsageSnapshot, Error>] = [:]
 
@@ -47,17 +56,29 @@ public final class Provider {
         makeDataSource: @escaping (DataSourceDefinition, String) -> DataSource,
         guestPasses: GuestPasses? = nil,
         folders: any LoginFolders = DiskLoginFolders(),
-        vault: (any SecretVault)? = nil
+        vault: (any SecretVault)? = nil,
+        paths: any PathChecking = DiskPaths(),
+        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) {
         self.folders = folders
+        self.paths = paths
         self.vault = vault
+        self.isExecutable = isExecutable
         self.definition = definition
+        let cliPath = settings.cliPath(forProvider: definition.id)
+        self.cliPath = cliPath
+        do {
+            self.running = try definition.runningCLI(cliPath ?? "")
+        } catch {
+            AppLog.providers.error("\(definition.id): can't run the CLI at the saved location: \(error.localizedDescription)")
+            self.running = definition
+        }
         self.settings = settings
         self.makeDataSource = makeDataSource
         self.guestPasses = guestPasses
         let label = settings.defaultAccountLabel(forProvider: definition.id) ?? ""
         self.accounts = [Account(provider: self, login: ProviderAccount(providerId: definition.id, label: label), values: [:])]
-        bound[definition.id] = definition.dataSources.map { makeDataSource($0, definition.id) }
+        bind(self.accounts[0])
         for config in accounts {
             attach(config)
         }
@@ -77,11 +98,144 @@ public final class Provider {
         accounts: [ProviderAccountConfig] = [],
         makeDataSource: @escaping (DataSourceDefinition) -> DataSource,
         guestPasses: GuestPasses? = nil,
-        folders: any LoginFolders = DiskLoginFolders()
+        folders: any LoginFolders = DiskLoginFolders(),
+        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) {
         self.init(definition: definition, settings: settings, accounts: accounts,
                   makeDataSource: { source, _ in makeDataSource(source) },
-                  guestPasses: guestPasses, folders: folders)
+                  guestPasses: guestPasses, folders: folders, isExecutable: isExecutable)
+    }
+
+    // MARK: - CLI location
+
+    /// *CLI location* — runs this provider's CLI from `path` for every login
+    /// and for Add Account's sign-in, saved and in effect at once. Empty goes
+    /// back to finding the CLI as usual. A path that isn't a program is
+    /// refused, and nothing changes.
+    public func setCLIPath(_ path: String?) throws {
+        let trimmed = (path ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let chosen = trimmed.isEmpty ? nil : NSString(string: trimmed).expandingTildeInPath
+        if let chosen, !isExecutable(chosen) {
+            throw UsageError.executionFailed("\(chosen) isn't a program ClaudeBar can run. Choose the \(definition.cli ?? name) executable itself.")
+        }
+        let running = try definition.runningCLI(chosen ?? "")
+        self.running = running
+        cliPath = chosen
+        settings.setCLIPath(chosen, forProvider: id)
+        for account in accounts {
+            bound[account.id] = try sources(for: account.values, isDefault: account.isDefault).map { makeDataSource($0, account.id) }
+        }
+    }
+
+    // MARK: - Settings — REGION, API KEY, ENV VAR …
+
+    /// What a setting holds for a login: the login's own value for an
+    /// account-scope one, else the provider's saved value, else its default.
+    /// Never a secret's: those are kept in the vault, not with these values.
+    public func value(of setting: Setting, for account: Account) -> String? {
+        value(of: setting, values: account.isDefault ? [:] : account.values)
+    }
+
+    /// What to do when the active data source's key lookup finds no key —
+    /// the lookup's own hint, when it has one.
+    public var keyHint: String? {
+        definition.dataSource(activeKind)?.credential?.hint
+    }
+
+    /// Whether a value of this setting is saved for a login — a key in the
+    /// vault, or a value in settings — never the value itself, so Settings
+    /// can say *Saved* without showing a key.
+    public func hasSaved(_ setting: Setting, for account: Account) -> Bool {
+        if vault?.secret(setting.id, provider: account.id) != nil { return true }
+        let own = account.isDefault ? settings.value(setting.id, forProvider: id) : account.values[setting.id]
+        return own != nil
+    }
+
+    /// Fills in a provider-scope setting — or the default login's value of an
+    /// account-scope one — and runs every login with it from the next
+    /// refresh. A secret goes to the vault; `nil` or empty forgets it.
+    public func set(_ id: String, to value: String?) throws {
+        guard let setting = definition.setting(id) else {
+            throw UsageError.executionFailed("\(name) has no setting \(id).")
+        }
+        let value = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let kept = (value?.isEmpty ?? true) ? nil : value
+        if let kept, let problem = setting.check(kept, paths: paths) {
+            throw UsageError.executionFailed(problem)
+        }
+        var entry = SettingEntry()
+        if let kept { setting.keep(kept, in: &entry) }
+        guard entry.secrets.isEmpty || vault != nil else {
+            throw UsageError.executionFailed("ClaudeBar can't keep this key securely here.")
+        }
+        settings.setValue(entry.values[id], id, forProvider: self.id)
+        if entry.secrets.isEmpty {
+            vault?.delete(id, provider: self.id)
+        } else {
+            try keep(entry.secrets, for: self.id)
+        }
+        for account in accounts { bind(account) }
+    }
+
+    /// The definition as the default login runs it — the CLI at its chosen
+    /// location and every `{{setting.x}}` filled — so Settings prints
+    /// `$MINIMAX_API_KEY`, not the template.
+    public var definitionAsRun: ProviderDefinition {
+        let sources = (try? sources(for: [:], isDefault: true)) ?? running.dataSources
+        return ProviderDefinition(profile: running.profile, cli: running.cli, enabledByDefault: running.enabledByDefault,
+                                  dataSources: sources, defaultDataSource: running.defaultDataSource,
+                                  accounts: running.accounts, settings: running.settings)
+    }
+
+    /// Every `{{setting.x}}` a login's data sources are filled with.
+    func settingFills(for account: Account) -> [String: String] {
+        settingFills(values: account.isDefault ? [:] : account.values)
+    }
+
+    private func settingFills(values: [String: String]) -> [String: String] {
+        definition.settings.reduce(into: [:]) { fills, setting in
+            fills.merge(setting.fills(for: value(of: setting, values: values))) { _, new in new }
+        }
+    }
+
+    private func value(of setting: Setting, values: [String: String]) -> String? {
+        let value = setting.value(from: setting.ownValue(in: values) ?? settings.value(setting.id, forProvider: id))
+        return value.isEmpty ? nil : value
+    }
+
+    /// Saves keys in the vault under a login, reading each back: an ad-hoc
+    /// build's Keychain can seem to save and keep nothing. On a refusal every
+    /// key goes back to what it was — a key being replaced is never lost.
+    private func keep(_ secrets: [String: String], for login: String) throws {
+        let before = secrets.keys.reduce(into: [String: String?]()) { $0[$1] = vault?.secret($1, provider: login) }
+        for (name, value) in secrets {
+            vault?.save(value, name, provider: login)
+            guard vault?.secret(name, provider: login) == value else {
+                for (name, previous) in before {
+                    vault?.delete(name, provider: login)
+                    if let previous { vault?.save(previous, name, provider: login) }
+                }
+                throw UsageError.executionFailed("ClaudeBar couldn't keep this key securely.")
+            }
+        }
+    }
+
+    /// A login's data sources as data: an added one's patched and filled
+    /// with its values, then every login's settings filled in.
+    private func sources(for values: [String: String], isDefault: Bool) throws -> [DataSourceDefinition] {
+        let sources = isDefault ? running.dataSources : try running.dataSources(forAccount: values)
+        let fills = settingFills(values: isDefault ? [:] : values)
+        guard !fills.isEmpty else { return sources }
+        return try sources.map { try $0.filled(fills, scope: "setting") }
+    }
+
+    /// Makes a login's data sources live again — after a setting changed.
+    private func bind(_ account: Account) {
+        do {
+            bound[account.id] = try sources(for: account.values, isDefault: account.isDefault).map { makeDataSource($0, account.id) }
+        } catch {
+            AppLog.providers.error("\(definition.id): can't run account \(account.id): \(error.localizedDescription)")
+        }
     }
 
     public var id: String { definition.id }
@@ -107,7 +261,7 @@ public final class Provider {
             return nil
         }
         do {
-            bound[login.id] = try definition.dataSources(forAccount: config.probeConfig).map { makeDataSource($0, login.id) }
+            bound[login.id] = try sources(for: config.probeConfig, isDefault: false).map { makeDataSource($0, login.id) }
         } catch {
             AppLog.providers.error("\(definition.id): can't run account \(login.id): \(error.localizedDescription)")
             return nil
@@ -125,8 +279,9 @@ public final class Provider {
         if let folder = account.folder, folder.goesWithAccount {
             folders.delete(folder.url)
         }
-        for field in definition.accounts?.form ?? [] where field.secret {
-            vault?.delete(field.id, provider: account.id)
+        // Whatever of the form went to the vault goes with the login.
+        for setting in definition.accountSettings {
+            vault?.delete(setting.id, provider: account.id)
         }
         accounts.removeAll { $0.id == account.id }
         bound[account.id] = nil
@@ -143,34 +298,56 @@ public final class Provider {
         try addAccount(SignedInFolder(url: folder, madeBy: .folder))
     }
 
-    /// *Add Account* by its form — the account's own settings. A secret is
-    /// kept in the vault under the new login's id, never in its saved values;
-    /// every field must be filled, and a choice must be one of its choices.
+    /// What *Add Account*'s form asks for: the account settings the active
+    /// data source uses.
+    public var accountForm: [Setting] {
+        definition.accountSettings.filter { $0.isUsed(by: activeKind) }
+    }
+
+    /// *Add Account* by its form — the login's own account-scope settings.
+    /// Each value keeps its setting's rule, a default fills a blank, a path
+    /// is never another login's, and a secret is kept in the vault under the
+    /// new login's id — read back before the login is kept, so nothing is
+    /// half saved.
     @discardableResult
     public func addAccount(filling entered: [String: String]) throws -> Account {
-        let fields = definition.accounts?.form ?? []
-        guard !fields.isEmpty else { throw UsageError.executionFailed("\(name) has no account form.") }
-        var values: [String: String] = [:]
-        var secrets: [String: String] = [:]
-        for field in fields {
-            let value = (entered[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !value.isEmpty else { throw UsageError.executionFailed("Fill in \(field.label).") }
-            if let choices = field.choices, !choices.contains(value) {
-                throw UsageError.executionFailed("Choose a \(field.label) from the list.")
+        let form = accountForm
+        guard !form.isEmpty else { throw UsageError.executionFailed("\(name) has no account form.") }
+        var entry = SettingEntry()
+        for setting in form {
+            let value = setting.value(from: entered[setting.id])
+            if let problem = setting.check(value, paths: paths) { throw UsageError.executionFailed(problem) }
+            if isTaken(value, by: setting) {
+                throw UsageError.executionFailed("Choose a separate folder for \(setting.label) — another \(name) login uses this one.")
             }
-            if field.secret { secrets[field.id] = value } else { values[field.id] = value }
+            setting.keep(value, in: &entry)
         }
-        guard secrets.isEmpty || vault != nil else {
+        guard entry.secrets.isEmpty || vault != nil else {
             throw UsageError.executionFailed("ClaudeBar can't keep this key securely here.")
         }
-        let config = ProviderAccountConfig(accountId: UUID().uuidString.lowercased(), label: "", probeConfig: values, madeBy: .form)
+        let config = ProviderAccountConfig(accountId: UUID().uuidString.lowercased(), label: "", probeConfig: entry.values, madeBy: .form)
         let lineupId = config.toProviderAccount(providerId: id).id
-        for (name, value) in secrets { vault?.save(value, name, provider: lineupId) }
+        do {
+            try keep(entry.secrets, for: lineupId)
+        } catch {
+            throw UsageError.executionFailed("ClaudeBar couldn't keep this key securely. The account wasn't added.")
+        }
         guard let account = add(config) else {
-            for name in secrets.keys { vault?.delete(name, provider: lineupId) }
+            for name in entry.secrets.keys { vault?.delete(name, provider: lineupId) }
             throw UsageError.executionFailed("This \(name) account can't be added.")
         }
+        // Supplying this login's key is an explicit opt-in, even when the
+        // product's unconfigured default login starts disabled.
+        account.isEnabled = true
         return account
+    }
+
+    /// Two logins never share a path setting — the default login's included.
+    private func isTaken(_ value: String, by setting: Setting) -> Bool {
+        accounts.contains { account in
+            guard let other = self.value(of: setting, values: account.isDefault ? [:] : account.values) else { return false }
+            return setting.isSamePlace(value, as: other, paths: paths)
+        }
     }
 
     /// *Sign in with browser* — runs the definition's login into a new folder
@@ -178,7 +355,7 @@ public final class Provider {
     /// that ends up holding no new login is deleted.
     @discardableResult
     public func signIn(with runner: AccountSignIn = AccountSignIn(), under root: URL = SignedInFolder.signInRoot) async throws -> Account {
-        guard let call = definition.accounts?.signIn else {
+        guard let call = running.accounts?.signIn else {
             throw UsageError.executionFailed("\(name) has no sign-in.")
         }
         let folder = SignedInFolder.forSignIn(to: id, under: root)
@@ -227,7 +404,7 @@ public final class Provider {
     /// up a key, filled with them. A folder whose key does not answer holds
     /// no login, whatever else it holds.
     private func signedIn(with values: [String: String], rule: ProviderDefinition.Accounts.Folder) -> (accountId: String?, email: String?)? {
-        guard let source = try? definition.dataSources(forAccount: values).first(where: { $0.credential != nil }) else { return nil }
+        guard let source = try? running.dataSources(forAccount: values).first(where: { $0.credential != nil }) else { return nil }
         let live = makeDataSource(source, "\(id).new")
         guard live.hasKey else { return nil }
         return (live.value(of: rule.accountId.field).flatMap { $0.isEmpty ? nil : $0 }, live.value(of: rule.email))
@@ -260,7 +437,7 @@ public final class Provider {
     /// person chose is theirs to sign in to; ClaudeBar never runs a login there.
     @discardableResult
     public func signInAgain(_ account: Account, with runner: AccountSignIn = AccountSignIn()) async throws -> UsageSnapshot {
-        guard let call = definition.accounts?.signIn, let folder = account.folder, folder.goesWithAccount else {
+        guard let call = running.accounts?.signIn, let folder = account.folder, folder.goesWithAccount else {
             throw UsageError.executionFailed("Sign in again in this folder yourself, then refresh.")
         }
         try await runner.signInAgain(call, in: folder.url)
@@ -348,6 +525,10 @@ public final class Provider {
     public func isAvailable(_ account: Account) async -> Bool {
         guard let active = startingDataSource(for: account) else { return false }
         if await active.isReady() { return true }
+        // No key here, but the data source it hands a missing key to is ready.
+        if let kind = active.handOffWithoutKey, let handOff = dataSource(kind, for: account), await handOff.isReady() {
+            return true
+        }
         guard let fallback = enabledFallback(of: active, for: account) else { return false }
         return await fallback.isReady()
     }

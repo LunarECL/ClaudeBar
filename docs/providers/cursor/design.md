@@ -1,6 +1,16 @@
-# Cursor probe research
+# Cursor: design
 
-Contributor notes for the Cursor probe. User-facing setup is in [README.md](README.md).
+Contributor notes for Cursor. User-facing setup is in [README.md](README.md).
+
+## As data
+
+Cursor is `Modules/Providers/Resources/Providers/cursor.json` and `cursor-usage.js`, run by the generic engine (TARGET_ARCHITECTURE §8.2); no Swift names it.
+
+- **Key — default login.** `CredentialLookup.sqlite` reads `cursorAuth/accessToken` from the app's `state.vscdb`. The database is opened read-only, and a query that would change it is refused. The lookup's `hint` ("Sign in again in Cursor settings, then refresh.") is what the Accounts card says when the key is gone. `requiresFiles` makes a missing database *Couldn't read your key* and not *Configured*.
+- **Key — added account.** Its patch drops the database and `requiresFiles`, and reads its own saved `accessToken` (account scope, in the vault).
+- **User id.** The session cookie is `WorkosCursorSessionToken={{token#jwt.sub}}::{{token}}`: the id is the token's own `sub` claim, read (not verified) when the request is filled, whichever lookup found the key. A token with no `sub` sends no cookie, and Cursor's 401 says so.
+- **Errors.** `http.401` carries the re-authenticate hint, `http.403` is *Authentication required*, and a 429 is a rate limit (the old probe said "HTTP error: 429"). Only 200 is an answer (`acceptedStatuses`).
+- **Left law.** An unlimited plan gives the plan and no quota, where the old probe showed a 100% "Monthly" card.
 
 ## Source
 

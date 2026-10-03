@@ -25,10 +25,12 @@ struct ClaudeBarApp: App {
         _ id: String,
         settings: any MultiAccountSettingsRepository,
         accounts: [ProviderAccountConfig] = [],
-        guestPasses: GuestPasses? = nil
+        secrets: (any SecretVault)? = nil,
+        guestPasses: GuestPasses? = nil,
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
     ) -> Provider {
         do {
-            return try Providers.make(id, settings: settings, accounts: accounts, guestPasses: guestPasses)
+            return try Providers.make(id, settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses, environment: environment)
         } catch {
             preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
         }
@@ -106,7 +108,10 @@ struct ClaudeBarApp: App {
             "claude",
             settings: settingsRepository,
             accounts: settingsRepository.accounts(forProvider: "claude"),
-            guestPasses: GuestPasses(source: ClaudeGuestPassSource())
+            // Guest passes run the same Claude CLI, at its CLI location (#210).
+            guestPasses: GuestPasses(source: ClaudeGuestPassSource(
+                claudeBinary: { settingsRepository.cliPath(forProvider: "claude") ?? "claude" }
+            ))
         )
         // Today's usage is read from local session logs, not a meter, so it
         // lives beside the providers: Claude's logs are its default login's
@@ -119,6 +124,51 @@ struct ClaudeBarApp: App {
         // product once, with the logins added beside the default one (#326).
         let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
 
+        let vault = ProviderVault()
+        // These are data: their keys, regions and environment variables are
+        // settings in their JSON, so nothing here is theirs.
+        let minimax = Self.builtIn("minimax", settings: settingsRepository,
+                                   accounts: settingsRepository.accounts(forProvider: "minimax"), secrets: vault)
+        let vercel = Self.builtIn("vercel-gateway", settings: settingsRepository,
+                                  accounts: settingsRepository.accounts(forProvider: "vercel-gateway"), secrets: vault)
+        let commandCode = Self.builtIn("commandcode", settings: settingsRepository,
+                                       accounts: settingsRepository.accounts(forProvider: "commandcode"), secrets: vault)
+        let amp = Self.builtIn("ampcode", settings: settingsRepository,
+                               accounts: settingsRepository.accounts(forProvider: "ampcode"), secrets: vault)
+        let kiro = Self.builtIn("kiro", settings: settingsRepository,
+                                accounts: settingsRepository.accounts(forProvider: "kiro"), secrets: vault)
+        let cursor = Self.builtIn("cursor", settings: settingsRepository,
+                                  accounts: settingsRepository.accounts(forProvider: "cursor"), secrets: vault)
+        let grok = Self.builtIn("grok", settings: settingsRepository,
+                                accounts: settingsRepository.accounts(forProvider: "grok"), secrets: vault)
+        let copilot = Self.builtIn("copilot", settings: settingsRepository,
+                                   accounts: settingsRepository.accounts(forProvider: "copilot"), secrets: vault)
+        let kimi = Self.builtIn("kimi", settings: settingsRepository,
+                                accounts: settingsRepository.accounts(forProvider: "kimi"), secrets: vault)
+        let openCodeGo = Self.builtIn("opencode-go", settings: settingsRepository,
+                                      accounts: settingsRepository.accounts(forProvider: "opencode-go"), secrets: vault)
+
+        // Keep the existing default login's configurable environment name until
+        // provider settings forms move to definitions. Added logins use only
+        // their own saved key, as deepseek.json's accounts.patch declares.
+        // A variable the person named for Z.ai is also read from their login
+        // shell (#170). Z.ai reads it last, after the saved key and Claude
+        // Code's settings, and no one else's lookup waits for a shell.
+        let shellEnvironment = ShellEnvironment()
+        let zai = Self.builtIn("zai", settings: settingsRepository,
+                               accounts: settingsRepository.accounts(forProvider: "zai"), secrets: vault,
+                               environment: { name in
+            let named = settingsRepository.value("glmAuthEnvVar", forProvider: "zai")
+            return name == named ? shellEnvironment.value(name) : ProcessInfo.processInfo.environment[name]
+        })
+        let deepseek = Self.builtIn("deepseek", settings: settingsRepository,
+                                   accounts: settingsRepository.accounts(forProvider: "deepseek"), secrets: vault,
+                                   environment: { name in
+            let configured = settingsRepository.deepseekAuthEnvVar()
+            let variable = name == "DEEPSEEK_API_KEY" && !configured.isEmpty ? configured : name
+            return ProcessInfo.processInfo.environment[variable]
+        })
+
         // The lineup: each login is its own pill. Legacy providers are their
         // own single login until they become definitions.
         // Each provider manages its own isEnabled state (persisted via ProviderSettingsRepository)
@@ -127,39 +177,19 @@ struct ClaudeBarApp: App {
             codex.defaultAccount,
             GeminiProvider(probe: GeminiUsageProbe(), settingsRepository: settingsRepository),
             AntigravityProvider(probe: AntigravityUsageProbe(), settingsRepository: settingsRepository),
-            ZaiProvider(
-                probe: ZaiUsageProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
-            CopilotProvider(
-                billingProbe: CopilotUsageProbe(settingsRepository: settingsRepository),
-                internalProbe: CopilotInternalAPIProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
+            zai.defaultAccount,
+            copilot.defaultAccount,
             BedrockProvider(
                 probe: BedrockUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
-            AmpCodeProvider(probe: AmpCodeUsageProbe(), settingsRepository: settingsRepository),
-            KimiProvider(
-                cliProbe: KimiCLIUsageProbe(),
-                apiProbe: KimiUsageProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
-            KiroProvider(probe: KiroUsageProbe(), settingsRepository: settingsRepository),
-            CursorProvider(probe: CursorUsageProbe(), settingsRepository: settingsRepository),
-            MiniMaxProvider(
-                probe: MiniMaxUsageProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
-            DeepSeekProvider(
-                probe: DeepSeekUsageProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
-            VercelProvider(
-                probe: VercelUsageProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
+            amp.defaultAccount,
+            kimi.defaultAccount,
+            kiro.defaultAccount,
+            cursor.defaultAccount,
+            minimax.defaultAccount,
+            deepseek.defaultAccount,
+            vercel.defaultAccount,
             AlibabaProvider(
                 probe: AlibabaUsageProbe(settingsRepository: settingsRepository, cookieProvider: AlibabaBrowserCookieProvider()),
                 settingsRepository: settingsRepository
@@ -168,30 +198,20 @@ struct ClaudeBarApp: App {
                 probe: MistralUsageProbe(),
                 settingsRepository: settingsRepository
             ),
-            OpenCodeProvider(
-                probe: OpenCodeAPIUsageProbe(fallback: OpenCodeUsageProbe()),
-                settingsRepository: settingsRepository
-            ),
+            openCodeGo.defaultAccount,
             OmpProvider(
                 probe: OmpUsageProbe(),
                 settingsRepository: settingsRepository
             ),
-            GrokProvider(
-                probe: GrokUsageProbe(),
-                settingsRepository: settingsRepository
-            ),
-            CommandCodeProvider(
-                probe: CommandCodeUsageProbe(),
-                settingsRepository: settingsRepository
-            ),
+            grok.defaultAccount,
+            commandCode.defaultAccount,
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts + openCodeGo.accounts + zai.accounts + kimi.accounts + copilot.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after
         // the built-ins; their keys come from ClaudeBar's vault.
-        let vault = ProviderVault()
         for definition in ProviderCatalog().custom() {
             Providers.register(custom: definition)
             let custom = Providers.make(definition, settings: settingsRepository,
@@ -205,6 +225,7 @@ struct ClaudeBarApp: App {
         // The settings repository carries the user's provider order (issue #141),
         // so the popover, overview and ⌘1–⌘9 follow it.
         // Alerts and every status follow the person's burn-rate setting (#357).
+        // Hidden quotas (#140) are read from the same settings, per product.
         let monitor = QuotaMonitor(
             providers: repository,
             alerter: quotaAlerter,

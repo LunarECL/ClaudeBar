@@ -8,18 +8,23 @@ import JavaScriptCore
 /// The script defines `read(response, context)`:
 ///
 /// - `response` — `{ status, headers, text, json }` (`json` is the parsed body, or `null`)
-/// - `context` — `{ now, timeZone, credential, ...files }`: epoch seconds, the
-///   current zone's identifier, the credential values the definition lets it
-///   see, and each declared context file's fields
+/// - `context` — `{ now, timeZone, credential, values, ...files }`: epoch
+///   seconds, the current zone's identifier, the credential values the
+///   definition lets it see, the settings it hands over (`values`), and each
+///   declared context file's fields
 ///
 /// and returns `{ quotas, plan, cost, account }` or `{ error }`. It may call
-/// `humanDate(text)` for an epoch-seconds reset time, or `null`.
+/// `humanDate(text)` for an epoch-seconds reset time, or `null`;
+/// `jsonDecimal(text)` to parse JSON keeping every number as its exact text;
+/// and `decimalCents(amount)` to round such an amount to cents without a
+/// binary float — money stays exact (CANONICAL §5, `Money`).
 ///
 /// The context has no file, network or process access: the script turns text
 /// into numbers and nothing else.
 struct ScriptMapper: Reading {
     let file: String
     let source: String?
+    var values: [String: String] = [:]
     let now: @Sendable () -> Date
 
     func read(_ response: Response, facts: MappingFacts, providerId: String) throws -> UsageSnapshot {
@@ -40,8 +45,9 @@ struct ScriptMapper: Reading {
             HumanDate.parse(text, now: clock()).map { $0.timeIntervalSince1970 } ?? NSNull()
         }
         context.setObject(humanDate, forKeyedSubscript: "humanDate" as NSString)
-        context.setObject(try Self.inputJSON(response, facts: facts, now: now()), forKeyedSubscript: "__input" as NSString)
+        context.setObject(try Self.inputJSON(response, facts: facts, values: values, now: now()), forKeyedSubscript: "__input" as NSString)
 
+        context.evaluateScript(DecimalScript.source)
         context.evaluateScript(source)
         if let exception {
             throw UsageError.parseFailed("Mapping script '\(file)' failed to load: \(exception)")
@@ -65,11 +71,13 @@ struct ScriptMapper: Reading {
         return try result.snapshot(providerId: providerId, capturedAt: now())
     }
 
-    private static func inputJSON(_ response: Response, facts: MappingFacts, now: Date) throws -> String {
+    private static func inputJSON(_ response: Response, facts: MappingFacts, values: [String: String], now: Date) throws -> String {
         var context: [String: Any] = [
             "now": now.timeIntervalSince1970,
             "timeZone": TimeZone.current.identifier,
             "credential": facts.credential,
+            // A blank setting never filled its template.
+            "values": values.filter { !$0.value.contains("{{") },
         ]
         for (name, fields) in facts.context {
             context[name] = fields
@@ -93,11 +101,46 @@ struct ScriptOutput: Decodable {
     struct Quota: Decodable {
         let type: QuotaKind
         let name: String?
-        let percentRemaining: Double
+        /// Exactly one measure: the old percentage or money, optionally of a ceiling.
+        let left: Left
         /// Epoch seconds.
         let resetsAt: Double?
         let resetText: String?
         let windowSeconds: Double?
+
+        private enum CodingKeys: String, CodingKey {
+            case type, name, percentRemaining, left, resetsAt, resetText, windowSeconds
+        }
+
+        private struct MoneyLeft: Decodable {
+            let money: Money
+            let of: Money?
+            let currency: String?
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            type = try container.decode(QuotaKind.self, forKey: .type)
+            name = try container.decodeIfPresent(String.self, forKey: .name)
+            let percent = try container.decodeIfPresent(Double.self, forKey: .percentRemaining)
+            let money = try container.decodeIfPresent(MoneyLeft.self, forKey: .left)
+            switch (percent, money) {
+            case (let percent?, nil): left = .share(percent)
+            case (nil, let money?):
+                let currency = money.currency ?? "USD"
+                guard !currency.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw DecodingError.dataCorruptedError(forKey: .left, in: container, debugDescription: "Empty currency")
+                }
+                left = .money(Quotas.Money(money.money.value, currency: currency),
+                              of: money.of.map { Quotas.Money($0.value, currency: currency) })
+            default:
+                throw DecodingError.dataCorruptedError(forKey: .left, in: container,
+                                                       debugDescription: "A quota must contain exactly one of percentRemaining or left")
+            }
+            resetsAt = try container.decodeIfPresent(Double.self, forKey: .resetsAt)
+            resetText = try container.decodeIfPresent(String.self, forKey: .resetText)
+            windowSeconds = try container.decodeIfPresent(Double.self, forKey: .windowSeconds)
+        }
     }
 
     struct Cost: Decodable {
@@ -128,7 +171,8 @@ struct ScriptOutput: Decodable {
             } else {
                 text = String(try container.decode(Double.self))
             }
-            guard let value = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX")) else {
+            guard text.range(of: #"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"#, options: .regularExpression) != nil,
+                  let value = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX")) else {
                 throw DecodingError.dataCorruptedError(in: container, debugDescription: "Not an amount: \(text)")
             }
             self.value = value
@@ -146,7 +190,7 @@ struct ScriptOutput: Decodable {
         let quotas = (quotas ?? []).compactMap { quota -> UsageQuota? in
             guard let type = JSONMapper.quotaType(quota.type, name: quota.name) else { return nil }
             return UsageQuota(
-                percentRemaining: quota.percentRemaining,
+                left: quota.left,
                 quotaType: type,
                 providerId: providerId,
                 resetsAt: quota.resetsAt.map { Date(timeIntervalSince1970: $0) },

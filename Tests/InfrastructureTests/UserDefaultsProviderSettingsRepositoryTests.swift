@@ -134,44 +134,51 @@ struct UserDefaultsProviderSettingsRepositoryTests {
         #expect(enabled == true)
     }
 
-    // MARK: - Copilot Monthly Limit Tests
+    // MARK: - Hidden Quota Keys (issue #140)
 
     @Test
-    func `copilotMonthlyLimit returns nil when not set`() {
-        // Given
+    func `hiddenQuotaKeys defaults to empty`() {
         let repository = makeRepository()
         defer { cleanupDefaults() }
 
-        // Then
-        #expect(repository.copilotMonthlyLimit() == nil)
+        #expect(repository.hiddenQuotaKeys(forProvider: "gemini") == [])
     }
 
     @Test
-    func `copilotMonthlyLimit returns stored value when set`() {
-        // Given
-        let repository = makeRepository()
+    func `setHiddenQuotaKeys persists across repository instances`() {
+        let defaults = UserDefaults(suiteName: testSuiteName)!
         defer { cleanupDefaults() }
 
-        // When
-        repository.setCopilotMonthlyLimit(300)
+        let repository1 = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        repository1.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
 
-        // Then
-        #expect(repository.copilotMonthlyLimit() == 300)
+        let repository2 = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+
+        #expect(repository2.hiddenQuotaKeys(forProvider: "gemini") == ["model:gemini-2.0-flash"])
     }
 
     @Test
-    func `setCopilotMonthlyLimit removes value when set to nil`() {
-        // Given
+    func `hiddenQuotaKeys is per provider`() {
         let repository = makeRepository()
         defer { cleanupDefaults() }
 
-        // When - set a value first
-        repository.setCopilotMonthlyLimit(300)
-        #expect(repository.copilotMonthlyLimit() == 300)
+        repository.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
+        repository.setHiddenQuotaKeys(["weekly"], forProvider: "codex")
 
-        // Then - clear it by setting nil
-        repository.setCopilotMonthlyLimit(nil)
-        #expect(repository.copilotMonthlyLimit() == nil)
+        #expect(repository.hiddenQuotaKeys(forProvider: "gemini") == ["model:gemini-2.0-flash"])
+        #expect(repository.hiddenQuotaKeys(forProvider: "codex") == ["weekly"])
+        #expect(repository.hiddenQuotaKeys(forProvider: "claude") == [])
+    }
+
+    @Test
+    func `setHiddenQuotaKeys with empty set clears the stored keys`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
+        repository.setHiddenQuotaKeys([], forProvider: "gemini")
+
+        #expect(repository.hiddenQuotaKeys(forProvider: "gemini") == [])
     }
 
     // MARK: - Claude CLI Fallback
@@ -191,25 +198,6 @@ struct UserDefaultsProviderSettingsRepositoryTests {
 
         repository.setClaudeCliFallbackEnabled(false)
         #expect(repository.claudeCliFallbackEnabled() == false)
-    }
-
-    // MARK: - Kimi Region
-
-    @Test
-    func `kimiRegion defaults to china`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        #expect(repository.kimiRegion() == .china)
-    }
-
-    @Test
-    func `setKimiRegion persists value`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        repository.setKimiRegion(.international)
-        #expect(repository.kimiRegion() == .international)
     }
 
     // MARK: - Codex Verified Flag

@@ -152,6 +152,52 @@ struct JSONSettingsRepositoryProviderTests {
 
         repo.setProviderOrder(["codex"])
         #expect(repo.providerOrder() == ["codex"])
+    // MARK: - Hidden Quota Keys (issue #140)
+
+    @Test
+    func `hiddenQuotaKeys defaults to empty`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.hiddenQuotaKeys(forProvider: "gemini") == [])
+    }
+
+    @Test
+    func `setHiddenQuotaKeys persists across store reopen`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setHiddenQuotaKeys(["model:gemini-2.0-flash", "time:mcp"], forProvider: "gemini")
+
+        // Reopen the same settings file as a fresh repository
+        let store = JSONSettingsStore(fileURL: dir.appendingPathComponent("settings.json"))
+        let reopened = JSONSettingsRepository(store: store)
+
+        #expect(reopened.hiddenQuotaKeys(forProvider: "gemini") == ["model:gemini-2.0-flash", "time:mcp"])
+    }
+
+    @Test
+    func `hiddenQuotaKeys is per provider`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
+        repo.setHiddenQuotaKeys(["weekly"], forProvider: "codex")
+
+        #expect(repo.hiddenQuotaKeys(forProvider: "gemini") == ["model:gemini-2.0-flash"])
+        #expect(repo.hiddenQuotaKeys(forProvider: "codex") == ["weekly"])
+        #expect(repo.hiddenQuotaKeys(forProvider: "claude") == [])
+    }
+
+    @Test
+    func `setHiddenQuotaKeys with empty set clears the stored keys`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setHiddenQuotaKeys(["model:gemini-2.0-flash"], forProvider: "gemini")
+        repo.setHiddenQuotaKeys([], forProvider: "gemini")
+
+        #expect(repo.hiddenQuotaKeys(forProvider: "gemini") == [])
     }
 
     // MARK: - Claude Settings
@@ -227,105 +273,6 @@ struct JSONSettingsRepositoryProviderTests {
 
         repo.setCodexVerifiedAtLeastOnce(false)
         #expect(repo.codexVerifiedAtLeastOnce() == false)
-    }
-
-    // MARK: - Kimi Settings
-
-    @Test
-    func `kimiProbeMode defaults to cli`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.kimiProbeMode() == .cli)
-    }
-
-    @Test
-    func `setKimiProbeMode persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setKimiProbeMode(.api)
-        #expect(repo.kimiProbeMode() == .api)
-    }
-
-    // MARK: - Zai Settings
-
-    @Test
-    func `zaiConfigPath defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.zaiConfigPath() == "")
-    }
-
-    @Test
-    func `setZaiConfigPath persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setZaiConfigPath("/custom/path")
-        #expect(repo.zaiConfigPath() == "/custom/path")
-    }
-
-    @Test
-    func `glmAuthEnvVar defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.glmAuthEnvVar() == "")
-    }
-
-    @Test
-    func `setGlmAuthEnvVar persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setGlmAuthEnvVar("GLM_TOKEN")
-        #expect(repo.glmAuthEnvVar() == "GLM_TOKEN")
-    }
-
-    // MARK: - Copilot Settings
-
-    @Test
-    func `copilotProbeMode defaults to billing`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.copilotProbeMode() == .billing)
-    }
-
-    @Test
-    func `setCopilotProbeMode persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setCopilotProbeMode(.copilotAPI)
-        #expect(repo.copilotProbeMode() == .copilotAPI)
-    }
-
-    @Test
-    func `copilotAuthEnvVar defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.copilotAuthEnvVar() == "")
-    }
-
-    @Test
-    func `copilotMonthlyLimit defaults to nil`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.copilotMonthlyLimit() == nil)
-    }
-
-    @Test
-    func `setCopilotMonthlyLimit persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setCopilotMonthlyLimit(100)
-        #expect(repo.copilotMonthlyLimit() == 100)
     }
 
     // MARK: - Bedrock Settings
@@ -406,44 +353,6 @@ struct JSONSettingsRepositoryProviderTests {
 
         repo.setHookPort(8080)
         #expect(repo.hookPort() == 8080)
-    }
-
-    // MARK: - MiniMax Settings
-
-    @Test
-    func `minimaxRegion defaults to china`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.minimaxRegion() == .china)
-    }
-
-    @Test
-    func `setMinimaxRegion persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setMinimaxRegion(.international)
-        #expect(repo.minimaxRegion() == .international)
-    }
-
-    // MARK: - Kimi Settings
-
-    @Test
-    func `kimiRegion defaults to china`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.kimiRegion() == .china)
-    }
-
-    @Test
-    func `setKimiRegion persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setKimiRegion(.international)
-        #expect(repo.kimiRegion() == .international)
     }
 
 }

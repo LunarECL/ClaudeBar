@@ -12,6 +12,8 @@ final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked
     private var cardURLs: [String: String] = [:]
     /// `"<provider>.<setting>"` → on/off, as `settings.json` keeps them.
     private var flags: [String: Bool]
+    /// Quota keys hidden per provider (issue #140).
+    private var hiddenKeys: [String: Set<String>] = [:]
 
     init(dataSourceKinds: [String: String] = [:], flags: [String: Bool] = [:]) {
         self.kinds = dataSourceKinds
@@ -24,6 +26,17 @@ final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked
 
     func setOn(_ on: Bool, _ setting: String, forProvider id: String) {
         flags["\(id).\(setting)"] = on
+    }
+
+    /// `"<provider>.<setting>"` → value, as `settings.json` keeps them.
+    private var values: [String: String] = [:]
+
+    func value(_ setting: String, forProvider id: String) -> String? {
+        values["\(id).\(setting)"]
+    }
+
+    func setValue(_ value: String?, _ setting: String, forProvider id: String) {
+        values["\(id).\(setting)"] = value
     }
 
     func isEnabled(forProvider id: String) -> Bool {
@@ -52,6 +65,16 @@ final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked
 
     func setDataSourceKind(_ kind: String, forProvider id: String) {
         kinds[id] = kind
+    }
+
+    private var cliPaths: [String: String] = [:]
+
+    func cliPath(forProvider id: String) -> String? {
+        cliPaths[id]
+    }
+
+    func setCLIPath(_ path: String?, forProvider id: String) {
+        cliPaths[id] = path
     }
 
     // MARK: - Accounts
@@ -90,5 +113,13 @@ final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked
 
     func setAccountOrder(_ accountIds: [String], forProvider id: String) {
         orders[id] = accountIds
+    }
+
+    func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
+        hiddenKeys[id] ?? []
+    }
+
+    func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {
+        hiddenKeys[id] = keys
     }
 }

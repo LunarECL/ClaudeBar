@@ -271,7 +271,11 @@ struct JSONMapper: Reading {
                     if let number = scope.value(path) as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
                         return Decimal(string: number.stringValue, locale: Locale(identifier: "en_US_POSIX"))
                     }
-                    if let value = scope.number(path) { return Decimal(value) }
+                    // An amount sent as text stays exact — decimal text only, never hex.
+                    if let text = (scope.value(path) as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       text.range(of: #"^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$"#, options: .regularExpression) != nil {
+                        return Decimal(string: text, locale: Locale(identifier: "en_US_POSIX"))
+                    }
                 }
             }
             return nil

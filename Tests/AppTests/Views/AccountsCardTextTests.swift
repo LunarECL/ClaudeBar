@@ -51,6 +51,19 @@ struct AccountsCardTextTests {
     }
 
     @Test
+    func `an API account is described and recovered without mentioning a CLI or folder`() throws {
+        let settings = JSONSettingsRepository(store: JSONSettingsStore(
+            fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("accounts-card-\(UUID()).json")))
+        let provider = try Providers.make("deepseek", settings: settings,
+                                          accounts: [ProviderAccountConfig(accountId: "work", label: "Work", probeConfig: [:], madeBy: .form)])
+        let text = AccountsCardText(provider: provider)
+        #expect(text.defaultLoginDescription == "Default account")
+        #expect(text.reauthHelp(for: provider.defaultAccount) == "Update the default account's key in Settings, then refresh.")
+        #expect(text.reauthHelp(for: provider.accounts[1]) == "Remove this account and add it again with a valid key.")
+        #expect(text.removeMessage(for: provider.accounts[1]) == "Removes Work from ClaudeBar and deletes its saved keys.")
+    }
+
+    @Test
     func `signing in yourself uses the definition's own command`() throws {
         let text = AccountsCardText(provider: try codex())
 
@@ -82,5 +95,24 @@ struct AccountsCardTextTests {
 
         #expect(text.reauthHelp(for: provider.accounts[1]) == nil)
         #expect(text.reauthHelp(for: provider.accounts[2]) == #"Sign in again yourself: CODEX_HOME=/Users/me/codex-b codex -c 'cli_auth_credentials_store="file"' login — then refresh."#)
+    }
+
+    @Test func `a path form keeps its folder and asks for CLI sign-in rather than a new key`() throws {
+        let json = #"{"profile":{"id":"example","name":"Example"},"cli":"example","defaultDataSource":"file","dataSources":[{"kind":"file","fetch":{"file":{"path":"/tmp/example.json"}},"mapping":{"json":{"quotas":[]}}}],"settings":[{"id":"home","label":"Home Folder","scope":"account","kind":"path"}],"accounts":{"patch":{}}}"#
+        let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)))
+        let account = ProviderAccountConfig(accountId: "work", label: "Work", probeConfig: ["home": "/tmp/work profile"], madeBy: .form)
+        let provider = Providers.make(try ProviderDefinition.parse(Data(json.utf8)), settings: settings, accounts: [account])
+        let text = AccountsCardText(provider: provider)
+
+        #expect(text.removeMessage(for: provider.accounts[1]) == "Removes Work from ClaudeBar. Its login and folder stay where they are.")
+        #expect(text.reauthHelp(for: provider.accounts[1]) == "Sign in again in /tmp/work profile with your CLI, then refresh.")
+    }
+
+    @Test func `the default login's re-sign-in help is its key lookup's own hint`() throws {
+        let json = #"{"profile":{"id":"example","name":"Example"},"defaultDataSource":"api","dataSources":[{"kind":"api","credential":{"sqlite":{"path":"~/example.db","query":"SELECT 1","fields":{},"hint":"Sign in again in Example, then refresh."}},"fetch":{"http":{"url":"https://example.test"}},"mapping":{"json":{"quotas":[]}}}]}"#
+        let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)))
+        let provider = Providers.make(try ProviderDefinition.parse(Data(json.utf8)), settings: settings)
+
+        #expect(AccountsCardText(provider: provider).reauthHelp(for: provider.defaultAccount) == "Sign in again in Example, then refresh.")
     }
 }

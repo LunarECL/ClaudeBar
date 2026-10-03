@@ -30,6 +30,9 @@ public protocol AppSettingsRepository: Sendable {
     func menuBarDurationEnabled() -> Bool
     func setMenuBarDurationEnabled(_ enabled: Bool)
 
+    func menuBarAccountLabelsEnabled() -> Bool
+    func setMenuBarAccountLabelsEnabled(_ enabled: Bool)
+
     func menuBarStackedEnabled() -> Bool
     func setMenuBarStackedEnabled(_ enabled: Bool)
 
@@ -95,6 +98,10 @@ public protocol AppSettingsRepository: Sendable {
 
     func burnRateThreshold() -> Double
     func setBurnRateThreshold(_ threshold: Double)
+
+    /// Monochrome provider marks in the menu bar; opt-in, across all accounts.
+    func nativeMenuBarIconsEnabled() -> Bool
+    func setNativeMenuBarIconsEnabled(_ enabled: Bool)
 
     // MARK: - Status Colors
 

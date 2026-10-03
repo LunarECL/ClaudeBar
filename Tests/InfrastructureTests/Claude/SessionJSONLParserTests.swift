@@ -82,6 +82,45 @@ struct SessionJSONLParserTests {
         #expect(records[0].requestId == nil)
     }
 
+    @Test func `reads from a byte offset up to the last complete line`() throws {
+        let first = #"{"type":"assistant","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":1,"output_tokens":1}},"timestamp":"2026-03-11T10:00:00.000Z"}"#
+        let second = #"{"type":"assistant","message":{"model":"claude-opus-4-6","usage":{"input_tokens":2,"output_tokens":2}},"timestamp":"2026-03-11T10:01:00.000Z"}"#
+        let unterminated = #"{"type":"assistant","message":{"model":"claude-haiku-4-5","usage":{"input_tokens":3,"output_tokens":3}},"timestamp":"2026-03-11T10:02:00.000Z"}"#
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).jsonl")
+        try "\(first)\n\(second)\n\(unterminated)".write(to: fileURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let chunk = try parser.parse(fileURL: fileURL, fromOffset: UInt64(first.utf8.count + 1))
+
+        #expect(chunk.records.map(\.model) == ["claude-opus-4-6"])
+        #expect(chunk.endOffset == UInt64(first.utf8.count + second.utf8.count + 2))
+        // The unterminated line still counts, but is left for the next read to finish.
+        #expect(chunk.tail.map(\.model) == ["claude-haiku-4-5"])
+    }
+
+    @Test func `parses a line longer than one read`() throws {
+        // A pasted image or large tool result can make one line several MB.
+        let padding = String(repeating: "x", count: 3 * 1024 * 1024)
+        let long = #"{"type":"assistant","message":{"model":"claude-sonnet-4-6","content":"\#(padding)","usage":{"input_tokens":1,"output_tokens":1}},"timestamp":"2026-03-11T10:00:00.000Z"}"#
+        let short = #"{"type":"assistant","message":{"model":"claude-opus-4-6","usage":{"input_tokens":2,"output_tokens":2}},"timestamp":"2026-03-11T10:01:00.000Z"}"#
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).jsonl")
+        try "\(long)\n\(short)\n".write(to: fileURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let chunk = try parser.parse(fileURL: fileURL, fromOffset: 0)
+
+        #expect(chunk.records.map(\.model) == ["claude-sonnet-4-6", "claude-opus-4-6"])
+        #expect(chunk.endOffset == UInt64(long.utf8.count + short.utf8.count + 2))
+        #expect(chunk.tail.isEmpty)
+    }
+
+    @Test func `ignores usage that only appears inside a quoted string`() {
+        let jsonl = #"""
+        {"type":"user","message":{"role":"user","content":"the \"usage\" field of an \"assistant\" line"},"timestamp":"2026-03-11T10:00:00.000Z"}
+        """#
+        #expect(parser.parse(content: jsonl).isEmpty)
+    }
+
     @Test func `parses ISO8601 timestamp correctly`() {
         let jsonl = """
         {"type":"assistant","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":10,"output_tokens":5}},"timestamp":"2026-03-11T10:30:45.123Z"}

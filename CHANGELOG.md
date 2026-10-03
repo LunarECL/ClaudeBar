@@ -8,20 +8,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Settings → Appearance → Native menu bar icons gives every provider account a monochrome mark that follows light and dark menu bars, while keeping quota colors. Off by default. ([#380](https://github.com/tddworks/ClaudeBar/pull/380))
+
+### Changed
+- Copilot supports separate accounts, each with its own token. An unlimited plan shows its plan instead of a made-up 100% card, and an organization seat's entered usage is used only while GitHub reports none. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Kimi supports separate accounts: a session token and region on the API, or a separate signed-in folder on the CLI. A signed-out CLI now asks you to sign in, and a plan with no stated period or limit no longer shows a made-up weekly 100%. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Z.ai supports separate accounts, each with its own key and platform, and a saved key can go to Zhipu as well as Z.ai. Claude Code no longer needs to be installed, and a key in Claude Code's settings is only used when it points at Z.ai. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- OpenCode Go supports separate accounts, each with its own API key. Without a key, its local estimate shows dollars left of each cap and waits out rate limits. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Grok supports separate accounts, each signed in under its own folder, and no longer shows a made-up 100% or weekly card when xAI reports no usage or no period. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Cursor supports separate accounts, each with its own access token. An unlimited plan shows its plan rather than a 100% card. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Kiro supports separate accounts, each signed in under its own home folder. Bonus credits show as their own card with no made-up weekly window, and the monthly window is the real month. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Amp supports separate accounts, each with its own access token, and shows the Free allowance as dollars of its ceiling. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Command Code supports separate accounts, each with its own API key, and waits out Command Code's rate limits instead of retrying at once. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Vercel Gateway supports separate accounts, each with its own API key. Your saved key and environment variable name carry over. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- A provider's Settings form now says when a key is already saved in your Keychain, and Clear removes a saved key or puts a setting back to its default. ([#402](https://github.com/tddworks/ClaudeBar/pull/402))
+- MiniMax supports separate accounts, each with its own API key and region. Your saved region, key and environment variable name carry over; the key moves to your Keychain. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Settings → Providers shows the same Data source, Settings and Accounts sections for every provider built from a definition. A CLI provider you add runs your command directly and reports when it fails. ([#399](https://github.com/tddworks/ClaudeBar/pull/399))
+- DeepSeek supports separate accounts with their own API keys, names and menu-bar pins, preserves existing sign-ins, and shows balances in their billing currency. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
+- Claude's daily cost and token cards load much faster when you open the popover: ClaudeBar reads only the session log lines written since the last open, instead of re-reading every log from today and yesterday. ([#378](https://github.com/tddworks/ClaudeBar/pull/378))
+
+---
+
+## [0.4.95] - 2026-10-02
+
+### Added
+- CLI location: when ClaudeBar can't find Claude's or Codex's CLI, or finds the wrong one, choose the program in Settings → Providers → Configuration. It applies at once, to every account and to sign-in. ([#361](https://github.com/tddworks/ClaudeBar/pull/361))
+- Settings → Providers lists the providers you turned on first, so the one you use isn't at the bottom of the list. ([#141](https://github.com/tddworks/ClaudeBar/issues/141))
 - Popover: a provider with several accounts is one tab, its accounts side by side. Chips hide one from view without pausing it, and a line names the account behind a warning. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Providers you made with Add Provider can have more than one account: Add Account asks for each account's API key, kept in your Keychain for that account only. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Claude and Codex accounts: Settings → Providers → Accounts adds a login by signing in with your browser or choosing a signed-in folder, then names, reorders, pins, pauses, removes and re-signs-in each one. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Accounts: with one Codex account the tab shows "Codex" again; with several, each shows its name or email. Menu bar labels stay short (`work`, `Side Project`) and are numbered when alike instead of widening to a full email. ([#308](https://github.com/tddworks/ClaudeBar/issues/308))
 - Providers: put your busiest assistant first — Settings → Providers has up/down controls per provider, and the menu bar pills, overview and ⌘1–⌘9 shortcuts all follow your order. ([#141](https://github.com/tddworks/ClaudeBar/issues/141))
+- Hide quotas you don't use: Settings → Providers → a provider → Quotas. A hidden quota disappears everywhere (popover, menu bar, Touch Bar, notch, status export, Notify!) and no longer sets a status or an alert. ([#140](https://github.com/tddworks/ClaudeBar/issues/140))
+- Menu bar: turn off Show Account Labels in Menu Bar in Settings to hide account names and emails while keeping icons, quotas, and hover details. ([#365](https://github.com/tddworks/ClaudeBar/pull/365))
 - Share a provider you made: Export… saves it as a file without your keys; Import… shows where it sends a key and any command it runs before you add it, then asks for your own key. ([#355](https://github.com/tddworks/ClaudeBar/issues/355))
 - Add Provider: track a service ClaudeBar doesn't ship. Settings → Providers → Add Provider… starts from an API, a command, a file or a copy; test it, click the numbers to map them, name it. Keys stay in your Keychain. ([#354](https://github.com/tddworks/ClaudeBar/issues/354))
 - Claude and Codex: the popover says which data source answered ("via RPC", or "via Terminal" after a fallback) and, when a refresh fails, which step went wrong ("Couldn't read your key"), keeping the last usage dimmed. ([#351](https://github.com/tddworks/ClaudeBar/issues/351))
 
 ### Fixed
+- MiniMax no longer shows 0% left on every model: it reads the Token Plan endpoint and shows each model's 5-hour and weekly windows, with request counts for older plans. ([#359](https://github.com/tddworks/ClaudeBar/pull/359))
 - A prepaid balance (Vercel, Copilot, Cursor, Grok, Command Code, Amp) shows its money in the menu bar instead of "100%", and no longer claims a pace. Pace only uses a provider's real window, never one guessed from a quota's name. ([#329](https://github.com/tddworks/ClaudeBar/pull/329))
 - Notifications, provider pills, the Touch Bar, the status export and Notify! now follow the burn-rate warning setting like the menu bar does, so a quota that's on pace no longer sends a warning while the menu bar says healthy. ([#357](https://github.com/tddworks/ClaudeBar/issues/357))
 
 ### Changed
+- Claude's CLI data source now reuses a single session named "ClaudeBar Probe" instead of creating a new empty session on every refresh, so `~/.claude/projects` and session pickers stay clean. ([#132](https://github.com/tddworks/ClaudeBar/issues/132))
 - Claude and Codex settings: one Data source section replaces Probe Mode. It shows where ClaudeBar looks for your key, says what happens if a source fails, and has a Test Connection button. Your choices carry over. ([#352](https://github.com/tddworks/ClaudeBar/issues/352))
 - Claude and Codex now run from built-in provider definitions instead of their own code: a first step toward adding providers from Settings. Usage, settings, accounts and the menu bar stay the same; please report anything that reads differently. ([#329](https://github.com/tddworks/ClaudeBar/pull/329))
 
@@ -1168,7 +1198,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.94...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.95...HEAD
+[0.4.95]: https://github.com/tddworks/ClaudeBar/compare/v0.4.94...v0.4.95
 [0.4.94]: https://github.com/tddworks/ClaudeBar/compare/v0.4.93...v0.4.94
 [0.4.93]: https://github.com/tddworks/ClaudeBar/compare/v0.4.92...v0.4.93
 [0.4.92]: https://github.com/tddworks/ClaudeBar/compare/v0.4.91...v0.4.92

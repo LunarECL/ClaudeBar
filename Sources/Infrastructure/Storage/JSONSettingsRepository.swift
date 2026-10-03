@@ -6,19 +6,14 @@ import Domain
 /// (including all sub-protocols) + HookSettingsRepository + NotifySettingsRepository.
 ///
 /// Backed by `JSONSettingsStore` reading/writing `~/.claudebar/settings.json`.
-/// Vercel and Notify! credentials use the injected secure store; legacy provider
+/// Notify! credentials use the injected secure store; legacy provider
 /// credentials remain in UserDefaults pending their own migrations.
 public final class JSONSettingsRepository:
     AppSettingsRepository,
-    ZaiSettingsRepository,
-    CopilotSettingsRepository,
     BedrockSettingsRepository,
     ClaudeSettingsRepository,
     CodexSettingsRepository,
-    KimiSettingsRepository,
-    MiniMaxSettingsRepository,
     AlibabaSettingsRepository,
-    VercelSettingsRepository,
     HookSettingsRepository,
     NotifySettingsRepository,
     @unchecked Sendable
@@ -30,23 +25,7 @@ public final class JSONSettingsRepository:
     private let credentials: UserDefaults
     private let secureCredentials: any CredentialRepository
 
-    private var vercelCredentials: SecureCredentialMigration {
-        SecureCredentialMigration(
-            secureStore: secureCredentials,
-            legacyStore: credentials,
-            secureKey: CredentialKey.vercelApiKey,
-            legacyKey: Self.legacyVercelApiKeyKey
-        )
-    }
 
-    private var zaiCredentials: SecureCredentialMigration {
-        SecureCredentialMigration(
-            secureStore: secureCredentials,
-            legacyStore: credentials,
-            secureKey: CredentialKey.zaiApiKey,
-            legacyKey: Self.legacyZaiApiKeyKey
-        )
-    }
 
     public init(
         store: JSONSettingsStore,
@@ -98,6 +77,14 @@ public final class JSONSettingsRepository:
 
     public func setMenuBarDurationEnabled(_ enabled: Bool) {
         store.write(value: enabled, key: "app.menuBarDurationEnabled")
+    }
+
+    public func menuBarAccountLabelsEnabled() -> Bool {
+        store.read(key: "app.menuBarAccountLabelsEnabled") ?? true
+    }
+
+    public func setMenuBarAccountLabelsEnabled(_ enabled: Bool) {
+        store.write(value: enabled, key: "app.menuBarAccountLabelsEnabled")
     }
 
     public func menuBarStackedEnabled() -> Bool {
@@ -276,6 +263,14 @@ public final class JSONSettingsRepository:
         store.write(value: value, key: "app.statusColorOverrides")
     }
 
+    public func nativeMenuBarIconsEnabled() -> Bool {
+        store.read(key: "app.nativeMenuBarIconsEnabled") ?? false
+    }
+
+    public func setNativeMenuBarIconsEnabled(_ enabled: Bool) {
+        store.write(value: enabled, key: "app.nativeMenuBarIconsEnabled")
+    }
+
     public func highContrastEnabled() -> Bool {
         store.read(key: "app.highContrastEnabled") ?? false
     }
@@ -308,6 +303,14 @@ public final class JSONSettingsRepository:
         store.write(value: kind, key: "\(id).probeMode")
     }
 
+    public func cliPath(forProvider id: String) -> String? {
+        store.read(key: "providers.\(id).cliPath")
+    }
+
+    public func setCLIPath(_ path: String?, forProvider id: String) {
+        store.write(value: path, key: "providers.\(id).cliPath")
+    }
+
     /// `<id>.<setting>` — e.g. `claude.cliFallbackEnabled`, the key the Claude card writes.
     public func isOn(_ setting: String, forProvider id: String) -> Bool? {
         store.read(key: "\(id).\(setting)")
@@ -316,6 +319,42 @@ public final class JSONSettingsRepository:
     public func setOn(_ on: Bool, _ setting: String, forProvider id: String) {
         store.write(value: on, key: "\(id).\(setting)")
     }
+
+    /// `<id>.<setting>` — e.g. `kimi.region`, the key the Kimi card writes.
+    /// A value a provider's old card kept under another key is read from
+    /// there, and moves the first time it is saved.
+    public func value(_ setting: String, forProvider id: String) -> String? {
+        let key = "\(id).\(setting)"
+        if let value = text(at: key) { return value }
+        if let legacy = Self.legacySettingKeys[key], let value = text(at: legacy) { return value }
+        return Self.legacyDefaultsKeys[key].flatMap { credentials.string(forKey: $0) }
+    }
+
+    public func setValue(_ value: String?, _ setting: String, forProvider id: String) {
+        let key = "\(id).\(setting)"
+        store.write(value: value, key: key)
+        if let legacy = Self.legacySettingKeys[key] { store.write(value: nil, key: legacy) }
+        if let legacy = Self.legacyDefaultsKeys[key] { credentials.removeObject(forKey: legacy) }
+    }
+
+    /// A value as text — an old card may have saved a number.
+    private func text(at key: String) -> String? {
+        if let value: String = store.read(key: key) { return value }
+        if let number: NSNumber = store.read(key: key), CFGetTypeID(number) != CFBooleanGetTypeID() { return number.stringValue }
+        return nil
+    }
+
+    /// Settings a provider's card kept under a key that isn't `<id>.<setting>`.
+    /// A migrating provider adds a row here, never a branch.
+    private static let legacySettingKeys = [
+        "vercel-gateway.authEnvVar": "vercel.authEnvVar",
+    ]
+
+    /// Settings a provider's card kept in UserDefaults; they move to
+    /// settings.json the first time they are saved.
+    private static let legacyDefaultsKeys = [
+        "copilot.username": "com.claudebar.credentials.github-username",
+    ]
 
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         store.write(value: enabled, key: "providers.\(id).isEnabled")
@@ -338,6 +377,16 @@ public final class JSONSettingsRepository:
     /// registration order" when nothing is stored — same rule as customCardURL.
     public func setProviderOrder(_ order: [String]) {
         store.write(value: order.isEmpty ? nil : order, key: "providers.order")
+    public func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
+        let stored: [String] = store.read(key: "providers.\(id).hiddenQuotaKeys") ?? []
+        return Set(stored)
+    }
+
+    public func setHiddenQuotaKeys(_ keys: Set<String>, forProvider id: String) {
+        // Persist an empty set as a removal so the file stays free of empty
+        // arrays and a fresh install reads back as "nothing hidden".
+        let value: [String]? = keys.isEmpty ? nil : keys.sorted()
+        store.write(value: value, key: "providers.\(id).hiddenQuotaKeys")
     }
 
     // MARK: - ClaudeSettingsRepository
@@ -382,173 +431,6 @@ public final class JSONSettingsRepository:
 
     public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
         store.write(value: verified, key: "codex.verifiedAtLeastOnce")
-    }
-
-    // MARK: - KimiSettingsRepository
-
-    public func kimiProbeMode() -> KimiProbeMode {
-        guard let raw: String = store.read(key: "kimi.probeMode"),
-              let mode = KimiProbeMode(rawValue: raw) else {
-            return .cli
-        }
-        return mode
-    }
-
-    public func setKimiProbeMode(_ mode: KimiProbeMode) {
-        store.write(value: mode.rawValue, key: "kimi.probeMode")
-    }
-
-    public func kimiRegion() -> KimiRegion {
-        guard let raw: String = store.read(key: "kimi.region"),
-              let region = KimiRegion(rawValue: raw) else {
-            return .china
-        }
-        return region
-    }
-
-    public func setKimiRegion(_ region: KimiRegion) {
-        store.write(value: region.rawValue, key: "kimi.region")
-    }
-
-    // MARK: - ZaiSettingsRepository
-
-    public func zaiConfigPath() -> String {
-        store.read(key: "zai.configPath") ?? ""
-    }
-
-    public func setZaiConfigPath(_ path: String) {
-        store.write(value: path, key: "zai.configPath")
-    }
-
-    public func glmAuthEnvVar() -> String {
-        store.read(key: "zai.glmAuthEnvVar") ?? ""
-    }
-
-    public func setGlmAuthEnvVar(_ envVar: String) {
-        store.write(value: envVar, key: "zai.glmAuthEnvVar")
-    }
-
-    // Z.ai Credentials (Keychain with legacy UserDefaults migration)
-
-    public func saveZaiApiKey(_ key: String) {
-        zaiCredentials.save(key)
-    }
-
-    public func getZaiApiKey() -> String? {
-        zaiCredentials.get()
-    }
-
-    public func deleteZaiApiKey() {
-        zaiCredentials.delete()
-    }
-
-    public func hasZaiApiKey() -> Bool {
-        zaiCredentials.exists()
-    }
-
-    // MARK: - CopilotSettingsRepository
-
-    public func copilotProbeMode() -> CopilotProbeMode {
-        guard let raw: String = store.read(key: "copilot.probeMode"),
-              let mode = CopilotProbeMode(rawValue: raw) else {
-            return .billing
-        }
-        return mode
-    }
-
-    public func setCopilotProbeMode(_ mode: CopilotProbeMode) {
-        store.write(value: mode.rawValue, key: "copilot.probeMode")
-    }
-
-    public func copilotAuthEnvVar() -> String {
-        store.read(key: "copilot.authEnvVar") ?? ""
-    }
-
-    public func setCopilotAuthEnvVar(_ envVar: String) {
-        store.write(value: envVar, key: "copilot.authEnvVar")
-    }
-
-    public func copilotMonthlyLimit() -> Int? {
-        store.read(key: "copilot.monthlyLimit")
-    }
-
-    public func setCopilotMonthlyLimit(_ limit: Int?) {
-        store.write(value: limit, key: "copilot.monthlyLimit")
-    }
-
-    public func copilotManualUsageValue() -> Double? {
-        store.read(key: "copilot.manualUsageValue")
-    }
-
-    public func setCopilotManualUsageValue(_ value: Double?) {
-        store.write(value: value, key: "copilot.manualUsageValue")
-    }
-
-    public func copilotManualUsageIsPercent() -> Bool {
-        store.read(key: "copilot.manualUsageIsPercent") ?? false
-    }
-
-    public func setCopilotManualUsageIsPercent(_ isPercent: Bool) {
-        store.write(value: isPercent, key: "copilot.manualUsageIsPercent")
-    }
-
-    public func copilotManualOverrideEnabled() -> Bool {
-        store.read(key: "copilot.manualOverrideEnabled") ?? false
-    }
-
-    public func setCopilotManualOverrideEnabled(_ enabled: Bool) {
-        store.write(value: enabled, key: "copilot.manualOverrideEnabled")
-    }
-
-    public func copilotApiReturnedEmpty() -> Bool {
-        store.read(key: "copilot.apiReturnedEmpty") ?? false
-    }
-
-    public func setCopilotApiReturnedEmpty(_ empty: Bool) {
-        store.write(value: empty, key: "copilot.apiReturnedEmpty")
-    }
-
-    public func copilotLastUsagePeriodMonth() -> Int? {
-        store.read(key: "copilot.lastUsagePeriodMonth")
-    }
-
-    public func copilotLastUsagePeriodYear() -> Int? {
-        store.read(key: "copilot.lastUsagePeriodYear")
-    }
-
-    public func setCopilotLastUsagePeriod(month: Int, year: Int) {
-        store.write(value: month, key: "copilot.lastUsagePeriodMonth")
-        store.write(value: year, key: "copilot.lastUsagePeriodYear")
-    }
-
-    // Credentials (UserDefaults for now, Keychain migration later)
-
-    public func saveGithubToken(_ token: String) {
-        credentials.set(token, forKey: "com.claudebar.credentials.github-copilot-token")
-    }
-
-    public func getGithubToken() -> String? {
-        credentials.string(forKey: "com.claudebar.credentials.github-copilot-token")
-    }
-
-    public func deleteGithubToken() {
-        credentials.removeObject(forKey: "com.claudebar.credentials.github-copilot-token")
-    }
-
-    public func hasGithubToken() -> Bool {
-        getGithubToken() != nil
-    }
-
-    public func saveGithubUsername(_ username: String) {
-        credentials.set(username, forKey: "com.claudebar.credentials.github-username")
-    }
-
-    public func getGithubUsername() -> String? {
-        credentials.string(forKey: "com.claudebar.credentials.github-username")
-    }
-
-    public func deleteGithubUsername() {
-        credentials.removeObject(forKey: "com.claudebar.credentials.github-username")
     }
 
     // MARK: - BedrockSettingsRepository
@@ -806,75 +688,6 @@ public final class JSONSettingsRepository:
         store.write(value: screenWidgetId, key: "notify.screenWidgetId")
     }
 
-    // MARK: - MiniMaxSettingsRepository
-
-    public func minimaxRegion() -> MiniMaxRegion {
-        guard let raw: String = store.read(key: "minimax.region"),
-              let region = MiniMaxRegion(rawValue: raw) else {
-            return .china
-        }
-        return region
-    }
-
-    public func setMinimaxRegion(_ region: MiniMaxRegion) {
-        store.write(value: region.rawValue, key: "minimax.region")
-    }
-
-    public func minimaxAuthEnvVar() -> String {
-        store.read(key: "minimax.authEnvVar") ?? ""
-    }
-
-    public func setMinimaxAuthEnvVar(_ envVar: String) {
-        store.write(value: envVar, key: "minimax.authEnvVar")
-    }
-
-    // MiniMax Credentials (UserDefaults for now)
-
-    public func saveMinimaxApiKey(_ key: String) {
-        credentials.set(key, forKey: "com.claudebar.credentials.minimax-api-key")
-    }
-
-    public func getMinimaxApiKey() -> String? {
-        credentials.string(forKey: "com.claudebar.credentials.minimax-api-key")
-    }
-
-    public func deleteMinimaxApiKey() {
-        credentials.removeObject(forKey: "com.claudebar.credentials.minimax-api-key")
-    }
-
-    public func hasMinimaxApiKey() -> Bool {
-        getMinimaxApiKey() != nil
-    }
-
-    // MARK: - VercelSettingsRepository
-
-    public func vercelAuthEnvVar() -> String {
-        store.read(key: "vercel.authEnvVar") ?? ""
-    }
-
-    public func setVercelAuthEnvVar(_ envVar: String) {
-        store.write(value: envVar, key: "vercel.authEnvVar")
-    }
-
-    public func saveVercelApiKey(_ key: String) {
-        vercelCredentials.save(key)
-    }
-
-    public func getVercelApiKey() -> String? {
-        vercelCredentials.get()
-    }
-
-    @discardableResult
-    public func deleteVercelApiKey() -> Bool {
-        vercelCredentials.delete()
-    }
-
-    public func hasVercelApiKey() -> Bool {
-        vercelCredentials.exists()
-    }
-
-    private static let legacyVercelApiKeyKey = "com.claudebar.credentials.vercel-api-key"
-    private static let legacyZaiApiKeyKey = "com.claudebar.credentials.zai-api-key"
 }
 
 // MARK: - DeepSeekSettingsRepository
@@ -888,18 +701,21 @@ extension JSONSettingsRepository: DeepSeekSettingsRepository {
         store.write(value: envVar, key: "deepseek.authEnvVar")
     }
 
-    // DeepSeek Credentials (UserDefaults for now)
+    // The configuration card and definition-driven lookup use the same vault.
+    private var deepseekVault: ProviderVault {
+        ProviderVault(credentials: secureCredentials, legacyStore: credentials)
+    }
 
     public func saveDeepSeekApiKey(_ key: String) {
-        credentials.set(key, forKey: "com.claudebar.credentials.deepseek-api-key")
+        deepseekVault.save(key, "apiKey", provider: "deepseek")
     }
 
     public func getDeepSeekApiKey() -> String? {
-        credentials.string(forKey: "com.claudebar.credentials.deepseek-api-key")
+        deepseekVault.secret("apiKey", provider: "deepseek")
     }
 
     public func deleteDeepSeekApiKey() {
-        credentials.removeObject(forKey: "com.claudebar.credentials.deepseek-api-key")
+        deepseekVault.delete("apiKey", provider: "deepseek")
     }
 
     public func hasDeepSeekApiKey() -> Bool {

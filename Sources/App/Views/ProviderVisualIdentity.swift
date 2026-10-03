@@ -93,34 +93,6 @@ extension GeminiProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - CopilotProvider Visual Identity
-
-extension CopilotProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "chevron.left.forwardslash.chevron.right" }
-
-    public var iconAssetName: String { "CopilotIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // GitHub's blue color
-        scheme == .dark
-            ? Color(red: 0.38, green: 0.55, blue: 0.93)
-            : Color(red: 0.26, green: 0.43, blue: 0.82)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.55, green: 0.40, blue: 0.90)
-                    : Color(red: 0.45, green: 0.30, blue: 0.80)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - AntigravityProvider Visual Identity
 
 extension AntigravityProvider: ProviderVisualIdentity {
@@ -142,34 +114,6 @@ extension AntigravityProvider: ProviderVisualIdentity {
                 scheme == .dark
                     ? Color(red: 0.45, green: 0.25, blue: 0.75)
                     : Color(red: 0.35, green: 0.15, blue: 0.65)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-// MARK: - ZaiProvider Visual Identity
-
-extension ZaiProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "z.square.fill" }
-
-    public var iconAssetName: String { "ZaiIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Blue color matching Z.ai branding
-        scheme == .dark
-            ? Color(red: 0.35, green: 0.60, blue: 1.0)
-            : Color(red: 0.23, green: 0.51, blue: 0.96)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.30, green: 0.45, blue: 0.85)
-                    : Color(red: 0.20, green: 0.35, blue: 0.75)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -205,202 +149,6 @@ extension BedrockProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - AmpCodeProvider Visual Identity
-
-extension AmpCodeProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "bolt.fill" }
-
-    public var iconAssetName: String { "AmpCodeIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // AmpCode orange color #F34E3F
-        scheme == .dark
-            ? Color(red: 0.95, green: 0.30, blue: 0.25)
-            : Color(red: 0.90, green: 0.25, blue: 0.20)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        let primaryColor = themeColor(for: scheme)
-        let secondaryColor = scheme == .dark
-            ? Color(red: 0.85, green: 0.20, blue: 0.15)
-            : Color(red: 0.80, green: 0.15, blue: 0.10)
-
-        return LinearGradient(
-            colors: [primaryColor, secondaryColor],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-// MARK: - KimiProvider Visual Identity
-
-extension KimiProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "k.square.fill" }
-
-    public var iconAssetName: String { "KimiIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Blue/cyan color matching Kimi branding
-        scheme == .dark
-            ? Color(red: 0.30, green: 0.65, blue: 0.95)
-            : Color(red: 0.20, green: 0.55, blue: 0.85)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.20, green: 0.50, blue: 0.80)
-                    : Color(red: 0.10, green: 0.40, blue: 0.70)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-// MARK: - KiroProvider Visual Identity
-
-extension KiroProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "wand.and.stars.inverse" }
-
-    public var iconAssetName: String { "KiroIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Purple/magenta color matching Kiro branding
-        scheme == .dark
-            ? Color(red: 0.55, green: 0.35, blue: 0.85)
-            : Color(red: 0.45, green: 0.25, blue: 0.75)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.70, green: 0.45, blue: 0.95)
-                    : Color(red: 0.60, green: 0.35, blue: 0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-// MARK: - CursorProvider Visual Identity
-
-extension CursorProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "cursorarrow.rays" }
-
-    public var iconAssetName: String { "CursorIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Cursor brand teal/cyan
-        scheme == .dark
-            ? Color(red: 0.20, green: 0.78, blue: 0.82)
-            : Color(red: 0.12, green: 0.62, blue: 0.66)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.15, green: 0.55, blue: 0.75)
-                    : Color(red: 0.08, green: 0.45, blue: 0.60)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-// MARK: - MiniMaxProvider Visual Identity
-
-extension MiniMaxProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "waveform" }
-
-    public var iconAssetName: String { "MiniMaxIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // MiniMax brand pink-orange
-        scheme == .dark
-            ? Color(red: 0.91, green: 0.27, blue: 0.42)
-            : Color(red: 0.82, green: 0.20, blue: 0.35)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.96, green: 0.53, blue: 0.24)
-                    : Color(red: 0.86, green: 0.43, blue: 0.14)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-// MARK: - DeepSeekProvider Visual Identity
-
-extension DeepSeekProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "d.square.fill" }
-
-    public var iconAssetName: String { "DeepSeekIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // DeepSeek brand blue
-        scheme == .dark
-            ? Color(red: 0.42, green: 0.52, blue: 1.0)
-            : Color(red: 0.23, green: 0.35, blue: 0.92)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.22, green: 0.28, blue: 0.85)
-                    : Color(red: 0.15, green: 0.20, blue: 0.75)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-// MARK: - VercelProvider Visual Identity
-
-extension VercelProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "triangle.fill" }
-
-    public var iconAssetName: String { "VercelIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Vercel brand black/white monochrome
-        scheme == .dark
-            ? Color(white: 0.92)
-            : Color(white: 0.08)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(white: 0.55)
-                    : Color(white: 0.45)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - MistralProvider Visual Identity
 
 extension MistralProvider: ProviderVisualIdentity {
@@ -422,34 +170,6 @@ extension MistralProvider: ProviderVisualIdentity {
                 scheme == .dark
                     ? Color(red: 0.85, green: 0.35, blue: 0.10)
                     : Color(red: 0.75, green: 0.25, blue: 0.05)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-// MARK: - OpenCodeProvider Visual Identity
-
-extension OpenCodeProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "square.stack.3d.up.fill" }
-
-    public var iconAssetName: String { "OpenCodeIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // OpenCode brand purple
-        scheme == .dark
-            ? Color(red: 0.52, green: 0.36, blue: 1.0)
-            : Color(red: 0.42, green: 0.28, blue: 1.0)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.36, green: 0.20, blue: 0.90)
-                    : Color(red: 0.30, green: 0.15, blue: 0.80)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -580,73 +300,22 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? BaseTheme.goldenGlow
                 : Color(red: 0.92, green: 0.72, blue: 0.28)
-        case "copilot":
-            return scheme == .dark
-                ? Color(red: 0.38, green: 0.55, blue: 0.93)
-                : Color(red: 0.26, green: 0.43, blue: 0.82)
         case "antigravity":
             return scheme == .dark
                 ? Color(red: 0.72, green: 0.35, blue: 0.85)
                 : Color(red: 0.58, green: 0.22, blue: 0.72)
-        case "zai":
-            return scheme == .dark
-                ? Color(red: 0.35, green: 0.60, blue: 1.0)
-                : Color(red: 0.23, green: 0.51, blue: 0.96)
         case "bedrock":
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.6, blue: 0.2)
                 : Color(red: 0.92, green: 0.5, blue: 0.15)
-        case "ampcode":
-            // AmpCode orange
-            return scheme == .dark
-                ? Color(red: 0.95, green: 0.30, blue: 0.25)
-                : Color(red: 0.90, green: 0.25, blue: 0.20)
-        case "kimi":
-            return scheme == .dark
-                ? Color(red: 0.30, green: 0.65, blue: 0.95)
-                : Color(red: 0.20, green: 0.55, blue: 0.85)
-        case "kiro":
-            return scheme == .dark
-                ? Color(red: 0.55, green: 0.35, blue: 0.85)
-                : Color(red: 0.45, green: 0.25, blue: 0.75)
-        case "minimax":
-            return scheme == .dark
-                ? Color(red: 0.91, green: 0.27, blue: 0.42)
-                : Color(red: 0.82, green: 0.20, blue: 0.35)
-        case "deepseek":
-            return scheme == .dark
-                ? Color(red: 0.42, green: 0.52, blue: 1.0)
-                : Color(red: 0.23, green: 0.35, blue: 0.92)
-        case "cursor":
-            return scheme == .dark
-                ? Color(red: 0.20, green: 0.78, blue: 0.82)
-                : Color(red: 0.12, green: 0.62, blue: 0.66)
         case "mistral":
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.55, blue: 0.0)
                 : Color(red: 0.90, green: 0.45, blue: 0.0)
-        case "opencode-go":
-            return scheme == .dark
-                ? Color(red: 0.52, green: 0.36, blue: 1.0)
-                : Color(red: 0.42, green: 0.28, blue: 1.0)
         case "omp":
             return scheme == .dark
                 ? Color(red: 0.30, green: 0.85, blue: 0.55)
                 : Color(red: 0.16, green: 0.62, blue: 0.38)
-        case "grok":
-            return scheme == .dark
-                ? Color(white: 0.92)
-                : Color(white: 0.12)
-        case "commandcode":
-            // Command Code brand: Burple-foreground #546BF3 / monochrome black
-            return scheme == .dark
-                ? Color(red: 0.33, green: 0.42, blue: 0.95)
-                : Color(red: 0.07, green: 0.07, blue: 0.07)
-        case "vercel-gateway":
-            // Vercel brand black/white monochrome
-            return scheme == .dark
-                ? Color(white: 0.92)
-                : Color(white: 0.08)
         default:
             return BaseTheme.purpleVibrant
         }
@@ -663,71 +332,22 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.95, green: 0.55, blue: 0.35)
                 : Color(red: 0.85, green: 0.45, blue: 0.25)
-        case "copilot":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.55, green: 0.40, blue: 0.90)
-                : Color(red: 0.45, green: 0.30, blue: 0.80)
         case "antigravity":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.45, green: 0.25, blue: 0.75)
                 : Color(red: 0.35, green: 0.15, blue: 0.65)
-        case "zai":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.30, green: 0.45, blue: 0.85)
-                : Color(red: 0.20, green: 0.35, blue: 0.75)
         case "bedrock":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.45, blue: 0.15)
                 : Color(red: 0.75, green: 0.35, blue: 0.1)
-        case "ampcode":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.85, green: 0.20, blue: 0.15)
-                : Color(red: 0.80, green: 0.15, blue: 0.10)
-        case "kimi":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.20, green: 0.50, blue: 0.80)
-                : Color(red: 0.10, green: 0.40, blue: 0.70)
-        case "kiro":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.70, green: 0.45, blue: 0.95)
-                : Color(red: 0.60, green: 0.35, blue: 0.85)
-        case "minimax":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.96, green: 0.53, blue: 0.24)
-                : Color(red: 0.86, green: 0.43, blue: 0.14)
-        case "deepseek":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.22, green: 0.28, blue: 0.85)
-                : Color(red: 0.15, green: 0.20, blue: 0.75)
-        case "cursor":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.15, green: 0.55, blue: 0.75)
-                : Color(red: 0.08, green: 0.45, blue: 0.60)
         case "mistral":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.35, blue: 0.10)
                 : Color(red: 0.75, green: 0.25, blue: 0.05)
-        case "opencode-go":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.36, green: 0.20, blue: 0.90)
-                : Color(red: 0.30, green: 0.15, blue: 0.80)
         case "omp":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.16, green: 0.62, blue: 0.42)
                 : Color(red: 0.10, green: 0.48, blue: 0.30)
-        case "grok":
-            secondaryColor = scheme == .dark
-                ? Color(white: 0.60)
-                : Color(white: 0.40)
-        case "commandcode":
-            // Command Code Burple-background #2E1B9C
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.18, green: 0.11, blue: 0.61)
-                : Color(red: 0.25, green: 0.25, blue: 0.25)
-        case "vercel-gateway":
-            secondaryColor = scheme == .dark
-                ? Color(white: 0.55)
-                : Color(white: 0.45)
         default:
             return LinearGradient(
                 colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
@@ -748,22 +368,10 @@ enum ProviderVisualIdentityLookup {
         if let icon = look(for: providerId)?.icon { return icon }
         switch providerId {
         case "gemini": return "GeminiIcon"
-        case "copilot": return "CopilotIcon"
         case "antigravity": return "AntigravityIcon"
-        case "zai": return "ZaiIcon"
         case "bedrock": return "BedrockIcon"
-        case "ampcode": return "AmpCodeIcon"
-        case "kimi": return "KimiIcon"
-        case "kiro": return "KiroIcon"
-        case "minimax": return "MiniMaxIcon"
-        case "deepseek": return "DeepSeekIcon"
-        case "cursor": return "CursorIcon"
         case "mistral": return "MistralIcon"
-        case "opencode-go": return "OpenCodeIcon"
         case "omp": return "OmpIcon"
-        case "grok": return "GrokIcon"
-        case "commandcode": return "CommandCodeIcon"
-        case "vercel-gateway": return "VercelIcon"
         default: return "QuestionIcon"
         }
     }
@@ -773,22 +381,10 @@ enum ProviderVisualIdentityLookup {
         if let definition = Providers.definition(forLineupId: providerId) { return definition.profile.name }
         switch providerId {
         case "gemini": return "Gemini"
-        case "copilot": return "GitHub Copilot"
         case "antigravity": return "Antigravity"
-        case "zai": return "Z.ai"
         case "bedrock": return "AWS Bedrock"
-        case "ampcode": return "Amp"
-        case "kimi": return "Kimi"
-        case "kiro": return "Kiro"
-        case "minimax": return "MiniMax"
-        case "deepseek": return "DeepSeek"
-        case "cursor": return "Cursor"
         case "mistral": return "Mistral"
-        case "opencode-go": return "OpenCode Go"
         case "omp": return "Oh My Pi"
-        case "grok": return "Grok"
-        case "commandcode": return "Command Code"
-        case "vercel-gateway": return "Vercel Gateway"
         default: return providerId.capitalized
         }
     }
@@ -798,22 +394,10 @@ enum ProviderVisualIdentityLookup {
         if let symbol = look(for: providerId)?.symbol { return symbol }
         switch providerId {
         case "gemini": return "sparkles"
-        case "copilot": return "chevron.left.forwardslash.chevron.right"
         case "antigravity": return "wand.and.stars"
-        case "zai": return "z.square.fill"
         case "bedrock": return "cloud.fill"
-        case "ampcode": return "bolt.fill"
-        case "kimi": return "k.square.fill"
-        case "kiro": return "wand.and.stars.inverse"
-        case "minimax": return "waveform"
-        case "deepseek": return "d.square.fill"
-        case "cursor": return "cursorarrow.rays"
         case "mistral": return "cat.fill"
-        case "opencode-go": return "square.stack.3d.up.fill"
         case "omp": return "terminal.fill"
-        case "grok": return "line.diagonal"
-        case "commandcode": return "command"
-        case "vercel-gateway": return "triangle.fill"
         default:
             return extensionSymbols.withLock { $0[providerId] } ?? "questionmark.circle.fill"
         }

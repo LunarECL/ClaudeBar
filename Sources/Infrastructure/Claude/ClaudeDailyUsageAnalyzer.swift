@@ -12,6 +12,8 @@ public struct ClaudeDailyUsageAnalyzer: DailyUsageAnalyzing, Sendable {
     /// the CLI at a local server takes effect on the next scan. Applies to today's
     /// records only — it describes the current route, and the window reaches back a day.
     private let isLocallyServed: @Sendable () -> Bool
+    /// Parsed records kept between scans; shared by every copy of this analyzer.
+    private let logCache = SessionLogCache()
 
     /// - Parameter isLocallyServed: defaults to `false` so tests never read the
     ///   real `~/.claude.json`; the app injects `ClaudeLocalInferenceDetector`.
@@ -40,16 +42,9 @@ public struct ClaudeDailyUsageAnalyzer: DailyUsageAnalyzing, Sendable {
         let projectsDir = claudeDir.appendingPathComponent("projects")
         let jsonlFiles = findRecentJSONLFiles(in: projectsDir, since: yesterdayStart)
 
-        AppLog.probes.info("DailyUsage: scanning \(jsonlFiles.count) recent JSONL files")
-
-        // Parse files and collect records
-        let parser = SessionJSONLParser()
-        var parsedRecords: [TokenUsageRecord] = []
-        for fileURL in jsonlFiles {
-            if let records = try? parser.parse(fileURL: fileURL) {
-                parsedRecords.append(contentsOf: records)
-            }
-        }
+        let parsedRecords = await logCache.records(in: jsonlFiles)
+        let scan = await logCache.lastScan
+        AppLog.probes.info("DailyUsage: scanned \(jsonlFiles.count) recent JSONL files (\(scan.reused) unchanged, \(scan.extended) appended, \(scan.reparsed) read in full)")
 
         // Claude Code repeats the same `message.usage` across streamed content blocks,
         // parallel tool calls, and resumed/branched session files. Collapse duplicates by
