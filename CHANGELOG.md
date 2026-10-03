@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.0] - 2026-10-03
+
 ### Added
 - Show Provider Logo (Settings → Menu Bar) starts the menu bar readout with the provider's logo even when it's the only one. Off by default. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
 - Pop theme: cream dotted paper, thick ink outlines, hard shadows, candy-coloured status and chunky numbers, with each menu-bar quota as a candy chip. Pick it in Settings → Appearance. ([#435](https://github.com/tddworks/ClaudeBar/pull/435))
@@ -1212,7 +1216,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.95...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/tddworks/ClaudeBar/compare/v0.4.95...v0.5.0
 [0.4.95]: https://github.com/tddworks/ClaudeBar/compare/v0.4.94...v0.4.95
 [0.4.94]: https://github.com/tddworks/ClaudeBar/compare/v0.4.93...v0.4.94
 [0.4.93]: https://github.com/tddworks/ClaudeBar/compare/v0.4.92...v0.4.93
