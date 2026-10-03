@@ -317,6 +317,11 @@ public final class AppSettings {
         }
     }
 
+    /// Use native monochrome provider icons only in the menu bar.
+    public var nativeMenuBarIconsEnabled: Bool {
+        didSet { repository.setNativeMenuBarIconsEnabled(nativeMenuBarIconsEnabled) }
+    }
+
     // MARK: - Status Color Settings
 
     /// Per-status user colors; nil defers to High Contrast, then the theme.
@@ -400,6 +405,7 @@ public final class AppSettings {
         self.burnRateWarningEnabled = repository.burnRateWarningEnabled()
         self.burnRateThreshold = repository.burnRateThreshold()
         self.statusColorOverrides = repository.statusColorOverrides()
+        self.nativeMenuBarIconsEnabled = repository.nativeMenuBarIconsEnabled()
         self.highContrastEnabled = repository.highContrastEnabled()
         self.showDailyUsageCards = repository.showDailyUsageCards()
         self.notchEnabled = repository.notchEnabled()

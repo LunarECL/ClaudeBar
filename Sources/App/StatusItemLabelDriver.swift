@@ -94,6 +94,8 @@ final class StatusItemLabelDriver {
         /// The High Contrast palette is per-appearance and `render` skips
         /// identical content, so an appearance flip must change the content.
         var isDarkAppearance: Bool = true
+        /// Global Appearance preference, included so toggling repaints immediately.
+        var nativeMenuBarIconsEnabled: Bool = false
         /// Blink phase for an H:MM countdown's separator colon. Only alternates
         /// while the label actually holds a countdown colon, so a "2d" or "45m"
         /// label keeps comparing equal across ticks and never repaints for the
@@ -238,6 +240,7 @@ final class StatusItemLabelDriver {
             stackedSize: settings.menuBarStackedSize,
             statusColors: settings.statusColorPolicy,
             isDarkAppearance: isDarkAppearance,
+            nativeMenuBarIconsEnabled: settings.nativeMenuBarIconsEnabled,
             colonVisible: hasCountdownColon ? blinkPhase : true
         )
     }
@@ -322,7 +325,7 @@ final class StatusItemLabelDriver {
         }
 
         if let providerId = content.primaryProviderId {
-            parts.append(providerIcon(for: providerId))
+            parts.append(providerIcon(for: providerId, native: content.nativeMenuBarIconsEnabled, dark: content.isDarkAppearance))
         }
 
         if let id = content.primaryProviderId, let name = content.accountNames[id] {
@@ -344,7 +347,7 @@ final class StatusItemLabelDriver {
             parts.append(StatusBarPercentageImageRenderer.image(
                 text: " | ", color: theme.statusColor(for: label.status)
             ))
-            parts.append(providerIcon(for: label.providerId))
+            parts.append(providerIcon(for: label.providerId, native: content.nativeMenuBarIconsEnabled, dark: content.isDarkAppearance))
             if let name = content.accountNames[label.providerId] {
                 parts.append(StatusBarPercentageImageRenderer.image(text: name, color: .primary))
             }
@@ -368,11 +371,30 @@ final class StatusItemLabelDriver {
         )
     }
 
-    private static func providerIcon(for providerId: String) -> NSImage {
+    /// Template assets contain only the mark, never the colored tile. Custom or
+    /// future providers without one use their configured SF Symbol. Account IDs
+    /// resolve through the same visual identity lookup as colored icons.
+    static func providerIcon(for providerId: String, native: Bool, dark: Bool) -> NSImage {
         let assetName = ProviderVisualIdentityLookup.iconAssetName(for: providerId)
+        let ink: NSColor = dark ? .white : .black
+        if native {
+            if let mask = NSImage(named: assetName + "MenuBar") {
+                return fittedProviderIcon(mask, ink: ink)
+            }
+            return symbolImage(ProviderVisualIdentityLookup.symbolIcon(for: providerId), color: ink)
+        }
         guard let source = NSImage(named: assetName), source.size.width > 0, source.size.height > 0 else {
             return symbolImage(ProviderVisualIdentityLookup.symbolIcon(for: providerId), color: .labelColor)
         }
+        return fittedProviderIcon(source)
+    }
+
+    /// Draw into our non-template composite: making only a child NSImage a
+    /// template does not tint it once flattened with colored quota text. Fixed
+    /// ink comes from the status button's actual appearance, not the app theme.
+    /// Do not mutate NSImage(named:) instances shared by the popover.
+    static func fittedProviderIcon(_ source: NSImage, ink: NSColor? = nil) -> NSImage {
+        guard source.size.width > 0, source.size.height > 0 else { return NSImage(size: .zero) }
         let size = NSSize(width: 16, height: 16)
         let scale = min(size.width / source.size.width, size.height / source.size.height)
         let fitted = NSSize(width: source.size.width * scale, height: source.size.height * scale)
@@ -381,6 +403,10 @@ final class StatusItemLabelDriver {
                               y: (bounds.height - fitted.height) / 2,
                               width: fitted.width, height: fitted.height)
             source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            if let ink {
+                ink.setFill()
+                bounds.fill(using: .sourceIn)
+            }
             return true
         }
         icon.isTemplate = false

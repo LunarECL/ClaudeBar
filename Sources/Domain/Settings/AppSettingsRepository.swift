@@ -99,6 +99,10 @@ public protocol AppSettingsRepository: Sendable {
     func burnRateThreshold() -> Double
     func setBurnRateThreshold(_ threshold: Double)
 
+    /// Monochrome provider marks in the menu bar; opt-in, across all accounts.
+    func nativeMenuBarIconsEnabled() -> Bool
+    func setNativeMenuBarIconsEnabled(_ enabled: Bool)
+
     // MARK: - Status Colors
 
     /// The user's own status colors, overriding the theme per status.
