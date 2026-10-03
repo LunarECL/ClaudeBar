@@ -448,7 +448,7 @@ enforces it. Across a fence the same word may mean something else, as long as
 | **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* | `Modules/Monitoring` |
 | **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export | `Modules/Alerting` |
 | **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch | `Modules/Activity` |
-| **Usage History** | supporting | *what did I use today, against yesterday?* | `Modules/UsageHistory` |
+| **Usage History** | supporting | *what did I use today, against yesterday?* | `Modules/UsageHistories` |
 | **Vault & Settings** | generic | *where is it kept?* — `settings.json`, secrets | `Modules/Storage` |
 | SDK clients | — (anti-corruption layers) | *what does this SDK say?* — a client that needs a heavy SDK gets its own module, behind a port, so only it links the SDK | `Modules/AWSClients` |
 
@@ -456,7 +456,7 @@ enforces it. Across a fence the same word may mean something else, as long as
                       Quota                    the shared kernel — knows nobody
                     ▲   ▲   ▲
           ┌─────────┘   │   └──────────┐
-    DataSources ◀── UsageHistory    Alerting ◀──┐
+    DataSources ◀── UsageHistories  Alerting ◀──┐
           ▲             ▲                       │
           │             │                       │
           │◀── AWSClients (the SDK)               │
@@ -476,7 +476,7 @@ the AWS SDK links into `AWSClients` and nowhere else.
 **Usage History is declared by the provider and run by its own context** —
 as a data source is. A definition's `usageHistory` block is the provider's data
 (the logs are the product's, and each login's); `Providers` decodes it with
-`UsageHistory`'s `UsageLog` type and fills it per login, the way it fills a
+`UsageHistories`' `UsageLog` type and fills it per login, the way it fills a
 `DataSourceDefinition`, and hands each login its `UsageHistory`. The
 context runs it: the readers, the day aggregator, the ledger of closed days. It reuses `DataSources`' path language
 and `PriceCatalog`, and never imports `Providers` — it is handed one

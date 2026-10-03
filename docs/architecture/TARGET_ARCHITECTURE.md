@@ -778,13 +778,13 @@ natural unit to keep:
 - **A ledger is a cache, not a record**: deleting it re-reads the logs; a
   change to the definition (`usageHistory` or the prices) invalidates it.
 
-### 10.4 · The engine: `Modules/UsageHistory`
+### 10.4 · The engine: `Modules/UsageHistories`
 
-**Where it lives.** The provider *declares* its usage history; `Modules/UsageHistory`
+**Where it lives.** The provider *declares* its usage history; `Modules/UsageHistories`
 *runs* it — the same split as `dataSources` (data in the definition) and
-`DataSources` (the work). `Providers` imports `UsageHistory` only to decode
+`DataSources` (the work). `Providers` imports `UsageHistories` only to decode
 `usageHistory` into a `UsageLog`, fill it per login and hand each login its
-`UsageHistory`; `UsageHistory` imports `DataSources` (the path language,
+`UsageHistory`; `UsageHistories` imports `DataSources` (the path language,
 `PriceCatalog`, path expansion) and `Quotas` (`Cost`), never `Providers`. Each login carries it as `account.usageHistory` — `nil` when the definition has no `usageHistory` — and a page reads `account.usageHistory?.days(in:)` (CANONICAL §2.1), never a dictionary keyed by provider ids. There is no app-wide registry of logs: what logins share (the ledger's store, the log cache) is the module's internals.
 Not in `Provider` itself: usage history is not a meter, is read on its own cadence
 (popover open, never the background poll) and keeps its own store — another
@@ -802,7 +802,9 @@ question, another context.
 | `Day` | the answer; `DailyUsageStat` until the words land | `Quotas` |
 
 Ports: the file system (a `@Mockable` `LogFiles`: list a glob with
-modification dates, read a byte range) and the ledger's store. No module names
+modification dates, read a byte range) and the ledger's store (a `@Mockable` `LedgerStore`). The module is
+`UsageHistories`, its type `UsageHistory` — no type has its module's name
+(MODULAR_DESIGN §4), as `Providers` holds `Provider`. No module names
 a vendor; the readers are named for formats. The page owns the views:
 *TODAY'S USAGE* cards read `days(in: .last(2))`, a chart reads
 `days(in: .last(30))` and stacks `tokens` by kind (or `cost.lines` by model).
@@ -834,7 +836,7 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 
 | # | Slice | Done when |
 |---|---|---|
-| UH1 | **Carve** `Modules/UsageHistory`: `UsageHistory`, `DailyUsageAnalyzing`, `DailyUsageReport`/`Stat` move in (typealiases keep call sites) | `Domain/UsageHistory` is empty; no visible change |
+| UH1 | **Carve** `Modules/UsageHistories`: `UsageHistory`, `DailyUsageAnalyzing`, `DailyUsageReport`/`Stat` move in (typealiases keep call sites) | `Domain/UsageHistory` is empty; no visible change |
 | UH2 | **Claude as data**: `UsageLog`, `JSONLinesReader`, a file `PriceCatalog` + `claude-prices.json`, `DayAggregator`, `days(in:)`; claude.json's `usageHistory`. Golden tests: today's `ClaudeDailyUsageAnalyzerTests`, `SessionJSONLParserTests`, `SessionLogCacheTests`, `ModelPricingTests` fixtures through the definition | `ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector` deleted; the same two-day numbers |
 | UH3 | **Mistral as data**: `JSONFileReader`, `at.fromPath`; mistral.json's `usageHistory`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
 | UH4 | **The ledger**: `DayLedger`, closed days kept, invalidated by a definition change | 30 days read in the time 2 take today |
