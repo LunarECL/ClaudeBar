@@ -240,25 +240,6 @@ struct UserDefaultsProviderSettingsRepositoryTests {
         #expect(repository.claudeCliFallbackEnabled() == false)
     }
 
-    // MARK: - Kimi Region
-
-    @Test
-    func `kimiRegion defaults to china`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        #expect(repository.kimiRegion() == .china)
-    }
-
-    @Test
-    func `setKimiRegion persists value`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        repository.setKimiRegion(.international)
-        #expect(repository.kimiRegion() == .international)
-    }
-
     // MARK: - Codex Verified Flag
 
     @Test

@@ -14,7 +14,6 @@ public final class JSONSettingsRepository:
     BedrockSettingsRepository,
     ClaudeSettingsRepository,
     CodexSettingsRepository,
-    KimiSettingsRepository,
     AlibabaSettingsRepository,
     HookSettingsRepository,
     NotifySettingsRepository,
@@ -410,32 +409,6 @@ public final class JSONSettingsRepository:
 
     public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
         store.write(value: verified, key: "codex.verifiedAtLeastOnce")
-    }
-
-    // MARK: - KimiSettingsRepository
-
-    public func kimiProbeMode() -> KimiProbeMode {
-        guard let raw: String = store.read(key: "kimi.probeMode"),
-              let mode = KimiProbeMode(rawValue: raw) else {
-            return .cli
-        }
-        return mode
-    }
-
-    public func setKimiProbeMode(_ mode: KimiProbeMode) {
-        store.write(value: mode.rawValue, key: "kimi.probeMode")
-    }
-
-    public func kimiRegion() -> KimiRegion {
-        guard let raw: String = store.read(key: "kimi.region"),
-              let region = KimiRegion(rawValue: raw) else {
-            return .china
-        }
-        return region
-    }
-
-    public func setKimiRegion(_ region: KimiRegion) {
-        store.write(value: region.rawValue, key: "kimi.region")
     }
 
     // MARK: - CopilotSettingsRepository

@@ -117,13 +117,23 @@ public struct Setting: Sendable, Equatable, Codable, Identifiable {
     public let kind: Kind
     public let scope: Scope
     public let `default`: String?
+    /// The data sources that use it (`"for": ["api"]`); empty is all of them.
+    /// *Add Account* asks only for what the active data source uses.
+    public let dataSources: [String]
 
-    public init(id: String, label: String, kind: Kind = .text(pattern: nil), scope: Scope = .provider, default value: String? = nil) {
+    public init(id: String, label: String, kind: Kind = .text(pattern: nil), scope: Scope = .provider,
+                default value: String? = nil, for dataSources: [String] = []) {
         self.id = id
         self.label = label
         self.kind = kind
         self.scope = scope
         self.default = kind == .secret ? nil : value
+        self.dataSources = dataSources
+    }
+
+    /// Whether the data source `kind` uses it.
+    public func isUsed(by kind: String) -> Bool {
+        dataSources.isEmpty || dataSources.contains(kind)
     }
 
     private var isSecret: Bool { kind == .secret }
@@ -213,7 +223,7 @@ public struct Setting: Sendable, Equatable, Codable, Identifiable {
 
     // MARK: - JSON
 
-    private enum CodingKeys: String, CodingKey { case id, label, kind, scope, `default`, secret, choices }
+    private enum CodingKeys: String, CodingKey { case id, label, kind, scope, `default`, secret, choices, `for` }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -239,7 +249,8 @@ public struct Setting: Sendable, Equatable, Codable, Identifiable {
             label: try container.decode(String.self, forKey: .label),
             kind: kind,
             scope: try container.decodeIfPresent(Scope.self, forKey: .scope) ?? .provider,
-            default: value
+            default: value,
+            for: try container.decodeIfPresent([String].self, forKey: .for) ?? []
         )
     }
 
@@ -250,6 +261,7 @@ public struct Setting: Sendable, Equatable, Codable, Identifiable {
         try container.encode(kind, forKey: .kind)
         try container.encode(scope, forKey: .scope)
         try container.encodeIfPresent(self.default, forKey: .default)
+        if !dataSources.isEmpty { try container.encode(dataSources, forKey: .for) }
     }
 }
 

@@ -388,7 +388,7 @@ vendor type:
 | a TUI screen and human reset dates no rule can say | `Mapping.script` — a JavaScript file in JavaScriptCore, no I/O, host `humanDate()`; the scripts ship beside the definition |
 | Claude Code's Keychain item | `CredentialLookup.keychain(service, fields)` via `security`, hex-decoded, written back as compact JSON |
 | expiry in milliseconds, a JSON refresh body with `scope` | `OAuth2Refresh.dueWhen`, `bodyFormat`, `scope`; values keep their JSON type on write-back; a failed refresh re-reads the store |
-| `env`, ready markers and a rendered screen for the CLI | `CLICall.environment`, `readyWhen`, `screen` |
+| `env`, ready markers and a rendered screen for the CLI; a TUI that discards input typed during its startup paint | `CLICall.environment`, `readyWhen`, `screen`, `inputDelay` |
 | `/cost` only for API-billed accounts; API→CLI only while a setting allows | `fallbackOn` (hand-off by failure) and `fallback.enabledBySetting`; the provider follows the chain and reports the first real failure |
 | 15-minute cache, a remembered 429 | `cache.ttl` (also the background floor) and rate-limit memory on `DataSource` |
 | the account's email and billing type | `context` files handed to the mapping |
@@ -470,6 +470,11 @@ a fetch only through its credential lookup.
 - **Account scope.** Each login has its own value; *Add Account* asks for
   exactly these. The default login's value is the provider-scope one, which is
   why it lives under the same key.
+- **A setting only some data sources use says so** (`"for": ["api"]`): Kimi's
+  session token is the API's, its signed-in folder the CLI's. *Add Account*
+  asks only for what the active data source uses (`provider.accountForm`),
+  and a login added without such a value runs only the sources that don't
+  need it.
 
 **The rules sit with whoever holds the data.**
 - **Each kind owns its rule.** `setting.check(value, paths:)` returns the

@@ -310,7 +310,6 @@ private struct ProviderDetailView: View {
     private func legacyCard(for id: String) -> AnyView? {
         switch id {
         case "claude": AnyView(ClaudeBudgetCard())
-        case "kimi": AnyView(KimiConfigCard(monitor: monitor))
         case "deepseek": AnyView(DeepSeekConfigCard(monitor: monitor))
         case "alibaba": AnyView(AlibabaConfigCard(monitor: monitor))
         case "copilot": AnyView(CopilotConfigCard(monitor: monitor))

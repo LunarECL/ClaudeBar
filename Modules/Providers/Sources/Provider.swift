@@ -298,6 +298,12 @@ public final class Provider {
         try addAccount(SignedInFolder(url: folder, madeBy: .folder))
     }
 
+    /// What *Add Account*'s form asks for: the account settings the active
+    /// data source uses.
+    public var accountForm: [Setting] {
+        definition.accountSettings.filter { $0.isUsed(by: activeKind) }
+    }
+
     /// *Add Account* by its form — the login's own account-scope settings.
     /// Each value keeps its setting's rule, a default fills a blank, a path
     /// is never another login's, and a secret is kept in the vault under the
@@ -305,7 +311,7 @@ public final class Provider {
     /// half saved.
     @discardableResult
     public func addAccount(filling entered: [String: String]) throws -> Account {
-        let form = definition.accountSettings
+        let form = accountForm
         guard !form.isEmpty else { throw UsageError.executionFailed("\(name) has no account form.") }
         var entry = SettingEntry()
         for setting in form {

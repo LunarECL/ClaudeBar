@@ -4,7 +4,7 @@ import Domain
 /// Legacy/test UserDefaults implementation of provider settings protocols.
 /// Production app persistence uses `JSONSettingsRepository`; this implementation
 /// supports legacy migration and isolated tests with injected UserDefaults suites.
-public final class UserDefaultsProviderSettingsRepository: CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -271,32 +271,6 @@ public final class UserDefaultsProviderSettingsRepository: CopilotSettingsReposi
         userDefaults.set(verified, forKey: Keys.codexVerifiedAtLeastOnce)
     }
 
-    // MARK: - KimiSettingsRepository
-
-    public func kimiProbeMode() -> KimiProbeMode {
-        guard let rawValue = userDefaults.string(forKey: Keys.kimiProbeMode) else {
-            return .cli // Default to CLI mode
-        }
-        return KimiProbeMode(rawValue: rawValue) ?? .cli
-    }
-
-    public func setKimiProbeMode(_ mode: KimiProbeMode) {
-        userDefaults.set(mode.rawValue, forKey: Keys.kimiProbeMode)
-    }
-
-    public func kimiRegion() -> KimiRegion {
-        // Legacy compatibility: key absent means user upgraded from a pre-region
-        // version, which only supported the China platform (kimi.com).
-        guard let rawValue = userDefaults.string(forKey: Keys.kimiRegion) else {
-            return .china
-        }
-        return KimiRegion(rawValue: rawValue) ?? .china
-    }
-
-    public func setKimiRegion(_ region: KimiRegion) {
-        userDefaults.set(region.rawValue, forKey: Keys.kimiRegion)
-    }
-
     // MARK: - BedrockSettingsRepository
 
     public func awsProfileName() -> String {
@@ -438,9 +412,6 @@ public final class UserDefaultsProviderSettingsRepository: CopilotSettingsReposi
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
         static let codexVerifiedAtLeastOnce = "providerConfig.codexVerifiedAtLeastOnce"
-        // Kimi settings
-        static let kimiProbeMode = "providerConfig.kimiProbeMode"
-        static let kimiRegion = "providerConfig.kimiRegion"
         static let copilotProbeMode = "providerConfig.copilotProbeMode"
         static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"
         static let copilotMonthlyLimit = "providerConfig.copilotMonthlyLimit"

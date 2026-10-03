@@ -82,9 +82,7 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 │  ├── CopilotUsageProbe - probes GitHub API with token               │
 │  ├── AntigravityUsageProbe - probes local Antigravity server        │
 │  ├── BedrockUsageProbe - probes AWS Bedrock API                     │
-│  ├── AmpCodeUsageProbe - probes Amp Code CLI                        │
-│  ├── KimiCLIUsageProbe - probes `kimi` CLI with /usage (CLI mode)   │
-│  └── KimiUsageProbe - probes Kimi HTTP API (API mode)               │
+│  └── AmpCodeUsageProbe - probes Amp Code CLI                        │
 │                                                                      │
 │  Storage (Sources/Infrastructure/Storage/)                          │
 │  ├── AIProviders - implements AIProviderRepository                  │

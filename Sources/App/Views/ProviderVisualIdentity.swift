@@ -177,34 +177,6 @@ extension BedrockProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - KimiProvider Visual Identity
-
-extension KimiProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "k.square.fill" }
-
-    public var iconAssetName: String { "KimiIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Blue/cyan color matching Kimi branding
-        scheme == .dark
-            ? Color(red: 0.30, green: 0.65, blue: 0.95)
-            : Color(red: 0.20, green: 0.55, blue: 0.85)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.20, green: 0.50, blue: 0.80)
-                    : Color(red: 0.10, green: 0.40, blue: 0.70)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - MistralProvider Visual Identity
 
 extension MistralProvider: ProviderVisualIdentity {
@@ -368,10 +340,6 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.6, blue: 0.2)
                 : Color(red: 0.92, green: 0.5, blue: 0.15)
-        case "kimi":
-            return scheme == .dark
-                ? Color(red: 0.30, green: 0.65, blue: 0.95)
-                : Color(red: 0.20, green: 0.55, blue: 0.85)
         case "mistral":
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.55, blue: 0.0)
@@ -408,10 +376,6 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.45, blue: 0.15)
                 : Color(red: 0.75, green: 0.35, blue: 0.1)
-        case "kimi":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.20, green: 0.50, blue: 0.80)
-                : Color(red: 0.10, green: 0.40, blue: 0.70)
         case "mistral":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.35, blue: 0.10)
@@ -443,7 +407,6 @@ enum ProviderVisualIdentityLookup {
         case "copilot": return "CopilotIcon"
         case "antigravity": return "AntigravityIcon"
         case "bedrock": return "BedrockIcon"
-        case "kimi": return "KimiIcon"
         case "mistral": return "MistralIcon"
         case "omp": return "OmpIcon"
         default: return "QuestionIcon"
@@ -458,7 +421,6 @@ enum ProviderVisualIdentityLookup {
         case "copilot": return "GitHub Copilot"
         case "antigravity": return "Antigravity"
         case "bedrock": return "AWS Bedrock"
-        case "kimi": return "Kimi"
         case "mistral": return "Mistral"
         case "omp": return "Oh My Pi"
         default: return providerId.capitalized
@@ -473,7 +435,6 @@ enum ProviderVisualIdentityLookup {
         case "copilot": return "chevron.left.forwardslash.chevron.right"
         case "antigravity": return "wand.and.stars"
         case "bedrock": return "cloud.fill"
-        case "kimi": return "k.square.fill"
         case "mistral": return "cat.fill"
         case "omp": return "terminal.fill"
         default:

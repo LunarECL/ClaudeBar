@@ -1,10 +1,11 @@
 import Testing
+import Providers
+import DataSources
 import Foundation
-@testable import Infrastructure
-@testable import Domain
+import Quotas
 
-@Suite("KimiUsageProbe Parsing Tests")
-struct KimiUsageProbeParsingTests {
+@Suite("Kimi API usage")
+struct KimiAPIDefinitionParsingTests {
 
     // MARK: - Full Response Parsing
 
@@ -33,7 +34,7 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
         #expect(snapshot.providerId == "kimi")
         #expect(snapshot.quotas.count == 2)
@@ -70,7 +71,7 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
         #expect(snapshot.accountTier == .custom("Moderato"))
     }
@@ -91,7 +92,7 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
         #expect(snapshot.accountTier == .custom("Andante"))
     }
@@ -112,7 +113,7 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
         #expect(snapshot.accountTier == .custom("Allegretto"))
     }
@@ -133,7 +134,7 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
         #expect(snapshot.accountTier == nil)
     }
@@ -156,7 +157,7 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
         #expect(snapshot.quotas.count == 1)
         #expect(snapshot.quota(for: .weekly) != nil)
@@ -180,9 +181,10 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
-        let weekly = snapshot.quota(for: .weekly)!
+        // Not one of the weekly plans: "Plan", with no guessed window.
+        let weekly = snapshot.quota(for: .timeLimit("Plan"))!
         #expect(weekly.percentRemaining == 75.0)
         #expect(weekly.resetText == "250/1000 requests")
     }
@@ -202,15 +204,16 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
-        let weekly = snapshot.quota(for: .weekly)!
+        // Not one of the weekly plans: "Plan", with no guessed window.
+        let weekly = snapshot.quota(for: .timeLimit("Plan"))!
         #expect(weekly.percentRemaining == 70.0)
         #expect(weekly.resetText == "300/1000 requests")
     }
 
     @Test
-    func `parseResponse handles both used and remaining missing`() throws {
+    func `parseResponse shows no quota when neither used nor remaining is reported`() throws {
         let json = """
         {
             "usages": [{
@@ -223,11 +226,10 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
-        let weekly = snapshot.quota(for: .weekly)!
-        #expect(weekly.percentRemaining == 100.0)
-        #expect(weekly.resetText == "0/2048 requests")
+        // Nothing reported is no quota, never a made-up 100% (the Left law).
+        #expect(snapshot.quota(for: .weekly) == nil)
     }
 
     // MARK: - Reset Time Parsing
@@ -248,9 +250,10 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
-        let weekly = snapshot.quota(for: .weekly)!
+        // Not one of the weekly plans: "Plan", with no guessed window.
+        let weekly = snapshot.quota(for: .timeLimit("Plan"))!
         #expect(weekly.resetsAt != nil)
 
         let formatter = ISO8601DateFormatter()
@@ -275,9 +278,10 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
-        let weekly = snapshot.quota(for: .weekly)!
+        // Not one of the weekly plans: "Plan", with no guessed window.
+        let weekly = snapshot.quota(for: .timeLimit("Plan"))!
         #expect(weekly.resetsAt != nil)
     }
 
@@ -288,7 +292,7 @@ struct KimiUsageProbeParsingTests {
         let json = "not json".data(using: .utf8)!
 
         #expect(throws: UsageError.self) {
-            try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+            try KimiDefinitionFixtures.api(json, providerId: "kimi")
         }
     }
 
@@ -309,7 +313,7 @@ struct KimiUsageProbeParsingTests {
         """.data(using: .utf8)!
 
         #expect(throws: UsageError.self) {
-            try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+            try KimiDefinitionFixtures.api(json, providerId: "kimi")
         }
     }
 
@@ -322,14 +326,14 @@ struct KimiUsageProbeParsingTests {
         """.data(using: .utf8)!
 
         #expect(throws: UsageError.self) {
-            try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+            try KimiDefinitionFixtures.api(json, providerId: "kimi")
         }
     }
 
     // MARK: - Edge Cases
 
     @Test
-    func `parseResponse handles zero limit gracefully`() throws {
+    func `parseResponse shows no quota for a zero limit`() throws {
         let json = """
         {
             "usages": [{
@@ -344,10 +348,10 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
-        let weekly = snapshot.quota(for: .weekly)!
-        #expect(weekly.percentRemaining == 100.0)
+        // A limit of 0 is nothing to show, never a made-up 100% (the Left law).
+        #expect(snapshot.quotas.isEmpty)
     }
 
     @Test
@@ -386,7 +390,7 @@ struct KimiUsageProbeParsingTests {
         }
         """.data(using: .utf8)!
 
-        let snapshot = try KimiUsageProbe.parseResponse(json, providerId: "kimi")
+        let snapshot = try KimiDefinitionFixtures.api(json, providerId: "kimi")
 
         let session = snapshot.quota(for: .session)!
         #expect(session.percentRemaining == 60.0)
