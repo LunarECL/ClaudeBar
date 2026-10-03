@@ -1,6 +1,18 @@
-# MiniMax: probe design
+# MiniMax: design
 
-Research notes for the MiniMax Token Plan probe, from the code, [#115](https://github.com/tddworks/ClaudeBar/pull/115), [#128](https://github.com/tddworks/ClaudeBar/pull/128) and [#266](https://github.com/tddworks/ClaudeBar/pull/266) (adapted in 2026-09).
+Research notes for MiniMax's Token Plan usage, from the code, [#115](https://github.com/tddworks/ClaudeBar/pull/115), [#128](https://github.com/tddworks/ClaudeBar/pull/128) and [#266](https://github.com/tddworks/ClaudeBar/pull/266) (adapted in 2026-09).
+
+## As data
+
+MiniMax is `Modules/Providers/Resources/Providers/minimax.json` and `minimax-remains.js`, run by the generic engine (TARGET_ARCHITECTURE §8.2); no Swift names it.
+
+| Setting | Kind · scope | Kept at | Used as |
+|---|---|---|---|
+| `region` | choice `china` (default) · `international`, each carrying `api` and `platform` hosts · account | `minimax.region` | `https://{{setting.region.api}}/v1/token_plan/remains`, the dashboard `https://{{setting.region.platform}}/…` |
+| `apiKey` | secret · account | vault `provider.minimax.apiKey`; the old `com.claudebar.credentials.minimax-api-key` moves there for the default login (`ProviderVault`) | `{"setting": "apiKey"}` |
+| `authEnvVar` | text, default `MINIMAX_API_KEY` · provider | `minimax.authEnvVar` (empty means the default) | `{"environment": "{{setting.authEnvVar}}"}` |
+
+An added account's patch drops the environment variable from its lookup, so it only ever uses its own key. Import lists both API hosts, since a key may be sent to either region. The mapping script keeps the old probe's rules below, quota for quota (`MiniMaxDefinitionTests`).
 
 ## Source
 
@@ -15,7 +27,7 @@ The probe originally called `/v1/api/openplatform/coding_plan/remains`. That end
 
 The first version hard-coded the China host, so international keys failed ([#125](https://github.com/tddworks/ClaudeBar/issues/125)). The region picker was added in 0.4.38; China is still the default.
 
-HTTP 401/403 → "Authentication required"; any other non-200 → "MiniMax API returned HTTP N".
+HTTP 401/403 → "Authentication required"; a 429 is a rate limit with its `Retry-After`; any other non-200 → "HTTP error: N" (the probe said "MiniMax API returned HTTP N").
 
 ## Response
 

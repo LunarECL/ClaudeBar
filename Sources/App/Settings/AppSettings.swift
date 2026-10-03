@@ -480,7 +480,6 @@ public final class AppSettings {
     public var copilot: CopilotSettingsRepository { repository }
     public var zai: ZaiSettingsRepository { repository }
     public var bedrock: BedrockSettingsRepository { repository }
-    public var minimax: MiniMaxSettingsRepository { repository }
     public var deepseek: DeepSeekSettingsRepository { repository }
     public var alibaba: AlibabaSettingsRepository { repository }
     public var vercel: VercelSettingsRepository { repository }

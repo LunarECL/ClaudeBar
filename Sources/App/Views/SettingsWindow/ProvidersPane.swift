@@ -311,7 +311,6 @@ private struct ProviderDetailView: View {
         switch id {
         case "claude": AnyView(ClaudeBudgetCard())
         case "kimi": AnyView(KimiConfigCard(monitor: monitor))
-        case "minimax": AnyView(MiniMaxConfigCard(monitor: monitor))
         case "deepseek": AnyView(DeepSeekConfigCard(monitor: monitor))
         case "alibaba": AnyView(AlibabaConfigCard(monitor: monitor))
         case "vercel-gateway": AnyView(VercelConfigCard(monitor: monitor))

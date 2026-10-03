@@ -4,7 +4,7 @@ import Domain
 /// Legacy/test UserDefaults implementation of provider settings protocols.
 /// Production app persistence uses `JSONSettingsRepository`; this implementation
 /// supports legacy migration and isolated tests with injected UserDefaults suites.
-public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, MiniMaxSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, VercelSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, VercelSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -381,45 +381,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         }
     }
 
-    // MARK: - MiniMaxSettingsRepository
-
-    public func minimaxRegion() -> MiniMaxRegion {
-        // Legacy compatibility: key absent means user upgraded from pre-region version,
-        // which only supported china (minimaxi.com). (兼容旧版：无 key 则默认中国区)
-        guard let rawValue = userDefaults.string(forKey: Keys.minimaxRegion) else {
-            return .china
-        }
-        return MiniMaxRegion(rawValue: rawValue) ?? .china
-    }
-
-    public func setMinimaxRegion(_ region: MiniMaxRegion) {
-        userDefaults.set(region.rawValue, forKey: Keys.minimaxRegion)
-    }
-
-    public func minimaxAuthEnvVar() -> String {
-        userDefaults.string(forKey: Keys.minimaxiAuthEnvVar) ?? ""
-    }
-
-    public func setMinimaxAuthEnvVar(_ envVar: String) {
-        userDefaults.set(envVar, forKey: Keys.minimaxiAuthEnvVar)
-    }
-
-    public func saveMinimaxApiKey(_ key: String) {
-        userDefaults.set(key, forKey: Keys.minimaxiApiKey)
-    }
-
-    public func getMinimaxApiKey() -> String? {
-        userDefaults.string(forKey: Keys.minimaxiApiKey)
-    }
-
-    public func deleteMinimaxApiKey() {
-        userDefaults.removeObject(forKey: Keys.minimaxiApiKey)
-    }
-
-    public func hasMinimaxApiKey() -> Bool {
-        userDefaults.object(forKey: Keys.minimaxiApiKey) != nil
-    }
-
     // MARK: - DeepSeekSettingsRepository
 
     public func deepseekAuthEnvVar() -> String {
@@ -574,10 +535,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let awsProfileName = "providerConfig.awsProfileName"
         static let bedrockRegions = "providerConfig.bedrockRegions"
         static let bedrockDailyBudget = "providerConfig.bedrockDailyBudget"
-        // MiniMax settings (key strings kept for backward compatibility 保持向后兼容)
-        static let minimaxRegion = "providerConfig.minimaxRegion"
-        static let minimaxiAuthEnvVar = "providerConfig.minimaxiAuthEnvVar"
-        static let minimaxiApiKey = "com.claudebar.credentials.minimaxi-api-key"
         // DeepSeek settings
         static let deepseekAuthEnvVar = "providerConfig.deepseekAuthEnvVar"
         static let deepseekApiKey = "com.claudebar.credentials.deepseek-api-key"

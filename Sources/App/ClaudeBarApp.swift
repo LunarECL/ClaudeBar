@@ -125,6 +125,11 @@ struct ClaudeBarApp: App {
         let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
 
         let vault = ProviderVault()
+        // MiniMax is data: its region, key and environment variable are
+        // settings in minimax.json, so nothing here is MiniMax's.
+        let minimax = Self.builtIn("minimax", settings: settingsRepository,
+                                   accounts: settingsRepository.accounts(forProvider: "minimax"), secrets: vault)
+
         // Keep the existing default login's configurable environment name until
         // provider settings forms move to definitions. Added logins use only
         // their own saved key, as deepseek.json's accounts.patch declares.
@@ -165,10 +170,7 @@ struct ClaudeBarApp: App {
             ),
             KiroProvider(probe: KiroUsageProbe(), settingsRepository: settingsRepository),
             CursorProvider(probe: CursorUsageProbe(), settingsRepository: settingsRepository),
-            MiniMaxProvider(
-                probe: MiniMaxUsageProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
+            minimax.defaultAccount,
             deepseek.defaultAccount,
             VercelProvider(
                 probe: VercelUsageProbe(settingsRepository: settingsRepository),
@@ -200,7 +202,7 @@ struct ClaudeBarApp: App {
             ),
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + deepseek.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after

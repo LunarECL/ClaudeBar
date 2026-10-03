@@ -16,7 +16,6 @@ public final class JSONSettingsRepository:
     ClaudeSettingsRepository,
     CodexSettingsRepository,
     KimiSettingsRepository,
-    MiniMaxSettingsRepository,
     AlibabaSettingsRepository,
     VercelSettingsRepository,
     HookSettingsRepository,
@@ -839,46 +838,6 @@ public final class JSONSettingsRepository:
     /// Passed through for the same reason as the two handles above.
     public func setNotifyScreenWidgetId(_ screenWidgetId: String?) {
         store.write(value: screenWidgetId, key: "notify.screenWidgetId")
-    }
-
-    // MARK: - MiniMaxSettingsRepository
-
-    public func minimaxRegion() -> MiniMaxRegion {
-        guard let raw: String = store.read(key: "minimax.region"),
-              let region = MiniMaxRegion(rawValue: raw) else {
-            return .china
-        }
-        return region
-    }
-
-    public func setMinimaxRegion(_ region: MiniMaxRegion) {
-        store.write(value: region.rawValue, key: "minimax.region")
-    }
-
-    public func minimaxAuthEnvVar() -> String {
-        store.read(key: "minimax.authEnvVar") ?? ""
-    }
-
-    public func setMinimaxAuthEnvVar(_ envVar: String) {
-        store.write(value: envVar, key: "minimax.authEnvVar")
-    }
-
-    // MiniMax Credentials (UserDefaults for now)
-
-    public func saveMinimaxApiKey(_ key: String) {
-        credentials.set(key, forKey: "com.claudebar.credentials.minimax-api-key")
-    }
-
-    public func getMinimaxApiKey() -> String? {
-        credentials.string(forKey: "com.claudebar.credentials.minimax-api-key")
-    }
-
-    public func deleteMinimaxApiKey() {
-        credentials.removeObject(forKey: "com.claudebar.credentials.minimax-api-key")
-    }
-
-    public func hasMinimaxApiKey() -> Bool {
-        getMinimaxApiKey() != nil
     }
 
     // MARK: - VercelSettingsRepository
