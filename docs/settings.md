@@ -48,6 +48,7 @@ A few `app.*` keys worth knowing:
 | `app.usageDisplayMode` | `remaining` (default), `used`, `pace` |
 | `app.menuBarAccountLabelsEnabled` | `true` (default) shows account labels; `false` hides their menu bar text while retaining hover details |
 | `app.menuBarProviderSettings` | Per-provider menu bar choices: `{ "codex": { "primaryQuotaKey": "session", "secondaryQuotaKey": "weekly", "stacked": false, "stackedSize": "small" } }` |
+| `app.nativeMenuBarIconsEnabled` | `false` (default) keeps brand colors; `true` uses monochrome provider marks for every menu bar account, adapting to the bar’s appearance |
 | `app.statusColorOverrides` | `{ "warning": "#F2BF33" }`; only the levels you set |
 
 The full list is the code: every key is read and written in [`JSONSettingsRepository.swift`](../Sources/Infrastructure/Storage/JSONSettingsRepository.swift), and extension fields in [`JSONExtensionConfigStore.swift`](../Sources/Infrastructure/Extension/JSONExtensionConfigStore.swift).
