@@ -10,13 +10,13 @@ Shows your OpenAI Codex rate-limit windows (usually the 5-hour session and weekl
 
 1. Install the [Codex CLI](https://github.com/openai/codex) and run `codex` once to sign in with your ChatGPT account.
 2. Settings → Providers → Codex: turn it on (it is on by default).
-3. Optional: in the same pane, **Codex Configuration → Probe Mode** picks RPC or API.
+3. Optional: in the same pane, **Codex Configuration → Data fetching method** picks RPC or API.
 
 ## Multiple accounts
 
 Use **Accounts → Add Account** in the provider settings to add another ChatGPT login: sign in with your browser, or choose a Codex folder that's already signed in. Accounts are told apart by their ChatGPT account, so two workspaces under one email are two accounts. Each can be named and pinned separately in the menu bar. See [multiple accounts](../../features/multi-account/README.md) for setup and reconnect instructions.
 
-## Probe modes
+## Data sources
 
 | Mode | Needs | Pick it when |
 |---|---|---|

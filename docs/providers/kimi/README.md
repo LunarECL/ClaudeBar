@@ -10,7 +10,7 @@ Shows your Kimi Code plan quota and 5-hour limit, with reset times. The CLI name
 
 1. Install the Kimi Code CLI (`curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash`), run `kimi` once and sign in with `/login`. If you already use the older Python `kimi-cli`, ClaudeBar reads its `/usage` layout too.
 2. Settings → Providers → Kimi: turn it on (it is on by default).
-3. Optional: click Kimi, then **Data source** picks CLI or API, and **Region** picks the platform your account is on.
+3. Optional: click Kimi, then **Kimi Configuration → Data fetching method** picks CLI or API, and **Region** picks the platform your account is on.
 
 ## Data sources
 

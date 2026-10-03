@@ -14,7 +14,7 @@ Shows how much of your OpenCode Go plan is left in its three windows: the rollin
 
 There are no OpenCode-specific settings. ClaudeBar picks its source automatically.
 
-## Probe modes
+## Data sources
 
 ClaudeBar chooses the mode itself; there is no switch.
 

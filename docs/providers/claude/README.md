@@ -10,9 +10,9 @@ Shows your Claude Code 5-hour session and weekly limits, any model-specific week
 
 1. Install [Claude Code](https://claude.ai/code) and run `claude` once in a terminal to sign in (`claude login`).
 2. Settings → Providers → Claude: turn it on (it is on by default).
-3. Optional: in the same pane, **Claude Configuration → Probe Mode** picks CLI or API.
+3. Optional: in the same pane, **Claude Configuration → Data fetching method** picks CLI or API.
 
-## Probe modes
+## Data sources
 
 | Mode | Needs | Pick it when |
 |---|---|---|
@@ -34,9 +34,9 @@ A shell alias or function (`alias c=…`) can't be used: ClaudeBar starts a prog
 
 ## Gotchas
 
-- **One session named "ClaudeBar Probe".** The CLI probe reuses a single Claude session instead of creating a new empty one on every refresh, so `~/.claude/projects` and the `/resume` picker stay clean. If you delete that session, the next refresh simply recreates it.
+- **One session named "ClaudeBar Probe".** The CLI data source reuses a single Claude session instead of creating a new empty one on every refresh, so `~/.claude/projects` and the `/resume` picker stay clean. If you delete that session, the next refresh simply recreates it.
 - **`claude setup-token` alone isn't enough.** The `CLAUDE_CODE_OAUTH_TOKEN` it creates can only be used for inference and can't read quota. ClaudeBar uses a full `claude login` credential when one exists, and removes that variable when it runs the CLI.
-- **Slow SessionStart hooks can make Claude look unavailable.** ClaudeBar's probe runs `claude /usage` and waits up to 20 seconds for the Usage screen. It opens only after Claude Code has finished its own startup, so hooks that take longer than that (or a very busy machine) make the probe time out even though you're working in Claude fine. ClaudeBar then falls back to the usage API, so you only see "Claude Unavailable" if that fails too. Run `claude` in a terminal and watch for `(running SessionStart hooks… N/M)`; if that counter is still climbing after ~15 seconds, that is the cause. Speeding up or trimming those hooks fixes it, and API probe mode skips the CLI entirely.
+- **Slow SessionStart hooks can make Claude look unavailable.** ClaudeBar runs `claude /usage` and waits up to 20 seconds for the Usage screen. It opens only after Claude Code has finished its own startup, so hooks that take longer than that (or a very busy machine) make the CLI time out even though you're working in Claude fine. ClaudeBar then falls back to the usage API, so you only see "Claude Unavailable" if that fails too. Run `claude` in a terminal and watch for `(running SessionStart hooks… N/M)`; if that counter is still climbing after ~15 seconds, that is the cause. Speeding up or trimming those hooks fixes it, and the API data source skips the CLI entirely.
 - **API mode refreshes at most every 15 minutes.** Anthropic throttles its usage endpoint hard (after a 429 it can refuse requests for up to an hour), so results are cached for 15 minutes and background refresh can't go faster than that. After a 429, ClaudeBar waits for the `Retry-After` time (5 minutes if none is given) and shows "Rate limited. Retrying …".
 - **"Claude usage data did not finish loading".** `/usage` shows a loading placeholder before its quota bars arrive. If it never gets past that, the usage endpoint is probably rate limited. Wait a moment, or switch modes.
 - **Max or Pro billed through Apple showing "The Claude CLI did not see this account's subscription".** On some subscriptions `/usage` reports API billing instead of a plan — either the cost panel on its own, or "only available for subscription plans". ClaudeBar sees from `~/.claude.json` that you have a subscription, so it tries the API rather than showing $0.00. If the API also fails, run `claude login` again or switch to API mode.
