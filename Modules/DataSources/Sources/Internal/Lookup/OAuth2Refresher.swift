@@ -10,6 +10,7 @@ struct OAuth2Refresher: CredentialRefreshing {
     let now: @Sendable () -> Date
 
     var retryStatuses: [Int] { refresh.onStatus }
+    var writesBack: Bool { true }
 
     /// Never without a refresh token: there is nothing to trade.
     func isDue(_ credential: Credential) -> Bool {

@@ -260,13 +260,18 @@ public struct DataSource: Sendable {
         return fresh
     }
 
-    /// Refreshes the token and writes it back where it was found.
+    /// Refreshes the token and writes it back where it was found — or, when
+    /// its owner renewed it, reads it again from there.
     private func refreshed(_ found: FoundCredential, by refresher: any CredentialRefreshing) async throws -> FoundCredential {
         var renewed = found
         do {
             renewed.credential = try await refresher.refresh(found.credential)
         } catch {
             throw DataSourceError.wrap(error, as: .lookup)
+        }
+        guard refresher.writesBack else {
+            guard let reread = try? credentials?.find() else { throw DataSourceError(.lookup, .authenticationRequired) }
+            return reread
         }
         renewed.save?(renewed.credential)
         return renewed
@@ -325,6 +330,9 @@ protocol CredentialFinding: Sendable {
 
 protocol CredentialRefreshing: Sendable {
     var retryStatuses: [Int] { get }
+    /// Whether the renewed credential is ClaudeBar's to write back, or the
+    /// owner wrote it and it is read again.
+    var writesBack: Bool { get }
     func isDue(_ credential: Credential) -> Bool
     func refresh(_ credential: Credential) async throws -> Credential
 }

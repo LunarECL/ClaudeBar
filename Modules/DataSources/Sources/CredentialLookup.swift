@@ -29,8 +29,9 @@ public indirect enum CredentialLookup: Sendable, Equatable {
     case refined(CredentialLookup, Refinement)
     /// The first lookup that answers wins.
     case firstOf([CredentialLookup])
-    /// A lookup whose token is kept fresh by an OAuth 2 refresh.
-    case refreshing(CredentialLookup, OAuth2Refresh)
+    /// A lookup whose token is kept fresh: by an OAuth 2 refresh, or by the
+    /// CLI that owns it.
+    case refreshing(CredentialLookup, CredentialRefresh)
 }
 
 /// `{ "domains": ["{{setting.region.site}}"], "names": ["auth"], "format": "value" }`
@@ -227,6 +228,23 @@ public struct JSONFileCredential: Sendable, Equatable, Codable {
     }
 }
 
+/// How a refused or ageing token is renewed.
+public enum CredentialRefresh: Sendable, Equatable {
+    /// `{ "oauth2": … }` — ClaudeBar trades the refresh token and writes the
+    /// new one back where it was found.
+    case oauth2(OAuth2Refresh)
+    /// `{ "cli": { "cli": "gemini", "input": "/quit\n" } }` — on a 401, runs
+    /// the CLI that owns the credential; it renews its own file, which is
+    /// then read again. ClaudeBar never writes it.
+    case cli(CLICall)
+
+    /// What to do when it can no longer renew the token.
+    var hint: String? {
+        if case .oauth2(let refresh) = self { return refresh.hint }
+        return nil
+    }
+}
+
 /// OAuth 2's refresh-token grant (RFC 6749 §6), with the two triggers a
 /// provider can ask for: age since the last refresh, and an HTTP status.
 public struct OAuth2Refresh: Sendable, Equatable, Codable {
@@ -352,7 +370,11 @@ extension CredentialLookup: Codable {
         }
         if container.contains(TagKey("refresh")) {
             let refresh = try container.nestedContainer(keyedBy: TagKey.self, forKey: TagKey("refresh"))
-            self = .refreshing(refined, try refresh.decode(OAuth2Refresh.self, forKey: TagKey("oauth2")))
+            if refresh.contains(TagKey("cli")) {
+                self = .refreshing(refined, .cli(try refresh.decode(CLICall.self, forKey: TagKey("cli"))))
+            } else {
+                self = .refreshing(refined, .oauth2(try refresh.decode(OAuth2Refresh.self, forKey: TagKey("oauth2"))))
+            }
         } else {
             self = refined
         }
@@ -387,7 +409,10 @@ extension CredentialLookup: Codable {
         case .refreshing(let base, let refresh):
             try base.encodeBase(into: &container)
             var nested = container.nestedContainer(keyedBy: TagKey.self, forKey: TagKey("refresh"))
-            try nested.encode(refresh, forKey: TagKey("oauth2"))
+            switch refresh {
+            case .oauth2(let oauth): try nested.encode(oauth, forKey: TagKey("oauth2"))
+            case .cli(let call): try nested.encode(call, forKey: TagKey("cli"))
+            }
         }
     }
 }

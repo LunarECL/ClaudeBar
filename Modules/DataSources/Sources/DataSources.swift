@@ -119,8 +119,11 @@ public enum DataSources {
 
         var refresher: (any CredentialRefreshing)?
         var lookup = definition.credential
-        if case .refreshing(let base, let oauth)? = lookup {
-            refresher = OAuth2Refresher(refresh: oauth, network: network, now: now)
+        if case .refreshing(let base, let refresh)? = lookup {
+            refresher = switch refresh {
+            case .oauth2(let oauth): OAuth2Refresher(refresh: oauth, network: network, now: now)
+            case .cli(let call): CLIRefresher(call: call, executor: makeCLIExecutor(call))
+            }
             lookup = base
         }
 

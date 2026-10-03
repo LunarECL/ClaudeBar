@@ -145,6 +145,8 @@ struct ClaudeBarApp: App {
                                    accounts: settingsRepository.accounts(forProvider: "copilot"), secrets: vault)
         let alibaba = Self.builtIn("alibaba", settings: settingsRepository,
                                    accounts: settingsRepository.accounts(forProvider: "alibaba"), secrets: vault)
+        let gemini = Self.builtIn("gemini", settings: settingsRepository,
+                                  accounts: settingsRepository.accounts(forProvider: "gemini"))
         let kimi = Self.builtIn("kimi", settings: settingsRepository,
                                 accounts: settingsRepository.accounts(forProvider: "kimi"), secrets: vault)
         let openCodeGo = Self.builtIn("opencode-go", settings: settingsRepository,
@@ -177,7 +179,7 @@ struct ClaudeBarApp: App {
         let repository = AIProviders(providers: [
             claude.defaultAccount,
             codex.defaultAccount,
-            GeminiProvider(probe: GeminiUsageProbe(), settingsRepository: settingsRepository),
+            gemini.defaultAccount,
             AntigravityProvider(probe: AntigravityUsageProbe(), settingsRepository: settingsRepository),
             zai.defaultAccount,
             copilot.defaultAccount,
@@ -206,7 +208,7 @@ struct ClaudeBarApp: App {
             commandCode.defaultAccount,
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts + openCodeGo.accounts + zai.accounts + kimi.accounts + copilot.accounts + alibaba.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts + openCodeGo.accounts + zai.accounts + kimi.accounts + copilot.accounts + alibaba.accounts + gemini.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after
