@@ -125,6 +125,10 @@ struct ClaudeBarApp: App {
                 probe: DeepSeekUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
+            OpenRouterProvider(
+                probe: OpenRouterUsageProbe(settingsRepository: settingsRepository),
+                settingsRepository: settingsRepository
+            ),
             VercelProvider(
                 probe: VercelUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository

@@ -256,6 +256,28 @@ public protocol DeepSeekSettingsRepository: ProviderSettingsRepository {
     func hasDeepSeekApiKey() -> Bool
 }
 
+/// OpenRouter-specific settings repository, extending base ProviderSettingsRepository.
+/// Stores the API key and env-var name for OpenRouter credit monitoring.
+public protocol OpenRouterSettingsRepository: ProviderSettingsRepository {
+    /// Gets the environment variable name for OpenRouter API key (empty = use default OPENROUTER_API_KEY)
+    func openrouterAuthEnvVar() -> String
+
+    /// Sets the environment variable name for OpenRouter API key
+    func setOpenRouterAuthEnvVar(_ envVar: String)
+
+    /// Saves the OpenRouter API key (for Settings UI input)
+    func saveOpenRouterApiKey(_ key: String)
+
+    /// Retrieves the OpenRouter API key
+    func getOpenRouterApiKey() -> String?
+
+    /// Deletes the OpenRouter API key
+    func deleteOpenRouterApiKey()
+
+    /// Checks if an OpenRouter API key is saved
+    func hasOpenRouterApiKey() -> Bool
+}
+
 /// Alibaba Coding Plan-specific settings repository, extending base ProviderSettingsRepository.
 /// Stores region, cookie source, manual cookie, and API key for Alibaba Coding Plan quota monitoring.
 public protocol AlibabaSettingsRepository: ProviderSettingsRepository {

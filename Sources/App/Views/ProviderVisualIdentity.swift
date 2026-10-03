@@ -386,6 +386,34 @@ extension DeepSeekProvider: ProviderVisualIdentity {
     }
 }
 
+// MARK: - OpenRouterProvider Visual Identity
+
+extension OpenRouterProvider: ProviderVisualIdentity {
+    public var symbolIcon: String { "arrow.triangle.branch" }
+
+    public var iconAssetName: String { "OpenRouterIcon" }
+
+    public func themeColor(for scheme: ColorScheme) -> Color {
+        // Indigo, evoking OpenRouter's routing identity
+        scheme == .dark
+            ? Color(red: 0.55, green: 0.42, blue: 1.0)
+            : Color(red: 0.40, green: 0.30, blue: 0.92)
+    }
+
+    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
+        LinearGradient(
+            colors: [
+                themeColor(for: scheme),
+                scheme == .dark
+                    ? Color(red: 0.32, green: 0.22, blue: 0.85)
+                    : Color(red: 0.24, green: 0.16, blue: 0.75)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - VercelProvider Visual Identity
 
 extension VercelProvider: ProviderVisualIdentity {
@@ -632,6 +660,10 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 0.42, green: 0.52, blue: 1.0)
                 : Color(red: 0.23, green: 0.35, blue: 0.92)
+        case "openrouter":
+            return scheme == .dark
+                ? Color(red: 0.55, green: 0.42, blue: 1.0)
+                : Color(red: 0.40, green: 0.30, blue: 0.92)
         case "cursor":
             return scheme == .dark
                 ? Color(red: 0.20, green: 0.78, blue: 0.82)
@@ -721,6 +753,10 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.22, green: 0.28, blue: 0.85)
                 : Color(red: 0.15, green: 0.20, blue: 0.75)
+        case "openrouter":
+            secondaryColor = scheme == .dark
+                ? Color(red: 0.32, green: 0.22, blue: 0.85)
+                : Color(red: 0.24, green: 0.16, blue: 0.75)
         case "cursor":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.15, green: 0.55, blue: 0.75)
@@ -780,6 +816,7 @@ enum ProviderVisualIdentityLookup {
         case "kiro": return "KiroIcon"
         case "minimax": return "MiniMaxIcon"
         case "deepseek": return "DeepSeekIcon"
+        case "openrouter": return "OpenRouterIcon"
         case "cursor": return "CursorIcon"
         case "mistral": return "MistralIcon"
         case "opencode-go": return "OpenCodeIcon"
@@ -806,6 +843,7 @@ enum ProviderVisualIdentityLookup {
         case "kiro": return "Kiro"
         case "minimax": return "MiniMax"
         case "deepseek": return "DeepSeek"
+        case "openrouter": return "OpenRouter"
         case "cursor": return "Cursor"
         case "mistral": return "Mistral"
         case "opencode-go": return "OpenCode Go"
@@ -832,6 +870,7 @@ enum ProviderVisualIdentityLookup {
         case "kiro": return "wand.and.stars.inverse"
         case "minimax": return "waveform"
         case "deepseek": return "d.square.fill"
+        case "openrouter": return "arrow.triangle.branch"
         case "cursor": return "cursorarrow.rays"
         case "mistral": return "cat.fill"
         case "opencode-go": return "square.stack.3d.up.fill"

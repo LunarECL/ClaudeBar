@@ -830,6 +830,36 @@ extension JSONSettingsRepository: DeepSeekSettingsRepository {
     }
 }
 
+// MARK: - OpenRouterSettingsRepository
+
+extension JSONSettingsRepository: OpenRouterSettingsRepository {
+    public func openrouterAuthEnvVar() -> String {
+        store.read(key: "openrouter.authEnvVar") ?? ""
+    }
+
+    public func setOpenRouterAuthEnvVar(_ envVar: String) {
+        store.write(value: envVar, key: "openrouter.authEnvVar")
+    }
+
+    // OpenRouter Credentials (UserDefaults for now)
+
+    public func saveOpenRouterApiKey(_ key: String) {
+        credentials.set(key, forKey: "com.claudebar.credentials.openrouter-api-key")
+    }
+
+    public func getOpenRouterApiKey() -> String? {
+        credentials.string(forKey: "com.claudebar.credentials.openrouter-api-key")
+    }
+
+    public func deleteOpenRouterApiKey() {
+        credentials.removeObject(forKey: "com.claudebar.credentials.openrouter-api-key")
+    }
+
+    public func hasOpenRouterApiKey() -> Bool {
+        getOpenRouterApiKey() != nil
+    }
+}
+
 // MARK: - MultiAccountSettingsRepository
 
 extension JSONSettingsRepository: MultiAccountSettingsRepository {

@@ -4,7 +4,7 @@ import Domain
 /// Legacy/test UserDefaults implementation of provider settings protocols.
 /// Production app persistence uses `JSONSettingsRepository`; this implementation
 /// supports legacy migration and isolated tests with injected UserDefaults suites.
-public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, MiniMaxSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, VercelSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, MiniMaxSettingsRepository, DeepSeekSettingsRepository, OpenRouterSettingsRepository, AlibabaSettingsRepository, VercelSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -351,6 +351,32 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.object(forKey: Keys.deepseekApiKey) != nil
     }
 
+    // MARK: - OpenRouterSettingsRepository
+
+    public func openrouterAuthEnvVar() -> String {
+        userDefaults.string(forKey: Keys.openrouterAuthEnvVar) ?? ""
+    }
+
+    public func setOpenRouterAuthEnvVar(_ envVar: String) {
+        userDefaults.set(envVar, forKey: Keys.openrouterAuthEnvVar)
+    }
+
+    public func saveOpenRouterApiKey(_ key: String) {
+        userDefaults.set(key, forKey: Keys.openrouterApiKey)
+    }
+
+    public func getOpenRouterApiKey() -> String? {
+        userDefaults.string(forKey: Keys.openrouterApiKey)
+    }
+
+    public func deleteOpenRouterApiKey() {
+        userDefaults.removeObject(forKey: Keys.openrouterApiKey)
+    }
+
+    public func hasOpenRouterApiKey() -> Bool {
+        userDefaults.object(forKey: Keys.openrouterApiKey) != nil
+    }
+
     // MARK: - VercelSettingsRepository
 
     public func vercelAuthEnvVar() -> String {
@@ -483,6 +509,9 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         // DeepSeek settings
         static let deepseekAuthEnvVar = "providerConfig.deepseekAuthEnvVar"
         static let deepseekApiKey = "com.claudebar.credentials.deepseek-api-key"
+        // OpenRouter settings
+        static let openrouterAuthEnvVar = "providerConfig.openrouterAuthEnvVar"
+        static let openrouterApiKey = "com.claudebar.credentials.openrouter-api-key"
         // Vercel AI Gateway settings
         static let vercelAuthEnvVar = "providerConfig.vercelAuthEnvVar"
         static let vercelApiKey = "com.claudebar.credentials.vercel-api-key"

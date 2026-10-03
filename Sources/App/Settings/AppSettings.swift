@@ -462,6 +462,7 @@ public final class AppSettings {
     public var bedrock: BedrockSettingsRepository { repository }
     public var minimax: MiniMaxSettingsRepository { repository }
     public var deepseek: DeepSeekSettingsRepository { repository }
+    public var openrouter: OpenRouterSettingsRepository { repository }
     public var alibaba: AlibabaSettingsRepository { repository }
     public var vercel: VercelSettingsRepository { repository }
     public var hook: HookSettingsRepository { repository }
