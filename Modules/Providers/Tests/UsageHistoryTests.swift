@@ -1,7 +1,6 @@
 import DataSources
 import Quotas
 import Foundation
-import Mockable
 import Providers
 import Testing
 
@@ -11,20 +10,23 @@ import Testing
 @MainActor
 @Suite
 struct UsageHistoryTests {
-    private func report(today: Decimal, previous: Decimal) -> DailyUsageReport {
-        DailyUsageReport(
-            today: DailyUsageStat(date: Date(), totalCost: today, totalTokens: today > 0 ? 1000 : 0,
-                                  workingTime: today > 0 ? 60 : 0, sessionCount: today > 0 ? 1 : 0),
-            previous: DailyUsageStat(date: Date().addingTimeInterval(-86400), totalCost: previous,
-                                     totalTokens: previous > 0 ? 1000 : 0, workingTime: previous > 0 ? 60 : 0,
-                                     sessionCount: previous > 0 ? 1 : 0)
-        )
+    private let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+
+    private func history() -> UsageHistory {
+        let definition = UsageLog.Definition(records: UsageLog.Records(
+            files: "~/.acme/*.jsonl", at: "$.at", tokens: UsageLog.Tokens(total: "$.tokens"), cost: "$.cost"))
+        return UsageHistory(log: DataSources.makeUsageLog(definition, environment: { _ in nil }, homeDirectory: home))
     }
 
-    private func history(_ report: DailyUsageReport) -> UsageHistory {
-        let analyzer = MockDailyUsageAnalyzing()
-        given(analyzer).analyzeToday().willReturn(report)
-        return UsageHistory(analyzer: analyzer)
+    private func log(_ entries: [(cost: String, daysAgo: Int)]) throws {
+        let dir = home.appendingPathComponent(".acme")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let lines = entries.map { entry -> String in
+            let day = Calendar.current.date(byAdding: .day, value: -entry.daysAgo, to: Date())!
+            let at = entry.daysAgo == 0 ? Date() : Calendar.current.startOfDay(for: day).addingTimeInterval(43_200)
+            return #"{"at":\#(at.timeIntervalSince1970),"tokens":1000,"cost":\#(entry.cost)}"#
+        }
+        try lines.joined(separator: "\n").write(to: dir.appendingPathComponent("log.jsonl"), atomically: true, encoding: .utf8)
     }
 
     private func login(_ id: String) -> ProviderAccountConfig {
@@ -34,17 +36,19 @@ struct UsageHistoryTests {
     // MARK: - Reading
 
     @Test
-    func `reading keeps today's usage`() async {
-        let history = history(report(today: 14, previous: 41))
+    func `reading keeps today's usage against yesterday's`() async throws {
+        try log([("14", 0), ("41", 1)])
+        let history = history()
 
         await history.read()
 
         #expect(history.report?.today.totalCost == 14)
+        #expect(history.report?.previous.totalCost == 41)
     }
 
     @Test
-    func `a day with no usage on either side is kept as none`() async {
-        let history = history(report(today: 0, previous: 0))
+    func `two days with nothing are kept as none`() async {
+        let history = history()
 
         await history.read()
 
@@ -52,32 +56,31 @@ struct UsageHistoryTests {
     }
 
     @Test
-    func `only yesterday's usage is still kept`() async {
-        let history = history(report(today: 0, previous: 41))
+    func `only yesterday's usage is still kept`() async throws {
+        try log([("41", 1)])
+        let history = history()
 
         await history.read()
 
         #expect(history.report?.previous.totalCost == 41)
+        #expect(history.report?.today.isEmpty == true)
     }
 
     @Test
-    func `logs that can't be read leave the last report`() async {
-        let analyzer = MockDailyUsageAnalyzing()
-        given(analyzer).analyzeToday().willReturn(report(today: 14, previous: 41))
-        let history = UsageHistory(analyzer: analyzer)
-        await history.read()
-        given(analyzer).analyzeToday().willThrow(CocoaError(.fileReadNoSuchFile))
+    func `days are any range, every date present`() async throws {
+        try log([("14", 0), ("41", 1)])
 
-        await history.read()
+        let days = await history().days(in: .last(30))
 
-        #expect(history.report?.today.totalCost == 14)
+        #expect(days.count == 30)
+        #expect(days.map(\.totalCost).suffix(2) == [41, 14])
     }
 
     // MARK: - The login owns it
 
     @Test
     func `the default login has the provider's usage history`() throws {
-        let history = history(report(today: 14, previous: 41))
+        let history = history()
         let provider = try Providers.make("codex", settings: InMemoryProviderSettings(), usageHistory: history)
 
         #expect(provider.defaultAccount.usageHistory === history)
@@ -86,7 +89,7 @@ struct UsageHistoryTests {
     @Test
     func `an added login whose logs aren't read has none`() throws {
         let provider = try Providers.make("codex", settings: InMemoryProviderSettings(), accounts: [login("work")],
-                                          usageHistory: history(report(today: 14, previous: 41)))
+                                          usageHistory: history())
 
         #expect(provider.accounts.first { !$0.isDefault }?.usageHistory == nil)
     }

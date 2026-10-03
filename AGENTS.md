@@ -28,7 +28,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 | `Modules/AWSClients` | the AWS SDK (CloudWatch, Bedrock pricing) behind DataSources' `CloudWatchClient` and `PriceCatalog` ports; the only module that links AWS |
 | `Modules/Diagnostics` | `AppLog` |
 | `Sources/Domain` | `QuotaMonitor`, extension providers, Notify!, sessions. Re-exports the modules |
-| `Sources/Infrastructure` | storage, notifications, hooks, the local-log analyzers (Claude, Vibe) behind Usage History |
+| `Sources/Infrastructure` | storage, notifications, hooks, Claude's guest-pass source |
 | `Sources/App` | SwiftUI views that read the domain directly; the composition root |
 
 - **Modules never `import Domain`**, and no module's Swift names a vendor or uses `Probe`: a provider is data, and what it needs becomes a generic rule in `DataSources` → [TARGET_ARCHITECTURE.md](docs/architecture/TARGET_ARCHITECTURE.md).
