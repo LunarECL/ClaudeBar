@@ -703,7 +703,7 @@ first that answers, `where`), so there is one way to point into JSON.
     "format": "jsonLines",                       // jsonLines (append-only, read incrementally) · json (one record per file)
     "where": { "path": "$.type", "equals": "assistant" },
     "at": "$.timestamp",                          // ISO 8601
-    "id": ["$.message.id", "$.requestId"],        // a record written twice counts once — the last wins
+    "id": ["$.message.id", "$.requestId"],        // together its identity: written twice, it counts once — the last wins
     "model": "$.message.model",
     "tokens": {
       "input": "$.message.usage.input_tokens",
@@ -712,9 +712,11 @@ first that answers, `where`), so there is one way to point into JSON.
       "cacheRead": "$.message.usage.cache_read_input_tokens"
     }
   },
-  "prices": { "file": "claude-prices.json" },    // a PriceCatalog — or { "service": "AmazonBedrock" }
+  "prices": { "file": "claude-prices.json" },    // a PriceList — or { "service": "AmazonBedrock" }, through PriceCatalog
   "freeWhen": { "localEndpoint": { "file": "${CLAUDE_CONFIG_DIR:-~}/.claude.json",
-                                   "url": ["$.env.ANTHROPIC_BASE_URL", "$.providers.0.base_url"] } },
+                                   // the first entry that answers decides; a list is one entry
+                                   "url": ["$.env.ANTHROPIC_BASE_URL",
+                                           ["$.providers[*].base_url", "$.providers[*].env.ANTHROPIC_BASE_URL"]] } },
   "sessionGap": 1800
 },
 "accounts": { "patch": { "usageHistory": { "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" } } } }
@@ -747,9 +749,12 @@ first that answers, `where`), so there is one way to point into JSON.
 }
 ```
 
-- **One price port.** `PriceCatalog` (DataSources, #417) is how Bedrock's
-  cost is priced; usage history uses the same port, with a second implementation
-  that reads a price file. A tool that writes its own cost needs neither.
+- **One price shape, two origins.** A price file is data, decoded into a
+  `PriceList` that holds the rules: exact id → the longest prefix (either
+  way round) → a family → a free family → `freeWhen` → `otherwise`. A cloud's
+  price list (`{ "service": … }`) is fetched through the `PriceCatalog` port
+  Bedrock uses (#417) into the same `PriceList`. A tool that writes its own
+  cost needs neither.
 - **Per login, like data sources.** The default login reads `usageHistory`; an
   added login gets `accounts.patch.usageHistory` merged in and its values filled
   (`{{account.configDirectory}}`), so an added Claude login has its own
@@ -758,7 +763,107 @@ first that answers, `where`), so there is one way to point into JSON.
   tokens × price ÷ `per` in `Decimal`, shown as an estimate unless the record
   gave its own `cost`.
 - **`freeWhen.localEndpoint`** replaces `ClaudeLocalInferenceDetector`: a
-  base URL in that file on a loopback host makes an unpriced model free.
+  base URL in that file on a loopback host (`localhost`, `127.0.0.1`, `::1`,
+  `0.0.0.0`, `*.localhost`) makes an unpriced model free. It describes the
+  route **now**, so it prices only the day that holds now; an earlier day
+  keeps its estimate — over-reporting is the safe direction.
+
+#### When logs differ: one record, three tiers
+
+Tools write their logs differently. The difference stays at the edge: every
+reader turns its file into the same **`LogRecord`** — `at`, `id`, `model`,
+`tokens` (input · output · cache write · cache read, or a `total`), `cost` —
+and everything after it (dedupe, days, sessions, prices, the ledger, the
+screens) never learns which tool wrote it.
+
+| How a tool's logs differ | What a contributor changes | Swift? |
+|---|---|---|
+| where the files are, what a field is called (Claude's `message.usage.input_tokens`, Vibe's `stats.session_total_llm_tokens`) | `files` and the field paths | no |
+| the same idea, said another way: the time in a folder's name, the log's own cost, a session per file, a running total | an option: `at.fromPath`, `cost`, no `sessionGap`, `"cumulative": true` | no |
+| a record no path can say (a field to compute, a list to add up) | `"script": "x-log.js"` — `read(record, context)` returns one `LogRecord`, the escape hatch a mapping already has (built when a tool first needs it) | no |
+| a file of another kind (SQLite, binary) | a new `format` case and its reader, named for the format, with a test that names no tool | once |
+
+**A script, by example.** Say a tool logs one line per turn, in an
+OpenAI-style shape no path can turn into a record: the time in epoch
+milliseconds, cached tokens *included* in the input count, and one usage
+entry per model in a list.
+
+```jsonc
+// a line of ~/.example/history/2026-10-03.jsonl
+{"kind":"turn","ts":1759500000123,"turn":"t_81","usage":[
+  {"model":"gpt-5","prompt_tokens":12000,"cached_tokens":9000,"completion_tokens":800},
+  {"model":"gpt-5-mini","prompt_tokens":3000,"cached_tokens":0,"completion_tokens":200}]}
+```
+
+The definition keeps what paths can say — the files, the format, the
+filter — and hands each record to a script instead of naming its fields:
+
+```jsonc
+// example.json
+"usageHistory": {
+  "records": {
+    "files": "~/.example/history/*.jsonl",
+    "format": "jsonLines",
+    "where": { "path": "$.kind", "equals": "turn" },   // still the byte prefilter: the script sees only these
+    "script": "example-log.js"                         // in place of at · id · model · tokens · cost
+  },
+  "prices": { "file": "example-prices.json" },
+  "sessionGap": 1800
+}
+```
+
+```js
+// example-log.js — read(record, context) → a LogRecord, a list of them, or null to skip
+function read(record, context) {
+  if (!Array.isArray(record.usage)) return null;
+  return record.usage.map(function (u, i) {
+    return {
+      at: record.ts / 1000,                          // epoch seconds
+      id: record.turn + "#" + i,                     // one record per model in the turn
+      model: u.model,
+      tokens: {
+        input: u.prompt_tokens - u.cached_tokens,    // the log counts cached tokens as input
+        cacheRead: u.cached_tokens,
+        output: u.completion_tokens
+      }
+      // cost: "0.0123" — when the log states it; a decimal text stays exact
+    };
+  });
+}
+```
+
+That line becomes two records — `gpt-5` with 3,000 input, 9,000 cache read
+and 800 output tokens, `gpt-5-mini` with 3,000 and 200 — priced, deduped and
+summed into days exactly like Claude's. The rules are a mapping script's
+(§2): it runs in JavaScriptCore with no file, network or process access;
+`context` holds `now`, `timeZone`, the file's `path` and the definition's
+`values`; money helpers (`jsonDecimal`, `decimalAdd`) keep a stated cost
+exact; and it turns one record into records, nothing else. A script is
+slower than paths, so `where` filters first, and a tool whose fields paths
+*can* reach never needs one.
+
+**Neither Claude nor Mistral uses a script**, and the script tier is not
+built with them. Claude's logs are paths plus options (`where`, a composite
+`id`, `sessionGap`, `freeWhen`), and they run to gigabytes: a JavaScriptCore
+call per line would undo the incremental reader and the byte prefilter.
+Mistral's one tool-shaped fact — the time in the folder's name — is a
+common one (logs rotated by date), so it is an option, `at.fromPath`, that
+any tool can use. The rule for choosing: **an idea several tools share is
+an option; an idea only one tool has is a script.**
+
+`format` is a closed sum like `Fetch`: the engine stays closed, a new tool is
+data. The reading rules every format shares:
+
+- **`files`** is a glob: `**` any depth, `*` within one name; hidden files
+  are skipped, and only files changed since the range's first day are read.
+- **`where`** keeps the records that match; its text values are also a byte
+  prefilter, so a line without them is never decoded.
+- A record without `at`, or without a declared `model`, is skipped; so is
+  one where no token field and no `cost` answers — it says nothing about
+  usage (Claude's assistant line without `usage`, a Vibe `meta.json`
+  without `stats`). Otherwise a missing token field counts 0.
+- **`id`**'s paths together are a record's identity; a record missing any of
+  them is never merged with another.
 
 ### 10.3 · Thirty days without re-reading thirty days: the ledger
 
@@ -811,15 +916,20 @@ own cadence (popover open, never the background poll).
 | `UsageLog` (`DataSources`) | `days(from:to:)`: the readers, prices and aggregator for one login | both analyzers' entry points |
 | `JSONLinesReader` (`DataSources/Internal`) | one record per matching line; reads only what was appended since the last scan, re-reads a file that changed under it; a byte prefilter derived from `where` | `SessionJSONLParser` + `SessionLogCache`, generalised |
 | `JSONLogReader` (`DataSources/Internal`) | one record per file; `at.fromPath` reads the time from the path | `VibeSessionLogAnalyzer.loadSessions` |
-| `PriceCatalog` (+ a file implementation in `DataSources/Internal`) | the record's own cost, else the catalog (exact → prefix → family → free → otherwise); `freeWhen` | `ModelPricing`, `ClaudeLocalInferenceDetector` |
+| `LogRecord` (`DataSources/Internal`) | the one shape every reader produces | `TokenUsageRecord`, `ParsedSession` |
+| `PriceList` (`DataSources/Internal`) | the record's own cost, else the list (exact → longest prefix → family → free → `freeWhen` → otherwise); cache savings | `ModelPricing` |
+| `LocalEndpoint` (`DataSources/Internal`) | `freeWhen.localEndpoint`: is the route in that file on this Mac? | `ClaudeLocalInferenceDetector` |
+| `LogFileFinder` (`DataSources/Internal`) | `files`' glob, changed since a date | `findRecentJSONLFiles` |
 | `DayAggregator` (`DataSources/Internal`) | dedupe by `id` (last wins), split by local day, sessions by `sessionGap` (a record is a session without one), working time, cache savings, a cost line per model | both analyzers' `aggregate` |
 | `DayLedger` (`Providers/Internal`) | closed days kept per login; open days asked of the `UsageLog` | — (new) |
 | `UsageHistory` (`Providers`, @Observable, one per login) | `days(in:)`, every date present | `Domain/UsageHistory` (one object for all logins, two days only) |
 | `Day` (`Quotas`) | the answer; `DailyUsageStat` until the words land | `Quotas` |
 
-Ports: the file system (a `@Mockable` `LogFiles`: list a glob with
-modification dates, read a byte range) in `DataSources`, and the ledger's
-store (a `@Mockable` `LedgerStore`) in `Providers`. No module names
+Ports: the ledger's store (a `@Mockable` `LedgerStore`) in `Providers`, and
+`PriceCatalog` for a cloud's prices. **The log files are not a port**: the
+readers' whole job is bytes on disk (offsets, inodes, half-written lines), so
+they are tested on files in a temporary folder, as credential files already
+are; a mock would test nothing they do. No module names
 a vendor; the readers are named for formats. The page owns the views:
 *TODAY'S USAGE* cards read `days(in: .last(2))`, a chart reads
 `days(in: .last(30))` and stacks `tokens` by kind (or `cost.lines` by model).
@@ -852,7 +962,7 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | # | Slice | Done when |
 |---|---|---|
 | UH1 | **Move**: `UsageHistory` into `Providers`, held by each `Account` (`account.usageHistory`), over today's analyzers behind `DailyUsageAnalyzing` | `Domain/UsageHistory` is empty; the App reads `account.usageHistory`; no visible change |
-| UH2 | **Claude as data**: `UsageLog` + `UsageLog.Definition` in `DataSources`, `JSONLinesReader`, a file `PriceCatalog` + `claude-prices.json`, `DayAggregator`, `days(in:)`; claude.json's `usageHistory`. Golden tests: today's `ClaudeDailyUsageAnalyzerTests`, `SessionJSONLParserTests`, `SessionLogCacheTests`, `ModelPricingTests` fixtures through the definition | `ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector` deleted; the same two-day numbers |
+| UH2 | **Claude as data**: `UsageLog` + `UsageLog.Definition` in `DataSources`, `JSONLinesReader`, `PriceList` + `claude-prices.json`, `LocalEndpoint`, `DayAggregator`, `days(in:)`; claude.json's `usageHistory`. Golden tests: today's `ClaudeDailyUsageAnalyzerTests`, `SessionJSONLParserTests`, `SessionLogCacheTests`, `ModelPricingTests` fixtures through the definition | `ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector` deleted; the same two-day numbers |
 | UH3 | **Mistral as data**: `JSONLogReader`, `at.fromPath`; mistral.json's `usageHistory`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
 | UH4 | **The ledger**: `DayLedger`, closed days kept, invalidated by a definition change | 30 days read in the time 2 take today |
 | UH5 | **The chart**: *Daily usage — last 30 days* (tokens by kind, two axes; cost by model) on the provider's page | visible |

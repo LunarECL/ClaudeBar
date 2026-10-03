@@ -141,11 +141,10 @@ Modules/DataSources/
 │   ├── RPCTransport.swift            port, @Mockable
 │   ├── SecretStore.swift             port, @Mockable — implemented in Storage
 │   │   (Fetch.swift also declares the ports CloudWatchClient · PriceCatalog, @Mockable —
-│   │    implemented in AWSClients; a file PriceCatalog is in Internal/Logs)
+│   │    implemented in AWSClients)
 │   ├── UsageLog.swift                ◆ days(from:to:) for one login · ◇ UsageLog.Definition —
 │   │                                   files · format · where · at · id · model · tokens · cost ·
 │   │                                   prices · freeWhen · sessionGap
-│   ├── LogFiles.swift                port, @Mockable — the files a glob names, and their bytes
 │   ├── DataSources.swift             the factory: make(_:providerId:…)
 │   └── Internal/
 │       ├── Lookup/    EnvironmentReader · SettingReader · JSONFileReader · KeychainReader ·
@@ -156,8 +155,8 @@ Modules/DataSources/
 │       │              CloudWatchFetcher
 │       ├── Mapping/   JSONMapper (+ the path dialect) · TextMapper · ScriptMapper ·
 │       │              DecimalScript · HumanDate
-│       ├── Logs/      JSONLinesReader · JSONLogReader (a reader per log format) ·
-│       │              DayAggregator · FilePriceCatalog · SystemLogFiles
+│       ├── Logs/      LogRecord · JSONLinesReader · JSONLogReader (a reader per log
+│       │              format) · LogFileFinder · DayAggregator · PriceList · LocalEndpoint
 │       ├── Process/   DefaultCLIExecutor · ProcessRPCTransport · InteractiveRunner ·
 │       │              BinaryLocator · LoginShellEnvironment · RunningProcesses ·
 │       │              TerminalRenderer
@@ -205,9 +204,8 @@ for that thing, is `@Mockable`, and has its implementation in an `Internal/`.
 | `NetworkClient` | DataSources | an HTTP endpoint | `DataSources/Internal/Network` |
 | `RPCTransport` | DataSources | a JSON-RPC pipe to a process | `DataSources/Internal/Process` |
 | `CloudWatchClient` | DataSources | AWS CloudWatch | `AWSClients` |
-| `PriceCatalog` | DataSources | a price list — AWS's, or a prices file a definition ships | `AWSClients`; `DataSources/Internal/Logs` (file) |
+| `PriceCatalog` | DataSources | a cloud's price list (AWS) — a price file a definition ships is data, not a port | `AWSClients` |
 | `SecretStore` | DataSources | the Keychain, for secrets a login saved | `Storage` |
-| `LogFiles` | DataSources | the local logs a CLI writes | `DataSources/Internal/Logs` |
 | `LedgerStore` | Providers | `~/.claudebar/usage-history/` | `Providers/Internal` (→ `Storage`) |
 | `Clipboard` | DataSources | the pasteboard, read after a `cli` run with `"clipboard": true` | `DataSources/Internal/Process` |
 | `ProviderSettingsRepository` · `CredentialRepository` | Providers | `settings.json`, the Keychain | `Storage` |
@@ -250,7 +248,7 @@ testability" alone.
 | `Domain/Notify/`, `Infrastructure/Notifications/`, `Notify/` | `Alerting` |
 | `Domain/Session/`, `Domain/Notch/`, `Infrastructure/Hooks/` | `Activity` (`NSScreen+NotchMetrics` → App) |
 | `Domain/UsageHistory/` (`DailyUsageReport`/`Stat`, the view's ranges) | `UsageHistory` → `Providers`; `Day`, `DateRange` → `Quotas` |
-| `Infrastructure/Claude/` (`ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector`) | **deleted** — the paths, fields and `freeWhen` move into `claude.json`'s `usageHistory`, the prices into `claude-prices.json`; parsing, caching and pricing become `UsageHistory/Internal` readers, aggregator and file `PriceCatalog` in `DataSources/Internal/Logs`, `DayLedger` in `Providers/Internal` |
+| `Infrastructure/Claude/` (`ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector`) | **deleted** — the paths, fields and `freeWhen` move into `claude.json`'s `usageHistory`, the prices into `claude-prices.json`; parsing, caching and pricing become the readers, aggregator, `PriceList` and `LocalEndpoint` in `DataSources/Internal/Logs`; `DayLedger` goes to `Providers/Internal` |
 | `Infrastructure/Claude/ClaudeGuestPassSource` | **deleted** — `claude.json`'s `guestPasses` block: a `cli` fetch and `claude-passes.js` |
 | `Infrastructure/Mistral/` (`VibeSessionLogAnalyzer`) | **deleted** — `mistral.json`'s `usageHistory` (a `json` log format) |
 | `Domain/Settings/`, `Infrastructure/Storage/` | `Storage` (`StatusColorPolicy`, `MenuBarProviderSettings` → App; `AIProviders` → `Providers`) |
@@ -299,7 +297,7 @@ in `DataSources` before Codex's code can be deleted.
   own `…Clients` module behind its own port in `DataSources`.
 - **Usage History as its own module, later?** Not now: `Providers` is its
   only consumer and its work is `DataSources`' (files, the path language,
-  `PriceCatalog`). It earns a module when it needs its own SDK (a binary or
+  prices). It earns a module when it needs its own SDK (a binary or
   SQLite log) or a second consumer; keeping `Internal/Logs/` and
   `UsageHistory.swift` in their own files keeps that carve cheap.
 - **`AIProvider` beside `Provider`** until the last provider moves — then the
