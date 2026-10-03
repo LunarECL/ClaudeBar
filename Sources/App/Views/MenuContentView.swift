@@ -302,7 +302,7 @@ struct MenuContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text("ClaudeBar")
-                        .font(.system(size: 18, weight: .bold, design: theme.fontDesign))
+                        .font(theme.displayFont(size: 18))
                         .foregroundStyle(theme.textPrimary)
 
                     // Christmas gift icon
@@ -331,6 +331,7 @@ struct MenuContentView: View {
         switch theme.id {
         case "cli": return "> usage monitor"
         case "christmas": return "Happy Holidays!"
+        case "pop": return "Your quotas, the cute way"
         default: return "AI Usage Monitor"
         }
     }
@@ -547,7 +548,7 @@ struct MenuContentView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Capsule().fill(hidden ? Color.clear : theme.glassBackground))
-                        .overlay(Capsule().stroke(theme.glassBorder, lineWidth: 1))
+                        .overlay(Capsule().stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
                         .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
                     }
                     .buttonStyle(.plain)
@@ -1142,7 +1143,7 @@ struct ProviderPill: View {
                     }
 
                     RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                        .stroke(isSelected ? theme.accentPrimary.opacity(0.5) : theme.glassBorder, lineWidth: 1)
+                        .stroke(isSelected ? theme.accentPrimary.opacity(0.5) : theme.glassBorder, lineWidth: theme.cardBorderWidth)
                 }
             )
         }
@@ -1341,7 +1342,7 @@ struct WrappedStatCard: View {
                    let dollarCap = quota.formattedDollarCap {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(dollarUsed)
-                            .font(.system(size: 20, weight: .heavy, design: theme.fontDesign))
+                            .font(theme.displayFont(size: 20, weight: .heavy))
                             .foregroundStyle(theme.textPrimary)
 
                         Text("of \(dollarCap)")
@@ -1353,12 +1354,12 @@ struct WrappedStatCard: View {
                     .layoutPriority(1)
                 } else if let dollarText = quota.formattedDollarRemaining {
                     Text(dollarText)
-                        .font(.system(size: 18, weight: .bold, design: theme.fontDesign))
+                        .font(theme.displayFont(size: 18))
                         .foregroundStyle(theme.textPrimary)
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text("\(Int(quota.displayPercent(mode: effectiveDisplayMode)))")
-                            .font(.system(size: 26, weight: .bold, design: theme.fontDesign))
+                            .font(theme.displayFont(size: 26))
                             .foregroundStyle(effectiveDisplayMode == .pace ? paceColor : theme.textPrimary)
 
                         Text("%")
@@ -1429,10 +1430,10 @@ struct WrappedStatCard: View {
         .background(
             ZStack {
                 RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .fill(theme.cardGradient)
+                    .fill(theme.cardGradient).themeShadow(theme)
 
                 RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .stroke(theme.glassBorder, lineWidth: 1)
+                    .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             }
         )
         .scaleEffect(isHovering ? 1.015 : 1.0)
@@ -1536,7 +1537,7 @@ struct WrappedActionButton: View {
                         .fill(isHovering ? AnyShapeStyle(gradient) : AnyShapeStyle(theme.glassBackground))
 
                     Capsule()
-                        .stroke(theme.glassBorder, lineWidth: 1)
+                        .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
                 }
             )
             .shadow(color: isHovering ? theme.accentPrimary.opacity(0.3) : .clear, radius: 8, y: 2)

@@ -67,7 +67,8 @@ struct AccountCardView: View {
                     .foregroundStyle(theme.statusWarning)
             }
         }
-        .glassCard(cornerRadius: 12, padding: 10)
+        .padding(10)
+        .themeCard()
     }
 
     /// The eye after the account: masks every account email in the popover

@@ -172,10 +172,10 @@ private struct ProviderListRow: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .fill(theme.cardGradient)
+                    .fill(theme.cardGradient).themeShadow(theme)
                     .overlay(
                         RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                            .stroke(isHovering ? theme.glassHighlight : theme.glassBorder, lineWidth: 1)
+                            .stroke(isHovering ? theme.glassHighlight : theme.glassBorder, lineWidth: theme.cardBorderWidth)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: theme.cardCornerRadius)
@@ -270,7 +270,7 @@ private struct ProviderDetailView: View {
             .background(
                 Capsule()
                     .fill(theme.glassBackground)
-                    .overlay(Capsule().stroke(theme.glassBorder, lineWidth: 1))
+                    .overlay(Capsule().stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
             )
             .contentShape(.rect)
         }

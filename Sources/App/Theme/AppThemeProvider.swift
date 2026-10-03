@@ -130,6 +130,22 @@ public protocol AppThemeProvider {
     /// Progress bar track color
     var progressTrack: Color { get }
 
+    // MARK: - Outlines, Shadows, Numbers
+
+    /// How thick a card's, pill's or button's outline is — 1 for the glass
+    /// themes, thicker for an outlined, printed look.
+    var cardBorderWidth: CGFloat { get }
+
+    /// A shadow under cards, pills and buttons — `nil` for none.
+    var cardShadow: ThemeShadow? { get }
+
+    /// The font for big numbers — percentages, totals, today's values;
+    /// `nil` is the system font, bold, in `fontDesign`.
+    var displayFontName: String? { get }
+
+    /// Text drawn on a status colour (a badge), readable on all four.
+    var textOnStatus: Color { get }
+
     // MARK: - Computed Helpers
 
     /// Returns the appropriate status color for a given quota status
@@ -153,6 +169,22 @@ public extension AppThemeProvider {
 
     /// Default overlay is nil
     @MainActor var overlayView: AnyView? { nil }
+
+    var cardBorderWidth: CGFloat { 1 }
+    var cardShadow: ThemeShadow? { nil }
+
+    /// A printed, outlined theme (Pop): opaque paper instead of glass, ink
+    /// outlines, inked selections and switches.
+    var isOutlined: Bool { cardBorderWidth > 1 }
+    var displayFontName: String? { nil }
+    var textOnStatus: Color { .white }
+
+    /// The font for a big number in this theme — the display font, else the
+    /// system font at `weight` in `fontDesign`.
+    func displayFont(size: CGFloat, weight: Font.Weight = .bold) -> Font {
+        if let displayFontName { return .custom(displayFontName, size: size) }
+        return .system(size: size, weight: weight, design: fontDesign)
+    }
 
     /// Default status color mapping
     func statusColor(for status: QuotaStatus) -> Color {
@@ -216,3 +248,34 @@ public struct BaseTheme {
     public static let pinkHot = Color(red: 0.85, green: 0.35, blue: 0.65)
     public static let magentaSoft = Color(red: 0.78, green: 0.42, blue: 0.75)
 }
+
+// MARK: - Theme Shadow
+
+/// A shadow a theme puts under its cards: offset, colour, softness. A hard
+/// printed shadow is `radius: 0`.
+public struct ThemeShadow: Sendable, Equatable {
+    public let color: Color
+    public let radius: CGFloat
+    public let x: CGFloat
+    public let y: CGFloat
+
+    public init(color: Color, radius: CGFloat = 0, x: CGFloat, y: CGFloat) {
+        self.color = color
+        self.radius = radius
+        self.x = x
+        self.y = y
+    }
+}
+
+public extension View {
+    /// The theme's card shadow, when it has one.
+    @ViewBuilder
+    func themeShadow(_ theme: any AppThemeProvider, scale: CGFloat = 1) -> some View {
+        if let shadow = theme.cardShadow {
+            self.shadow(color: shadow.color, radius: shadow.radius, x: shadow.x * scale, y: shadow.y * scale)
+        } else {
+            self
+        }
+    }
+}
+

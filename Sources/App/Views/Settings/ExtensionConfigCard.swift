@@ -39,7 +39,7 @@ struct ExtensionConfigCard: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(theme.cardGradient)
+                .fill(theme.cardGradient).themeShadow(theme)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(
@@ -189,7 +189,7 @@ struct ExtensionConfigCard: View {
             .fill(theme.glassBackground)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(theme.glassBorder, lineWidth: 1)
+                    .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             )
     }
 
