@@ -94,34 +94,6 @@ extension MistralProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - OmpProvider Visual Identity
-
-extension OmpProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "terminal.fill" }
-
-    public var iconAssetName: String { "OmpIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Oh My Pi green
-        scheme == .dark
-            ? Color(red: 0.30, green: 0.85, blue: 0.55)
-            : Color(red: 0.16, green: 0.62, blue: 0.38)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.16, green: 0.62, blue: 0.42)
-                    : Color(red: 0.10, green: 0.48, blue: 0.30)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - ExtensionProvider Visual Identity
 
 extension ExtensionProvider: ProviderVisualIdentity {
@@ -217,10 +189,6 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.55, blue: 0.0)
                 : Color(red: 0.90, green: 0.45, blue: 0.0)
-        case "omp":
-            return scheme == .dark
-                ? Color(red: 0.30, green: 0.85, blue: 0.55)
-                : Color(red: 0.16, green: 0.62, blue: 0.38)
         default:
             return BaseTheme.purpleVibrant
         }
@@ -237,10 +205,6 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.35, blue: 0.10)
                 : Color(red: 0.75, green: 0.25, blue: 0.05)
-        case "omp":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.16, green: 0.62, blue: 0.42)
-                : Color(red: 0.10, green: 0.48, blue: 0.30)
         default:
             return LinearGradient(
                 colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
@@ -261,7 +225,6 @@ enum ProviderVisualIdentityLookup {
         if let icon = look(for: providerId)?.icon { return icon }
         switch providerId {
         case "mistral": return "MistralIcon"
-        case "omp": return "OmpIcon"
         default: return "QuestionIcon"
         }
     }
@@ -271,7 +234,6 @@ enum ProviderVisualIdentityLookup {
         if let definition = Providers.definition(forLineupId: providerId) { return definition.profile.name }
         switch providerId {
         case "mistral": return "Mistral"
-        case "omp": return "Oh My Pi"
         default: return providerId.capitalized
         }
     }
@@ -281,7 +243,6 @@ enum ProviderVisualIdentityLookup {
         if let symbol = look(for: providerId)?.symbol { return symbol }
         switch providerId {
         case "mistral": return "cat.fill"
-        case "omp": return "terminal.fill"
         default:
             return extensionSymbols.withLock { $0[providerId] } ?? "questionmark.circle.fill"
         }

@@ -40,6 +40,19 @@ struct ScriptMoneyTests {
     }
 
     @Test
+    func `a quota can name the group it belongs to`() throws {
+        let usage = try read(#"{quotas:[{type:'time',name:'Kimi 5h',percentRemaining:40,group:'Kimi'},{type:'time',name:'Solo',percentRemaining:9}]}"#)
+        #expect(usage.quotas.map(\.group) == ["Kimi", nil])
+    }
+
+    @Test
+    func `a group with nothing to measure carries a note`() throws {
+        let usage = try read(#"{quotas:[{type:'time',name:'Kimi 5h',percentRemaining:40,group:'Kimi'}],notes:[{group:'Copilot · me',text:'No usage reported'}]}"#)
+        #expect(usage.quotaGroups.map(\.title) == ["Kimi", "Copilot · me"])
+        #expect(usage.quotaGroups.last?.note == "No usage reported")
+    }
+
+    @Test
     func `existing percentage scripts keep working`() throws {
         let usage = try read(#"{quotas:[{type:'session',percentRemaining:37}]}"#)
         #expect(usage.quotas.first?.left == .share(37))

@@ -13,8 +13,9 @@ import JavaScriptCore
 ///   definition lets it see, the settings it hands over (`values`), and each
 ///   declared context file's fields
 ///
-/// and returns `{ quotas, plan, cost, account }` or `{ error }` — a cost may
-/// carry `lines`, its parts. It may call
+/// and returns `{ quotas, notes, plan, cost, account }` or `{ error }` — a cost
+/// may carry `lines`, its parts, and a quota its `group`, with `notes` for a
+/// group that has nothing to measure. It may call
 /// `humanDate(text)` for an epoch-seconds reset time, or `null`;
 /// `jsonDecimal(text)` to parse JSON keeping every number as its exact text;
 /// and `decimalCents(amount)` to round such an amount to cents without a
@@ -108,9 +109,11 @@ struct ScriptOutput: Decodable {
         let resetsAt: Double?
         let resetText: String?
         let windowSeconds: Double?
+        /// The account or source it belongs to, when a report holds several.
+        let group: String?
 
         private enum CodingKeys: String, CodingKey {
-            case type, name, percentRemaining, left, resetsAt, resetText, windowSeconds
+            case type, name, percentRemaining, left, resetsAt, resetText, windowSeconds, group
         }
 
         private struct MoneyLeft: Decodable {
@@ -141,6 +144,7 @@ struct ScriptOutput: Decodable {
             resetsAt = try container.decodeIfPresent(Double.self, forKey: .resetsAt)
             resetText = try container.decodeIfPresent(String.self, forKey: .resetText)
             windowSeconds = try container.decodeIfPresent(Double.self, forKey: .windowSeconds)
+            group = try container.decodeIfPresent(String.self, forKey: .group)
         }
     }
 
@@ -187,7 +191,16 @@ struct ScriptOutput: Decodable {
         }
     }
 
+    /// A line under a group with nothing to measure — "No usage reported".
+    struct Note: Decodable {
+        let group: String
+        let text: String
+        /// The row's own name, unique in the report — the group's, unless said.
+        let label: String?
+    }
+
     let quotas: [Quota]?
+    let notes: [Note]?
     let plan: String?
     let cost: Cost?
     let account: Account?
@@ -203,7 +216,8 @@ struct ScriptOutput: Decodable {
                 providerId: providerId,
                 resetsAt: quota.resetsAt.map { Date(timeIntervalSince1970: $0) },
                 resetText: quota.resetText,
-                windowDuration: quota.windowSeconds
+                windowDuration: quota.windowSeconds,
+                group: quota.group
             )
         }
         let costUsage = cost.map { cost in
@@ -227,7 +241,10 @@ struct ScriptOutput: Decodable {
             accountOrganization: account?.organization,
             loginMethod: account?.loginMethod,
             accountTier: plan.map(Self.tier),
-            costUsage: costUsage
+            costUsage: costUsage,
+            extensionMetrics: notes.flatMap { notes in
+                notes.isEmpty ? nil : notes.map { ExtensionMetric(label: $0.label ?? $0.group, value: $0.text, unit: "", group: $0.group) }
+            }
         )
     }
 
