@@ -650,3 +650,148 @@ which now also makes a source not *Configured* while its files are missing.
   one `Provider` owning its `Account`s. The rest is designed in
   [features/multi-account/design.md](../features/multi-account/design.md).
 - **A `command` fetch from the UI** — see [CANONICAL_MODEL §9](CANONICAL_MODEL.md#9--open).
+
+## 10 · Usage History as data
+
+> **Status: PROPOSED.** The model, laws and words are in
+> [CANONICAL_MODEL](CANONICAL_MODEL.md) §1, §5, §8. This section says how it
+> runs and the order of the work.
+
+### 10.1 · What a person sees, and what is true
+
+*TODAY'S USAGE* answers **"what did I use today, against yesterday?"** — cost,
+tokens, sessions and working time, read from the logs a tool already writes
+on this Mac. It is not a meter: nothing is left, nothing refills, nothing is
+judged by a policy. So it lives beside the providers, read when the popover
+opens.
+
+Today two vendor-named analyzers answer it, and each one hard-codes the same
+five jobs:
+
+| Job | Claude (`ClaudeDailyUsageAnalyzer` + 5 helpers) | Mistral (`VibeSessionLogAnalyzer`) | What it really is |
+|---|---|---|---|
+| where the records are | `~/.claude/projects/**/*.jsonl`, changed since yesterday | `~/.vibe/logs/session/session_*/meta.json` | a glob |
+| how to read one | an assistant line: `message.model`, `message.usage.*`, `timestamp` | `stats.session_total_llm_tokens`, `stats.session_cost`; the time from the folder name, in UTC | a format and field paths |
+| which copy counts | `message.id` + `requestId`, the last wins | each file once | an identity |
+| what it cost | `ModelPricing` — a Swift table of prices; a local model, or a base URL on this Mac, is free | the log says | a price list, or the record's own cost |
+| the day | local midnight; a 30-minute pause starts a session | local midnight; a file is a session | one aggregator |
+
+None of these is a vendor's behaviour; each is a value. So, as for usage
+(§2), **a tool's history is a definition and one engine runs it**: a new
+tool's logs, or a new model's price, is a JSON change (OCP).
+
+### 10.2 · The definition: `history` beside `dataSources`
+
+```jsonc
+// claude.json
+"history": {
+  "records": {
+    "files": "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
+    "format": "jsonLines",                       // jsonLines (append-only, read incrementally) · json (one record per file)
+    "where": { "path": "$.type", "equals": "assistant" },
+    "at": "$.timestamp",                          // ISO 8601
+    "id": ["$.message.id", "$.requestId"],        // a record written twice counts once — the last wins
+    "model": "$.message.model",
+    "tokens": {
+      "input": "$.message.usage.input_tokens",
+      "output": "$.message.usage.output_tokens",
+      "cacheWrite": "$.message.usage.cache_creation_input_tokens",
+      "cacheRead": "$.message.usage.cache_read_input_tokens"
+    }
+  },
+  "prices": "claude-prices.json",
+  "freeWhen": { "localEndpoint": { "file": "${CLAUDE_CONFIG_DIR:-~}/.claude.json",
+                                   "url": ["$.env.ANTHROPIC_BASE_URL", "$.providers.0.base_url"] } },
+  "sessionGap": 1800
+},
+"accounts": { "patch": { "history": { "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" } } } }
+```
+
+```jsonc
+// mistral.json
+"history": {
+  "records": {
+    "files": "~/.vibe/logs/session/session_*/meta.json",
+    "format": "json",
+    "at": { "fromPath": "session_(\\d{8}_\\d{6})", "format": "yyyyMMdd_HHmmss", "timeZone": "UTC" },
+    "tokens": { "total": "$.stats.session_total_llm_tokens" },
+    "cost": "$.stats.session_cost"               // the log's own cost wins over any price
+  }
+}
+```
+
+```jsonc
+// claude-prices.json — beside the definition; a price change edits this, never Swift
+{
+  "currency": "USD", "per": 1000000,
+  "models": [                                     // exact id first, then the longest prefix
+    { "id": "claude-opus-5",   "input": "5", "output": "25", "cacheWrite": "6.25", "cacheRead": "0.50" },
+    { "id": "claude-sonnet-5", "input": "2", "output": "10", "cacheWrite": "2.50", "cacheRead": "0.20" }
+  ],
+  "families": [ { "contains": "opus", "as": "claude-opus-4-6" }, { "contains": "haiku", "as": "claude-haiku-4-5-20251001" } ],
+  "free": [ "qwen", "llama", "gemma", "mistral", "gpt-oss", "ollama" ],   // a model of a local family costs nothing
+  "otherwise": { "input": "3", "output": "15", "cacheWrite": "3.75", "cacheRead": "0.30" }
+}
+```
+
+- **Per login, like data sources.** The default login reads `history`; an
+  added login gets `accounts.patch.history` merged in and its values filled
+  (`{{account.configDirectory}}`), so an added Claude login has its own
+  *TODAY'S USAGE* for the first time. A definition without `history` has none.
+- **Money stays exact.** Prices are decimal texts; cost is
+  tokens × price ÷ `per` in `Decimal`, and is shown as an estimate unless
+  the record gave its own `cost`.
+- **`freeWhen.localEndpoint`** replaces `ClaudeLocalInferenceDetector`: a
+  base URL in that file on a loopback host means an unpriced model costs
+  nothing today. It reads one file, like a `jsonFile` lookup.
+
+### 10.3 · The engine: `Modules/UsageHistory`
+
+| Piece | Job | From today's |
+|---|---|---|
+| `UsageLog` (+ `RecordSource`, `PriceList`) | the JSON, `Codable`, no behaviour | the constants in both analyzers |
+| `JSONLinesReader` | one record per matching line; reads only what was appended since the last scan, re-reads a file that changed under it; a cheap byte prefilter derived from `where` | `SessionJSONLParser` + `SessionLogCache`, generalised |
+| `JSONFileReader` | one record per file; `at.fromPath` reads the time from the path | `VibeSessionLogAnalyzer.loadSessions` |
+| `Pricer` | the record's own cost, else the price list (exact → prefix → family → free → otherwise); `freeWhen` | `ModelPricing`, `ClaudeLocalInferenceDetector` |
+| `DayAggregator` | dedupe by `id` (last wins), split by local day, sessions by `sessionGap` (a record is a session without one), working time, cache savings | `ClaudeDailyUsageAnalyzer.aggregate`, `VibeSessionLogAnalyzer.aggregate` |
+| `UsageHistory` (@Observable) | `read(for:)` / `report(for:)` per login; built from each provider's logins | `Domain/UsageHistory` |
+| `DayComparison` · `Day` | the answer — today's `DailyUsageReport` / `DailyUsageStat`, renamed when the words land | `Quotas` |
+
+Ports: the file system only (`FileManager` behind a `@Mockable` `LogFiles`
+port: list a glob with modification dates, read a range). No module names a
+vendor; the readers are named for formats.
+
+### 10.4 · OCP, checked against the next tool
+
+Codex writes `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`, where a
+`token_count` event carries the session's **running total**. That is one new
+option, `"cumulative": true` — the last record per session counts, the rest are
+subtotals — added to `JSONLinesReader` with a neutral test. Codex's
+*TODAY'S USAGE* is then a `history` block in `codex.json`: no new type, no
+vendor name. The same holds for any tool whose logs are lines or files of
+JSON; a binary format would be one new reader.
+
+### 10.5 · The rest of `Infrastructure/Claude`
+
+Deleting the folder also needs a home for **guest passes**
+(`ClaudeGuestPassSource`): `claude /passes` in a terminal, the referral link
+from the screen or, failing that, the clipboard, and an optional count. As
+data: a `guestPasses` block in `claude.json` holding a `cli` fetch and a
+`claude-passes.js` mapping, run by the same `DataSource` machinery; the one
+new piece is a `cli` option that hands the clipboard's text to the mapping
+after the run (`"clipboard": true`, a `@Mockable` `Clipboard` port). The
+`GuestPasses` capability in `Providers` stays as it is and takes any
+definition's `guestPasses`.
+
+### 10.6 · Slices
+
+Each slice is one PR, green, with no change a user can see unless it says so.
+
+| # | Slice | Done when |
+|---|---|---|
+| UH1 | **Carve** `Modules/UsageHistory`: `UsageHistory`, `DailyUsageAnalyzing`, `DailyUsageReport`/`Stat` move in (typealiases keep call sites) | `Domain/UsageHistory` is empty; no visible change |
+| UH2 | **Claude as data**: `UsageLog`, `JSONLinesReader`, `Pricer` + `claude-prices.json`, `DayAggregator`; claude.json's `history`. Golden tests: today's `ClaudeDailyUsageAnalyzerTests`, `SessionJSONLParserTests`, `SessionLogCacheTests`, `ModelPricingTests` fixtures through the definition | `ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector` deleted; same numbers |
+| UH3 | **Mistral as data**: `JSONFileReader`, `at.fromPath`; mistral.json's `history`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
+| UH4 | **Per login**: `accounts.patch.history`; `UsageHistory` built from every provider's logins | an added Claude login shows its own *TODAY'S USAGE* (visible) |
+| GP | **Guest passes as data**: `cli.clipboard`, claude.json's `guestPasses` + `claude-passes.js`; `ClaudeGuestPassSourceTests` fixtures | `Infrastructure/Claude` deleted |
+| — | the words: `DayComparison`, `Day`; the typealiases go | with §8 slice 7 |
