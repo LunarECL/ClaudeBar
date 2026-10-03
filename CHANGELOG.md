@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Breaking: the CLI theme's menu bar icon is now an outline terminal that fills in while Claude Code works, in your quota's status colour. It replaces the two terminals shown side by side; nothing to change on your side. Applies with the readout off.
+- Breaking: the CLI theme's menu bar icon is now an outline terminal that fills in while Claude Code works, in your quota's status colour. It replaces the two terminals shown side by side; nothing to change on your side. Applies with the readout off. ([#445](https://github.com/tddworks/ClaudeBar/pull/445))
 
 ---
 
