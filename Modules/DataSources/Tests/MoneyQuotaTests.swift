@@ -15,6 +15,20 @@ struct MoneyQuotaTests {
         return try DataSources.make(definition, providerId: "openrouter").read(Response(status: 200, body: Data(body.utf8)))
     }
 
+    @Test(arguments: ["0.123456789", "1245.67", "-1.25", "1e2"])
+    func `money sent as text stays exact`(_ amount: String) throws {
+        let usage = try usage(#"{ "quotas": [{ "kind": "model", "name": "Balance", "left": { "money": "$.balance", "currency": "USD" } }] }"#,
+                              "{\"balance\":\"\(amount)\"}")
+        #expect(usage.quotas.first?.left == .money(Money(Decimal(string: amount)!, currency: "USD"), of: nil))
+    }
+
+    @Test(arguments: ["0x10", "12abc", "", "NaN"])
+    func `text that isn't a decimal amount is no money`(_ text: String) throws {
+        let usage = try usage(#"{ "quotas": [{ "kind": "model", "name": "Balance", "left": { "money": "$.balance", "currency": "USD" } }] }"#,
+                              "{\"balance\":\"\(text)\"}")
+        #expect(usage.quotas.isEmpty)
+    }
+
     @Test
     func `money with a limit is money of that limit`() throws {
         let usage = try usage("""

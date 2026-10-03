@@ -313,7 +313,6 @@ private struct ProviderDetailView: View {
         case "kimi": AnyView(KimiConfigCard(monitor: monitor))
         case "deepseek": AnyView(DeepSeekConfigCard(monitor: monitor))
         case "alibaba": AnyView(AlibabaConfigCard(monitor: monitor))
-        case "vercel-gateway": AnyView(VercelConfigCard(monitor: monitor))
         case "copilot": AnyView(CopilotConfigCard(monitor: monitor))
         case "zai": AnyView(ZaiConfigCard(monitor: monitor))
         case "bedrock": AnyView(BedrockConfigCard(monitor: monitor))

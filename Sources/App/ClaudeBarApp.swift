@@ -125,10 +125,12 @@ struct ClaudeBarApp: App {
         let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
 
         let vault = ProviderVault()
-        // MiniMax is data: its region, key and environment variable are
-        // settings in minimax.json, so nothing here is MiniMax's.
+        // MiniMax and Vercel are data: their keys, regions and environment
+        // variables are settings in their JSON, so nothing here is theirs.
         let minimax = Self.builtIn("minimax", settings: settingsRepository,
                                    accounts: settingsRepository.accounts(forProvider: "minimax"), secrets: vault)
+        let vercel = Self.builtIn("vercel-gateway", settings: settingsRepository,
+                                  accounts: settingsRepository.accounts(forProvider: "vercel-gateway"), secrets: vault)
 
         // Keep the existing default login's configurable environment name until
         // provider settings forms move to definitions. Added logins use only
@@ -172,10 +174,7 @@ struct ClaudeBarApp: App {
             CursorProvider(probe: CursorUsageProbe(), settingsRepository: settingsRepository),
             minimax.defaultAccount,
             deepseek.defaultAccount,
-            VercelProvider(
-                probe: VercelUsageProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
+            vercel.defaultAccount,
             AlibabaProvider(
                 probe: AlibabaUsageProbe(settingsRepository: settingsRepository, cookieProvider: AlibabaBrowserCookieProvider()),
                 settingsRepository: settingsRepository
@@ -202,7 +201,7 @@ struct ClaudeBarApp: App {
             ),
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after

@@ -42,4 +42,17 @@ struct JSONSettingsRepositorySettingValueTests {
 
         #expect(repository.value("region", forProvider: "acme") == nil)
     }
+
+    @Test
+    func `a value an old card kept under another key is read, and moves when saved`() {
+        let (store, repository, directory) = make()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        store.write(value: "MY_GATEWAY_KEY", key: "vercel.authEnvVar")
+
+        #expect(repository.value("authEnvVar", forProvider: "vercel-gateway") == "MY_GATEWAY_KEY")
+
+        repository.setValue("OTHER_KEY", "authEnvVar", forProvider: "vercel-gateway")
+        #expect(store.read(key: "vercel-gateway.authEnvVar") as String? == "OTHER_KEY")
+        #expect(store.read(key: "vercel.authEnvVar") as String? == nil)
+    }
 }
