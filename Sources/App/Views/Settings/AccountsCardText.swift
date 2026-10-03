@@ -67,7 +67,8 @@ struct AccountsCardText {
             return "Remove this account and add it again with a valid key."
         }
         if account.isDefault, provider.definition.cli == nil {
-            return "Update the default account's key in Settings, then refresh."
+            // The key lookup says how its key comes back — Cursor: the app's own login.
+            return provider.keyHint ?? "Update the default account's key in Settings, then refresh."
         }
         guard let folder = account.folder, !folder.goesWithAccount else { return nil }
         guard let command = signInCommand(in: folder.url.path) else { return "Sign in again in \(folder.url.path), then refresh." }

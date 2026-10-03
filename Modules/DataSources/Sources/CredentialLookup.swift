@@ -22,6 +22,8 @@ public indirect enum CredentialLookup: Sendable, Equatable {
     case setting(String)
     /// Cookies of a site the person is signed in to in a browser — *COOKIE SOURCE*.
     case browserCookies(BrowserCookieCredential)
+    /// A row of another app's own SQLite database, read only.
+    case sqlite(SQLiteCredential)
     /// The first lookup that answers wins.
     case firstOf([CredentialLookup])
     /// A lookup whose token is kept fresh by an OAuth 2 refresh.
@@ -50,6 +52,25 @@ public struct BrowserCookieCredential: Sendable, Equatable, Codable {
         domains = try container.decode([String].self, forKey: .domains)
         names = try container.decode([String].self, forKey: .names)
         format = try container.decodeIfPresent(Format.self, forKey: .format) ?? .value
+    }
+}
+
+/// `{ "path": "~/…/state.vscdb", "query": "SELECT value AS token FROM …",
+/// "fields": { "token": "$.token" }, "hint": "Sign in again in Acme." }` — the
+/// first row's columns, read like a JSON object. The query must not change
+/// the database; one that would is refused.
+public struct SQLiteCredential: Sendable, Equatable, Codable {
+    public let path: String
+    public let query: String
+    public let fields: [String: String]
+    /// What to do when no key answers — the app that owns the database.
+    public let hint: String?
+
+    public init(path: String, query: String, fields: [String: String], hint: String? = nil) {
+        self.path = path
+        self.query = query
+        self.fields = fields
+        self.hint = hint
     }
 }
 
@@ -222,7 +243,7 @@ public struct OAuth2Refresh: Sendable, Equatable, Codable {
 // MARK: - JSON
 
 extension CredentialLookup: Codable {
-    private static let tags = ["environment", "jsonFile", "keychain", "setting", "browserCookies", "firstOf"]
+    private static let tags = ["environment", "jsonFile", "keychain", "setting", "browserCookies", "sqlite", "firstOf"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
@@ -238,6 +259,8 @@ extension CredentialLookup: Codable {
             base = .setting(try container.decode(String.self, forKey: TagKey("setting")))
         case "browserCookies":
             base = .browserCookies(try container.decode(BrowserCookieCredential.self, forKey: TagKey("browserCookies")))
+        case "sqlite":
+            base = .sqlite(try container.decode(SQLiteCredential.self, forKey: TagKey("sqlite")))
         default:
             base = .firstOf(try container.decode([CredentialLookup].self, forKey: TagKey("firstOf")))
         }
@@ -266,6 +289,8 @@ extension CredentialLookup: Codable {
             try container.encode(name, forKey: TagKey("setting"))
         case .browserCookies(let cookies):
             try container.encode(cookies, forKey: TagKey("browserCookies"))
+        case .sqlite(let database):
+            try container.encode(database, forKey: TagKey("sqlite"))
         case .firstOf(let lookups):
             try container.encode(lookups, forKey: TagKey("firstOf"))
         case .refreshing(let base, let refresh):
@@ -286,6 +311,7 @@ extension CredentialLookup {
         case .keychain(let item): ["Keychain “\(item.service)”"]
         case .setting: ["API key saved in ClaudeBar"]
         case .browserCookies(let cookies): ["Browser cookies for \(cookies.domains.first ?? "the site")"]
+        case .sqlite(let database): [database.path]
         case .firstOf(let lookups): lookups.flatMap(\.lookupOrder)
         case .refreshing(let base, _): base.lookupOrder
         }
@@ -297,6 +323,7 @@ extension CredentialLookup {
         switch self {
         case .refreshing(let base, let refresh): refresh.hint ?? base.hint
         case .firstOf(let lookups): lookups.lazy.compactMap(\.hint).first
+        case .sqlite(let database): database.hint
         case .environment, .jsonFile, .keychain, .setting, .browserCookies: nil
         }
     }
