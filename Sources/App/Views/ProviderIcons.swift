@@ -96,7 +96,6 @@ struct ProviderIconView: View {
         case "omp": return "terminal.fill"
         case "grok": return "line.diagonal"
         case "commandcode": return "command"
-        case "vercel-gateway": return "triangle.fill"
         default: return ProviderVisualIdentityLookup.symbolIcon(for: providerId)
         }
     }

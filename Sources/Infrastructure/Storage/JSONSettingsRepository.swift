@@ -6,7 +6,7 @@ import Domain
 /// (including all sub-protocols) + HookSettingsRepository + NotifySettingsRepository.
 ///
 /// Backed by `JSONSettingsStore` reading/writing `~/.claudebar/settings.json`.
-/// Vercel and Notify! credentials use the injected secure store; legacy provider
+/// Notify! credentials use the injected secure store; legacy provider
 /// credentials remain in UserDefaults pending their own migrations.
 public final class JSONSettingsRepository:
     AppSettingsRepository,
@@ -17,7 +17,6 @@ public final class JSONSettingsRepository:
     CodexSettingsRepository,
     KimiSettingsRepository,
     AlibabaSettingsRepository,
-    VercelSettingsRepository,
     HookSettingsRepository,
     NotifySettingsRepository,
     @unchecked Sendable
@@ -29,14 +28,6 @@ public final class JSONSettingsRepository:
     private let credentials: UserDefaults
     private let secureCredentials: any CredentialRepository
 
-    private var vercelCredentials: SecureCredentialMigration {
-        SecureCredentialMigration(
-            secureStore: secureCredentials,
-            legacyStore: credentials,
-            secureKey: CredentialKey.vercelApiKey,
-            legacyKey: Self.legacyVercelApiKeyKey
-        )
-    }
 
     private var zaiCredentials: SecureCredentialMigration {
         SecureCredentialMigration(
@@ -341,13 +332,25 @@ public final class JSONSettingsRepository:
     }
 
     /// `<id>.<setting>` — e.g. `kimi.region`, the key the Kimi card writes.
+    /// A value a provider's old card kept under another key is read from
+    /// there, and moves the first time it is saved.
     public func value(_ setting: String, forProvider id: String) -> String? {
-        store.read(key: "\(id).\(setting)")
+        let key = "\(id).\(setting)"
+        if let value: String = store.read(key: key) { return value }
+        return Self.legacySettingKeys[key].flatMap { store.read(key: $0) }
     }
 
     public func setValue(_ value: String?, _ setting: String, forProvider id: String) {
-        store.write(value: value, key: "\(id).\(setting)")
+        let key = "\(id).\(setting)"
+        store.write(value: value, key: key)
+        if let legacy = Self.legacySettingKeys[key] { store.write(value: nil, key: legacy) }
     }
+
+    /// Settings a provider's card kept under a key that isn't `<id>.<setting>`.
+    /// A migrating provider adds a row here, never a branch.
+    private static let legacySettingKeys = [
+        "vercel-gateway.authEnvVar": "vercel.authEnvVar",
+    ]
 
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         store.write(value: enabled, key: "providers.\(id).isEnabled")
@@ -840,34 +843,6 @@ public final class JSONSettingsRepository:
         store.write(value: screenWidgetId, key: "notify.screenWidgetId")
     }
 
-    // MARK: - VercelSettingsRepository
-
-    public func vercelAuthEnvVar() -> String {
-        store.read(key: "vercel.authEnvVar") ?? ""
-    }
-
-    public func setVercelAuthEnvVar(_ envVar: String) {
-        store.write(value: envVar, key: "vercel.authEnvVar")
-    }
-
-    public func saveVercelApiKey(_ key: String) {
-        vercelCredentials.save(key)
-    }
-
-    public func getVercelApiKey() -> String? {
-        vercelCredentials.get()
-    }
-
-    @discardableResult
-    public func deleteVercelApiKey() -> Bool {
-        vercelCredentials.delete()
-    }
-
-    public func hasVercelApiKey() -> Bool {
-        vercelCredentials.exists()
-    }
-
-    private static let legacyVercelApiKeyKey = "com.claudebar.credentials.vercel-api-key"
     private static let legacyZaiApiKeyKey = "com.claudebar.credentials.zai-api-key"
 }
 

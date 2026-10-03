@@ -30,6 +30,15 @@ public struct ProviderVault: SecretVault, @unchecked Sendable {
         return credentials.delete(forKey: Self.key(name, provider: provider))
     }
 
+    /// Where a default login's key was kept before its provider became a
+    /// definition: a UserDefaults entry, and for some an older Keychain item.
+    /// A migrating provider adds a row here, never a branch.
+    private static let legacyKeys: [String: (userDefaults: String, keychain: String?)] = [
+        "provider.deepseek.apiKey": ("com.claudebar.credentials.deepseek-api-key", nil),
+        "provider.minimax.apiKey": ("com.claudebar.credentials.minimax-api-key", nil),
+        "provider.vercel-gateway.apiKey": ("com.claudebar.credentials.vercel-api-key", CredentialKey.vercelApiKey),
+    ]
+
     static func key(_ name: String, provider: String) -> String {
         "provider.\(provider).\(name)"
     }
@@ -37,12 +46,9 @@ public struct ProviderVault: SecretVault, @unchecked Sendable {
     private func migration(_ name: String, provider: String) -> SecureCredentialMigration? {
         // Compatibility lives at storage's boundary, never in the provider runtime.
         // Exact default-login keys only: an added login never inherits this entry.
-        let legacyKeys = [
-            "provider.deepseek.apiKey": "com.claudebar.credentials.deepseek-api-key",
-            "provider.minimax.apiKey": "com.claudebar.credentials.minimax-api-key",
-        ]
         let key = Self.key(name, provider: provider)
-        guard let legacyKey = legacyKeys[key] else { return nil }
-        return SecureCredentialMigration(secureStore: credentials, legacyStore: legacyStore, secureKey: key, legacyKey: legacyKey)
+        guard let legacy = Self.legacyKeys[key] else { return nil }
+        return SecureCredentialMigration(secureStore: credentials, legacyStore: legacyStore, secureKey: key,
+                                         legacyKey: legacy.userDefaults, legacySecureKey: legacy.keychain)
     }
 }

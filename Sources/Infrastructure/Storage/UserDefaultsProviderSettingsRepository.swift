@@ -4,22 +4,13 @@ import Domain
 /// Legacy/test UserDefaults implementation of provider settings protocols.
 /// Production app persistence uses `JSONSettingsRepository`; this implementation
 /// supports legacy migration and isolated tests with injected UserDefaults suites.
-public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, VercelSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, DeepSeekSettingsRepository, AlibabaSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
     /// The UserDefaults instance to use
     private let userDefaults: UserDefaults
     private let secureCredentials: any CredentialRepository
-
-    private var vercelCredentials: SecureCredentialMigration {
-        SecureCredentialMigration(
-            secureStore: secureCredentials,
-            legacyStore: userDefaults,
-            secureKey: CredentialKey.vercelApiKey,
-            legacyKey: Keys.vercelApiKey
-        )
-    }
 
     private var zaiCredentials: SecureCredentialMigration {
         SecureCredentialMigration(
@@ -407,33 +398,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.object(forKey: Keys.deepseekApiKey) != nil
     }
 
-    // MARK: - VercelSettingsRepository
-
-    public func vercelAuthEnvVar() -> String {
-        userDefaults.string(forKey: Keys.vercelAuthEnvVar) ?? ""
-    }
-
-    public func setVercelAuthEnvVar(_ envVar: String) {
-        userDefaults.set(envVar, forKey: Keys.vercelAuthEnvVar)
-    }
-
-    public func saveVercelApiKey(_ key: String) {
-        vercelCredentials.save(key)
-    }
-
-    public func getVercelApiKey() -> String? {
-        vercelCredentials.get()
-    }
-
-    @discardableResult
-    public func deleteVercelApiKey() -> Bool {
-        vercelCredentials.delete()
-    }
-
-    public func hasVercelApiKey() -> Bool {
-        vercelCredentials.exists()
-    }
-
     // MARK: - AlibabaSettingsRepository
 
     public func alibabaRegion() -> AlibabaRegion {
@@ -538,9 +502,6 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         // DeepSeek settings
         static let deepseekAuthEnvVar = "providerConfig.deepseekAuthEnvVar"
         static let deepseekApiKey = "com.claudebar.credentials.deepseek-api-key"
-        // Vercel AI Gateway settings
-        static let vercelAuthEnvVar = "providerConfig.vercelAuthEnvVar"
-        static let vercelApiKey = "com.claudebar.credentials.vercel-api-key"
         // Alibaba settings
         static let alibabaRegion = "providerConfig.alibabaRegion"
         static let alibabaCookieSource = "providerConfig.alibabaCookieSource"

@@ -317,34 +317,6 @@ extension CursorProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - VercelProvider Visual Identity
-
-extension VercelProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "triangle.fill" }
-
-    public var iconAssetName: String { "VercelIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Vercel brand black/white monochrome
-        scheme == .dark
-            ? Color(white: 0.92)
-            : Color(white: 0.08)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(white: 0.55)
-                    : Color(white: 0.45)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - MistralProvider Visual Identity
 
 extension MistralProvider: ProviderVisualIdentity {
@@ -578,11 +550,6 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 0.33, green: 0.42, blue: 0.95)
                 : Color(red: 0.07, green: 0.07, blue: 0.07)
-        case "vercel-gateway":
-            // Vercel brand black/white monochrome
-            return scheme == .dark
-                ? Color(white: 0.92)
-                : Color(white: 0.08)
         default:
             return BaseTheme.purpleVibrant
         }
@@ -652,10 +619,6 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.18, green: 0.11, blue: 0.61)
                 : Color(red: 0.25, green: 0.25, blue: 0.25)
-        case "vercel-gateway":
-            secondaryColor = scheme == .dark
-                ? Color(white: 0.55)
-                : Color(white: 0.45)
         default:
             return LinearGradient(
                 colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
@@ -689,7 +652,6 @@ enum ProviderVisualIdentityLookup {
         case "omp": return "OmpIcon"
         case "grok": return "GrokIcon"
         case "commandcode": return "CommandCodeIcon"
-        case "vercel-gateway": return "VercelIcon"
         default: return "QuestionIcon"
         }
     }
@@ -712,7 +674,6 @@ enum ProviderVisualIdentityLookup {
         case "omp": return "Oh My Pi"
         case "grok": return "Grok"
         case "commandcode": return "Command Code"
-        case "vercel-gateway": return "Vercel Gateway"
         default: return providerId.capitalized
         }
     }
@@ -735,7 +696,6 @@ enum ProviderVisualIdentityLookup {
         case "omp": return "terminal.fill"
         case "grok": return "line.diagonal"
         case "commandcode": return "command"
-        case "vercel-gateway": return "triangle.fill"
         default:
             return extensionSymbols.withLock { $0[providerId] } ?? "questionmark.circle.fill"
         }
