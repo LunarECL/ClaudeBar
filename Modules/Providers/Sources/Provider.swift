@@ -136,6 +136,15 @@ public final class Provider {
         value(of: setting, values: account.isDefault ? [:] : account.values)
     }
 
+    /// Whether a value of this setting is saved for a login — a key in the
+    /// vault, or a value in settings — never the value itself, so Settings
+    /// can say *Saved* without showing a key.
+    public func hasSaved(_ setting: Setting, for account: Account) -> Bool {
+        if vault?.secret(setting.id, provider: account.id) != nil { return true }
+        let own = account.isDefault ? settings.value(setting.id, forProvider: id) : account.values[setting.id]
+        return own != nil
+    }
+
     /// Fills in a provider-scope setting — or the default login's value of an
     /// account-scope one — and runs every login with it from the next
     /// refresh. A secret goes to the vault; `nil` or empty forgets it.
