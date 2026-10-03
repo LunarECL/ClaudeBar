@@ -13,7 +13,8 @@ import JavaScriptCore
 ///   definition lets it see, the settings it hands over (`values`), and each
 ///   declared context file's fields
 ///
-/// and returns `{ quotas, plan, cost, account }` or `{ error }`. It may call
+/// and returns `{ quotas, plan, cost, account }` or `{ error }` — a cost may
+/// carry `lines`, its parts. It may call
 /// `humanDate(text)` for an epoch-seconds reset time, or `null`;
 /// `jsonDecimal(text)` to parse JSON keeping every number as its exact text;
 /// and `decimalCents(amount)` to round such an amount to cents without a
@@ -144,6 +145,12 @@ struct ScriptOutput: Decodable {
     }
 
     struct Cost: Decodable {
+        struct Line: Decodable {
+            let label: String
+            let used: Money
+            let detail: String?
+        }
+
         let kind: CostRule.Kind?
         /// Decimal strings keep money exact; numbers are accepted too.
         let used: Money
@@ -151,6 +158,7 @@ struct ScriptOutput: Decodable {
         let apiDurationSeconds: Double?
         let resetsAt: Double?
         let resetText: String?
+        let lines: [Line]?
     }
 
     struct Account: Decodable {
@@ -207,7 +215,8 @@ struct ScriptOutput: Decodable {
                 kind: cost.kind == .extraUsage ? .extraUsage : .apiCost,
                 capturedAt: capturedAt,
                 resetsAt: cost.resetsAt.map { Date(timeIntervalSince1970: $0) },
-                resetText: cost.resetText
+                resetText: cost.resetText,
+                lines: (cost.lines ?? []).map { CostLine(label: $0.label, amount: $0.used.value, detail: $0.detail) }
             )
         }
         return UsageSnapshot(

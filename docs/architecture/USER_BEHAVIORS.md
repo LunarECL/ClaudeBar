@@ -571,7 +571,7 @@ Scenario: Budget configured
 ```
 
 ### Inner TDD Tests (existing)
-- `BedrockUsageProbeTests.*`
+- `BedrockDefinitionTests.*`
 
 ---
 

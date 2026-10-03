@@ -5,7 +5,7 @@ import Foundation
 ///
 /// - Note: Interim — today's shape, moved unchanged into the kernel.
 ///   Final version (docs/architecture/CANONICAL_MODEL.md) — becomes `Usage`: quotas, a cost, a plan, the data source that answered,
-///   and when (§1). `bedrockUsage`, `extensionMetrics` and `dailyUsageReport`
+///   and when (§1). `extensionMetrics` and `dailyUsageReport`
 ///   move to their own contexts (§8).
 public struct UsageSnapshot: Sendable, Equatable {
     /// The provider ID this snapshot belongs to (e.g., "claude", "codex", "gemini")
@@ -28,8 +28,6 @@ public struct UsageSnapshot: Sendable, Equatable {
     /// Cost-based usage data (for Claude API accounts)
     public let costUsage: CostUsage?
 
-    /// Bedrock usage summary (for AWS Bedrock provider)
-    public let bedrockUsage: BedrockUsageSummary?
 
     /// Daily usage report from local session JSONL analysis (e.g., Claude Code)
     public let dailyUsageReport: DailyUsageReport?
@@ -48,7 +46,6 @@ public struct UsageSnapshot: Sendable, Equatable {
         loginMethod: String? = nil,
         accountTier: AccountTier? = nil,
         costUsage: CostUsage? = nil,
-        bedrockUsage: BedrockUsageSummary? = nil,
         dailyUsageReport: DailyUsageReport? = nil,
         extensionMetrics: [ExtensionMetric]? = nil
     ) {
@@ -60,7 +57,6 @@ public struct UsageSnapshot: Sendable, Equatable {
         self.loginMethod = loginMethod
         self.accountTier = accountTier
         self.costUsage = costUsage
-        self.bedrockUsage = bedrockUsage
         self.dailyUsageReport = dailyUsageReport
         self.extensionMetrics = extensionMetrics
     }
@@ -150,7 +146,7 @@ public struct UsageSnapshot: Sendable, Equatable {
             providerId: providerId, quotas: watched, capturedAt: capturedAt,
             accountEmail: accountEmail, accountOrganization: accountOrganization,
             loginMethod: loginMethod, accountTier: accountTier, costUsage: costUsage,
-            bedrockUsage: bedrockUsage, dailyUsageReport: dailyUsageReport,
+            dailyUsageReport: dailyUsageReport,
             extensionMetrics: extensionMetrics
         )
     }

@@ -22,6 +22,7 @@ extension Fetch {
         case .command(let call): call
         case .file(let call): call
         case .localServer(let call): call
+        case .cloudWatch(let call): call
         }
     }
 
@@ -53,6 +54,12 @@ extension LocalServerCall: Connection {
     public var commands: [[String]] {
         [LocalServerFetcher.processQuery(process), ["/usr/sbin/lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", "{{pid}}"]]
     }
+}
+
+extension CloudWatchCall: Connection {
+    /// The cloud's own SDK, signed with the person's profile — no key of ours.
+    public var urls: [String] { [] }
+    public var commands: [[String]] { [] }
 }
 
 extension FileCall: Connection {

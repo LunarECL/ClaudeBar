@@ -58,8 +58,8 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 │                                                                      │
 │  Repository Protocols (ISP - Interface Segregation Principle)        │
 │  ├── ProviderSettingsRepository - base: isEnabled state             │
-│  ├── BedrockSettingsRepository: ProviderSettingsRepository          │
-│  │   └── Bedrock specific: awsProfileName, regions, dailyBudget     │
+│  ├── CodexSettingsRepository: ProviderSettingsRepository            │
+│  │   └── Codex specific: probe mode, verified-once flag             │
 │  └── ClaudeSettingsRepository: ProviderSettingsRepository           │
 │      └── Claude specific: probe mode, CLI fallback                  │
 │                                                                      │
@@ -78,7 +78,6 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 │  CLI Probes (Sources/Infrastructure/)                               │
 │  ├── ClaudeUsageProbe - probes `claude /usage` (CLI + API)          │
 │  ├── CodexUsageProbe - probes Codex via RPC/TTY (RPC + API)         │
-│  ├── BedrockUsageProbe - probes AWS Bedrock API                     │
 │  └── AmpCodeUsageProbe - probes Amp Code CLI                        │
 │                                                                      │
 │  Storage (Sources/Infrastructure/Storage/)                          │
@@ -162,12 +161,12 @@ public protocol ProviderSettingsRepository: Sendable {
     func setEnabled(_ enabled: Bool, forProvider id: String)
 }
 
-// Bedrock-specific protocol - extends base with AWS config
-public protocol BedrockSettingsRepository: ProviderSettingsRepository {
-    func awsProfileName() -> String
-    func setAWSProfileName(_ name: String)
-    func bedrockRegions() -> [String]
-    func setBedrockRegions(_ regions: [String])
+// Codex-specific protocol - extends base with Codex's own config
+public protocol CodexSettingsRepository: ProviderSettingsRepository {
+    func codexProbeMode() -> CodexProbeMode
+    func setCodexProbeMode(_ mode: CodexProbeMode)
+    func codexVerifiedAtLeastOnce() -> Bool
+    func setCodexVerifiedAtLeastOnce(_ verified: Bool)
 }
 
 // Claude-specific protocol - extends base with Claude's own config
@@ -181,7 +180,7 @@ public protocol ClaudeSettingsRepository: ProviderSettingsRepository {
 // Single infrastructure implementation for all protocols
 public final class JSONSettingsRepository:
     AppSettingsRepository,
-    BedrockSettingsRepository,
+    CodexSettingsRepository,
     ClaudeSettingsRepository,
     // ... all other sub-protocols
 {
@@ -193,7 +192,7 @@ public final class JSONSettingsRepository:
 **Why ISP?**
 - Each provider depends **only** on its specific interface
 - Simple providers (Claude, Codex, Gemini) use base `ProviderSettingsRepository`
-- Bedrock uses `BedrockSettingsRepository` (AWS profile + regions)
+- Codex uses `CodexSettingsRepository` (probe mode + verified flag)
 - Claude uses `ClaudeSettingsRepository` (probe mode + CLI fallback)
 - No provider sees methods it doesn't need
 
@@ -215,7 +214,7 @@ public init(probe: any UsageProbe, settingsRepository: any ProviderSettingsRepos
 }
 
 // Specialized providers receive their specific repository
-public init(probe: any UsageProbe, settingsRepository: any BedrockSettingsRepository) { ... }
+public init(probe: any UsageProbe, settingsRepository: any CodexSettingsRepository) { ... }
 public init(probe: any UsageProbe, settingsRepository: any ClaudeSettingsRepository) { ... }
 ```
 
@@ -316,7 +315,6 @@ Sources/
 │   │   ├── AIProvider.swift         # Protocol
 │   │   ├── AIProviders.swift        # Repository protocol
 │   │   ├── ClaudeProvider.swift     # Rich domain model
-│   │   ├── BedrockProvider.swift    # Uses BedrockSettingsRepository
 │   │   ├── ProviderSettingsRepository.swift  # ISP protocols hierarchy
 │   │   ├── UsageProbe.swift
 │   │   ├── UsageQuota.swift

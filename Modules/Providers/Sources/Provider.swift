@@ -676,7 +676,6 @@ public final class Provider {
             loginMethod: usage.loginMethod,
             accountTier: usage.accountTier,
             costUsage: usage.costUsage,
-            bedrockUsage: usage.bedrockUsage,
             dailyUsageReport: usage.dailyUsageReport,
             extensionMetrics: usage.extensionMetrics
         )

@@ -1,4 +1,5 @@
 import Foundation
+import Mockable
 
 /// HOW TO GET THE BYTES — *Data fetching method*. A closed sum, one case per
 /// JSON tag, because the decoder must know every tag and the picker is a fixed
@@ -19,6 +20,59 @@ public enum Fetch: Sendable, Equatable {
     case file(FileCall)
     /// An app's own server on this Mac, found through its running process.
     case localServer(LocalServerCall)
+    /// A cloud's metrics, summed per dimension value — through `CloudWatchClient`.
+    case cloudWatch(CloudWatchCall)
+}
+
+/// `"cloudWatch": {…}` — today's sums of `metrics` in `namespace`, one row per
+/// `dimension` value in each region, read with the person's own cloud
+/// profile. With `prices`, each row's unit prices come with it from the
+/// `PriceCatalog`, so a mapping can turn usage into money.
+public struct CloudWatchCall: Sendable, Equatable, Codable {
+    public let namespace: String
+    public let dimension: String
+    public let metrics: [String]
+    /// Comma-separated — `"{{setting.regions}}"`.
+    public let regions: String
+    /// A named profile, or blank for the default credentials.
+    public let profile: String?
+    /// The service whose price list prices each dimension value.
+    public let prices: String?
+
+    public init(namespace: String, dimension: String, metrics: [String], regions: String, profile: String? = nil, prices: String? = nil) {
+        self.namespace = namespace
+        self.dimension = dimension
+        self.metrics = metrics
+        self.regions = regions
+        self.profile = profile
+        self.prices = prices
+    }
+
+    /// The regions named, without blanks or a template left unfilled.
+    var regionList: [String] {
+        regions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && !$0.contains("{{") }
+    }
+
+    /// The profile, unless it was left blank.
+    var profileName: String? {
+        guard let profile = profile?.trimmingCharacters(in: .whitespaces), !profile.isEmpty, !profile.contains("{{") else { return nil }
+        return profile
+    }
+}
+
+/// A cloud's metrics service. Implemented where its SDK is linked.
+@Mockable
+public protocol CloudWatchClient: Sendable {
+    /// Each `dimension` value's sum of each metric between `from` and `to`.
+    func sums(namespace: String, dimension: String, metrics: [String], region: String, profile: String?,
+              from: Date, to: Date) async throws -> [String: [String: Double]]
+}
+
+/// A cloud's price list: what each thing costs, as exact decimal texts by
+/// field — `{"input": "3", "output": "15", "per": "1000000", "name": "…"}`.
+@Mockable
+public protocol PriceCatalog: Sendable {
+    func prices(service: String, ids: [String]) async -> [String: [String: String]]
 }
 
 /// `"localServer": {…}` — an app that serves its usage on 127.0.0.1: its
@@ -544,7 +598,7 @@ extension CLICall {
 // MARK: - JSON
 
 extension Fetch: Codable {
-    private static let tags = ["http", "jsonRpc", "cli", "command", "file", "localServer"]
+    private static let tags = ["http", "jsonRpc", "cli", "command", "file", "localServer", "cloudWatch"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
@@ -558,6 +612,7 @@ extension Fetch: Codable {
         case "file": self = .file(try container.decode(FileCall.self, forKey: TagKey("file")))
         case "command": self = .command(try container.decode(CommandCall.self, forKey: TagKey("command")))
         case "localServer": self = .localServer(try container.decode(LocalServerCall.self, forKey: TagKey("localServer")))
+        case "cloudWatch": self = .cloudWatch(try container.decode(CloudWatchCall.self, forKey: TagKey("cloudWatch")))
         default: self = .cli(try container.decode(CLICall.self, forKey: TagKey("cli")))
         }
     }
@@ -572,6 +627,7 @@ extension Fetch: Codable {
         case .command(let call): try container.encode(call, forKey: TagKey("command"))
         case .file(let call): try container.encode(call, forKey: TagKey("file"))
         case .localServer(let call): try container.encode(call, forKey: TagKey("localServer"))
+        case .cloudWatch(let call): try container.encode(call, forKey: TagKey("cloudWatch"))
         }
     }
 }

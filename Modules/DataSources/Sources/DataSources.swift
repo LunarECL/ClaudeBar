@@ -26,7 +26,9 @@ public enum DataSources {
         providerId: String,
         scripts: @escaping ScriptSource = { _ in nil },
         secrets: (any SecretStore)? = nil,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        cloudWatch: (any CloudWatchClient)? = nil,
+        priceCatalog: (any PriceCatalog)? = nil
     ) -> DataSource {
         make(
             definition,
@@ -34,6 +36,8 @@ public enum DataSources {
             makeCLIExecutor: CLIFetcher.system,
             makeCommandExecutor: CommandFetcher.system,
             network: URLSession.shared,
+            cloudWatch: cloudWatch,
+            priceCatalog: priceCatalog,
             makeTransport: { executable, arguments, environment, directory in
                 try ProcessRPCTransport(executable: executable, arguments: arguments, environment: environment, workingDirectory: directory)
             },
@@ -63,6 +67,8 @@ public enum DataSources {
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         processPaths: @escaping @Sendable () -> [String] = { [] },
+        cloudWatch: (any CloudWatchClient)? = nil,
+        priceCatalog: (any PriceCatalog)? = nil,
         now: @escaping @Sendable () -> Date
     ) -> DataSource {
         make(
@@ -73,6 +79,8 @@ public enum DataSources {
             network: network,
             localNetwork: network,
             processPaths: processPaths,
+            cloudWatch: cloudWatch,
+            priceCatalog: priceCatalog,
             makeTransport: makeTransport,
             security: security,
             scripts: scripts,
@@ -92,6 +100,8 @@ public enum DataSources {
         network: any NetworkClient,
         localNetwork: any NetworkClient = InsecureLocalhostNetworkClient(),
         processPaths: @escaping @Sendable () -> [String] = RunningProcesses.system,
+        cloudWatch: (any CloudWatchClient)? = nil,
+        priceCatalog: (any PriceCatalog)? = nil,
         makeTransport: @escaping TransportFactory,
         security: @escaping KeychainReader.Security,
         scripts: @escaping ScriptSource,
@@ -117,6 +127,8 @@ public enum DataSources {
         case .localServer(let call):
             LocalServerFetcher(call: call, commands: makeCommandExecutor(ProcessEnvironment()), network: localNetwork,
                                processPaths: processPaths)
+        case .cloudWatch(let call):
+            CloudWatchFetcher(call: call, client: cloudWatch, catalog: priceCatalog, now: now)
         }
 
         let mapper: any Reading = switch definition.mapping {

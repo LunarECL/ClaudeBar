@@ -99,6 +99,32 @@ let project = Project(
             )
         ),
 
+        // AWSClients — the only module that links the AWS SDK: CloudWatch
+        // sums and the Bedrock price list, behind DataSources' ports.
+        .target(
+            name: "AWSClients",
+            destinations: .macOS,
+            product: .staticFramework,
+            bundleId: "com.tddworks.claudebar.awsclients",
+            deploymentTargets: .macOS("15.0"),
+            sources: ["Modules/AWSClients/Sources/**"],
+            dependencies: [
+                .target(name: "DataSources"),
+                .target(name: "Diagnostics"),
+                .external(name: "AWSCloudWatch"),
+                .external(name: "AWSSTS"),
+                .external(name: "AWSPricing"),
+                .external(name: "AWSSDKIdentity"),
+                .external(name: "AWSSSO"),
+                .external(name: "AWSSSOOIDC"),
+            ],
+            settings: .settings(
+                base: [
+                    "SWIFT_STRICT_CONCURRENCY": "complete",
+                ]
+            )
+        ),
+
         // Providers — the one Provider lifecycle, ProviderDefinition and the
         // catalog; the built-in definitions ship in its Resources.
         .target(
@@ -118,6 +144,24 @@ let project = Project(
             settings: .settings(
                 base: [
                     "SWIFT_STRICT_CONCURRENCY": "complete",
+                ]
+            )
+        ),
+
+        .target(
+            name: "AWSClientsTests",
+            destinations: .macOS,
+            product: .unitTests,
+            bundleId: "com.tddworks.claudebar.awsclients-tests",
+            deploymentTargets: .macOS("15.0"),
+            sources: ["Modules/AWSClients/Tests/**"],
+            dependencies: [
+                .target(name: "AWSClients"),
+                .target(name: "DataSources"),
+            ],
+            settings: .settings(
+                base: [
+                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "MOCKING",
                 ]
             )
         ),
@@ -175,12 +219,6 @@ let project = Project(
                 .target(name: "DataSources"),
                 .external(name: "Mockable"),
                 .external(name: "SwiftTerm"),
-                .external(name: "AWSCloudWatch"),
-                .external(name: "AWSSTS"),
-                .external(name: "AWSPricing"),
-                .external(name: "AWSSDKIdentity"),
-                .external(name: "AWSSSO"),
-                .external(name: "AWSSSOOIDC"),
                 .external(name: "SweetCookieKit"),
                 .external(name: "Subprocess"),
             ],
@@ -209,6 +247,7 @@ let project = Project(
                 .target(name: "Diagnostics"),
                 .target(name: "DataSources"),
                 .target(name: "Providers"),
+                .target(name: "AWSClients"),
                 .target(name: "Infrastructure"),
                 .external(name: "Sparkle"),
                 .external(name: "MenuBarExtraAccess"),
@@ -340,6 +379,7 @@ let project = Project(
                     .testableTarget(target: .target("InfrastructureTests")),
                     .testableTarget(target: .target("AppTests")),
                     .testableTarget(target: .target("DataSourcesTests")),
+                    .testableTarget(target: .target("AWSClientsTests")),
                     .testableTarget(target: .target("ProvidersTests")),
                 ],
                 configuration: .debug

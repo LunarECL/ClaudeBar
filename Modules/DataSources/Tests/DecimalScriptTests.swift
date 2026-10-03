@@ -33,4 +33,24 @@ struct DecimalScriptTests {
         """)
         #expect(usage.quotas.first?.left == .money(Money(Decimal(string: cents)!, currency: "USD"), of: nil))
     }
+
+    @Test(arguments: [("1234567", "0.000003", "3.703701"), ("0.1", "0.2", "0.02"), ("-2.5", "4", "-10"), ("1e6", "1.5", "1500000")])
+    func `decimalMultiply multiplies exactly`(_ a: String, _ b: String, _ product: String) throws {
+        let usage = try read("{}", script: """
+        function read() {
+          return { quotas: [{ type: 'model', name: 'Cost', left: { money: decimalMultiply('\(a)', '\(b)'), currency: 'USD' } }] };
+        }
+        """)
+        #expect(usage.quotas.first?.left == .money(Money(Decimal(string: product)!, currency: "USD"), of: nil))
+    }
+
+    @Test(arguments: [("0.1", "0.2", "0.3"), ("1.005", "-0.005", "1"), ("12", "0.000001", "12.000001")])
+    func `decimalAdd adds exactly`(_ a: String, _ b: String, _ sum: String) throws {
+        let usage = try read("{}", script: """
+        function read() {
+          return { quotas: [{ type: 'model', name: 'Cost', left: { money: decimalAdd('\(a)', '\(b)'), currency: 'USD' } }] };
+        }
+        """)
+        #expect(usage.quotas.first?.left == .money(Money(Decimal(string: sum)!, currency: "USD"), of: nil))
+    }
 }

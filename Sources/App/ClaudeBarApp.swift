@@ -2,6 +2,7 @@ import SwiftUI
 import Domain
 import Infrastructure
 import Providers
+import AWSClients
 import MenuBarExtraAccess
 #if ENABLE_SPARKLE
 import Sparkle
@@ -148,6 +149,15 @@ struct ClaudeBarApp: App {
         let gemini = Self.builtIn("gemini", settings: settingsRepository,
                                   accounts: settingsRepository.accounts(forProvider: "gemini"))
         let antigravity = Self.builtIn("antigravity", settings: settingsRepository)
+        // Bedrock's metrics and prices come from the AWS SDK, linked by AWSClients alone.
+        let bedrock: Provider = {
+            do {
+                return try Providers.make("bedrock", settings: settingsRepository,
+                                          cloudWatch: AWSClients.makeCloudWatch(), priceCatalog: AWSClients.makePriceCatalog())
+            } catch {
+                preconditionFailure("Built-in provider 'bedrock' failed to load: \(error.localizedDescription)")
+            }
+        }()
         let kimi = Self.builtIn("kimi", settings: settingsRepository,
                                 accounts: settingsRepository.accounts(forProvider: "kimi"), secrets: vault)
         let openCodeGo = Self.builtIn("opencode-go", settings: settingsRepository,
@@ -184,10 +194,7 @@ struct ClaudeBarApp: App {
             antigravity.defaultAccount,
             zai.defaultAccount,
             copilot.defaultAccount,
-            BedrockProvider(
-                probe: BedrockUsageProbe(settingsRepository: settingsRepository),
-                settingsRepository: settingsRepository
-            ),
+            bedrock.defaultAccount,
             amp.defaultAccount,
             kimi.defaultAccount,
             kiro.defaultAccount,

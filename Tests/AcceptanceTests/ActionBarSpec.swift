@@ -67,11 +67,11 @@ struct ActionBarSpec {
         }
 
         @Test
-        func `Bedrock dashboard URL is AWS console`() {
+        func `Bedrock dashboard URL is AWS console`() throws {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let bedrock = BedrockProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let bedrock = try Providers.make("bedrock", settings: settings).defaultAccount
             #expect(bedrock.dashboardURL?.absoluteString == "https://console.aws.amazon.com/bedrock/home")
         }
 
