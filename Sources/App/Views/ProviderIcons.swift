@@ -89,7 +89,6 @@ struct ProviderIconView: View {
 
     private func providerSymbol(for providerId: String) -> String {
         switch providerId {
-        case "omp": return "terminal.fill"
         default: return ProviderVisualIdentityLookup.symbolIcon(for: providerId)
         }
     }

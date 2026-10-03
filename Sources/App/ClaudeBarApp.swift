@@ -158,6 +158,7 @@ struct ClaudeBarApp: App {
                 preconditionFailure("Built-in provider 'bedrock' failed to load: \(error.localizedDescription)")
             }
         }()
+        let omp = Self.builtIn("omp", settings: settingsRepository)
         let kimi = Self.builtIn("kimi", settings: settingsRepository,
                                 accounts: settingsRepository.accounts(forProvider: "kimi"), secrets: vault)
         let openCodeGo = Self.builtIn("opencode-go", settings: settingsRepository,
@@ -208,10 +209,7 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
             openCodeGo.defaultAccount,
-            OmpProvider(
-                probe: OmpUsageProbe(),
-                settingsRepository: settingsRepository
-            ),
+            omp.defaultAccount,
             grok.defaultAccount,
             commandCode.defaultAccount,
         ])

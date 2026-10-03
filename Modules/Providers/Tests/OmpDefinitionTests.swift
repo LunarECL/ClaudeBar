@@ -1,10 +1,30 @@
-import Testing
+import DataSources
 import Foundation
-@testable import Infrastructure
-@testable import Domain
+import Providers
+import Quotas
+import Testing
 
-@Suite
-struct OmpUsageProbeParsingTests {
+/// `omp usage --json` read by `omp-usage.js`, through Oh My Pi's definition.
+enum OmpFixtures {
+    static func parse(_ text: String) throws -> UsageSnapshot {
+        let definition = try Providers.builtIn("omp")
+        let source = DataSources.make(definition.dataSources[0], providerId: "omp", scripts: Providers.builtInScripts,
+                                      environment: { _ in nil })
+        do { return try source.read(Response(text: text)) }
+        catch let error as DataSourceError { throw error.reason }
+    }
+
+    /// The name a provider id is shown with, read through a one-limit report.
+    static func displayName(_ id: String) throws -> String? {
+        let snapshot = try parse(#"{"reports":[{"provider":"\#(id)","limits":[{"scope":{"windowId":"5h"},"amount":{"remainingFraction":0.5}}]}]}"#)
+        return snapshot.quotas.first?.group
+    }
+}
+
+/// The old probe's fixtures, quota for quota. Card and menu-bar titles are the
+/// page's, not the usage's, so they are no longer checked here.
+@Suite("Oh My Pi usage")
+struct OmpDefinitionTests {
 
     /// Representative fixture modeled on real `omp usage --json` output
     /// (omp v16.4.6): three upstream providers, tiered sub-limits, and a
@@ -99,7 +119,7 @@ struct OmpUsageProbeParsingTests {
 
     @Test
     func `parses every limit into a quota`() throws {
-        let snapshot = try OmpUsageProbe.parse(Self.sampleResponse)
+        let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
         #expect(snapshot.providerId == "omp")
         #expect(snapshot.quotas.count == 7)
@@ -108,7 +128,7 @@ struct OmpUsageProbeParsingTests {
 
     @Test
     func `maps remaining fraction to percent remaining`() throws {
-        let snapshot = try OmpUsageProbe.parse(Self.sampleResponse)
+        let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
         #expect(snapshot.quota(for: .timeLimit("Claude 5h"))?.percentRemaining == 92.0)
         #expect(snapshot.quota(for: .timeLimit("Codex 7d"))?.percentRemaining == 42.0)
@@ -118,7 +138,7 @@ struct OmpUsageProbeParsingTests {
 
     @Test
     func `labels quotas with provider tier and window`() throws {
-        let snapshot = try OmpUsageProbe.parse(Self.sampleResponse)
+        let snapshot = try OmpFixtures.parse(Self.sampleResponse)
         let labels = snapshot.quotas.map(\.quotaType.displayName)
 
         #expect(labels.contains("Claude 5h"))
@@ -129,7 +149,7 @@ struct OmpUsageProbeParsingTests {
 
     @Test
     func `parses reset time from epoch milliseconds`() throws {
-        let snapshot = try OmpUsageProbe.parse(Self.sampleResponse)
+        let snapshot = try OmpFixtures.parse(Self.sampleResponse)
         let claude = try #require(snapshot.quota(for: .timeLimit("Claude 5h")))
 
         #expect(claude.resetsAt == Date(timeIntervalSince1970: 1_783_885_200))
@@ -137,7 +157,7 @@ struct OmpUsageProbeParsingTests {
 
     @Test
     func `passes window duration through for pace math`() throws {
-        let snapshot = try OmpUsageProbe.parse(Self.sampleResponse)
+        let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
         #expect(snapshot.quota(for: .timeLimit("Claude 5h"))?.windowDuration == 18_000)
         #expect(snapshot.quota(for: .timeLimit("Codex 7d"))?.windowDuration == 604_800)
@@ -145,7 +165,7 @@ struct OmpUsageProbeParsingTests {
 
     @Test
     func `limit without reset timestamp keeps nil resetsAt`() throws {
-        let snapshot = try OmpUsageProbe.parse(Self.sampleResponse)
+        let snapshot = try OmpFixtures.parse(Self.sampleResponse)
         let zai = try #require(snapshot.quota(for: .timeLimit("Z.ai 5h")))
 
         #expect(zai.resetsAt == nil)
@@ -174,18 +194,17 @@ struct OmpUsageProbeParsingTests {
         } ] }
         """
 
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let quota = try #require(snapshot.quota(for: .timeLimit("Claude Extra")))
 
         #expect(quota.percentRemaining == 100)
         #expect(quota.dollarUsed == 0)
         #expect(quota.dollarCap == 500)
-        #expect(quota.compactTitle == "Extra")
         #expect(quota.group == "Claude")
     }
 
     @Test
-    func `capped spend honors fractions and preserves rounded dollars`() throws {
+    func `capped spend is money left of its cap, in rounded dollars`() throws {
         let json = """
         { "reports": [ {
             "provider": "anthropic",
@@ -202,10 +221,12 @@ struct OmpUsageProbeParsingTests {
         } ] }
         """
 
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let quota = try #require(snapshot.quota(for: .timeLimit("Claude Extra")))
 
-        #expect(quota.percentRemaining == 80)
+        // Money left of its cap is the measure (the Left law): $376.55 of $500,
+        // whatever fraction omp reports beside it.
+        #expect(quota.left == .money(Money(Decimal(string: "376.55")!, currency: "USD"), of: Money(500, currency: "USD")))
         #expect(quota.dollarUsed == Decimal(string: "123.45"))
         #expect(quota.dollarCap == 500)
     }
@@ -224,14 +245,14 @@ struct OmpUsageProbeParsingTests {
         } ] }
         """
 
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let quota = try #require(snapshot.quota(for: .timeLimit("Claude Extra")))
 
         #expect(quota.dollarUsed == Decimal(string: "1.01"))
         #expect(quota.dollarCap == Decimal(string: "12.5"))
-        // Derived percent math (no explicit fractions): (12.5-1.005)/12.5.
+        // The share follows the cents shown: (12.50 - 1.01) / 12.50.
         let percent = try #require(quota.percentRemaining)
-        #expect(abs(percent - 91.96) < 0.0001)
+        #expect(abs(percent - 91.92) < 0.0001)
     }
 
     @Test
@@ -246,10 +267,9 @@ struct OmpUsageProbeParsingTests {
         } ] }
         """
 
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let quota = try #require(snapshot.quota(for: .timeLimit("OpenCode Go Monthly")))
 
-        #expect(quota.compactTitle == "Monthly")
     }
 
     @Test
@@ -267,14 +287,13 @@ struct OmpUsageProbeParsingTests {
         } ] }
         """
 
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.isEmpty)
         let metrics = try #require(snapshot.extensionMetrics)
         #expect(metrics.count == 1)
         #expect(metrics[0].label == "Claude Extra Usage")
         #expect(metrics[0].value == "Extra usage $1,234.56 spent · no cap")
-        #expect(metrics[0].icon == "dollarsign.circle")
         #expect(metrics[0].group == "Claude")
         #expect(snapshot.quotaGroups.first?.note == "Extra usage $1,234.56 spent · no cap")
     }
@@ -299,12 +318,11 @@ struct OmpUsageProbeParsingTests {
         } ] }
         """
 
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let labels = snapshot.quotas.map(\.quotaType.displayName)
 
         #expect(labels == ["Cursor Spend", "Cursor Spend (2)"])
         #expect(labels.allSatisfy { !$0.localizedCaseInsensitiveContains("usd") })
-        #expect(snapshot.quotas.first?.compactTitle == "Spend")
         #expect(snapshot.quotas.first?.dollarUsed == Decimal(string: "1234.56"))
         #expect(snapshot.quotas.first?.dollarCap == 5000)
     }
@@ -328,7 +346,7 @@ struct OmpUsageProbeParsingTests {
         } ] }
         """
 
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.map(\.quotaType.displayName) == ["Claude 5h", "Claude Extra"])
         #expect(snapshot.quotas.allSatisfy { $0.group == "Claude" })
@@ -359,7 +377,7 @@ struct OmpUsageProbeParsingTests {
         ] }
         """
 
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let metrics = try #require(snapshot.extensionMetrics)
 
         #expect(snapshot.quotas.isEmpty)
@@ -375,7 +393,7 @@ struct OmpUsageProbeParsingTests {
 
     @Test
     func `email is nil when accounts span multiple emails`() throws {
-        let snapshot = try OmpUsageProbe.parse(Self.sampleResponse)
+        let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
         #expect(snapshot.accountEmail == nil)
     }
@@ -393,7 +411,7 @@ struct OmpUsageProbeParsingTests {
             "metadata": { "email": "solo@example.com" }
         } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.accountEmail == "solo@example.com")
     }
@@ -424,7 +442,7 @@ struct OmpUsageProbeParsingTests {
           }
         ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let labels = snapshot.quotas.map(\.quotaType.displayName)
 
         #expect(labels.contains("Claude 5h · work"))
@@ -433,111 +451,6 @@ struct OmpUsageProbeParsingTests {
         // they must never collide across accounts.
         let keys = Set(snapshot.quotas.map(\.quotaType.quotaKey))
         #expect(keys.count == snapshot.quotas.count)
-    }
-
-    @Test
-    func `condenses long discriminators into the menu bar title`() throws {
-        // A 16-character email local part is a legitimate quota-key
-        // discriminator but wastes most of the menu bar's width — the quota
-        // carries a truncated variant for display while the persisted key
-        // keeps the full token.
-        let json = """
-        { "reports": [
-          {
-            "provider": "anthropic",
-            "limits": [ {
-              "scope": { "windowId": "7d" },
-              "window": { "id": "7d", "durationMs": 604800000 },
-              "amount": { "remainingFraction": 0.69 }
-            } ],
-            "metadata": { "email": "jkjk987654321012@example.com" }
-          },
-          {
-            "provider": "anthropic",
-            "limits": [ {
-              "scope": { "windowId": "7d" },
-              "window": { "id": "7d", "durationMs": 604800000 },
-              "amount": { "remainingFraction": 0.4 }
-            } ],
-            "metadata": { "email": "work@example.com" }
-          }
-        ] }
-        """
-        let snapshot = try OmpUsageProbe.parse(json)
-
-        let long = try #require(snapshot.quotas.first {
-            $0.quotaType.displayName == "Claude 7d · jkjk987654321012"
-        })
-        #expect(long.menuBarTitle == "Claude 7d · jkjk987…")
-
-        // Short discriminators need no condensing — nil falls back to the
-        // full label in the menu bar.
-        let short = try #require(snapshot.quotas.first {
-            $0.quotaType.displayName == "Claude 7d · work"
-        })
-        #expect(short.menuBarTitle == nil)
-    }
-
-    @Test
-    func `suffixes menu bar titles when condensed discriminators collide`() throws {
-        // Two distinct discriminators can share the 7-character condensed
-        // prefix; the full labels differ, so the label-level "(2)" guard
-        // never fires. The condensed titles must still stay unique, or the
-        // menu bar and the Settings quota picker chips become
-        // indistinguishable.
-        let json = """
-        { "reports": [
-          {
-            "provider": "anthropic",
-            "limits": [ {
-              "scope": { "windowId": "7d" },
-              "window": { "id": "7d", "durationMs": 604800000 },
-              "amount": { "remainingFraction": 0.69 }
-            } ],
-            "metadata": { "email": "jkjk987654321012@example.com" }
-          },
-          {
-            "provider": "anthropic",
-            "limits": [ {
-              "scope": { "windowId": "7d" },
-              "window": { "id": "7d", "durationMs": 604800000 },
-              "amount": { "remainingFraction": 0.4 }
-            } ],
-            "metadata": { "email": "jkjk987999999999@example.com" }
-          }
-        ] }
-        """
-        let snapshot = try OmpUsageProbe.parse(json)
-
-        let titles = snapshot.quotas.compactMap(\.menuBarTitle)
-        #expect(titles == [
-            "Claude 7d · jkjk987…",
-            "Claude 7d · jkjk987… (2)",
-        ])
-        // Full labels — and therefore persisted quota keys — keep the
-        // untruncated discriminators and never collided in the first place.
-        #expect(Set(snapshot.quotas.map(\.quotaType.quotaKey)).count == 2)
-    }
-
-    @Test
-    func `keeps single-account quotas free of menu bar title overrides`() throws {
-        // One account per provider gets no discriminator, so there is
-        // nothing to condense.
-        let json = """
-        { "reports": [ {
-            "provider": "anthropic",
-            "limits": [ {
-              "scope": { "windowId": "5h" },
-              "window": { "id": "5h", "durationMs": 18000000 },
-              "amount": { "remainingFraction": 0.5 }
-            } ],
-            "metadata": { "email": "jkjk987654321012@example.com" }
-        } ] }
-        """
-        let snapshot = try OmpUsageProbe.parse(json)
-
-        #expect(snapshot.quotas.count == 1)
-        #expect(snapshot.quotas[0].menuBarTitle == nil)
     }
 
     @Test
@@ -563,7 +476,7 @@ struct OmpUsageProbeParsingTests {
             ]
         } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let labels = snapshot.quotas.map(\.quotaType.displayName)
 
         #expect(labels.contains("Z.ai Tokens 5h"))
@@ -599,139 +512,11 @@ struct OmpUsageProbeParsingTests {
     } ] }
     """
 
-    @Test
-    func `derives a compact card title from the window duration for machine ids`() throws {
-        // "300time_unit_minute" is omp's machine id for Kimi's 5-hour rate
-        // limit; the card must read "5h", not the raw id. The quota label —
-        // and therefore the persisted quota key — keeps the raw token.
-        let snapshot = try OmpUsageProbe.parse(Self.kimiResponse)
-        let rate = try #require(snapshot.quota(for: .timeLimit("Kimi 300time_unit_minute")))
-
-        #expect(rate.compactTitle == "5h")
-        #expect(rate.percentRemaining == 19.0)
-        #expect(rate.windowDuration == 18_000)
-    }
-
-    @Test
-    func `falls back to the limit label for card titles when a window has no duration`() throws {
-        // Kimi's summary row has windowId "default" and no duration; the
-        // card shows Kimi's own "Total quota" label while the quota key
-        // stays on the raw token.
-        let snapshot = try OmpUsageProbe.parse(Self.kimiResponse)
-        let total = try #require(snapshot.quota(for: .timeLimit("Kimi default")))
-
-        #expect(total.compactTitle == "Total quota")
-        #expect(total.resetsAt == Date(timeIntervalSince1970: 1_784_828_755))
-        #expect(snapshot.quotas.allSatisfy { $0.group == "Kimi" })
-    }
-
-    @Test
-    func `strips the provider prefix from label-derived card titles`() throws {
-        // Gemini limit labels embed the provider name ("Gemini <model>")
-        // and its window ids ("reset-<epoch>") carry no duration; the card
-        // sits inside the "Gemini" section already, so the prefix goes.
-        let json = """
-        { "reports": [ {
-            "provider": "google-gemini-cli",
-            "limits": [ {
-              "label": "Gemini gemini-2.5-pro",
-              "scope": { "provider": "google-gemini-cli", "windowId": "reset-1784310000000" },
-              "window": { "id": "reset-1784310000000", "label": "Quota window", "resetsAt": 1784310000000 },
-              "amount": { "usedFraction": 0.3, "remainingFraction": 0.7 }
-            } ]
-        } ] }
-        """
-        let snapshot = try OmpUsageProbe.parse(json)
-        let quota = try #require(snapshot.quota(for: .timeLimit("Gemini reset-1784310000000")))
-
-        #expect(quota.compactTitle == "gemini-2.5-pro")
-    }
-
-    @Test
-    func `keeps meter words off self-describing card titles`() throws {
-        // Copilot meters three request pools over one "monthly" window;
-        // each label already names its resource, so the shared-window meter
-        // prefix must not double it ("Requests Premium Requests").
-        let json = """
-        { "reports": [ {
-            "provider": "github-copilot",
-            "limits": [
-              {
-                "label": "Premium Requests",
-                "scope": { "windowId": "monthly" },
-                "window": { "id": "monthly", "label": "Monthly" },
-                "amount": { "usedFraction": 0.1, "remainingFraction": 0.9, "unit": "requests" }
-              },
-              {
-                "label": "Chat Requests",
-                "scope": { "windowId": "monthly" },
-                "window": { "id": "monthly", "label": "Monthly" },
-                "amount": { "usedFraction": 0.2, "remainingFraction": 0.8, "unit": "requests" }
-              }
-            ]
-        } ] }
-        """
-        let snapshot = try OmpUsageProbe.parse(json)
-        let titles = snapshot.quotas.compactMap(\.compactTitle)
-
-        #expect(titles == ["Premium Requests", "Chat Requests"])
-    }
-
-    @Test
-    func `keeps the meter prefix for window-label card titles`() throws {
-        // A window label ("Monthly") names timing, not the metered
-        // resource: two meters falling back to the same window label must
-        // stay distinguishable on their cards.
-        let json = """
-        { "reports": [ {
-            "provider": "zai",
-            "limits": [
-              {
-                "scope": { "windowId": "billing-cycle" },
-                "window": { "id": "billing-cycle", "label": "Monthly" },
-                "amount": { "usedFraction": 0.1, "remainingFraction": 0.9, "unit": "tokens" }
-              },
-              {
-                "scope": { "windowId": "billing-cycle" },
-                "window": { "id": "billing-cycle", "label": "Monthly" },
-                "amount": { "usedFraction": 0.2, "remainingFraction": 0.8, "unit": "requests" }
-              }
-            ]
-        } ] }
-        """
-        let snapshot = try OmpUsageProbe.parse(json)
-        let titles = snapshot.quotas.compactMap(\.compactTitle)
-
-        #expect(titles == ["Tokens Monthly", "Requests Monthly"])
-    }
-
-    @Test
-    func `degrades oversized window durations to the label instead of trapping`() throws {
-        // durationMs is attacker-adjacent external JSON; a finite value past
-        // Int.max must fall through to the label fallback, not crash the
-        // Int conversion.
-        let json = """
-        { "reports": [ {
-            "provider": "kimi-code",
-            "limits": [ {
-              "label": "Broken window",
-              "scope": { "windowId": "broken_machine_id" },
-              "window": { "id": "broken_machine_id", "durationMs": 1.0e308 },
-              "amount": { "usedFraction": 0.5, "remainingFraction": 0.5 }
-            } ]
-        } ] }
-        """
-        let snapshot = try OmpUsageProbe.parse(json)
-        let quota = try #require(snapshot.quota(for: .timeLimit("Kimi broken_machine_id")))
-
-        #expect(quota.compactTitle == "Broken window")
-    }
-
     // MARK: - Accounts Without Usage
 
     @Test
     func `empty accountsWithoutUsage adds no metric rows`() throws {
-        let snapshot = try OmpUsageProbe.parse(Self.sampleResponse)
+        let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
         #expect(snapshot.extensionMetrics == nil)
     }
@@ -751,7 +536,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "github-copilot", "type": "oauth", "email": "work@example.com" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.count == 1)
         let metrics = try #require(snapshot.extensionMetrics)
@@ -769,7 +554,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "openai-codex", "type": "api_key" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.isEmpty)
         let metrics = try #require(snapshot.extensionMetrics)
@@ -788,7 +573,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "openai-codex", "type": "api_key" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let labels = try #require(snapshot.extensionMetrics).map(\.label)
 
         #expect(labels == ["Codex · API key", "Codex · API key (2)"])
@@ -803,7 +588,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "anthropic", "type": "oauth", "email": "solo@example.com" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.accountEmail == "solo@example.com")
     }
@@ -824,7 +609,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "anthropic", "type": "oauth", "accountId": "account-123" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.count == 1)
         #expect(snapshot.extensionMetrics == nil)
@@ -852,7 +637,7 @@ struct OmpUsageProbeParsingTests {
             }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.count == 1)
         #expect(snapshot.extensionMetrics == nil)
@@ -878,7 +663,7 @@ struct OmpUsageProbeParsingTests {
             }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Copilot · shared-account-id"])
     }
@@ -899,7 +684,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "anthropic", "type": "oauth", "email": "alice@example.com" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics == nil)
     }
@@ -926,7 +711,7 @@ struct OmpUsageProbeParsingTests {
             "accountId": "stale-credential-id"
           } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics == nil)
     }
@@ -953,7 +738,7 @@ struct OmpUsageProbeParsingTests {
             "orgId": "unreported-org"
           } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · alice@example.com"])
     }
@@ -983,7 +768,7 @@ struct OmpUsageProbeParsingTests {
             "orgId": "same-org"
           } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · alice@example.com"])
     }
@@ -1007,7 +792,7 @@ struct OmpUsageProbeParsingTests {
             "orgId": "unreported-org"
           } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · shared-account-id"])
     }
@@ -1028,7 +813,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "github-copilot", "type": "oauth", "email": "shared@example.com" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Copilot · shared@example.com"])
     }
@@ -1055,7 +840,7 @@ struct OmpUsageProbeParsingTests {
             "accountId": "bob-credential"
           } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.count == 1)
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · bob@example.com"])
@@ -1084,7 +869,7 @@ struct OmpUsageProbeParsingTests {
             "accountId": "shared-credential-id"
           } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · bob@example.com"])
     }
@@ -1107,7 +892,7 @@ struct OmpUsageProbeParsingTests {
             "projectId": "shared-project"
           } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Gemini · shared-project"])
     }
@@ -1131,7 +916,7 @@ struct OmpUsageProbeParsingTests {
             }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.count == 2)
     }
@@ -1155,7 +940,7 @@ struct OmpUsageProbeParsingTests {
             }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.count == 1)
     }
@@ -1179,7 +964,7 @@ struct OmpUsageProbeParsingTests {
             }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let metrics = try #require(snapshot.extensionMetrics)
 
         #expect(metrics.count == 1)
@@ -1207,7 +992,7 @@ struct OmpUsageProbeParsingTests {
             }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.count == 2)
     }
@@ -1251,8 +1036,8 @@ struct OmpUsageProbeParsingTests {
           ] }
         """
 
-        let organizationFirstSnapshot = try OmpUsageProbe.parse(organizationFirst)
-        let legacyFirstSnapshot = try OmpUsageProbe.parse(legacyFirst)
+        let organizationFirstSnapshot = try OmpFixtures.parse(organizationFirst)
+        let legacyFirstSnapshot = try OmpFixtures.parse(legacyFirst)
 
         #expect(organizationFirstSnapshot.extensionMetrics?.count == 2)
         #expect(legacyFirstSnapshot.extensionMetrics?.count == 2)
@@ -1270,7 +1055,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "ollama", "type": "oauth", "email": "LOCAL@OLLAMA.DEV" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Ollama · local@ollama.dev"])
         #expect(snapshot.quotaGroups.map(\.title) == ["Ollama · local"])
@@ -1287,7 +1072,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "ollama", "type": "oauth" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == [
             "Ollama · account 1",
@@ -1339,7 +1124,7 @@ struct OmpUsageProbeParsingTests {
             }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.count == 2)
         #expect(snapshot.quotaGroups.map(\.title) == ["Claude · alice", "Claude · bob"])
@@ -1371,7 +1156,7 @@ struct OmpUsageProbeParsingTests {
           }
         ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.count == 1)
         let metrics = try #require(snapshot.extensionMetrics)
@@ -1384,7 +1169,7 @@ struct OmpUsageProbeParsingTests {
         let json = """
         { "reports": [ { "provider": "ollama", "limits": [] } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.isEmpty)
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Ollama · account 1"])
@@ -1404,7 +1189,7 @@ struct OmpUsageProbeParsingTests {
             } ]
         } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Gemini · my-gcp-project"])
     }
@@ -1417,14 +1202,14 @@ struct OmpUsageProbeParsingTests {
             { "provider": "ollama", "limits": [] }
         ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let labels = try #require(snapshot.extensionMetrics).map(\.label)
 
         #expect(labels == ["Ollama · #1", "Ollama · #2"])
         #expect(Set(labels).count == labels.count)
         // Section titles stay clean per account — no bogus "(2)" suffixes
         // from quota-group reservations that never emitted quotas.
-        let snapshot2 = try OmpUsageProbe.parse(json)
+        let snapshot2 = try OmpFixtures.parse(json)
         #expect(snapshot2.extensionMetrics?.map(\.group) == ["Ollama · #1", "Ollama · #2"])
         #expect(snapshot2.hasQuotaGroups == true)
         #expect(snapshot2.quotaGroups.map(\.title) == ["Ollama · #1", "Ollama · #2"])
@@ -1434,18 +1219,15 @@ struct OmpUsageProbeParsingTests {
 
     @Test
     func `quotas carry group and compact title for sectioned rendering`() throws {
-        let snapshot = try OmpUsageProbe.parse(Self.sampleResponse)
+        let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
         let claude5h = try #require(snapshot.quota(for: .timeLimit("Claude 5h")))
         #expect(claude5h.group == "Claude")
-        #expect(claude5h.compactTitle == "5h")
 
         let spark = try #require(snapshot.quota(for: .timeLimit("Codex Spark 5h")))
         #expect(spark.group == "Codex")
-        #expect(spark.compactTitle == "Spark 5h")
 
         let fable = try #require(snapshot.quota(for: .timeLimit("Claude Fable 7d")))
-        #expect(fable.compactTitle == "Fable 7d")
 
         // Three upstream providers → three sections, in payload order.
         #expect(snapshot.quotaGroups.map(\.title) == ["Codex", "Claude", "Z.ai"])
@@ -1475,11 +1257,10 @@ struct OmpUsageProbeParsingTests {
           }
         ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotaGroups.map(\.title) == ["Claude · work", "Claude · home"])
         // Card titles inside a section drop the account context entirely.
-        #expect(snapshot.quotas.allSatisfy { $0.compactTitle == "5h" })
     }
 
     @Test
@@ -1494,7 +1275,7 @@ struct OmpUsageProbeParsingTests {
             { "provider": "github-copilot", "type": "oauth", "email": "work@example.com" }
           ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
         let metrics = try #require(snapshot.extensionMetrics)
 
         #expect(metrics.map(\.group) == ["Ollama · local", "Copilot · work"])
@@ -1521,8 +1302,8 @@ struct OmpUsageProbeParsingTests {
         ("ollama", "Ollama"),
         ("ollama-cloud", "Ollama Cloud"),
     ])
-    func `maps emitted provider ids to display names`(id: String, expected: String) {
-        #expect(OmpUsageProbe.upstreamDisplayName(id) == expected)
+    func `maps emitted provider ids to display names`(id: String, expected: String) throws {
+        #expect(try OmpFixtures.displayName(id) == expected)
     }
 
     // MARK: - Robustness
@@ -1530,7 +1311,7 @@ struct OmpUsageProbeParsingTests {
     @Test
     func `tolerates noise around the JSON object`() throws {
         let noisy = "Synced 3 accounts\n\(Self.sampleResponse)\nDone."
-        let snapshot = try OmpUsageProbe.parse(noisy)
+        let snapshot = try OmpFixtures.parse(noisy)
 
         #expect(snapshot.quotas.count == 7)
     }
@@ -1553,7 +1334,7 @@ struct OmpUsageProbeParsingTests {
             ]
         } ] }
         """
-        let snapshot = try OmpUsageProbe.parse(json)
+        let snapshot = try OmpFixtures.parse(json)
 
         #expect(snapshot.quotas.count == 1)
     }
@@ -1563,13 +1344,13 @@ struct OmpUsageProbeParsingTests {
         // Pin the exact error so a regression to `noData` (or any other
         // case) fails instead of passing as "some UsageError".
         #expect(throws: UsageError.parseFailed("No JSON object in omp usage output")) {
-            try OmpUsageProbe.parse("not json at all")
+            try OmpFixtures.parse("not json at all")
         }
 
         // A JSON object whose reports can't decode (missing `provider`)
         // is a decode failure - parseFailed, never an empty-pool noData.
         do {
-            _ = try OmpUsageProbe.parse("{ \"reports\": [ { } ] }")
+            _ = try OmpFixtures.parse("{ \"reports\": [ { } ] }")
             Issue.record("Expected parse to throw on an undecodable report")
         } catch let error as UsageError {
             guard case .parseFailed(let message) = error else {
@@ -1583,7 +1364,7 @@ struct OmpUsageProbeParsingTests {
     @Test
     func `throws noData when no accounts are authenticated`() {
         #expect(throws: UsageError.noData) {
-            try OmpUsageProbe.parse("{ \"reports\": [] }")
+            try OmpFixtures.parse("{ \"reports\": [] }")
         }
     }
 }
