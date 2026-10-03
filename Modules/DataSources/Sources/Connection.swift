@@ -21,6 +21,7 @@ extension Fetch {
         case .cli(let call): call
         case .command(let call): call
         case .file(let call): call
+        case .localServer(let call): call
         }
     }
 
@@ -44,6 +45,14 @@ extension HTTPRequest: Connection {
 extension HTTPSteps: Connection {
     public var urls: [String] { steps.map(\.request.url) }
     public var commands: [[String]] { [] }
+}
+
+extension LocalServerCall: Connection {
+    /// Only this Mac's loopback address, on whatever port the app listens.
+    public var urls: [String] { paths.map { "https://127.0.0.1:{{port}}\($0)" } }
+    public var commands: [[String]] {
+        [LocalServerFetcher.processQuery(process), ["/usr/sbin/lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", "{{pid}}"]]
+    }
 }
 
 extension FileCall: Connection {

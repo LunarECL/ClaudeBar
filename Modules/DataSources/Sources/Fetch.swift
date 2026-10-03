@@ -17,6 +17,79 @@ public enum Fetch: Sendable, Equatable {
     case command(CommandCall)
     /// A file on this Mac that some tool keeps up to date — the *File* choice.
     case file(FileCall)
+    /// An app's own server on this Mac, found through its running process.
+    case localServer(LocalServerCall)
+}
+
+/// `"localServer": {…}` — an app that serves its usage on 127.0.0.1: its
+/// process is found by name (`pgrep`), the values it was started with read
+/// from its command line, its listening ports looked up (`lsof`), and the
+/// declared paths asked on each port in turn. Self-signed TLS is accepted on
+/// the loopback address only.
+public struct LocalServerCall: Sendable, Equatable, Codable {
+    /// Which process: its name contains one of `names`, and its command line
+    /// matches one of `match` (any, when empty).
+    public struct Process: Sendable, Equatable, Codable {
+        public let names: [String]
+        public let match: [String]
+
+        public init(names: [String], match: [String] = []) {
+            self.names = names
+            self.match = match
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            names = try container.decode([String].self, forKey: .names)
+            match = try container.decodeIfPresent([String].self, forKey: .match) ?? []
+        }
+    }
+
+    /// What `cli.missing` names when no such process runs — "Antigravity".
+    public let app: String
+    public let process: Process
+    /// Name → a pattern over the command line; its first group is the value,
+    /// filled as `{{name}}`.
+    public let values: [String: String]
+    /// Values the server can't be asked without: missing is *Key needed*.
+    public let required: [String]
+    /// Asked in order on every listening port; the first 200 answers.
+    public let paths: [String]
+    /// A value holding a port also asked over plain HTTP, last.
+    public let plainHTTPPort: String?
+    public let method: String
+    public let headers: [String: String]
+    public let body: String?
+    public let timeout: TimeInterval
+
+    public init(app: String, process: Process, values: [String: String] = [:], required: [String] = [], paths: [String],
+                plainHTTPPort: String? = nil, method: String = "POST", headers: [String: String] = [:], body: String? = nil,
+                timeout: TimeInterval = 8) {
+        self.app = app
+        self.process = process
+        self.values = values
+        self.required = required
+        self.paths = paths
+        self.plainHTTPPort = plainHTTPPort
+        self.method = method
+        self.headers = headers
+        self.body = body
+        self.timeout = timeout
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        app = try container.decode(String.self, forKey: .app)
+        process = try container.decode(Process.self, forKey: .process)
+        values = try container.decodeIfPresent([String: String].self, forKey: .values) ?? [:]
+        required = try container.decodeIfPresent([String].self, forKey: .required) ?? []
+        paths = try container.decode([String].self, forKey: .paths)
+        plainHTTPPort = try container.decodeIfPresent(String.self, forKey: .plainHTTPPort)
+        method = try container.decodeIfPresent(String.self, forKey: .method) ?? "POST"
+        headers = try container.decodeIfPresent([String: String].self, forKey: .headers) ?? [:]
+        body = try container.decodeIfPresent(String.self, forKey: .body)
+        timeout = try container.decodeIfPresent(TimeInterval.self, forKey: .timeout) ?? 8
+    }
 }
 
 /// `{ "path": "~/.tool/usage.json" }` — `~` and `${VAR:-default}` expand.
@@ -471,7 +544,7 @@ extension CLICall {
 // MARK: - JSON
 
 extension Fetch: Codable {
-    private static let tags = ["http", "jsonRpc", "cli", "command", "file"]
+    private static let tags = ["http", "jsonRpc", "cli", "command", "file", "localServer"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
@@ -484,6 +557,7 @@ extension Fetch: Codable {
         case "jsonRpc": self = .jsonRpc(try container.decode(JSONRPCCall.self, forKey: TagKey("jsonRpc")))
         case "file": self = .file(try container.decode(FileCall.self, forKey: TagKey("file")))
         case "command": self = .command(try container.decode(CommandCall.self, forKey: TagKey("command")))
+        case "localServer": self = .localServer(try container.decode(LocalServerCall.self, forKey: TagKey("localServer")))
         default: self = .cli(try container.decode(CLICall.self, forKey: TagKey("cli")))
         }
     }
@@ -497,6 +571,7 @@ extension Fetch: Codable {
         case .cli(let call): try container.encode(call, forKey: TagKey("cli"))
         case .command(let call): try container.encode(call, forKey: TagKey("command"))
         case .file(let call): try container.encode(call, forKey: TagKey("file"))
+        case .localServer(let call): try container.encode(call, forKey: TagKey("localServer"))
         }
     }
 }

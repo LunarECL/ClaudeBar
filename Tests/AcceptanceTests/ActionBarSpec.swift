@@ -60,8 +60,9 @@ struct ActionBarSpec {
         }
 
         @Test
-        func `Antigravity has no dashboard URL`() {
-            let antigravity = AntigravityProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
+        func `Antigravity has no dashboard URL`() throws {
+            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let antigravity = try Providers.make("antigravity", settings: settings).defaultAccount
             #expect(antigravity.dashboardURL == nil)
         }
 

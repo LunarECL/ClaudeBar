@@ -66,34 +66,6 @@ extension ProviderLook {
     }
 }
 
-// MARK: - AntigravityProvider Visual Identity
-
-extension AntigravityProvider: ProviderVisualIdentity {
-    public var symbolIcon: String { "wand.and.stars" }
-
-    public var iconAssetName: String { "AntigravityIcon" }
-
-    public func themeColor(for scheme: ColorScheme) -> Color {
-        // Purple/magenta color matching Antigravity branding
-        scheme == .dark
-            ? Color(red: 0.72, green: 0.35, blue: 0.85)
-            : Color(red: 0.58, green: 0.22, blue: 0.72)
-    }
-
-    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                themeColor(for: scheme),
-                scheme == .dark
-                    ? Color(red: 0.45, green: 0.25, blue: 0.75)
-                    : Color(red: 0.35, green: 0.15, blue: 0.65)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 // MARK: - BedrockProvider Visual Identity
 
 extension BedrockProvider: ProviderVisualIdentity {
@@ -269,10 +241,6 @@ enum ProviderVisualIdentityLookup {
     static func color(for providerId: String, scheme: ColorScheme) -> Color {
         if let color = look(for: providerId)?.color { return color.color(for: scheme) }
         switch providerId {
-        case "antigravity":
-            return scheme == .dark
-                ? Color(red: 0.72, green: 0.35, blue: 0.85)
-                : Color(red: 0.58, green: 0.22, blue: 0.72)
         case "bedrock":
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.6, blue: 0.2)
@@ -297,10 +265,6 @@ enum ProviderVisualIdentityLookup {
         let secondaryColor: Color
 
         switch providerId {
-        case "antigravity":
-            secondaryColor = scheme == .dark
-                ? Color(red: 0.45, green: 0.25, blue: 0.75)
-                : Color(red: 0.35, green: 0.15, blue: 0.65)
         case "bedrock":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.45, blue: 0.15)
@@ -332,7 +296,6 @@ enum ProviderVisualIdentityLookup {
     static func iconAssetName(for providerId: String) -> String {
         if let icon = look(for: providerId)?.icon { return icon }
         switch providerId {
-        case "antigravity": return "AntigravityIcon"
         case "bedrock": return "BedrockIcon"
         case "mistral": return "MistralIcon"
         case "omp": return "OmpIcon"
@@ -344,7 +307,6 @@ enum ProviderVisualIdentityLookup {
     static func name(for providerId: String) -> String {
         if let definition = Providers.definition(forLineupId: providerId) { return definition.profile.name }
         switch providerId {
-        case "antigravity": return "Antigravity"
         case "bedrock": return "AWS Bedrock"
         case "mistral": return "Mistral"
         case "omp": return "Oh My Pi"
@@ -356,7 +318,6 @@ enum ProviderVisualIdentityLookup {
     static func symbolIcon(for providerId: String) -> String {
         if let symbol = look(for: providerId)?.symbol { return symbol }
         switch providerId {
-        case "antigravity": return "wand.and.stars"
         case "bedrock": return "cloud.fill"
         case "mistral": return "cat.fill"
         case "omp": return "terminal.fill"
