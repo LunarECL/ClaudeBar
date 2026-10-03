@@ -785,8 +785,7 @@ natural unit to keep:
 `DataSources` (the work). `Providers` imports `UsageHistory` only to decode
 `history` into a `UsageLog` and fill it per login (`provider.history(for:
 account)`); `UsageHistory` imports `DataSources` (the path language,
-`PriceCatalog`, path expansion) and `Quotas` (`Cost`), never `Providers`. The
-App builds one `UsageHistory` from every provider's logins, as it does today.
+`PriceCatalog`, path expansion) and `Quotas` (`Cost`), never `Providers`. Each login carries its handle, `account.history` — `nil` when the definition has no `history` — and a page reads `account.history?.days(in:)` (CANONICAL §2.1), never a dictionary keyed by provider ids.
 Not in `Provider` itself: history is not a meter, is read on its own cadence
 (popover open, never the background poll) and keeps its own store — another
 question, another context.
@@ -827,9 +826,7 @@ from the screen or, failing that, the clipboard, and an optional count. As
 data: a `guestPasses` block in `claude.json` holding a `cli` fetch and a
 `claude-passes.js` mapping, run by the same `DataSource` machinery; the one
 new piece is a `cli` option that hands the clipboard's text to the mapping
-after the run (`"clipboard": true`, a `@Mockable` `Clipboard` port). The
-`GuestPasses` capability in `Providers` stays and takes any definition's
-`guestPasses`.
+after the run (`"clipboard": true`, a `@Mockable` `Clipboard` port). The `GuestPasses` capability in `Providers` stays, takes any definition's `guestPasses`, and is reached as `account.guestPasses` — no longer handed to `builtIn("claude", …)` by name in the App.
 
 ### 10.7 · Slices
 
@@ -842,6 +839,6 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | UH3 | **Mistral as data**: `JSONFileReader`, `at.fromPath`; mistral.json's `history`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
 | UH4 | **The ledger**: `DayLedger`, closed days kept, invalidated by a definition change | 30 days read in the time 2 take today |
 | UH5 | **The chart**: *Daily usage — last 30 days* (tokens by kind, two axes; cost by model) on the provider's page | visible |
-| UH6 | **Per login**: `accounts.patch.history` | an added Claude login shows its own history (visible) |
+| UH6 | **Per login**: `accounts.patch.history`; `account.history` on every login | an added Claude login shows its own history (visible) |
 | GP | **Guest passes as data**: `cli.clipboard`, claude.json's `guestPasses` + `claude-passes.js`; `ClaudeGuestPassSourceTests` fixtures | `Infrastructure/Claude` deleted |
 | — | the words: `Day`, `DayLedger`; the typealiases go | with §8 slice 7 |
