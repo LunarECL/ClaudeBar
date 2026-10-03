@@ -650,3 +650,212 @@ which now also makes a source not *Configured* while its files are missing.
   one `Provider` owning its `Account`s. The rest is designed in
   [features/multi-account/design.md](../features/multi-account/design.md).
 - **A `command` fetch from the UI** — see [CANONICAL_MODEL §9](CANONICAL_MODEL.md#9--open).
+
+## 10 · Usage History as data
+
+> **Status: PROPOSED.** The model, laws and words are in
+> [CANONICAL_MODEL](CANONICAL_MODEL.md) §1, §5, §8. This section says how it
+> runs and the order of the work.
+
+### 10.1 · What a person asks, and what is true
+
+A person asks **"how much did I use, day by day?"** *TODAY'S USAGE* (today
+against yesterday) and a *Daily token usage — last 30 days* chart (input,
+output, cache read and cache write per day, two axes) are **two views of that
+one answer**: the last two days, and the last thirty. So the model is a
+**series of days**, and a view is a range the page asks for:
+
+```swift
+account.usageHistory?.days(in: .last(2))    // TODAY'S USAGE
+account.usageHistory?.days(in: .last(30))   // the chart; every date present, empty days included
+```
+
+A `Day` holds what every view needs: tokens by kind, a `Cost` with a line per
+model (so a chart can stack by model too), sessions, working time and cache
+savings. Nothing about "today and yesterday" is a type.
+
+Today two vendor-named analyzers answer only the last two days, and each one
+hard-codes the same five jobs:
+
+| Job | Claude (`ClaudeDailyUsageAnalyzer` + 5 helpers) | Mistral (`VibeSessionLogAnalyzer`) | What it really is |
+|---|---|---|---|
+| where the records are | `~/.claude/projects/**/*.jsonl`, changed since yesterday | `~/.vibe/logs/session/session_*/meta.json` | a glob |
+| how to read one | an assistant line: `message.model`, `message.usage.*`, `timestamp` | `stats.session_total_llm_tokens`, `stats.session_cost`; the time from the folder name, in UTC | a format and field paths |
+| which copy counts | `message.id` + `requestId`, the last wins | each file once | an identity |
+| what it cost | `ModelPricing` — a Swift table; a local model, or a base URL on this Mac, is free | the log says | a price catalog, or the record's own cost |
+| the day | local midnight; a 30-minute pause starts a session | local midnight; a file is a session | one aggregator |
+
+None of these is a vendor's behaviour; each is a value. So, as for usage
+(§2), **a tool's usage history is a definition and one engine runs it**: a new
+tool's logs, a new model's price or a new view never edit a vendor's Swift
+(OCP).
+
+### 10.2 · The definition: `usageHistory` beside `dataSources`
+
+Record fields use **the mapping's path language** (§3: `$.a.b`, a list is the
+first that answers, `where`), so there is one way to point into JSON.
+
+```jsonc
+// claude.json
+"usageHistory": {
+  "records": {
+    "files": "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
+    "format": "jsonLines",                       // jsonLines (append-only, read incrementally) · json (one record per file)
+    "where": { "path": "$.type", "equals": "assistant" },
+    "at": "$.timestamp",                          // ISO 8601
+    "id": ["$.message.id", "$.requestId"],        // a record written twice counts once — the last wins
+    "model": "$.message.model",
+    "tokens": {
+      "input": "$.message.usage.input_tokens",
+      "output": "$.message.usage.output_tokens",
+      "cacheWrite": "$.message.usage.cache_creation_input_tokens",
+      "cacheRead": "$.message.usage.cache_read_input_tokens"
+    }
+  },
+  "prices": { "file": "claude-prices.json" },    // a PriceCatalog — or { "service": "AmazonBedrock" }
+  "freeWhen": { "localEndpoint": { "file": "${CLAUDE_CONFIG_DIR:-~}/.claude.json",
+                                   "url": ["$.env.ANTHROPIC_BASE_URL", "$.providers.0.base_url"] } },
+  "sessionGap": 1800
+},
+"accounts": { "patch": { "usageHistory": { "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" } } } }
+```
+
+```jsonc
+// mistral.json
+"usageHistory": {
+  "records": {
+    "files": "~/.vibe/logs/session/session_*/meta.json",
+    "format": "json",
+    "at": { "fromPath": "session_(\\d{8}_\\d{6})", "format": "yyyyMMdd_HHmmss", "timeZone": "UTC" },
+    "tokens": { "total": "$.stats.session_total_llm_tokens" },
+    "cost": "$.stats.session_cost"               // the log's own cost wins over any price
+  }
+}
+```
+
+```jsonc
+// claude-prices.json — beside the definition; a price change edits this, never Swift
+{
+  "currency": "USD", "per": 1000000,
+  "models": [                                     // exact id first, then the longest prefix
+    { "id": "claude-opus-5",   "name": "Claude Opus 5",   "input": "5", "output": "25", "cacheWrite": "6.25", "cacheRead": "0.50" },
+    { "id": "claude-sonnet-5", "name": "Claude Sonnet 5", "input": "2", "output": "10", "cacheWrite": "2.50", "cacheRead": "0.20" }
+  ],
+  "families": [ { "contains": "opus", "as": "claude-opus-4-6" }, { "contains": "haiku", "as": "claude-haiku-4-5-20251001" } ],
+  "free": [ "qwen", "llama", "gemma", "mistral", "gpt-oss", "ollama" ],   // a model of a local family costs nothing
+  "otherwise": { "input": "3", "output": "15", "cacheWrite": "3.75", "cacheRead": "0.30" }
+}
+```
+
+- **One price port.** `PriceCatalog` (DataSources, #417) is how Bedrock's
+  cost is priced; usage history uses the same port, with a second implementation
+  that reads a price file. A tool that writes its own cost needs neither.
+- **Per login, like data sources.** The default login reads `usageHistory`; an
+  added login gets `accounts.patch.usageHistory` merged in and its values filled
+  (`{{account.configDirectory}}`), so an added Claude login has its own
+  usage history for the first time. A definition without `usageHistory` has none.
+- **Money stays exact.** Prices are decimal texts; cost is
+  tokens × price ÷ `per` in `Decimal`, shown as an estimate unless the record
+  gave its own `cost`.
+- **`freeWhen.localEndpoint`** replaces `ClaudeLocalInferenceDetector`: a
+  base URL in that file on a loopback host makes an unpriced model free.
+
+### 10.3 · Thirty days without re-reading thirty days: the ledger
+
+Claude's logs run to gigabytes; re-reading thirty days on every popover open
+is not an option, and today's in-memory cache only covers two. The day is the
+natural unit to keep:
+
+- **A day closes** a fixed while after its midnight (late lines from a
+  session that ran past midnight still land). A closed day is summed once
+  and kept in a **`DayLedger`** — per login, one small JSON file under
+  `~/.claudebar/usage-history/`, a few hundred bytes a day.
+- **Open days** (today, and yesterday until it closes) are read from the logs
+  every time — incrementally, as today, so a popover open reads only what
+  was appended.
+- **Dedupe stays exact**: a record's identity only has to be remembered
+  while its day is open.
+- **A ledger is a cache, not a record**: deleting it re-reads the logs; a
+  change to the definition (`usageHistory` or the prices) invalidates it.
+
+### 10.4 · Where it lives: the login owns it, `DataSources` extracts it
+
+**No new module.** A module earns its place with its own SDK, a second
+consumer, or a boundary the build must enforce; usage history has none —
+`Providers` is its only consumer, and the work it needs (find files, read
+JSON with the path language, expand `~`, price tokens) is what `DataSources`
+already does behind `internal`. So it splits along the line every provider
+already has:
+
+- **The login owns it.** `Account` holds `usageHistory: UsageHistory?` —
+  `nil` when the definition has no `usageHistory` — and `UsageHistory`
+  (in `Providers`) answers `days(in:)` from its `DayLedger` of closed days,
+  asking its log for the open ones. A page reads
+  `account.usageHistory?.days(in:)` (CANONICAL §2.1), never a dictionary
+  keyed by provider ids, and there is no app-wide registry.
+- **`DataSources` extracts it** — the only part that differs per provider.
+  The definition's `usageHistory` decodes as a `UsageLog.Definition` (as
+  `dataSources` decode as `DataSourceDefinition`); `DataSources.makeUsageLog`
+  fills it with the login's values and returns a `UsageLog` whose
+  `days(from:to:)` reads and prices the records. Its readers and aggregator
+  are `internal` workers beside `FileFetcher` and `JSONMapper`.
+- **`Day` is a kernel value** in `Quotas`, beside `Cost` and `CostLine`,
+  replacing `DailyUsageReport`/`Stat`, which already live there.
+
+Not in `Provider`'s refresh: usage history is not a meter and is read on its
+own cadence (popover open, never the background poll).
+
+| Piece | Job | From today's |
+|---|---|---|
+| `UsageLog.Definition` (`DataSources`) | the JSON, `Codable`, no behaviour | the constants in both analyzers |
+| `UsageLog` (`DataSources`) | `days(from:to:)`: the readers, prices and aggregator for one login | both analyzers' entry points |
+| `JSONLinesReader` (`DataSources/Internal`) | one record per matching line; reads only what was appended since the last scan, re-reads a file that changed under it; a byte prefilter derived from `where` | `SessionJSONLParser` + `SessionLogCache`, generalised |
+| `JSONLogReader` (`DataSources/Internal`) | one record per file; `at.fromPath` reads the time from the path | `VibeSessionLogAnalyzer.loadSessions` |
+| `PriceCatalog` (+ a file implementation in `DataSources/Internal`) | the record's own cost, else the catalog (exact → prefix → family → free → otherwise); `freeWhen` | `ModelPricing`, `ClaudeLocalInferenceDetector` |
+| `DayAggregator` (`DataSources/Internal`) | dedupe by `id` (last wins), split by local day, sessions by `sessionGap` (a record is a session without one), working time, cache savings, a cost line per model | both analyzers' `aggregate` |
+| `DayLedger` (`Providers/Internal`) | closed days kept per login; open days asked of the `UsageLog` | — (new) |
+| `UsageHistory` (`Providers`, @Observable, one per login) | `days(in:)`, every date present | `Domain/UsageHistory` (one object for all logins, two days only) |
+| `Day` (`Quotas`) | the answer; `DailyUsageStat` until the words land | `Quotas` |
+
+Ports: the file system (a `@Mockable` `LogFiles`: list a glob with
+modification dates, read a byte range) in `DataSources`, and the ledger's
+store (a `@Mockable` `LedgerStore`) in `Providers`. No module names
+a vendor; the readers are named for formats. The page owns the views:
+*TODAY'S USAGE* cards read `days(in: .last(2))`, a chart reads
+`days(in: .last(30))` and stacks `tokens` by kind (or `cost.lines` by model).
+
+### 10.5 · Is it easy to change? The checks
+
+| A person or a contributor wants… | They change |
+|---|---|
+| a *Last 30 days* chart, a week view, a month total | the page only: another range of `days` |
+| a new model's price, or a price cut | `claude-prices.json` |
+| *TODAY'S USAGE* for another tool that logs JSON | that tool's definition: a `usageHistory` block |
+| Codex's usage history (`~/.codex/sessions/**/rollout-*.jsonl`, whose `token_count` events carry a session's **running total**) | `codex.json`'s `usageHistory`, plus one reader option, `"cumulative": true` (the last record per session counts), with a neutral test |
+| a binary log format | one new reader, named for the format |
+| an added login's own usage history | nothing: `accounts.patch.usageHistory` |
+
+### 10.6 · The rest of `Infrastructure/Claude`
+
+Deleting the folder also needs a home for **guest passes**
+(`ClaudeGuestPassSource`): `claude /passes` in a terminal, the referral link
+from the screen or, failing that, the clipboard, and an optional count. As
+data: a `guestPasses` block in `claude.json` holding a `cli` fetch and a
+`claude-passes.js` mapping, run by the same `DataSource` machinery; the one
+new piece is a `cli` option that hands the clipboard's text to the mapping
+after the run (`"clipboard": true`, a `@Mockable` `Clipboard` port). The `GuestPasses` capability in `Providers` stays, takes any definition's `guestPasses`, and is reached as `account.guestPasses` — no longer handed to `builtIn("claude", …)` by name in the App.
+
+### 10.7 · Slices
+
+Each slice is one PR, green, with no change a user can see unless it says so.
+
+| # | Slice | Done when |
+|---|---|---|
+| UH1 | **Move**: `UsageHistory` into `Providers`, held by each `Account` (`account.usageHistory`), over today's analyzers behind `DailyUsageAnalyzing` | `Domain/UsageHistory` is empty; the App reads `account.usageHistory`; no visible change |
+| UH2 | **Claude as data**: `UsageLog` + `UsageLog.Definition` in `DataSources`, `JSONLinesReader`, a file `PriceCatalog` + `claude-prices.json`, `DayAggregator`, `days(in:)`; claude.json's `usageHistory`. Golden tests: today's `ClaudeDailyUsageAnalyzerTests`, `SessionJSONLParserTests`, `SessionLogCacheTests`, `ModelPricingTests` fixtures through the definition | `ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector` deleted; the same two-day numbers |
+| UH3 | **Mistral as data**: `JSONLogReader`, `at.fromPath`; mistral.json's `usageHistory`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
+| UH4 | **The ledger**: `DayLedger`, closed days kept, invalidated by a definition change | 30 days read in the time 2 take today |
+| UH5 | **The chart**: *Daily usage — last 30 days* (tokens by kind, two axes; cost by model) on the provider's page | visible |
+| UH6 | **Per login**: `accounts.patch.usageHistory`; `account.usageHistory` on every login | an added Claude login shows its own usage history (visible) |
+| GP | **Guest passes as data**: `cli.clipboard`, claude.json's `guestPasses` + `claude-passes.js`; `ClaudeGuestPassSourceTests` fixtures | `Infrastructure/Claude` deleted |
+| — | the words: `Day`, `DayLedger`; the typealiases go | with §8 slice 7 |

@@ -57,7 +57,8 @@ for a protocol or a format — all in `DataSources`.
 let settings = Storage.makeSettings()                     // → any ProviderSettingsRepository
 let vault    = Storage.makeVault()                        // → any CredentialRepository
 let catalog  = Providers.makeCatalog(settings: settings, vault: vault,
-                                     cloudWatch: AWSClients.makeCloudWatch())
+                                     cloudWatch: AWSClients.makeCloudWatch(),
+                                     priceCatalog: AWSClients.makePriceCatalog())
 let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 ```
 
@@ -65,15 +66,14 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 
 | Module | Context ([model §7](CANONICAL_MODEL.md#7--the-contexts-and-the-modules-that-implement-them)) | Public (the domain) | `Internal/` (the implementation) |
 |---|---|---|---|
-| `Quotas` | Quota · shared kernel | `UsageSnapshot`, `UsageQuota`, `QuotaType`, `QuotaStatus`, `UsagePace`, `CostUsage`, `BudgetStatus`, `AccountTier`, `UsageError` — today's shapes; the final kernel is the model's `Usage`, `Quota`, `Left`, `Window`, `Status`, `Pace`, `Cost`, `Budget`, `Plan` (§9) | — none: pure values, no I/O |
-| `DataSources` | Data Sources | `DataSource`, `DataSourceDefinition`, `Response`, `DataSourceError`, the closed sums `CredentialLookup` · `Fetch` · `Mapping`, `ConfigField`; the ports `CLIExecutor`, `NetworkClient`, `RPCTransport`, `CloudWatchClient`; the factory `DataSources.make(_:settings:vault:cloudWatch:)` | the workers — `Lookup/`, `Fetch/`, `Mapping/` — and the implementations of its own ports — `Process/`, `Network/` (§5) |
-| `AWSClients` | Data Sources (SDK-backed) | `AWSClients.makeCloudWatch()` → `any CloudWatchClient` | the AWS SDK client and Bedrock pricing; the only module that links AWS |
-| `Providers` | Providers · core | `Provider` (the product), `Account` (a login — today `ProviderAccount`), `AIProvider` (until it folds in), `ProviderDefinition`, `ProviderCatalog`, `ProviderSettingsRepository`, `CredentialRepository` | definition-file reading, `ExtensionDirectoryScanner`, `AIProviders` |
+| `Quotas` | Quota · shared kernel | `UsageSnapshot`, `UsageQuota`, `QuotaType`, `QuotaStatus`, `UsagePace`, `CostUsage`, `BudgetStatus`, `AccountTier`, `UsageError`, `Day` (a day of usage history — today `DailyUsageReport`/`Stat`) — today's shapes; the final kernel is the model's `Usage`, `Quota`, `Left`, `Window`, `Status`, `Pace`, `Cost`, `Budget`, `Plan` (§9) | — none: pure values, no I/O |
+| `DataSources` | Data Sources | `DataSource`, `DataSourceDefinition`, `Response`, `DataSourceError`, the closed sums `CredentialLookup` · `Fetch` · `Mapping`, `ConfigField`; `UsageLog` and `UsageLog.Definition` (how a login's usage history is extracted from its logs); the ports `CLIExecutor`, `NetworkClient`, `RPCTransport`, `SecretStore`, `CloudWatchClient`, `PriceCatalog`; the factory `DataSources.make(_:providerId:…)` | the workers — `Lookup/`, `Fetch/`, `Mapping/`, `Logs/` — and the implementations of its own ports — `Process/`, `Network/` (§5) |
+| `AWSClients` | Data Sources (SDK-backed) | `AWSClients.makeCloudWatch()` → `any CloudWatchClient`, `AWSClients.makePriceCatalog()` → `any PriceCatalog` | the CloudWatch client and the AWS Price List reader; the only module that links AWS |
+| `Providers` | Providers · core | `Provider` (the product), `Account` (a login — today `ProviderAccount`) and its capability handles `usageHistory: UsageHistory?` · `guestPasses` (nil when the definition doesn't offer them), `UsageHistory` (`days(in:)`), `AIProvider` (until it folds in), `ProviderDefinition`, `ProviderCatalog`, `ProviderSettingsRepository`, `CredentialRepository` | definition-file reading, `DayLedger` (closed days, under `~/.claudebar/usage-history/`), `ExtensionDirectoryScanner`, `AIProviders` |
 | `Providers/Resources/Providers/` | — | **the built-in definitions**: `codex.json`, `deepseek.json`, … | |
 | `Monitoring` | Monitoring · conductor | `QuotaMonitor`, `MonitoringEvent`, `RefreshInterval`, `RefreshKind`, `Clock`, `PowerStateProvider` | `SystemClock`, `SystemPowerStateProvider`, `SingleFlightCache` |
 | `Alerting` | Alerting | `QuotaAlerter`, Notify! values, `NotifySettingsRepository` | `NotificationAlerter`, `SystemAlertSender`, `NotifyGatewayClient` |
 | `Activity` | Activity | `ClaudeSession`, `SessionEvent`, `SessionMonitor`, `NotchActivity`, `HookSettingsRepository` | `HookHTTPServer`, `HookInstaller`, `PortDiscovery`, `SessionEventParser` |
-| `UsageHistory` | Usage History | `DailyUsageReport`, `DailyUsageStat`, `DailyUsageAnalyzing` | the JSONL analyzer, `SessionJSONLParser`, `ModelPricing` |
 | `Storage` | Vault & Settings · generic | `Storage.makeSettings()`, `Storage.makeVault()`, `AppSettingsRepository` | `JSONSettingsRepository`, `JSONSettingsStore`, `KeychainCredentialRepository`, `UserDefaults…`, `SecureCredentialMigration` |
 | `Diagnostics` | — cross-cutting | `AppLog` and its categories | `AppLogger`, `FileLogger` |
 | `ClaudeBar` (App) | — the composition root | SwiftUI views, themes, menu-bar label, page state, the Add Provider sheet | — |
@@ -82,9 +82,9 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 
 ```text
                          ClaudeBar (App)
-       ┌────────┬────────┬────┴─────┬──────────┬──────────┐
-       ▼        ▼        ▼          ▼          ▼          ▼
-  Monitoring Alerting Activity AWSClients  Storage   UsageHistory
+       ┌────────┬────────┬────┴─────┬──────────┐
+       ▼        ▼        ▼          ▼          ▼
+  Monitoring Alerting Activity AWSClients  Storage
        │        │                   │          │
        ▼        │                   ▼          ▼
    Providers ───┼──────────────▶ DataSources ◀─┘ (implements its ports)
@@ -131,25 +131,37 @@ Modules/DataSources/
 │   ├── DataSourceError.swift         step: lookup · fetch · mapping
 │   ├── DataSourceDefinition.swift    ◇ kind · credential · fetch · mapping · fallback — Codable
 │   ├── CredentialLookup.swift        ◇ enum: environment · setting · jsonFile · keychain ·
-│   │                                   browserCookie · refreshing(_, oauth2)
-│   ├── Fetch.swift                   ◇ enum: http · jsonRpc · cli · terminal · file · script ·
-│   │                                   cloudWatch
-│   ├── Mapping.swift                 ◇ enum: json · text
+│   │                                   browserCookies · sqlite · refined · firstOf ·
+│   │                                   refreshing(_, oauth2 | cli)
+│   ├── Fetch.swift                   ◇ enum: http · httpSteps · jsonRpc · cli · command · file ·
+│   │                                   localServer · cloudWatch · directory
+│   ├── Mapping.swift                 ◇ enum: json · text · script
 │   ├── CLIExecutor.swift             port, @Mockable
 │   ├── NetworkClient.swift           port, @Mockable
 │   ├── RPCTransport.swift            port, @Mockable
-│   ├── CloudWatchClient.swift        port, @Mockable — implemented in AWSClients
-│   ├── DataSources.swift             the factory: make(_:settings:vault:cloudWatch:)
+│   ├── SecretStore.swift             port, @Mockable — implemented in Storage
+│   │   (Fetch.swift also declares the ports CloudWatchClient · PriceCatalog, @Mockable —
+│   │    implemented in AWSClients; a file PriceCatalog is in Internal/Logs)
+│   ├── UsageLog.swift                ◆ days(from:to:) for one login · ◇ UsageLog.Definition —
+│   │                                   files · format · where · at · id · model · tokens · cost ·
+│   │                                   prices · freeWhen · sessionGap
+│   ├── LogFiles.swift                port, @Mockable — the files a glob names, and their bytes
+│   ├── DataSources.swift             the factory: make(_:providerId:…)
 │   └── Internal/
 │       ├── Lookup/    EnvironmentReader · SettingReader · JSONFileReader · KeychainReader ·
-│       │              BrowserCookieReader · OAuth2Refresher
+│       │              BrowserCookieReader · SQLiteReader · RefinedReader · FirstOfReader ·
+│       │              OAuth2Refresher · CLIRefresher
 │       ├── Fetch/     HTTPFetcher · HTTPStepsFetcher · JSONRPCFetcher · CLIFetcher ·
-│       │              CommandFetcher · FileFetcher · ScriptFetcher · CloudWatchFetcher
+│       │              CommandFetcher · FileFetcher · DirectoryFetcher · LocalServerFetcher ·
+│       │              CloudWatchFetcher
 │       ├── Mapping/   JSONMapper (+ the path dialect) · TextMapper · ScriptMapper ·
-│       │              HumanDate
+│       │              DecimalScript · HumanDate
+│       ├── Logs/      JSONLinesReader · JSONLogReader (a reader per log format) ·
+│       │              DayAggregator · FilePriceCatalog · SystemLogFiles
 │       ├── Process/   DefaultCLIExecutor · ProcessRPCTransport · InteractiveRunner ·
-│       │              BinaryLocator · LoginShellEnvironment · TerminalRenderer
-│       └── Network/   URLSessionNetworkClient
+│       │              BinaryLocator · LoginShellEnvironment · RunningProcesses ·
+│       │              TerminalRenderer
+│       └── Network/   URLSessionNetworkClient · InsecureLocalhostNetworkClient
 └── Tests/
     ├── Fetch/JSONRPCFetcherTests.swift
     ├── Mapping/JSONMapperTests.swift  one test per mapping feature
@@ -160,14 +172,21 @@ Modules/DataSources/
 Modules/Providers/
 ├── Sources/
 │   ├── Provider.swift                  ◆ the lifecycle, and the fallback between data sources
-│   ├── ProviderDefinition.swift        ◇ the definition and its laws
+│   ├── Account.swift                   ◆ a login: refresh() · usageHistory? · guestPasses?
+│   ├── UsageHistory.swift              ◆ one per login: days(in: DateRange) → [Day], over its
+│   │                                     UsageLog and its ledger
+│   ├── LedgerStore.swift               port, @Mockable — where closed days are kept
+│   ├── ProviderDefinition.swift        ◇ the definition and its laws; its optional blocks
+│   │                                     usageHistory · guestPasses are the capabilities
 │   ├── ProviderCatalog.swift           built in · custom · extension; add · import · export
 │   ├── ProviderSettingsRepository.swift  port, @Mockable
 │   ├── CredentialRepository.swift      port, @Mockable
-│   ├── Providers.swift                 the factory: makeCatalog(settings:vault:cloudWatch:)
+│   ├── Providers.swift                 the factory: makeCatalog(settings:vault:cloudWatch:priceCatalog:)
 │   └── Internal/
-│       └── DefinitionFiles.swift       reads *.json from Bundle.module or a folder
-├── Resources/Providers/                codex.json · claude.json · claude-*.js · …   — the vendors
+│       ├── DefinitionFiles.swift       reads *.json from Bundle.module or a folder
+│       └── DayLedger · FileLedgerStore closed days kept in ~/.claudebar/usage-history/
+├── Resources/Providers/                codex.json · claude.json · claude-*.js ·
+│                                       claude-prices.json · …   — the vendors
 └── Tests/
     ├── ProviderTests.swift
     ├── CatalogTests.swift              every bundled definition decodes
@@ -186,6 +205,11 @@ for that thing, is `@Mockable`, and has its implementation in an `Internal/`.
 | `NetworkClient` | DataSources | an HTTP endpoint | `DataSources/Internal/Network` |
 | `RPCTransport` | DataSources | a JSON-RPC pipe to a process | `DataSources/Internal/Process` |
 | `CloudWatchClient` | DataSources | AWS CloudWatch | `AWSClients` |
+| `PriceCatalog` | DataSources | a price list — AWS's, or a prices file a definition ships | `AWSClients`; `DataSources/Internal/Logs` (file) |
+| `SecretStore` | DataSources | the Keychain, for secrets a login saved | `Storage` |
+| `LogFiles` | DataSources | the local logs a CLI writes | `DataSources/Internal/Logs` |
+| `LedgerStore` | Providers | `~/.claudebar/usage-history/` | `Providers/Internal` (→ `Storage`) |
+| `Clipboard` | DataSources | the pasteboard, read after a `cli` run with `"clipboard": true` | `DataSources/Internal/Process` |
 | `ProviderSettingsRepository` · `CredentialRepository` | Providers | `settings.json`, the Keychain | `Storage` |
 | `Clock` · `PowerStateProvider` | Monitoring | time, the battery | `Monitoring/Internal` |
 | `QuotaAlerter` | Alerting | the user's notifications | `Alerting/Internal` |
@@ -225,7 +249,10 @@ testability" alone.
 | `Domain/Monitor/` | `Monitoring` (`QuotaAlerter` → `Alerting`) |
 | `Domain/Notify/`, `Infrastructure/Notifications/`, `Notify/` | `Alerting` |
 | `Domain/Session/`, `Domain/Notch/`, `Infrastructure/Hooks/` | `Activity` (`NSScreen+NotchMetrics` → App) |
-| `Domain/DailyUsage/`, Claude's JSONL analyzer and pricing | `UsageHistory` |
+| `Domain/UsageHistory/` (`DailyUsageReport`/`Stat`, the view's ranges) | `UsageHistory` → `Providers`; `Day`, `DateRange` → `Quotas` |
+| `Infrastructure/Claude/` (`ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector`) | **deleted** — the paths, fields and `freeWhen` move into `claude.json`'s `usageHistory`, the prices into `claude-prices.json`; parsing, caching and pricing become `UsageHistory/Internal` readers, aggregator and file `PriceCatalog` in `DataSources/Internal/Logs`, `DayLedger` in `Providers/Internal` |
+| `Infrastructure/Claude/ClaudeGuestPassSource` | **deleted** — `claude.json`'s `guestPasses` block: a `cli` fetch and `claude-passes.js` |
+| `Infrastructure/Mistral/` (`VibeSessionLogAnalyzer`) | **deleted** — `mistral.json`'s `usageHistory` (a `json` log format) |
 | `Domain/Settings/`, `Infrastructure/Storage/` | `Storage` (`StatusColorPolicy`, `MenuBarProviderSettings` → App; `AIProviders` → `Providers`) |
 | `Infrastructure/Logging/` | `Diagnostics` |
 | `Infrastructure/TerminalImport/` | the App — themes are presentation |
@@ -243,15 +270,16 @@ files move. When an old target is empty it is deleted.
 | **M1** ✅ | `DataSources` — the ports and their implementations move in; `DataSource`, the closed sums and the workers Codex needs are written test-first | none |
 | **M2** ✅ | `Providers` — `Provider`, the definition, the catalog; `codex.json` with golden tests; the App builds Codex from it; `CodexProvider` and every `Codex*` type in `Infrastructure/Codex` deleted. **Slice 1 of the target architecture** | none |
 | **M3** ✅ | one group of providers per PR (target §8), through #419; `AWSClients` carved from `Infrastructure/Bedrock` (#417) | none |
-| M4… | `Monitoring`, `Alerting`, `Activity`, `UsageHistory`, `Storage` | none |
+| M4 | Usage History — no new module: `UsageHistory` into `Providers`, `UsageLog` into `DataSources`, `Day` into `Quotas`; slices UH1–UH6 and GP of [TARGET §10](TARGET_ARCHITECTURE.md#10--usage-history-as-data); `Infrastructure/Claude` and `Infrastructure/Mistral` deleted | the 30-day chart; Mistral's history beside Claude's |
+| M5… | `Monitoring`, `Alerting`, `Activity`, `Storage` | none |
 | last | `Domain` and `Infrastructure` are empty and removed from `Project.swift` | none |
 
 **M0 moved the kernel as it is.** `Quotas` holds today's types unchanged —
 and, because `UsageSnapshot` carries them, a few that belong elsewhere:
-`DailyUsageReport`/`Stat` (→ `UsageHistory`), `UsageDisplayMode` (→ the App),
+`DailyUsageReport`/`Stat` (→ `Day`, staying in `Quotas`), `UsageDisplayMode` (→ the App),
 `ExtensionMetric` (→ out of the kernel); `BedrockModels` has left (#417: a `Cost` with lines). `RefreshKind` and
-`DailyUsageAnalyzing` sit in `Providers` until `Monitoring` and `UsageHistory`
-exist. Each type carries a `- Note: Interim` naming its final shape; reshaping
+`DailyUsageAnalyzing` sit in `Providers` until `Monitoring` exists and
+Usage History moves (M4). Each type carries a `- Note: Interim` naming its final shape; reshaping
 the kernel follows [CANONICAL_MODEL §8](CANONICAL_MODEL.md#8--build-truth-node-by-node)'s
 order of work, one step per PR, because it touches every provider and view:
 **`Left` and `Window` first** (the two kernel laws), **then the words**
@@ -269,5 +297,10 @@ in `DataSources` before Codex's code can be deleted.
   `settings.json` is one file many contexts write, so one owner today.
 - **One module per heavy SDK.** AWS is the only one today; the next gets its
   own `…Clients` module behind its own port in `DataSources`.
+- **Usage History as its own module, later?** Not now: `Providers` is its
+  only consumer and its work is `DataSources`' (files, the path language,
+  `PriceCatalog`). It earns a module when it needs its own SDK (a binary or
+  SQLite log) or a second consumer; keeping `Internal/Logs/` and
+  `UsageHistory.swift` in their own files keeps that carve cheap.
 - **`AIProvider` beside `Provider`** until the last provider moves — then the
   protocol folds in.
