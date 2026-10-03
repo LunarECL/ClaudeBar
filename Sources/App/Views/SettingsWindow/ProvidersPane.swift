@@ -314,7 +314,6 @@ private struct ProviderDetailView: View {
         case "deepseek": AnyView(DeepSeekConfigCard(monitor: monitor))
         case "alibaba": AnyView(AlibabaConfigCard(monitor: monitor))
         case "copilot": AnyView(CopilotConfigCard(monitor: monitor))
-        case "zai": AnyView(ZaiConfigCard(monitor: monitor))
         case "bedrock": AnyView(BedrockConfigCard(monitor: monitor))
         default: nil
         }

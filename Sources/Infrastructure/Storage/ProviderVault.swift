@@ -37,6 +37,7 @@ public struct ProviderVault: SecretVault, @unchecked Sendable {
         "provider.deepseek.apiKey": ("com.claudebar.credentials.deepseek-api-key", nil),
         "provider.minimax.apiKey": ("com.claudebar.credentials.minimax-api-key", nil),
         "provider.vercel-gateway.apiKey": ("com.claudebar.credentials.vercel-api-key", CredentialKey.vercelApiKey),
+        "provider.zai.apiKey": ("com.claudebar.credentials.zai-api-key", CredentialKey.zaiApiKey),
     ]
 
     static func key(_ name: String, provider: String) -> String {

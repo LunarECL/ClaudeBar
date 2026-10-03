@@ -167,6 +167,8 @@ public enum DataSources {
                 KeychainReader(item: item, security: security)
             case .setting(let name):
                 SettingReader(name: name, providerId: providerId, secrets: secrets)
+            case .refined(let base, let refinement):
+                RefinedReader(base: reader(for: base), refinement: refinement)
             case .sqlite(let database):
                 SQLiteReader(file: database, homeDirectory: homeDirectory, environment: environment)
             case .browserCookies(let query):

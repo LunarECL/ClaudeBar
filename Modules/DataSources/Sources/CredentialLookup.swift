@@ -24,6 +24,9 @@ public indirect enum CredentialLookup: Sendable, Equatable {
     case browserCookies(BrowserCookieCredential)
     /// A row of another app's own SQLite database, read only.
     case sqlite(SQLiteCredential)
+    /// A lookup that answers only when its values match, with fixed values
+    /// added — `"match": { "baseURL": "api\\.z\\.ai" }`, `"with": { … }`.
+    case refined(CredentialLookup, Refinement)
     /// The first lookup that answers wins.
     case firstOf([CredentialLookup])
     /// A lookup whose token is kept fresh by an OAuth 2 refresh.
@@ -71,6 +74,19 @@ public struct SQLiteCredential: Sendable, Equatable, Codable {
         self.query = query
         self.fields = fields
         self.hint = hint
+    }
+}
+
+/// `match`: a value must match its pattern, or the lookup has no key — a
+/// token is never sent to a host it wasn't meant for. `with`: fixed values
+/// added to what was found; they never replace a found value.
+public struct Refinement: Sendable, Equatable, Codable {
+    public let match: [String: String]
+    public let with: [String: String]
+
+    public init(match: [String: String] = [:], with: [String: String] = [:]) {
+        self.match = match
+        self.with = with
     }
 }
 
@@ -143,15 +159,19 @@ public struct JSONFileCredential: Sendable, Equatable, Codable {
     public let path: String
     /// Credential name → JSON path in the file. `token` is required.
     public let fields: [String: String]
+    /// Further paths for a field written as a list — the first that answers.
+    public let alternatives: [String: [String]]
     public let record: Record?
     /// Values for fields the file lacks — never written back to it.
     public let defaults: [String: String]
 
     private static let reserved: Set = ["path", "record", "defaults"]
 
-    public init(path: String, fields: [String: String], record: Record? = nil, defaults: [String: String] = [:]) {
+    public init(path: String, fields: [String: String], alternatives: [String: [String]] = [:],
+                record: Record? = nil, defaults: [String: String] = [:]) {
         self.path = path
         self.fields = fields
+        self.alternatives = alternatives
         self.record = record
         self.defaults = defaults
     }
@@ -162,10 +182,17 @@ public struct JSONFileCredential: Sendable, Equatable, Codable {
         record = try container.decodeIfPresent(Record.self, forKey: TagKey("record"))
         defaults = try container.decodeIfPresent([String: String].self, forKey: TagKey("defaults")) ?? [:]
         var fields: [String: String] = [:]
+        var alternatives: [String: [String]] = [:]
         for key in container.allKeys where !Self.reserved.contains(key.stringValue) {
-            fields[key.stringValue] = try container.decode(String.self, forKey: key)
+            if let paths = try? container.decode([String].self, forKey: key), let first = paths.first {
+                fields[key.stringValue] = first
+                alternatives[key.stringValue] = Array(paths.dropFirst())
+            } else {
+                fields[key.stringValue] = try container.decode(String.self, forKey: key)
+            }
         }
         self.fields = fields
+        self.alternatives = alternatives
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -174,7 +201,11 @@ public struct JSONFileCredential: Sendable, Equatable, Codable {
         try container.encodeIfPresent(record, forKey: TagKey("record"))
         if !defaults.isEmpty { try container.encode(defaults, forKey: TagKey("defaults")) }
         for (name, path) in fields {
-            try container.encode(path, forKey: TagKey(name))
+            if let more = alternatives[name], !more.isEmpty {
+                try container.encode([path] + more, forKey: TagKey(name))
+            } else {
+                try container.encode(path, forKey: TagKey(name))
+            }
         }
     }
 }
@@ -295,11 +326,17 @@ extension CredentialLookup: Codable {
         default:
             base = .firstOf(try container.decode([CredentialLookup].self, forKey: TagKey("firstOf")))
         }
+        var refined = base
+        let match = try container.decodeIfPresent([String: String].self, forKey: TagKey("match")) ?? [:]
+        let with = try container.decodeIfPresent([String: String].self, forKey: TagKey("with")) ?? [:]
+        if !match.isEmpty || !with.isEmpty {
+            refined = .refined(base, Refinement(match: match, with: with))
+        }
         if container.contains(TagKey("refresh")) {
             let refresh = try container.nestedContainer(keyedBy: TagKey.self, forKey: TagKey("refresh"))
-            self = .refreshing(base, try refresh.decode(OAuth2Refresh.self, forKey: TagKey("oauth2")))
+            self = .refreshing(refined, try refresh.decode(OAuth2Refresh.self, forKey: TagKey("oauth2")))
         } else {
-            self = base
+            self = refined
         }
     }
 
@@ -322,6 +359,10 @@ extension CredentialLookup: Codable {
             try container.encode(cookies, forKey: TagKey("browserCookies"))
         case .sqlite(let database):
             try container.encode(database, forKey: TagKey("sqlite"))
+        case .refined(let base, let refinement):
+            try base.encodeBase(into: &container)
+            if !refinement.match.isEmpty { try container.encode(refinement.match, forKey: TagKey("match")) }
+            if !refinement.with.isEmpty { try container.encode(refinement.with, forKey: TagKey("with")) }
         case .firstOf(let lookups):
             try container.encode(lookups, forKey: TagKey("firstOf"))
         case .refreshing(let base, let refresh):
@@ -343,6 +384,7 @@ extension CredentialLookup {
         case .setting: ["API key saved in ClaudeBar"]
         case .browserCookies(let cookies): ["Browser cookies for \(cookies.domains.first ?? "the site")"]
         case .sqlite(let database): [database.path]
+        case .refined(let base, _): base.lookupOrder
         case .firstOf(let lookups): lookups.flatMap(\.lookupOrder)
         case .refreshing(let base, _): base.lookupOrder
         }
@@ -355,6 +397,7 @@ extension CredentialLookup {
         case .refreshing(let base, let refresh): refresh.hint ?? base.hint
         case .firstOf(let lookups): lookups.lazy.compactMap(\.hint).first
         case .sqlite(let database): database.hint
+        case .refined(let base, _): base.hint
         case .environment, .jsonFile, .keychain, .setting, .browserCookies: nil
         }
     }

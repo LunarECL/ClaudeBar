@@ -4,7 +4,8 @@ import Foundation
 
 /// Fills `{{name}}` from a credential. `nil` when a placeholder has no value,
 /// so a header like `ChatGPT-Account-Id: {{account}}` is simply left out.
-/// `{{token#jwt.sub}}` is a claim of the value, a JWT — read, not verified.
+/// `{{token#jwt.sub}}` is a claim of the value, a JWT — read, not verified;
+/// `{{baseURL#host}}` is the host of a URL value.
 enum Template {
     static func fill(_ text: String, with credential: Credential?) -> String? {
         var result = ""
@@ -21,6 +22,9 @@ enum Template {
     }
 
     private static func value(of name: String, in credential: Credential?) -> String? {
+        if name.hasSuffix("#host") {
+            return credential?[String(name.dropLast(5))].flatMap { URL(string: $0)?.host }
+        }
         let parts = name.components(separatedBy: "#jwt.")
         guard let value = credential?[parts[0]] else { return nil }
         return parts.count == 2 ? CredentialDocument.claim(parts[1], in: value) : value

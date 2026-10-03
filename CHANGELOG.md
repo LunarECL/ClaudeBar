@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Appearance → Native menu bar icons gives every provider account a monochrome mark that follows light and dark menu bars, while keeping quota colors. Off by default. ([#380](https://github.com/tddworks/ClaudeBar/pull/380))
 
 ### Changed
+- Z.ai supports separate accounts, each with its own key and platform, and a saved key can go to Zhipu as well as Z.ai. Claude Code no longer needs to be installed, and a key in Claude Code's settings is only used when it points at Z.ai. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
 - OpenCode Go supports separate accounts, each with its own API key. Without a key, its local estimate shows dollars left of each cap and waits out rate limits. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
 - Grok supports separate accounts, each signed in under its own folder, and no longer shows a made-up 100% or weekly card when xAI reports no usage or no period. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
 - Cursor supports separate accounts, each with its own access token. An unlimited plan shows its plan rather than a 100% card. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))

@@ -253,42 +253,6 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.kimiProbeMode() == .api)
     }
 
-    // MARK: - Zai Settings
-
-    @Test
-    func `zaiConfigPath defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.zaiConfigPath() == "")
-    }
-
-    @Test
-    func `setZaiConfigPath persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setZaiConfigPath("/custom/path")
-        #expect(repo.zaiConfigPath() == "/custom/path")
-    }
-
-    @Test
-    func `glmAuthEnvVar defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.glmAuthEnvVar() == "")
-    }
-
-    @Test
-    func `setGlmAuthEnvVar persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setGlmAuthEnvVar("GLM_TOKEN")
-        #expect(repo.glmAuthEnvVar() == "GLM_TOKEN")
-    }
-
     // MARK: - Copilot Settings
 
     @Test

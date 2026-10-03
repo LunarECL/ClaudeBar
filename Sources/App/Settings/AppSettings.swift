@@ -478,7 +478,6 @@ public final class AppSettings {
     public var codex: CodexSettingsRepository { repository }
     public var kimi: KimiSettingsRepository { repository }
     public var copilot: CopilotSettingsRepository { repository }
-    public var zai: ZaiSettingsRepository { repository }
     public var bedrock: BedrockSettingsRepository { repository }
     public var deepseek: DeepSeekSettingsRepository { repository }
     public var alibaba: AlibabaSettingsRepository { repository }
