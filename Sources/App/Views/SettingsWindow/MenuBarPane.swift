@@ -38,9 +38,9 @@ struct MenuBarPane: View {
                         .accessibilityLabel("Show Provider Logo")
                 }
                 SettingsRowDivider()
-                SettingsRow(title: "Show Account Labels in Menu Bar", subtitle: "Show account names or emails beside provider icons. Hover to see account details when hidden.") {
+                SettingsRow(title: "Show Names for Multiple Accounts", subtitle: "Show account names beside provider icons when the same provider has more than one enabled account. Single accounts do not show a name.") {
                     SettingsSwitch(isOn: $settings.menuBarAccountLabelsEnabled)
-                        .accessibilityLabel("Show Account Labels in Menu Bar")
+                        .accessibilityLabel("Show Names for Multiple Accounts")
                 }
                 SettingsRowDivider()
                 SettingsRow(title: "Hide Account Emails", subtitle: "Mask emails as s•••@g•••.com in the menu bar and popover. The eye beside the account does the same.") {
