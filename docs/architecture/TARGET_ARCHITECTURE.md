@@ -945,15 +945,24 @@ a vendor; the readers are named for formats. The page owns the views:
 | a binary log format | one new reader, named for the format |
 | an added login's own usage history | nothing: `accounts.patch.usageHistory` |
 
-### 10.6 · The rest of `Infrastructure/Claude`
+### 10.6 · Guest passes stay Swift
 
-Deleting the folder also needs a home for **guest passes**
-(`ClaudeGuestPassSource`): `claude /passes` in a terminal, the referral link
-from the screen or, failing that, the clipboard, and an optional count. As
-data: a `guestPasses` block in `claude.json` holding a `cli` fetch and a
-`claude-passes.js` mapping, run by the same `DataSource` machinery; the one
-new piece is a `cli` option that hands the clipboard's text to the mapping
-after the run (`"clipboard": true`, a `@Mockable` `Clipboard` port). The `GuestPasses` capability in `Providers` stays, takes any definition's `guestPasses`, and is reached as `account.guestPasses` — no longer handed to `builtIn("claude", …)` by name in the App.
+**Guest passes** (`ClaudeGuestPassSource`: `claude /passes` in a terminal,
+the referral link from the screen or the clipboard, an optional count) are
+**not** a definition block. Only one product has them: a `guestPasses` key
+in the shared definition, with a `clipboard` option on every `cli` fetch,
+would put one vendor's feature into the format every provider uses —
+speculative generality, the opposite of OCP. The rule that decides it is the
+one for log shapes (§10.2): *an idea several providers share is data; an
+idea only one product has stays at the edge.*
+
+So the capability is generic and its one source is Claude's: `GuestPasses`
+and the `@Mockable` `GuestPassSource` port live in `Providers`;
+`ClaudeGuestPassSource` is handed in by the App for Claude and reached as
+`account.guestPasses` (the default login's). It is the last file in
+`Infrastructure/Claude`, and moves to the App when `Infrastructure` is
+carved — the composition root is where a vendor may be named. If a second
+product ever offers passes or referrals, that is the moment to make it data.
 
 ### 10.7 · Slices
 
@@ -967,5 +976,5 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | UH4 ✅ | **The ledger**: `DayLedger`, closed days kept, invalidated by a definition change | 30 days read in the time 2 take today |
 | UH5 ✅ | **The chart**: *Daily usage — last 30 days* (tokens by kind, two axes; cost by model) on the provider's page | visible |
 | UH6 ✅ | **Per login**: `accounts.patch.usageHistory`; `account.usageHistory` on every login | an added Claude login shows its own usage history (visible) |
-| GP | **Guest passes as data**: `cli.clipboard`, claude.json's `guestPasses` + `claude-passes.js`; `ClaudeGuestPassSourceTests` fixtures | `Infrastructure/Claude` deleted |
+| GP ✗ | ~~Guest passes as data~~ — dropped: Claude's alone (§10.6) | `ClaudeGuestPassSource` stays Swift, handed in by the App |
 | — | the words: `Day`, `DayLedger`; the typealiases go | with §8 slice 7 |

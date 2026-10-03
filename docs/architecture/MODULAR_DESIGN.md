@@ -207,7 +207,6 @@ for that thing, is `@Mockable`, and has its implementation in an `Internal/`.
 | `PriceCatalog` | DataSources | a cloud's price list (AWS) — a price file a definition ships is data, not a port | `AWSClients` |
 | `SecretStore` | DataSources | the Keychain, for secrets a login saved | `Storage` |
 | `LedgerStore` | Providers | `~/.claudebar/usage-history/` | `Providers/Internal` (→ `Storage`) |
-| `Clipboard` | DataSources | the pasteboard, read after a `cli` run with `"clipboard": true` | `DataSources/Internal/Process` |
 | `ProviderSettingsRepository` · `CredentialRepository` | Providers | `settings.json`, the Keychain | `Storage` |
 | `Clock` · `PowerStateProvider` | Monitoring | time, the battery | `Monitoring/Internal` |
 | `QuotaAlerter` | Alerting | the user's notifications | `Alerting/Internal` |
@@ -249,7 +248,7 @@ testability" alone.
 | `Domain/Session/`, `Domain/Notch/`, `Infrastructure/Hooks/` | `Activity` (`NSScreen+NotchMetrics` → App) |
 | `Domain/UsageHistory/` (`DailyUsageReport`/`Stat`, the view's ranges) | `UsageHistory` → `Providers`; `Day`, `DateRange` → `Quotas` |
 | `Infrastructure/Claude/` (`ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector`) | **deleted** — the paths, fields and `freeWhen` move into `claude.json`'s `usageHistory`, the prices into `claude-prices.json`; parsing, caching and pricing become the readers, aggregator, `PriceList` and `LocalEndpoint` in `DataSources/Internal/Logs`; `DayLedger` goes to `Providers/Internal` |
-| `Infrastructure/Claude/ClaudeGuestPassSource` | **deleted** — `claude.json`'s `guestPasses` block: a `cli` fetch and `claude-passes.js` |
+| `Infrastructure/Claude/ClaudeGuestPassSource` | the App, when `Infrastructure` is carved — Claude's alone, so a source the composition root hands in behind `GuestPassSource`, not definition data (TARGET §10.6) |
 | `Infrastructure/Mistral/` (`VibeSessionLogAnalyzer`) | **deleted** — `mistral.json`'s `usageHistory` (a `json` log format) |
 | `Domain/Settings/`, `Infrastructure/Storage/` | `Storage` (`StatusColorPolicy`, `MenuBarProviderSettings` → App; `AIProviders` → `Providers`) |
 | `Infrastructure/Logging/` | `Diagnostics` |
@@ -268,7 +267,7 @@ files move. When an old target is empty it is deleted.
 | **M1** ✅ | `DataSources` — the ports and their implementations move in; `DataSource`, the closed sums and the workers Codex needs are written test-first | none |
 | **M2** ✅ | `Providers` — `Provider`, the definition, the catalog; `codex.json` with golden tests; the App builds Codex from it; `CodexProvider` and every `Codex*` type in `Infrastructure/Codex` deleted. **Slice 1 of the target architecture** | none |
 | **M3** ✅ | one group of providers per PR (target §8), through #419; `AWSClients` carved from `Infrastructure/Bedrock` (#417) | none |
-| M4 | Usage History — no new module: `UsageHistory` into `Providers`, `UsageLog` into `DataSources`, `Day` into `Quotas`; slices UH1–UH6 and GP of [TARGET §10](TARGET_ARCHITECTURE.md#10--usage-history-as-data); `Infrastructure/Claude` and `Infrastructure/Mistral` deleted | the 30-day chart; Mistral's history beside Claude's |
+| M4 ✅ | Usage History — no new module: `UsageHistory` into `Providers`, `UsageLog` into `DataSources`, `Day` into `Quotas`; slices UH1–UH6 of [TARGET §10](TARGET_ARCHITECTURE.md#10--usage-history-as-data); `Infrastructure/Mistral` and Claude's log analyzers deleted | the 30-day chart; Mistral's history beside Claude's |
 | M5… | `Monitoring`, `Alerting`, `Activity`, `Storage` | none |
 | last | `Domain` and `Infrastructure` are empty and removed from `Project.swift` | none |
 
