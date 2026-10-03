@@ -344,9 +344,12 @@ final class StatusItemLabelDriver {
         }
 
         for label in content.additionalLabels {
-            parts.append(StatusBarPercentageImageRenderer.image(
-                text: " | ", color: theme.menuBarStatusColor(for: label.status, darkMenuBar: content.isDarkAppearance)
-            ))
+            // Chips stand apart on their own; text needs a separator.
+            if !theme.isOutlined || label.stacked {
+                parts.append(StatusBarPercentageImageRenderer.image(
+                    text: " | ", color: theme.menuBarStatusColor(for: label.status, darkMenuBar: content.isDarkAppearance)
+                ))
+            }
             parts.append(providerIcon(for: label.providerId, native: content.nativeMenuBarIconsEnabled, dark: content.isDarkAppearance))
             if let name = content.accountNames[label.providerId] {
                 parts.append(StatusBarPercentageImageRenderer.image(text: name, color: .primary))
@@ -365,6 +368,15 @@ final class StatusItemLabelDriver {
                 bottom: (label.segments[1].text, theme.menuBarStatusColor(for: label.segments[1].status, darkMenuBar: dark)),
                 size: size, colonVisible: colonVisible
             )
+        }
+        if theme.isOutlined {
+            // A printed theme's quota is a candy chip: its status colour,
+            // inked, ink text — readable on a light or dark menu bar alike.
+            let text = StatusBarPercentageImageRenderer.image(
+                text: label.text, color: theme.textOnStatus, colonVisible: colonVisible
+            )
+            return StatusBarChipRenderer.chip(text, fill: theme.statusColor(for: label.status),
+                                              ink: theme.glassBorder, shadow: theme.cardShadow != nil)
         }
         return StatusBarPercentageImageRenderer.image(
             text: label.text, color: theme.menuBarStatusColor(for: label.status, darkMenuBar: dark), colonVisible: colonVisible
@@ -694,6 +706,42 @@ enum CountdownColonStyle {
 
 /// Renders status text as an original-color image because macOS can ignore
 /// `Text.foregroundStyle` inside a menu bar item.
+/// A label drawn as a printed chip: a pill in `fill`, outlined in `ink`,
+/// on a small hard shadow — sized to stay inside the menu bar's 22 pt.
+enum StatusBarChipRenderer {
+    static let outline: CGFloat = 1.5
+    static let shadowOffset: CGFloat = 1.5
+
+    @MainActor
+    static func chip(_ content: NSImage, fill: Color, ink: Color, shadow: Bool) -> NSImage {
+        let horizontalPadding: CGFloat = 6
+        let pillHeight = min(content.size.height + 4, 19)
+        let pillWidth = ceil(content.size.width) + horizontalPadding * 2
+        let lift = shadow ? shadowOffset : 0
+        let size = NSSize(width: pillWidth + lift + outline, height: pillHeight + lift + outline)
+        let image = NSImage(size: size, flipped: false) { _ in
+            // The pill sits top-left; its shadow falls down and to the right.
+            let pill = NSRect(x: outline / 2, y: lift + outline / 2, width: pillWidth, height: pillHeight)
+            let radius = pillHeight / 2
+            if shadow {
+                NSColor(ink).setFill()
+                NSBezierPath(roundedRect: pill.offsetBy(dx: lift, dy: -lift), xRadius: radius, yRadius: radius).fill()
+            }
+            let path = NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius)
+            NSColor(fill).setFill()
+            path.fill()
+            path.lineWidth = outline
+            NSColor(ink).setStroke()
+            path.stroke()
+            let origin = NSPoint(x: pill.midX - content.size.width / 2, y: pill.midY - content.size.height / 2)
+            content.draw(at: origin, from: .zero, operation: .sourceOver, fraction: 1)
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+}
+
 enum StatusBarPercentageImageRenderer {
     @MainActor
     static func image(text: String, color: Color, colonVisible: Bool = true) -> NSImage {

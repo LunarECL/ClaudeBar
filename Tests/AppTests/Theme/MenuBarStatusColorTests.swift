@@ -41,3 +41,16 @@ struct MenuBarStatusColorTests {
         #expect(theme.menuBarStatusColor(for: .warning, darkMenuBar: false) == PopTheme.amber)
     }
 }
+
+/// Pop's quota in the menu bar is a candy chip: status colour, ink outline
+/// and text, a hard shadow — and it always fits the 22 pt menu bar.
+@MainActor
+@Suite
+struct MenuBarChipTests {
+    @Test func `a chip wraps its label and fits the menu bar`() {
+        let text = StatusBarPercentageImageRenderer.image(text: "5h 82% · 3:07", color: PopTheme().textOnStatus)
+        let chip = StatusBarChipRenderer.chip(text, fill: PopTheme().statusHealthy, ink: PopTheme().glassBorder, shadow: true)
+        #expect(chip.size.width > text.size.width + 10)
+        #expect(chip.size.height <= 22)
+    }
+}
