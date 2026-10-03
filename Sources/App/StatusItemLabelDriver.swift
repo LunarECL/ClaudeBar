@@ -221,10 +221,10 @@ final class StatusItemLabelDriver {
         let shownIds = [settings.menuBarPercentageProviderId] + additionalLabels.map(\.providerId)
         let accountNames = MenuBarAccountName.names(Dictionary(uniqueKeysWithValues: Set(shownIds).compactMap { id in
             (monitor.enabledProviders.first { $0.id == id } as? Account)
-                .flatMap { $0.provider.hasSeveralAccounts ? (id, $0.displayName) : nil }
+                .flatMap { $0.provider.hasSeveralAccounts ? (id, settings.shown($0.displayName)) : nil }
         }))
         let primaryProviderName = !showsQuota || (additionalLabels.isEmpty && accountNames[settings.menuBarPercentageProviderId] == nil)
-            ? nil : primaryProvider?.name
+            ? nil : primaryProvider.map { settings.shown($0.name) }
 
         return LabelContent(
             label: label,
@@ -294,8 +294,8 @@ final class StatusItemLabelDriver {
         button.image = image
         button.imagePosition = .imageOnly
         let primaryText = [content.primaryProviderName, content.label?.text].compactMap { $0 }.joined(separator: " ")
-        let tooltip = ([primaryText].filter { !$0.isEmpty } + content.additionalLabels.map(\.text))
-            .joined(separator: " | ")
+        let tooltip = settings.shown(([primaryText].filter { !$0.isEmpty } + content.additionalLabels.map(\.text))
+            .joined(separator: " | "))
         button.toolTip = tooltip.isEmpty ? nil : tooltip
         button.setAccessibilityLabel(tooltip.isEmpty ? "ClaudeBar" : tooltip)
     }

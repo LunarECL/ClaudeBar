@@ -164,6 +164,14 @@ public final class JSONSettingsRepository:
         store.write(value: show, key: "app.showDailyUsageCards")
     }
 
+    public func hideAccountEmail() -> Bool {
+        store.read(key: "app.hideAccountEmail") ?? false
+    }
+
+    public func setHideAccountEmail(_ hide: Bool) {
+        store.write(value: hide, key: "app.hideAccountEmail")
+    }
+
     public func notchEnabled() -> Bool {
         store.read(key: "app.notchEnabled") ?? false
     }

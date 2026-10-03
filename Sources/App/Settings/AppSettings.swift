@@ -163,6 +163,14 @@ public final class AppSettings {
         }
     }
 
+    /// *Hide account email* (#375): emails show masked — `s•••@g•••.com` —
+    /// in the popover and the menu bar. Settings still shows them in full.
+    public var hideAccountEmail: Bool {
+        didSet {
+            repository.setHideAccountEmail(hideAccountEmail)
+        }
+    }
+
     /// Whether to show daily usage report cards (API Cost, Token Usage, Working Time)
     public var showDailyUsageCards: Bool {
         didSet {
@@ -408,6 +416,7 @@ public final class AppSettings {
         self.nativeMenuBarIconsEnabled = repository.nativeMenuBarIconsEnabled()
         self.highContrastEnabled = repository.highContrastEnabled()
         self.showDailyUsageCards = repository.showDailyUsageCards()
+        self.hideAccountEmail = repository.hideAccountEmail()
         self.notchEnabled = repository.notchEnabled()
         self.touchBarEnabled = repository.touchBarEnabled()
         self.notifyEnabled = repository.isNotifyEnabled()
