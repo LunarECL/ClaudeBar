@@ -173,14 +173,17 @@ public struct CommandCall: Sendable, Equatable, Codable {
 
     public let cli: String
     public let args: [String]
+    /// Text written to the command's standard input — `"/usage\n/quit\n"`.
+    public let input: String?
     public let timeout: TimeInterval
     public let workingDirectory: WorkingDirectory?
     public let environment: ProcessEnvironment
 
-    public init(cli: String, args: [String] = [], timeout: TimeInterval = 20,
+    public init(cli: String, args: [String] = [], input: String? = nil, timeout: TimeInterval = 20,
                 workingDirectory: WorkingDirectory? = nil, environment: ProcessEnvironment = ProcessEnvironment()) {
         self.cli = cli
         self.args = args
+        self.input = input
         self.timeout = timeout
         self.workingDirectory = workingDirectory
         self.environment = environment
@@ -190,6 +193,7 @@ public struct CommandCall: Sendable, Equatable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         cli = try container.decode(String.self, forKey: .cli)
         args = try container.decodeIfPresent([String].self, forKey: .args) ?? []
+        input = try container.decodeIfPresent(String.self, forKey: .input)
         timeout = try container.decodeIfPresent(TimeInterval.self, forKey: .timeout) ?? 20
         workingDirectory = try container.decodeIfPresent(WorkingDirectory.self, forKey: .workingDirectory)
         environment = try container.decodeIfPresent(ProcessEnvironment.self, forKey: .environment) ?? ProcessEnvironment()

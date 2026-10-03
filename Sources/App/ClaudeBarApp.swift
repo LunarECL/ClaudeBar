@@ -135,6 +135,8 @@ struct ClaudeBarApp: App {
                                        accounts: settingsRepository.accounts(forProvider: "commandcode"), secrets: vault)
         let amp = Self.builtIn("ampcode", settings: settingsRepository,
                                accounts: settingsRepository.accounts(forProvider: "ampcode"), secrets: vault)
+        let kiro = Self.builtIn("kiro", settings: settingsRepository,
+                                accounts: settingsRepository.accounts(forProvider: "kiro"), secrets: vault)
 
         // Keep the existing default login's configurable environment name until
         // provider settings forms move to definitions. Added logins use only
@@ -174,7 +176,7 @@ struct ClaudeBarApp: App {
                 apiProbe: KimiUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
-            KiroProvider(probe: KiroUsageProbe(), settingsRepository: settingsRepository),
+            kiro.defaultAccount,
             CursorProvider(probe: CursorUsageProbe(), settingsRepository: settingsRepository),
             minimax.defaultAccount,
             deepseek.defaultAccount,
@@ -202,7 +204,7 @@ struct ClaudeBarApp: App {
             commandCode.defaultAccount,
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after

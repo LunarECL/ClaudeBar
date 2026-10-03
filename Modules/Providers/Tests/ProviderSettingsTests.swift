@@ -168,6 +168,21 @@ struct ProviderSettingsTests {
     }
 
     @Test
+    func `Settings shows only what the default login uses`() throws {
+        let json = #"""
+        {"profile":{"id":"tool","name":"Tool"},"cli":"tool","defaultDataSource":"cli",
+         "settings":[{"id":"home","label":"Home","scope":"account","kind":"path"},
+                     {"id":"envVar","label":"Env","default":"TOOL_KEY"}],
+         "dataSources":[{"kind":"cli","credential":{"environment":"{{setting.envVar}}"},
+           "fetch":{"command":{"cli":"tool"}},"mapping":{"json":{"quotas":[]}}}],
+         "accounts":{"patch":{"cli":{"fetch":{"command":{"environment":{"set":{"HOME":"{{account.home}}"}}}}}}}}
+        """#
+        let definition = try ProviderDefinition.parse(Data(json.utf8))
+        #expect(definition.defaultLoginSettings.map(\.id) == ["envVar"])
+        #expect(try ProviderDefinition.parse(Data(Self.acme.utf8)).defaultLoginSettings.map(\.id) == ["region", "apiKey"])
+    }
+
+    @Test
     func `import lists the host of every region a key may go to`() throws {
         let definition = try ProviderDefinition.parse(Data(Self.acme.utf8))
         #expect(definition.keyDestinations == ["api.acme.cn", "api.acme.com"])

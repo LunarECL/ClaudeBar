@@ -42,7 +42,7 @@ struct AccountsCardText {
     }
 
     func removeMessage(for account: Account) -> String {
-        if account.madeBy == .form {
+        if account.madeBy == .form, signedInFolder(of: account) == nil {
             return "Removes \(account.displayName) from ClaudeBar and deletes its saved keys."
         }
         if account.folder?.goesWithAccount == true {
@@ -61,6 +61,9 @@ struct AccountsCardText {
     /// made; otherwise how the person does it in their own folder.
     func reauthHelp(for account: Account) -> String? {
         if account.madeBy == .form {
+            if let folder = signedInFolder(of: account) {
+                return "Sign in again in \(folder) with your CLI, then refresh."
+            }
             return "Remove this account and add it again with a valid key."
         }
         if account.isDefault, provider.definition.cli == nil {
@@ -76,5 +79,10 @@ struct AccountsCardText {
         let plain = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_./=:@~"))
         guard argument.unicodeScalars.contains(where: { !plain.contains($0) }) else { return argument }
         return "'" + argument.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
+    }
+
+    /// The folder an account made by the form signed in at — its path setting.
+    private func signedInFolder(of account: Account) -> String? {
+        fields.lazy.compactMap { $0.path(in: account.values) }.first
     }
 }
