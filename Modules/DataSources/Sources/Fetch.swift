@@ -359,6 +359,9 @@ public struct CLICall: Sendable, Equatable, Codable {
     public let screen: Screen
     /// Run in one session instead of a fresh one per run (#132).
     public let session: Session?
+    /// Seconds to let a TUI finish its startup paint before `input` is typed;
+    /// typed sooner, a redraw can discard it. Unset is the terminal's default.
+    public let inputDelay: TimeInterval?
 
     public init(
         cli: String,
@@ -370,7 +373,8 @@ public struct CLICall: Sendable, Equatable, Codable {
         environment: Environment = Environment(),
         readyWhen: [ReadyMarker] = [],
         screen: Screen = .raw,
-        session: Session? = nil
+        session: Session? = nil,
+        inputDelay: TimeInterval? = nil
     ) {
         self.cli = cli
         self.args = args
@@ -382,6 +386,7 @@ public struct CLICall: Sendable, Equatable, Codable {
         self.readyWhen = readyWhen
         self.screen = screen
         self.session = session
+        self.inputDelay = inputDelay
     }
 
     public init(from decoder: Decoder) throws {
@@ -391,6 +396,7 @@ public struct CLICall: Sendable, Equatable, Codable {
         input = try container.decodeIfPresent(String.self, forKey: .input)
         timeout = try container.decodeIfPresent(TimeInterval.self, forKey: .timeout) ?? 20
         workingDirectory = try container.decodeIfPresent(WorkingDirectory.self, forKey: .workingDirectory)
+        inputDelay = try container.decodeIfPresent(TimeInterval.self, forKey: .inputDelay)
         autoResponses = try container.decodeIfPresent([String: String].self, forKey: .autoResponses) ?? [:]
         environment = try container.decodeIfPresent(Environment.self, forKey: .environment) ?? Environment()
         readyWhen = try container.decodeIfPresent([ReadyMarker].self, forKey: .readyWhen) ?? []
@@ -399,7 +405,7 @@ public struct CLICall: Sendable, Equatable, Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case cli, args, input, timeout, workingDirectory, autoResponses, environment, readyWhen, screen, session
+        case cli, args, input, timeout, workingDirectory, autoResponses, environment, readyWhen, screen, session, inputDelay
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -414,6 +420,7 @@ public struct CLICall: Sendable, Equatable, Codable {
         try container.encode(readyWhen, forKey: .readyWhen)
         try container.encode(screen, forKey: .screen)
         try container.encodeIfPresent(session, forKey: .session)
+        try container.encodeIfPresent(inputDelay, forKey: .inputDelay)
     }
 }
 

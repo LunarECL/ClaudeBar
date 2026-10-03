@@ -166,24 +166,6 @@ public protocol CodexSettingsRepository: ProviderSettingsRepository {
     func setCodexVerifiedAtLeastOnce(_ verified: Bool)
 }
 
-/// Kimi-specific settings repository, extending base ProviderSettingsRepository.
-/// Includes configuration for probe mode (CLI vs API).
-/// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.
-/// App uses UserDefaultsProviderSettingsRepository.
-public protocol KimiSettingsRepository: ProviderSettingsRepository {
-    /// Gets the probe mode for Kimi (CLI or API)
-    func kimiProbeMode() -> KimiProbeMode
-
-    /// Sets the probe mode for Kimi
-    func setKimiProbeMode(_ mode: KimiProbeMode)
-
-    /// Gets the API region (china or international, default: china for legacy compatibility)
-    func kimiRegion() -> KimiRegion
-
-    /// Sets the API region
-    func setKimiRegion(_ region: KimiRegion)
-}
-
 /// DeepSeek-specific settings repository, extending base ProviderSettingsRepository.
 /// Stores the API key and env-var name for DeepSeek balance monitoring.
 public protocol DeepSeekSettingsRepository: ProviderSettingsRepository {

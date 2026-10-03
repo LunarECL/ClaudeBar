@@ -22,6 +22,8 @@ enum Template {
     }
 
     private static func value(of name: String, in credential: Credential?) -> String? {
+        // The Mac's own time zone, as a browser would send it.
+        if name == "system.timeZone" { return TimeZone.current.identifier }
         if name.hasSuffix("#host") {
             return credential?[String(name.dropLast(5))].flatMap { URL(string: $0)?.host }
         }
@@ -306,7 +308,8 @@ struct CLIFetcher: Fetching {
             environmentAdditions: call.environment.set,
             completionRule: call.readyWhen.isEmpty
                 ? nil
-                : CLICompletionRule(readyMarkers: call.readyWhen.map { CLICompletionRule.Marker($0.text, endsRow: $0.endsRow) })
+                : CLICompletionRule(readyMarkers: call.readyWhen.map { CLICompletionRule.Marker($0.text, endsRow: $0.endsRow) }),
+            inputDelay: call.inputDelay ?? 0.4
         )
     }
 }

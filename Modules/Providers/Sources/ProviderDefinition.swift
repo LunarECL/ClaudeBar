@@ -323,7 +323,9 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
 
     /// The data sources an added login runs: each one with `accounts.patch`
     /// merged in and `{{account.<name>}}` filled from the login's `values`.
-    /// Throws when a value the definition needs is missing.
+    /// A source that needs a value only some sources ask for (`"for"`) is left
+    /// out of a login added without it — added for another source. Throws
+    /// when a value every source asks for is missing.
     public func dataSources(forAccount values: [String: String]) throws -> [DataSourceDefinition] {
         let patch = accounts?.patch ?? [:]
         return try dataSources.compactMap { source -> DataSourceDefinition? in
@@ -334,6 +336,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             }
             adapted = try adapted.filled(values, scope: "account")
             if let missing = adapted.unfilled(scope: "account").first {
+                if accountSettings.contains(where: { $0.id == missing && !$0.dataSources.isEmpty }) { return nil }
                 throw DefinitionError.missingAccountValue(id, missing)
             }
             return adapted

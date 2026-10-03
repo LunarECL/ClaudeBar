@@ -234,25 +234,6 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.codexVerifiedAtLeastOnce() == false)
     }
 
-    // MARK: - Kimi Settings
-
-    @Test
-    func `kimiProbeMode defaults to cli`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.kimiProbeMode() == .cli)
-    }
-
-    @Test
-    func `setKimiProbeMode persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setKimiProbeMode(.api)
-        #expect(repo.kimiProbeMode() == .api)
-    }
-
     // MARK: - Copilot Settings
 
     @Test
@@ -375,25 +356,6 @@ struct JSONSettingsRepositoryProviderTests {
 
         repo.setHookPort(8080)
         #expect(repo.hookPort() == 8080)
-    }
-
-    // MARK: - Kimi Settings
-
-    @Test
-    func `kimiRegion defaults to china`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.kimiRegion() == .china)
-    }
-
-    @Test
-    func `setKimiRegion persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setKimiRegion(.international)
-        #expect(repo.kimiRegion() == .international)
     }
 
 }

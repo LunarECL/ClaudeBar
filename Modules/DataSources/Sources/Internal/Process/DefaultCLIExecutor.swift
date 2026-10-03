@@ -21,7 +21,7 @@ public struct DefaultCLIExecutor: CLIExecutor {
 
     /// How long to wait after launch before sending input, so typed commands
     /// land on a settled TUI screen (see InteractiveRunner.Options.inputDelay).
-    private let inputDelay: TimeInterval
+    public let inputDelay: TimeInterval
 
     public init(
         environmentExclusions: [String] = [],
