@@ -96,6 +96,8 @@ Every provider runs on the same engine, so its log lines have the same shape: `<
 | `<namespace> metrics in <region> failed: …` | One cloud region failed (Bedrock); the others still count |
 | `A key was found but its <field> isn't one this provider uses; not using it` | A key found in another tool's config points elsewhere (e.g. a Claude Code key that isn't Z.ai's) |
 | `Hook HTTP server failed: …` | Port 19847 is taken, so session hooks are off ([session hooks](features/session-hooks/README.md)) |
+| `Usage history: scanned <n> recent log files (…)` / `… raw records, … after dedup` | *TODAY'S USAGE* read a tool's local logs. Days that have closed are kept in `~/.claudebar/usage-history/`; deleting that folder makes the next read sum them again |
+| `Usage history: price file '<file>' is missing` / `is malformed` | A provider's price list didn't load, so its usage history shows tokens without cost. Report it with the log |
 
 Each provider's own errors and what to do: its page under [providers/](providers/).
 

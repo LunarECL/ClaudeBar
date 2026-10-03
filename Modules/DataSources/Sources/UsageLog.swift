@@ -1,3 +1,4 @@
+import CryptoKit
 import Diagnostics
 import Foundation
 import Quotas
@@ -16,8 +17,19 @@ public struct UsageLog: Sendable {
     let prices: PriceList?
     let localEndpoint: LocalEndpoint?
     let files: String
-    let calendar: Calendar
+    /// The local calendar its days are counted in.
+    public let calendar: Calendar
     let now: @Sendable () -> Date
+    /// Changes whenever how the logs read does — the definition, the price
+    /// file, where the files are — so days kept under an older one are
+    /// summed again.
+    public let fingerprint: String
+
+    /// The start of the day that holds now.
+    public var today: Date { calendar.startOfDay(for: now()) }
+
+    /// Now, as this log's clock tells it.
+    public var currentTime: Date { now() }
 
     /// One stat per day of `range`, every date present; a day with nothing
     /// is an empty day. Unreadable files are skipped.
@@ -253,6 +265,13 @@ extension DataSources {
         now: @escaping @Sendable () -> Date = { Date() }
     ) -> UsageLog {
         let expand = { (path: String) in Paths.expand(path, homeDirectory: homeDirectory, environment: environment) }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        var hash = SHA256()
+        hash.update(data: (try? encoder.encode(definition)) ?? Data())
+        hash.update(data: Data(expand(definition.records.files).utf8))
+        hash.update(data: Data((definition.prices.flatMap { scripts($0.file) } ?? "").utf8))
+        let fingerprint = hash.finalize().map { String(format: "%02x", $0) }.joined()
         return UsageLog(
             definition: definition,
             reader: LogReader(definition.records),
@@ -260,7 +279,8 @@ extension DataSources {
             localEndpoint: definition.freeWhen?.localEndpoint.map { LocalEndpoint(file: expand($0.file), url: $0.url) },
             files: expand(definition.records.files),
             calendar: calendar,
-            now: now
+            now: now,
+            fingerprint: fingerprint
         )
     }
 }
