@@ -277,53 +277,48 @@ private struct ProviderDetailView: View {
         .buttonStyle(.plain)
     }
 
-    /// The provider-specific config card, when one exists.
+    /// A provider made from a definition gets the same sections as every
+    /// other: its data source, its settings form and its accounts. A provider
+    /// still on its own card keeps that card until it moves to JSON.
     @ViewBuilder
     private var configCard: some View {
-        switch (provider as? Account)?.provider.id ?? provider.id {
-        case "claude":
-            if let claude = (provider as? Account)?.provider {
-                DataSourceSection(provider: claude, monitor: monitor)
-                ProviderAccountsCard(provider: claude, monitor: monitor)
+        if let product = (provider as? Account)?.provider {
+            let legacy = legacyCard(for: product.id)
+            DataSourceSection(provider: product, monitor: monitor)
+            if legacy == nil, !product.definition.settings.isEmpty {
+                ProviderSettingsSection(provider: product)
             }
-            ClaudeBudgetCard()
-        case "codex":
-            if let codex = (provider as? Account)?.provider {
-                DataSourceSection(provider: codex, monitor: monitor)
-                ProviderAccountsCard(provider: codex, monitor: monitor)
+            if product.definition.accounts != nil {
+                ProviderAccountsCard(provider: product, monitor: monitor)
             }
-        case "kimi":
-            KimiConfigCard(monitor: monitor)
-        case "minimax":
-            MiniMaxConfigCard(monitor: monitor)
-        case "deepseek":
-            if let deepseek = (provider as? Account)?.provider {
-                ProviderAccountsCard(provider: deepseek, monitor: monitor)
+            if let legacy { legacy }
+            if product.definition.profile.origin == .custom {
+                CustomProviderCard(provider: product, monitor: monitor, onDeleted: onBack)
             }
-            DeepSeekConfigCard(monitor: monitor)
-        case "alibaba":
-            AlibabaConfigCard(monitor: monitor)
-        case "vercel-gateway":
-            VercelConfigCard(monitor: monitor)
-        case "copilot":
-            CopilotConfigCard(monitor: monitor)
-        case "zai":
-            ZaiConfigCard(monitor: monitor)
-        case "bedrock":
-            BedrockConfigCard(monitor: monitor)
-        default:
-            if let custom = (provider as? Account)?.provider, custom.definition.profile.origin == .custom {
-                DataSourceSection(provider: custom, monitor: monitor)
-                if custom.definition.accounts != nil {
-                    ProviderAccountsCard(provider: custom, monitor: monitor)
-                }
-                CustomProviderCard(provider: custom, monitor: monitor, onDeleted: onBack)
-            } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
-                ExtensionConfigCard(
-                    provider: extProvider,
-                    configRepository: AppSettings.shared.extensionConfig
-                )
-            }
+        } else if let legacy = legacyCard(for: provider.id) {
+            legacy
+        } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
+            ExtensionConfigCard(
+                provider: extProvider,
+                configRepository: AppSettings.shared.extensionConfig
+            )
+        }
+    }
+
+    /// The card a provider has before its settings are a form — gone as each
+    /// one moves to JSON (TARGET_ARCHITECTURE §8 slice 3).
+    private func legacyCard(for id: String) -> AnyView? {
+        switch id {
+        case "claude": AnyView(ClaudeBudgetCard())
+        case "kimi": AnyView(KimiConfigCard(monitor: monitor))
+        case "minimax": AnyView(MiniMaxConfigCard(monitor: monitor))
+        case "deepseek": AnyView(DeepSeekConfigCard(monitor: monitor))
+        case "alibaba": AnyView(AlibabaConfigCard(monitor: monitor))
+        case "vercel-gateway": AnyView(VercelConfigCard(monitor: monitor))
+        case "copilot": AnyView(CopilotConfigCard(monitor: monitor))
+        case "zai": AnyView(ZaiConfigCard(monitor: monitor))
+        case "bedrock": AnyView(BedrockConfigCard(monitor: monitor))
+        default: nil
         }
     }
 }

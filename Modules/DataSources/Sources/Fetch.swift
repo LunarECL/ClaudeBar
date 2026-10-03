@@ -6,10 +6,15 @@ import Foundation
 public enum Fetch: Sendable, Equatable {
     /// An HTTP request — the *API* choice.
     case http(HTTPRequest)
+    /// HTTP requests in order, each able to use what an earlier one said —
+    /// also the *API* choice, written `"http": { "steps": […] }`.
+    case httpSteps(HTTPSteps)
     /// A JSON-RPC conversation with a CLI over stdin/stdout.
     case jsonRpc(JSONRPCCall)
-    /// A CLI run in a terminal, its screen captured — the *CLI* choice.
+    /// A CLI run in a terminal, its screen captured — for a TUI.
     case cli(CLICall)
+    /// A command run over pipes, its output and exit code read.
+    case command(CommandCall)
     /// A file on this Mac that some tool keeps up to date — the *File* choice.
     case file(FileCall)
 }
@@ -31,13 +36,18 @@ public struct HTTPRequest: Sendable, Equatable, Codable {
     public let headers: [String: String]
     public let body: String?
     public let timeout: TimeInterval
+    /// The statuses that are an answer — part of the protocol, not of how a
+    /// failure is worded. `nil`: 2xx.
+    public let acceptedStatuses: [Int]?
 
-    public init(url: String, method: String = "GET", headers: [String: String] = [:], body: String? = nil, timeout: TimeInterval = 15) {
+    public init(url: String, method: String = "GET", headers: [String: String] = [:], body: String? = nil,
+                timeout: TimeInterval = 15, acceptedStatuses: [Int]? = nil) {
         self.url = url
         self.method = method
         self.headers = headers
         self.body = body
         self.timeout = timeout
+        self.acceptedStatuses = acceptedStatuses
     }
 
     public init(from decoder: Decoder) throws {
@@ -47,6 +57,138 @@ public struct HTTPRequest: Sendable, Equatable, Codable {
         headers = try container.decodeIfPresent([String: String].self, forKey: .headers) ?? [:]
         body = try container.decodeIfPresent(String.self, forKey: .body)
         timeout = try container.decodeIfPresent(TimeInterval.self, forKey: .timeout) ?? 15
+        acceptedStatuses = try container.decodeIfPresent([Int].self, forKey: .acceptedStatuses)
+    }
+
+    /// Whether a status is an answer rather than a failure.
+    public func accepts(_ status: Int) -> Bool {
+        acceptedStatuses?.contains(status) ?? (200..<300).contains(status)
+    }
+}
+
+/// `"http": { "steps": […] }` — call A, then B with something A said. The
+/// last step that runs answers; at most eight steps.
+public struct HTTPSteps: Sendable, Equatable, Codable {
+    public static let limit = 8
+
+    public let steps: [HTTPStep]
+
+    public init(steps: [HTTPStep]) {
+        self.steps = steps
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        steps = try container.decode([HTTPStep].self, forKey: .steps)
+        guard !steps.isEmpty, steps.count <= Self.limit else {
+            throw DecodingError.dataCorruptedError(forKey: .steps, in: container,
+                debugDescription: "http.steps needs 1 to \(Self.limit) steps")
+        }
+        guard Set(steps.map(\.name)).count == steps.count else {
+            throw DecodingError.dataCorruptedError(forKey: .steps, in: container,
+                debugDescription: "http.steps names must be unique")
+        }
+    }
+}
+
+/// One request in `http.steps`.
+public struct HTTPStep: Sendable, Equatable, Codable {
+    /// A value read from a step's response, for later steps' `{{name}}`.
+    public enum Keep: Sendable, Equatable, Codable {
+        /// `"$.path"` in a JSON body.
+        case path(String)
+        /// `{ "pattern": "…" }` over the body's text; the first group.
+        case pattern(String)
+
+        private enum Keys: String, CodingKey { case pattern }
+
+        public init(from decoder: Decoder) throws {
+            if let path = try? decoder.singleValueContainer().decode(String.self) {
+                self = .path(path)
+            } else {
+                self = .pattern(try decoder.container(keyedBy: Keys.self).decode(String.self, forKey: .pattern))
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            switch self {
+            case .path(let path):
+                var container = encoder.singleValueContainer()
+                try container.encode(path)
+            case .pattern(let pattern):
+                var container = encoder.container(keyedBy: Keys.self)
+                try container.encode(pattern, forKey: .pattern)
+            }
+        }
+    }
+
+    public let name: String
+    public let request: HTTPRequest
+    public let keep: [String: Keep]
+    /// A failure leaves this step's values unknown instead of ending the fetch.
+    public let optional: Bool
+    /// Skipped when this value is already known.
+    public let unless: String?
+    /// Tries again on a network failure or a 5xx, up to this many times in all.
+    public let attempts: Int
+    /// JSON body keys left out when their value came out empty.
+    public let dropEmpty: [String]
+
+    public init(name: String, request: HTTPRequest, keep: [String: Keep] = [:], optional: Bool = false,
+                unless: String? = nil, attempts: Int = 1, dropEmpty: [String] = []) {
+        self.name = name
+        self.request = request
+        self.keep = keep
+        self.optional = optional
+        self.unless = unless
+        self.attempts = attempts
+        self.dropEmpty = dropEmpty
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        request = try container.decode(HTTPRequest.self, forKey: .request)
+        keep = try container.decodeIfPresent([String: Keep].self, forKey: .keep) ?? [:]
+        optional = try container.decodeIfPresent(Bool.self, forKey: .optional) ?? false
+        unless = try container.decodeIfPresent(String.self, forKey: .unless)
+        attempts = try container.decodeIfPresent(Int.self, forKey: .attempts) ?? 1
+        dropEmpty = try container.decodeIfPresent([String].self, forKey: .dropEmpty) ?? []
+        guard (1...3).contains(attempts) else {
+            throw DecodingError.dataCorruptedError(forKey: .attempts, in: container,
+                debugDescription: "a step's attempts is 1 to 3")
+        }
+    }
+}
+
+/// `"command": { "cli": "tool", "args": ["usage", "--json"] }` — runs a
+/// command over pipes and reads what it printed. Its exit code is reported,
+/// never ignored. A TUI that only draws in a terminal is a `cli` instead.
+public struct CommandCall: Sendable, Equatable, Codable {
+    public typealias Environment = ProcessEnvironment
+
+    public let cli: String
+    public let args: [String]
+    public let timeout: TimeInterval
+    public let workingDirectory: WorkingDirectory?
+    public let environment: ProcessEnvironment
+
+    public init(cli: String, args: [String] = [], timeout: TimeInterval = 20,
+                workingDirectory: WorkingDirectory? = nil, environment: ProcessEnvironment = ProcessEnvironment()) {
+        self.cli = cli
+        self.args = args
+        self.timeout = timeout
+        self.workingDirectory = workingDirectory
+        self.environment = environment
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        cli = try container.decode(String.self, forKey: .cli)
+        args = try container.decodeIfPresent([String].self, forKey: .args) ?? []
+        timeout = try container.decodeIfPresent(TimeInterval.self, forKey: .timeout) ?? 20
+        workingDirectory = try container.decodeIfPresent(WorkingDirectory.self, forKey: .workingDirectory)
+        environment = try container.decodeIfPresent(ProcessEnvironment.self, forKey: .environment) ?? ProcessEnvironment()
     }
 }
 
@@ -96,7 +238,7 @@ public struct JSONRPCCall: Sendable, Equatable, Codable {
     public let params: JSONValue?
     public let then: [FollowUp]
     /// Variables to remove from, and add to, the CLI's environment.
-    public let environment: CLICall.Environment
+    public let environment: ProcessEnvironment
 
     public init(
         cli: String,
@@ -106,7 +248,7 @@ public struct JSONRPCCall: Sendable, Equatable, Codable {
         call: String,
         params: JSONValue? = nil,
         then: [FollowUp] = [],
-        environment: CLICall.Environment = CLICall.Environment()
+        environment: ProcessEnvironment = ProcessEnvironment()
     ) {
         self.cli = cli
         self.args = args
@@ -127,29 +269,33 @@ public struct JSONRPCCall: Sendable, Equatable, Codable {
         call = try container.decode(String.self, forKey: .call)
         params = try container.decodeIfPresent(JSONValue.self, forKey: .params)
         then = try container.decodeIfPresent([FollowUp].self, forKey: .then) ?? []
-        environment = try container.decodeIfPresent(CLICall.Environment.self, forKey: .environment) ?? CLICall.Environment()
+        environment = try container.decodeIfPresent(ProcessEnvironment.self, forKey: .environment) ?? ProcessEnvironment()
+    }
+}
+
+/// Variables to remove from, and add to, a CLI's environment. Each process
+/// gets its own; the app's is never changed. `{{token}}` in a value is filled
+/// when a `command` starts.
+public struct ProcessEnvironment: Sendable, Equatable, Codable {
+    public let unset: [String]
+    public let set: [String: String]
+
+    public init(unset: [String] = [], set: [String: String] = [:]) {
+        self.unset = unset
+        self.set = set
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        unset = try container.decodeIfPresent([String].self, forKey: .unset) ?? []
+        set = try container.decodeIfPresent([String: String].self, forKey: .set) ?? [:]
     }
 }
 
 /// Runs `cli args…` in a terminal, types `input`, answers prompts it
 /// recognises from `autoResponses`, and returns what the screen showed.
 public struct CLICall: Sendable, Equatable, Codable {
-    /// Variables to remove from, and add to, the CLI's environment.
-    public struct Environment: Sendable, Equatable, Codable {
-        public let unset: [String]
-        public let set: [String: String]
-
-        public init(unset: [String] = [], set: [String: String] = [:]) {
-            self.unset = unset
-            self.set = set
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            unset = try container.decodeIfPresent([String].self, forKey: .unset) ?? []
-            set = try container.decodeIfPresent([String: String].self, forKey: .set) ?? [:]
-        }
-    }
+    public typealias Environment = ProcessEnvironment
 
     /// Text that means the screen has finished drawing: a phrase, or
     /// `{ "row": "…" }` for a phrase that must end its row.
@@ -309,14 +455,19 @@ extension CLICall {
 // MARK: - JSON
 
 extension Fetch: Codable {
-    private static let tags = ["http", "jsonRpc", "cli", "file"]
+    private static let tags = ["http", "jsonRpc", "cli", "command", "file"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
         switch try container.singleTag(of: Self.tags, in: "fetch") {
-        case "http": self = .http(try container.decode(HTTPRequest.self, forKey: TagKey("http")))
+        case "http":
+            let http = try container.nestedContainer(keyedBy: TagKey.self, forKey: TagKey("http"))
+            self = http.contains(TagKey("steps"))
+                ? .httpSteps(try container.decode(HTTPSteps.self, forKey: TagKey("http")))
+                : .http(try container.decode(HTTPRequest.self, forKey: TagKey("http")))
         case "jsonRpc": self = .jsonRpc(try container.decode(JSONRPCCall.self, forKey: TagKey("jsonRpc")))
         case "file": self = .file(try container.decode(FileCall.self, forKey: TagKey("file")))
+        case "command": self = .command(try container.decode(CommandCall.self, forKey: TagKey("command")))
         default: self = .cli(try container.decode(CLICall.self, forKey: TagKey("cli")))
         }
     }
@@ -325,8 +476,10 @@ extension Fetch: Codable {
         var container = encoder.container(keyedBy: TagKey.self)
         switch self {
         case .http(let request): try container.encode(request, forKey: TagKey("http"))
+        case .httpSteps(let steps): try container.encode(steps, forKey: TagKey("http"))
         case .jsonRpc(let call): try container.encode(call, forKey: TagKey("jsonRpc"))
         case .cli(let call): try container.encode(call, forKey: TagKey("cli"))
+        case .command(let call): try container.encode(call, forKey: TagKey("command"))
         case .file(let call): try container.encode(call, forKey: TagKey("file"))
         }
     }

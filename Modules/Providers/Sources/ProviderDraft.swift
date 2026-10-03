@@ -108,7 +108,8 @@ public struct ProviderDraft: Sendable, Equatable {
                 cli: source.cli,
                 dataSources: source.dataSources,
                 defaultDataSource: source.defaultDataSource,
-                accounts: source.accounts
+                accounts: source.accounts,
+                settings: source.settings
             )
         }
 
@@ -203,7 +204,7 @@ public struct ProviderDraft: Sendable, Equatable {
         if credential != .setting("apiKey") {
             patch[kind] = try JSONDecoder().decode(JSONValue.self, from: Data(#"{ "credential": { "environment": null, "setting": "apiKey" } }"#.utf8))
         }
-        return .init(form: [.init(id: "apiKey", label: "API key", secret: true)], patch: patch)
+        return .init(form: [Setting(id: "apiKey", label: "API key", kind: .secret, scope: .account)], patch: patch)
     }
 
     private func credential() throws -> CredentialLookup? {
@@ -230,7 +231,8 @@ public struct ProviderDraft: Sendable, Equatable {
         case .cli:
             let words = Self.words(command)
             guard let cli = words.first else { throw Missing.command }
-            return .cli(CLICall(cli: cli, args: Array(words.dropFirst()), workingDirectory: .dedicated))
+            // A command a person types runs over pipes; a TUI needs a definition's `cli`.
+            return .command(CommandCall(cli: cli, args: Array(words.dropFirst()), workingDirectory: .dedicated))
         case .file:
             let path = path.trimmingCharacters(in: .whitespaces)
             guard !path.isEmpty else { throw Missing.path }

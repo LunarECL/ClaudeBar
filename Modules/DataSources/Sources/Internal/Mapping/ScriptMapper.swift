@@ -13,7 +13,10 @@ import JavaScriptCore
 ///   see, and each declared context file's fields
 ///
 /// and returns `{ quotas, plan, cost, account }` or `{ error }`. It may call
-/// `humanDate(text)` for an epoch-seconds reset time, or `null`.
+/// `humanDate(text)` for an epoch-seconds reset time, or `null`;
+/// `jsonDecimal(text)` to parse JSON keeping every number as its exact text;
+/// and `decimalCents(amount)` to round such an amount to cents without a
+/// binary float — money stays exact (CANONICAL §5, `Money`).
 ///
 /// The context has no file, network or process access: the script turns text
 /// into numbers and nothing else.
@@ -42,6 +45,7 @@ struct ScriptMapper: Reading {
         context.setObject(humanDate, forKeyedSubscript: "humanDate" as NSString)
         context.setObject(try Self.inputJSON(response, facts: facts, now: now()), forKeyedSubscript: "__input" as NSString)
 
+        context.evaluateScript(DecimalScript.source)
         context.evaluateScript(source)
         if let exception {
             throw UsageError.parseFailed("Mapping script '\(file)' failed to load: \(exception)")

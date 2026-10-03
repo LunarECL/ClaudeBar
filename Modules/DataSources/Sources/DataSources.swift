@@ -32,6 +32,7 @@ public enum DataSources {
             definition,
             providerId: providerId,
             makeCLIExecutor: CLIFetcher.system,
+            makeCommandExecutor: CommandFetcher.system,
             network: URLSession.shared,
             makeTransport: { executable, arguments, environment, directory in
                 try ProcessRPCTransport(executable: executable, arguments: arguments, environment: environment, workingDirectory: directory)
@@ -39,6 +40,7 @@ public enum DataSources {
             security: KeychainReader.system,
             scripts: scripts,
             secrets: secrets,
+            browserCookies: SystemBrowserCookies(),
             environment: environment,
             homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
             now: { Date() }
@@ -47,7 +49,7 @@ public enum DataSources {
 
     /// The same, with each connection handed in — how tests, here and in the
     /// modules above, run real definitions over stubbed connections. Every
-    /// CLI call runs on `cliExecutor`, whatever environment it asks for.
+    /// CLI and command runs on `cliExecutor`, whatever environment it asks for.
     public static func make(
         _ definition: DataSourceDefinition,
         providerId: String,
@@ -57,6 +59,7 @@ public enum DataSources {
         security: @escaping @Sendable ([String]) -> (status: Int32, output: String) = { _ in (1, "") },
         scripts: @escaping ScriptSource = { _ in nil },
         secrets: (any SecretStore)? = nil,
+        browserCookies: any BrowserCookieReading = SystemBrowserCookies(),
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         now: @escaping @Sendable () -> Date
@@ -65,11 +68,13 @@ public enum DataSources {
             definition,
             providerId: providerId,
             makeCLIExecutor: { _ in cliExecutor },
+            makeCommandExecutor: { _ in cliExecutor },
             network: network,
             makeTransport: makeTransport,
             security: security,
             scripts: scripts,
             secrets: secrets,
+            browserCookies: browserCookies,
             environment: environment,
             homeDirectory: homeDirectory,
             now: now
@@ -80,11 +85,13 @@ public enum DataSources {
         _ definition: DataSourceDefinition,
         providerId: String,
         makeCLIExecutor: @escaping CLIFetcher.MakeExecutor,
+        makeCommandExecutor: @escaping CommandFetcher.MakeExecutor,
         network: any NetworkClient,
         makeTransport: @escaping TransportFactory,
         security: @escaping KeychainReader.Security,
         scripts: @escaping ScriptSource,
         secrets: (any SecretStore)?,
+        browserCookies: any BrowserCookieReading,
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         now: @escaping @Sendable () -> Date
@@ -92,10 +99,14 @@ public enum DataSources {
         let fetcher: any Fetching = switch definition.fetch {
         case .http(let request):
             HTTPFetcher(request: request, network: network, now: now)
+        case .httpSteps(let steps):
+            HTTPStepsFetcher(steps: steps, network: network, now: now)
         case .jsonRpc(let call):
             JSONRPCFetcher(call: call, cliExecutor: makeCLIExecutor(CLICall(cli: call.cli)), makeTransport: makeTransport)
         case .cli(let call):
             CLIFetcher(call: call, makeExecutor: makeCLIExecutor)
+        case .command(let call):
+            CommandFetcher(call: call, makeExecutor: makeCommandExecutor)
         case .file(let call):
             FileFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
         }
@@ -114,7 +125,7 @@ public enum DataSources {
         }
 
         let readers = Readers(environment: environment, homeDirectory: homeDirectory, security: security,
-                              secrets: secrets, providerId: providerId)
+                              secrets: secrets, providerId: providerId, browserCookies: browserCookies)
         return DataSource(
             definition: definition,
             providerId: providerId,
@@ -144,6 +155,7 @@ public enum DataSources {
         let security: KeychainReader.Security
         let secrets: (any SecretStore)?
         let providerId: String
+        let browserCookies: any BrowserCookieReading
 
         func reader(for lookup: CredentialLookup) -> any CredentialFinding {
             switch lookup {
@@ -155,6 +167,8 @@ public enum DataSources {
                 KeychainReader(item: item, security: security)
             case .setting(let name):
                 SettingReader(name: name, providerId: providerId, secrets: secrets)
+            case .browserCookies(let query):
+                BrowserCookieReader(query: query, cookies: browserCookies)
             case .firstOf(let lookups):
                 FirstOfReader(readers: lookups.map { reader(for: $0) })
             case .refreshing(let base, _):

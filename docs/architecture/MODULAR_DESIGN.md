@@ -141,8 +141,8 @@ Modules/DataSources/
 │   └── Internal/
 │       ├── Lookup/    EnvironmentReader · SettingReader · JSONFileReader · KeychainReader ·
 │       │              BrowserCookieReader · OAuth2Refresher
-│       ├── Fetch/     HTTPFetcher · JSONRPCFetcher · CLIFetcher · TerminalFetcher ·
-│       │              FileFetcher · ScriptFetcher · CloudWatchFetcher
+│       ├── Fetch/     HTTPFetcher · HTTPStepsFetcher · JSONRPCFetcher · CLIFetcher ·
+│       │              CommandFetcher · FileFetcher · ScriptFetcher · CloudWatchFetcher
 │       ├── Mapping/   JSONMapper (+ the path dialect) · TextMapper · ScriptMapper ·
 │       │              HumanDate
 │       ├── Process/   DefaultCLIExecutor · ProcessRPCTransport · InteractiveRunner ·
