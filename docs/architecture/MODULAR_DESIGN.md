@@ -10,9 +10,11 @@ description: How ClaudeBar's code is cut into modules — one module per bounded
 > cut**: which module a file goes in, what a module shows and hides, and what
 > it may import.
 >
-> **Status: PROPOSED.** Branch `refactor/provider-data-sources`. Today the
-> code is three layers — `Domain`, `Infrastructure`, `App`. This design
-> removes the middle one.
+> **Status: IN PROGRESS.** `Quotas`, `Diagnostics`, `DataSources`,
+> `Providers` and `AWSClients` are built, and every built-in provider runs
+> from them (M0–M3 below). `Domain` and `Infrastructure` still hold the
+> monitor, alerting, activity, Usage History and storage, which are the next
+> modules to carve.
 
 ---
 
@@ -238,15 +240,16 @@ files move. When an old target is empty it is deleted.
 | Step | Moves | Visible change |
 |---|---|---|
 | **M0** ✅ | `Diagnostics` and `Quotas` carved; `Domain` re-exports `Quotas`, `DataSources` and `Providers`, which no longer import `Domain` | none |
-| **M1** | `DataSources` — the ports and their implementations move in; `DataSource`, the closed sums and the workers Codex needs are written test-first | none |
-| **M2** | `Providers` — `Provider`, the definition, the catalog; `codex.json` with golden tests; the App builds Codex from it; `CodexProvider` and every `Codex*` type in `Infrastructure/Codex` deleted. **Slice 1 of the target architecture** | none |
-| M3… | one group of providers per PR (target §8); then `Monitoring`, `Alerting`, `Activity`, `UsageHistory`, `Storage` | none |
+| **M1** ✅ | `DataSources` — the ports and their implementations move in; `DataSource`, the closed sums and the workers Codex needs are written test-first | none |
+| **M2** ✅ | `Providers` — `Provider`, the definition, the catalog; `codex.json` with golden tests; the App builds Codex from it; `CodexProvider` and every `Codex*` type in `Infrastructure/Codex` deleted. **Slice 1 of the target architecture** | none |
+| **M3** ✅ | one group of providers per PR (target §8), through #419; `AWSClients` carved from `Infrastructure/Bedrock` (#417) | none |
+| M4… | `Monitoring`, `Alerting`, `Activity`, `UsageHistory`, `Storage` | none |
 | last | `Domain` and `Infrastructure` are empty and removed from `Project.swift` | none |
 
 **M0 moved the kernel as it is.** `Quotas` holds today's types unchanged —
 and, because `UsageSnapshot` carries them, a few that belong elsewhere:
 `DailyUsageReport`/`Stat` (→ `UsageHistory`), `UsageDisplayMode` (→ the App),
-`ExtensionMetric` and `BedrockModels` (→ out of the kernel). `RefreshKind` and
+`ExtensionMetric` (→ out of the kernel); `BedrockModels` has left (#417: a `Cost` with lines). `RefreshKind` and
 `DailyUsageAnalyzing` sit in `Providers` until `Monitoring` and `UsageHistory`
 exist. Each type carries a `- Note: Interim` naming its final shape; reshaping
 the kernel follows [CANONICAL_MODEL §8](CANONICAL_MODEL.md#8--build-truth-node-by-node)'s

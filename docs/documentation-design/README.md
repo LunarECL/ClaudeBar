@@ -59,7 +59,7 @@ docs/
 ├── release/                    maintainer-only: RELEASE_SETUP, SPARKLE_SETUP (unchanged)
 ├── providers/                  one folder per provider, shaped like a Skill
 │   ├── claude/
-│   │   ├── README.md           tier 2: setup, probe modes, permissions, gotchas (≤200 lines)
+│   │   ├── README.md           tier 2: setup, data sources, permissions, gotchas (≤200 lines)
 │   │   └── design.md           tier 3: endpoints, fields, CLI screen quirks, fallbacks, dead ends
 │   └── kiro/
 │       └── README.md           most small providers stop here

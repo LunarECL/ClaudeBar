@@ -11,9 +11,9 @@ description: The architecture that implements the canonical model — a provider
 > **This document says how a provider runs**: from a JSON file, through one
 > `DataSource`, to the popover — and in what order today's code gets there.
 >
-> **Status: PROPOSED.** Branch `refactor/provider-data-sources`. Today's
-> wiring is [ARCHITECTURE.md](ARCHITECTURE.md); it stays the truth until a
-> slice below lands, and each slice updates it.
+> **Status: BUILT** for every built-in provider (slices 1–6 below, merged
+> through #419); slice 7 (Claude's renames, `AIProvider` folding into
+> `Provider`) is what remains. Today's wiring is [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
@@ -368,20 +368,20 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 
 | # | Slice | Done when |
 |---|---|---|
-| **1** | **Codex** — the definition types, `CredentialLookup` · `Fetch` · `Mapping`, `DataSource`, `Provider`; workers `JSONFileReader`, `OAuth2Refresher`, `HTTPFetcher`, `JSONRPCFetcher`, `CLIFetcher` (terminal), `JSONMapper`, `TextMapper`; `codex.json`; golden tests | `CodexProvider`, `CodexUsageProbe`, `CodexAPIUsageProbe`, `DefaultCodexRPCClient`, `CodexCredentialLoader` are deleted; both modes and the fallback work; `codex.probeMode` is read as before |
+| 1 ✅ | **Codex** — the definition types, `CredentialLookup` · `Fetch` · `Mapping`, `DataSource`, `Provider`; workers `JSONFileReader`, `OAuth2Refresher`, `HTTPFetcher`, `JSONRPCFetcher`, `CLIFetcher` (terminal), `JSONMapper`, `TextMapper`; `codex.json`; golden tests | `CodexProvider`, `CodexUsageProbe`, `CodexAPIUsageProbe`, `DefaultCodexRPCClient`, `CodexCredentialLoader` are deleted; both modes and the fallback work; `codex.probeMode` is read as before |
 | 1a ✅ | **Accounts under one Provider** — `Provider` owns `[Account]`; `{{account.x}}` filled at fetch time; `codex.json`'s `accounts.dataSources` deleted; `AddedAccounts` → `provider.add(account:)` | same ids, pills, pins and settings keys; no visible change |
 | 2a ✅ | **DeepSeek** — `deepseek.json`, balance script, `accounts.form`, scoped keys and verified legacy-key migration | its probe and provider class are deleted; golden tests cover currency, paid/granted details and independent keys |
-| 2 | the remaining HTTP + API-key providers (MiniMax, Z.ai, Kimi API, Vercel, …): `EnvironmentReader`, `SettingReader`, on the engine of [§8.2](#82--the-engine-the-remaining-migrations-share) | their probes and provider classes are deleted |
-| 3 | the look (✅ #353), the Data source section (✅ #352) and the settings form move into the JSON; the `switch id` tables and the simple config cards go | adding a provider edits no Swift |
+| 2 ✅ | the remaining HTTP + API-key providers on the engine of [§8.2](#82--the-engine-the-remaining-migrations-share): MiniMax #401, Vercel #403, Command Code #404, Cursor #407, Grok #408, OpenCode Go #409, Z.ai #410, Copilot #412, #415 | their probes and provider classes are deleted |
+| 3 ✅ | the look (#353), the Data source section (#352) and the settings form (#399) move into the JSON; the `switch id` tables and the config cards go — only Claude's budget card and DeepSeek's card remain | adding a provider edits no Swift |
 | 4 ✅ | the kernel laws: `Left` (no fake 100%), `Window` (no guessed length) | balance definitions map money only |
-| 5 | the CLI and cookie providers (Gemini, Kiro, Cursor, AmpCode, Antigravity, Alibaba, …), on the engine of [§8.2](#82--the-engine-the-remaining-migrations-share): `CommandFetcher`, `BrowserCookieReader`, …; Bedrock via `Fetch.cloudWatch` and the `AWSClients` module; extensions read as definitions; *PROBE MODE* → *DATA SOURCE* | no `XxxUsageProbe` is left |
+| 5 ✅ | the CLI, cookie and local providers on the engine of [§8.2](#82--the-engine-the-remaining-migrations-share): Amp #405, Kiro #406, Kimi #411, Alibaba #413, Gemini #414, Antigravity #416, Oh My Pi #418, Mistral #419; Bedrock via `Fetch.cloudWatch` and the `AWSClients` module #417; *PROBE MODE* → *Data fetching method* | no `XxxUsageProbe` is left |
 | 6 ✅ | *Add Provider* (#354), *Export*, *Import* (#355) — the screens of [USER_JOURNEYS.md](USER_JOURNEYS.md) moments 5–11, outer loop from its §5 scenarios | a person adds, shares and imports a provider without a restart, and no exported file contains a key |
 | 7 | Claude (PTY CLI, multi-account, guest passes, budget); the renames (`Usage`, `Plan`, `Cost`, `DataSourceError`) | `AIProvider` folds into `Provider` |
 
-## 8.1 · What Claude added
+## 8.1 · What each provider added
 
-Claude needed more than Codex, and each need became a generic piece, never a
-vendor type:
+Claude needed more than Codex, and every provider after it brought its own
+needs; each became a generic piece, never a vendor type:
 
 | Need | Generic piece |
 |---|---|

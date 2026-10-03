@@ -12,7 +12,7 @@ Copilot is **off by default**, because it needs a token.
 
 1. Settings → Providers → Copilot: turn it on.
 2. Signed in to the GitHub CLI (`gh auth login`)? That's enough: with no token saved, Copilot reads your AI credits through the Copilot API with `gh`'s login. macOS may ask once to let ClaudeBar read the `gh:github.com` Keychain item.
-3. Otherwise pick a **Data source** (see below), create the token it needs and paste it into **GitHub Token**. On Billing, also fill in **GitHub Username** and **Monthly AI Credits**.
+3. Otherwise pick the **Data fetching method** under **Copilot Configuration** (see below), create the token it needs and paste it into **GitHub Token**. On Billing, also fill in **GitHub Username** and **Monthly AI Credits**.
 
 ## Data sources
 
