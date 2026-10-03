@@ -88,7 +88,8 @@ public enum Providers {
             guestPasses: guestPasses,
             // The definition says how to read the default login's logs.
             usageHistory: usageHistory ?? definition.usageHistory.map {
-                UsageHistory(log: DataSources.makeUsageLog($0, scripts: builtInScripts, environment: environment))
+                UsageHistory(log: DataSources.makeUsageLog($0, scripts: builtInScripts, environment: environment),
+                             ledger: DayLedger(store: FileLedgerStore(), key: definition.id))
             },
             vault: secrets
         )
