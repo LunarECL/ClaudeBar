@@ -45,7 +45,7 @@ struct DataSourceSection: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(theme.cardGradient)
+                .fill(theme.cardGradient).themeShadow(theme)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(

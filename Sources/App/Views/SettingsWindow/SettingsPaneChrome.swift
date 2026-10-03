@@ -49,10 +49,10 @@ struct SettingsCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                .fill(theme.cardGradient)
+                .fill(theme.cardGradient).themeShadow(theme)
                 .overlay(
                     RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                        .stroke(theme.glassBorder, lineWidth: 1)
+                        .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
                 )
         )
     }
@@ -159,7 +159,7 @@ struct SettingsSegmentedControl<Option: Hashable>: View {
                 .fill(Color.black.opacity(0.2))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(theme.glassBorder, lineWidth: 1)
+                        .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
                 )
         )
     }

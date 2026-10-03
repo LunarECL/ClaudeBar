@@ -43,8 +43,8 @@ struct ProviderSettingsSection: View {
             }
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: theme.cardCornerRadius).fill(theme.cardGradient))
-        .overlay(RoundedRectangle(cornerRadius: theme.cardCornerRadius).stroke(theme.glassBorder, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: theme.cardCornerRadius).fill(theme.cardGradient).themeShadow(theme))
+        .overlay(RoundedRectangle(cornerRadius: theme.cardCornerRadius).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
     }
 
     private func clear(_ setting: Setting) {

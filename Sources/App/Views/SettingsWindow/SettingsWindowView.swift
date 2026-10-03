@@ -135,7 +135,7 @@ struct SettingsWindowView: View {
                 .fill(theme.glassBackground.opacity(0.5))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(theme.glassBorder, lineWidth: 1)
+                        .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
                 )
         )
     }

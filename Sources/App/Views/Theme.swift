@@ -10,6 +10,7 @@ enum ThemeMode: String, CaseIterable {
     case system
     case cli
     case christmas
+    case pop
 
     var displayName: String {
         switch self {
@@ -18,6 +19,7 @@ enum ThemeMode: String, CaseIterable {
         case .system: "System"
         case .cli: "CLI"
         case .christmas: "Christmas"
+        case .pop: "Pop"
         }
     }
 
@@ -28,6 +30,7 @@ enum ThemeMode: String, CaseIterable {
         case .system: "circle.lefthalf.filled"
         case .cli: "terminal.fill"
         case .christmas: "snowflake"
+        case .pop: "paintpalette.fill"
         }
     }
 
@@ -538,22 +541,30 @@ extension View {
 
 struct BadgeStyle: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.appTheme) private var theme
     let color: Color
+
+    /// An outlined theme (Pop) draws badges as solid outlined chips.
+    private var isOutlined: Bool { theme.cardBorderWidth > 1 }
 
     func body(content: Content) -> some View {
         content
             .font(AppTheme.captionFont(size: 8))
-            .foregroundStyle(colorScheme == .dark ? .white : .white)
+            .foregroundStyle(theme.textOnStatus)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(color.opacity(colorScheme == .dark ? 0.9 : 0.85))
+                RoundedRectangle(cornerRadius: isOutlined ? 999 : 4)
+                    .fill(isOutlined ? color : color.opacity(colorScheme == .dark ? 0.9 : 0.85))
                     .shadow(
-                        color: colorScheme == .light ? color.opacity(0.3) : .clear,
+                        color: colorScheme == .light && !isOutlined ? color.opacity(0.3) : .clear,
                         radius: 2,
                         y: 1
                     )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: isOutlined ? 999 : 4)
+                    .stroke(isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth * 0.6)
             )
             .fixedSize()
     }
@@ -760,7 +771,8 @@ struct ThemeSwitcherButton: View {
         case .dark: themeMode = .system
         case .system: themeMode = .cli
         case .cli: themeMode = .christmas
-        case .christmas: themeMode = .light
+        case .christmas: themeMode = .pop
+        case .pop: themeMode = .light
         }
     }
 }
@@ -778,6 +790,7 @@ struct ThemeProvider: ViewModifier {
         case .system: systemColorScheme
         case .cli: .dark  // CLI uses dark mode base
         case .christmas: .dark  // Christmas uses dark mode base
+        case .pop: .light  // Pop is cream paper
         }
     }
 

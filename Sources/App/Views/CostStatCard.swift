@@ -85,7 +85,7 @@ struct CostStatCard: View {
             // Large cost display
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(costUsage.formattedCost)
-                    .font(.system(size: 28, weight: .heavy, design: theme.fontDesign))
+                    .font(theme.displayFont(size: 28, weight: .heavy))
                     .foregroundStyle(theme.textPrimary)
 
                 if let budget = effectiveBudget {
@@ -157,7 +157,7 @@ struct CostStatCard: View {
         .background(
             ZStack {
                 RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .fill(theme.cardGradient)
+                    .fill(theme.cardGradient).themeShadow(theme)
 
                 // Light mode shadow
                 if colorScheme == .light {

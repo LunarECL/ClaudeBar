@@ -43,6 +43,10 @@ struct StatusColorOverridingTheme: AppThemeProvider {
     var textTertiary: Color { base.textTertiary }
     var fontDesign: Font.Design { base.fontDesign }
     var customFontName: String? { base.customFontName }
+    var displayFontName: String? { base.displayFontName }
+    var cardBorderWidth: CGFloat { base.cardBorderWidth }
+    var cardShadow: ThemeShadow? { base.cardShadow }
+    var textOnStatus: Color { base.textOnStatus }
 
     // MARK: Status Colors
 

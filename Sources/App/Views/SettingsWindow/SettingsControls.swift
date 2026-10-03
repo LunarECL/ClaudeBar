@@ -122,7 +122,7 @@ struct DisplayModeButton: View {
             .fill(isSelected ? theme.accentPrimary.opacity(0.2) : (isHovering ? theme.hoverOverlay : Color.clear))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? theme.accentPrimary.opacity(0.5) : theme.glassBorder, lineWidth: 1)
+                    .stroke(isSelected ? theme.accentPrimary.opacity(0.5) : theme.glassBorder, lineWidth: theme.cardBorderWidth)
             )
     }
 }
@@ -204,7 +204,7 @@ struct MenuBarChoiceButton: View {
             }
 
             RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                .stroke(isSelected ? theme.accentPrimary.opacity(0.5) : theme.glassBorder, lineWidth: 1)
+                .stroke(isSelected ? theme.accentPrimary.opacity(0.5) : theme.glassBorder, lineWidth: theme.cardBorderWidth)
         }
     }
 }

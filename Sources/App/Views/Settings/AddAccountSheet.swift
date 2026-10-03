@@ -61,7 +61,7 @@ struct AddAccountSheet: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                         .background(RoundedRectangle(cornerRadius: 8).fill(theme.glassBackground))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.glassBorder, lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
