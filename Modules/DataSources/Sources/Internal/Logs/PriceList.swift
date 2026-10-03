@@ -15,14 +15,17 @@ struct PriceList: Sendable, Equatable, Decodable {
         let input: Decimal
         let output: Decimal
         let cacheWrite: Decimal
+        /// A write kept an hour; unset is the five-minute price.
+        let cacheWrite1h: Decimal?
         let cacheRead: Decimal
 
-        static let free = Price(input: 0, output: 0, cacheWrite: 0, cacheRead: 0)
+        static let free = Price(input: 0, output: 0, cacheWrite: 0, cacheWrite1h: 0, cacheRead: 0)
 
-        init(input: Decimal, output: Decimal, cacheWrite: Decimal, cacheRead: Decimal) {
+        init(input: Decimal, output: Decimal, cacheWrite: Decimal, cacheWrite1h: Decimal? = nil, cacheRead: Decimal) {
             self.input = input
             self.output = output
             self.cacheWrite = cacheWrite
+            self.cacheWrite1h = cacheWrite1h
             self.cacheRead = cacheRead
         }
 
@@ -31,10 +34,11 @@ struct PriceList: Sendable, Equatable, Decodable {
             input = try PriceAmount.decode(container, .input)
             output = try PriceAmount.decode(container, .output)
             cacheWrite = try PriceAmount.decode(container, .cacheWrite)
+            cacheWrite1h = container.contains(.cacheWrite1h) ? try PriceAmount.decode(container, .cacheWrite1h) : nil
             cacheRead = try PriceAmount.decode(container, .cacheRead)
         }
 
-        enum CodingKeys: String, CodingKey { case input, output, cacheWrite, cacheRead }
+        enum CodingKeys: String, CodingKey { case input, output, cacheWrite, cacheWrite1h, cacheRead }
     }
 
     struct Model: Sendable, Equatable, Decodable {
@@ -110,7 +114,8 @@ struct PriceList: Sendable, Equatable, Decodable {
         let price = price(for: record.model ?? "", servedLocally: servedLocally)
         return Decimal(record.input) / per * price.input
             + Decimal(record.output) / per * price.output
-            + Decimal(record.cacheWrite) / per * price.cacheWrite
+            + Decimal(record.cacheWrite - record.cacheWrite1h) / per * price.cacheWrite
+            + Decimal(record.cacheWrite1h) / per * (price.cacheWrite1h ?? price.cacheWrite)
             + Decimal(record.cacheRead) / per * price.cacheRead
     }
 

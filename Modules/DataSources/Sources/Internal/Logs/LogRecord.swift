@@ -11,6 +11,8 @@ struct LogRecord: Sendable, Equatable {
     let input: Int
     let output: Int
     let cacheWrite: Int
+    /// The part of `cacheWrite` kept an hour.
+    let cacheWrite1h: Int
     let cacheRead: Int
     /// The log's own sum, when it keeps only that.
     let total: Int?
@@ -18,13 +20,14 @@ struct LogRecord: Sendable, Equatable {
     let cost: Decimal?
 
     init(at: Date, id: String? = nil, model: String? = nil, input: Int = 0, output: Int = 0,
-         cacheWrite: Int = 0, cacheRead: Int = 0, total: Int? = nil, cost: Decimal? = nil) {
+         cacheWrite: Int = 0, cacheWrite1h: Int = 0, cacheRead: Int = 0, total: Int? = nil, cost: Decimal? = nil) {
         self.at = at
         self.id = id
         self.model = model
         self.input = input
         self.output = output
         self.cacheWrite = cacheWrite
+        self.cacheWrite1h = min(cacheWrite1h, cacheWrite)
         self.cacheRead = cacheRead
         self.total = total
         self.cost = cost
@@ -90,16 +93,16 @@ struct RecordShape: Sendable {
             model = name
         }
         let tokens = records.tokens
-        let counts = [tokens.input, tokens.output, tokens.cacheWrite, tokens.cacheRead, tokens.total]
+        let counts = [tokens.input, tokens.output, tokens.cacheWrite, tokens.cacheRead, tokens.total, tokens.cacheWrite1h]
             .map { path in path.flatMap { scope.number($0) }.map { Int($0) } }
         let cost = records.cost.flatMap { Self.decimal(scope.value($0)) }
         // A record that says nothing about usage isn't usage.
-        guard counts.contains(where: { $0 != nil }) || cost != nil else { return nil }
+        guard counts.prefix(5).contains(where: { $0 != nil }) || cost != nil else { return nil }
         let parts = records.id.map { scope.string($0) }
         let id = parts.isEmpty || parts.contains(nil) ? nil : parts.compactMap { $0 }.joined(separator: "\u{1F}")
         return LogRecord(at: at, id: id, model: model,
                          input: counts[0] ?? 0, output: counts[1] ?? 0, cacheWrite: counts[2] ?? 0,
-                         cacheRead: counts[3] ?? 0, total: counts[4], cost: cost)
+                         cacheWrite1h: counts[5] ?? 0, cacheRead: counts[3] ?? 0, total: counts[4], cost: cost)
     }
 
     private func time(in scope: JSONScope, path: String) -> Date? {

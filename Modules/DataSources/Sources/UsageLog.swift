@@ -183,14 +183,18 @@ extension UsageLog {
         public let input: String?
         public let output: String?
         public let cacheWrite: String?
+        /// The part of `cacheWrite` kept an hour, which costs more than a
+        /// five-minute write.
+        public let cacheWrite1h: String?
         public let cacheRead: String?
         public let total: String?
 
-        public init(input: String? = nil, output: String? = nil, cacheWrite: String? = nil,
+        public init(input: String? = nil, output: String? = nil, cacheWrite: String? = nil, cacheWrite1h: String? = nil,
                     cacheRead: String? = nil, total: String? = nil) {
             self.input = input
             self.output = output
             self.cacheWrite = cacheWrite
+            self.cacheWrite1h = cacheWrite1h
             self.cacheRead = cacheRead
             self.total = total
         }
