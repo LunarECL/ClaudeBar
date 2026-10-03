@@ -980,16 +980,19 @@ struct MenuContentView: View {
                     ZStack {
                         Circle()
                             .fill(theme.shareGradient)
+                            .themeShadow(theme, scale: 0.6)
+                            .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                             .frame(width: 32, height: 32)
 
+                        // On a printed theme's light candy fill, the icon is ink.
                         if isFetchingPasses {
                             ProgressView()
                                 .scaleEffect(0.5)
-                                .tint(.white)
+                                .tint(theme.isOutlined ? theme.textPrimary : .white)
                         } else {
                             Image(systemName: "gift.fill")
                                 .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(theme.isOutlined ? theme.textPrimary : .white)
                         }
                     }
                 }
@@ -1560,9 +1563,10 @@ struct WrappedActionButton: View {
             .background(
                 ZStack {
                     if theme.isOutlined {
-                        // Printed: a paper chip on a hard shadow, mint under the pointer.
+                        // Printed: a paper chip on a hard shadow, mint under the
+                        // pointer, sky while it works — never greyed out.
                         Capsule()
-                            .fill(isHovering ? theme.statusHealthy : theme.glassBackground)
+                            .fill(isLoading ? theme.accentSecondary : (isHovering ? theme.statusHealthy : theme.glassBackground))
                             .themeShadow(theme, scale: isHovering ? 1 : 0.75)
                     } else {
                         Capsule()
@@ -1579,7 +1583,10 @@ struct WrappedActionButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
-        .disabled(isLoading)
+        // A disabled button is dimmed; a printed theme shows its sky "working"
+        // chip at full strength instead, and simply ignores clicks meanwhile.
+        .disabled(isLoading && !theme.isOutlined)
+        .allowsHitTesting(!isLoading)
     }
 }
 
