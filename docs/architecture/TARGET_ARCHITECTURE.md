@@ -842,6 +842,15 @@ exact; and it turns one record into records, nothing else. A script is
 slower than paths, so `where` filters first, and a tool whose fields paths
 *can* reach never needs one.
 
+**Neither Claude nor Mistral uses a script**, and the script tier is not
+built with them. Claude's logs are paths plus options (`where`, a composite
+`id`, `sessionGap`, `freeWhen`), and they run to gigabytes: a JavaScriptCore
+call per line would undo the incremental reader and the byte prefilter.
+Mistral's one tool-shaped fact — the time in the folder's name — is a
+common one (logs rotated by date), so it is an option, `at.fromPath`, that
+any tool can use. The rule for choosing: **an idea several tools share is
+an option; an idea only one tool has is a script.**
+
 `format` is a closed sum like `Fetch`: the engine stays closed, a new tool is
 data. The reading rules every format shares:
 
@@ -849,8 +858,10 @@ data. The reading rules every format shares:
   are skipped, and only files changed since the range's first day are read.
 - **`where`** keeps the records that match; its text values are also a byte
   prefilter, so a line without them is never decoded.
-- A record without `at`, or without a declared `model`, is skipped; a token
-  field that is missing counts 0.
+- A record without `at`, or without a declared `model`, is skipped; so is
+  one where no token field and no `cost` answers — it says nothing about
+  usage (Claude's assistant line without `usage`, a Vibe `meta.json`
+  without `stats`). Otherwise a missing token field counts 0.
 - **`id`**'s paths together are a record's identity; a record missing any of
   them is never merged with another.
 
