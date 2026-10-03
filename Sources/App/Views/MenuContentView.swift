@@ -900,6 +900,13 @@ struct MenuContentView: View {
                 }
             }
 
+            // The same login's last thirty days, as a chart.
+            if settings.showDailyUsageCards,
+               let days = (monitor.provider(for: snapshot.providerId) as? Account)?.usageHistory?.lastThirtyDays,
+               !days.isEmpty {
+                UsageHistoryChartView(days: days, delay: Double(snapshot.quotas.count + 4) * 0.08)
+            }
+
             // Show extension metrics cards (from extension probes)
             if let extensionMetrics = snapshot.extensionMetrics?.filter({ $0.group == nil }),
                !extensionMetrics.isEmpty {

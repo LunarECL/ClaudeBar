@@ -67,6 +67,27 @@ struct UsageHistoryTests {
     }
 
     @Test
+    func `reading also keeps the last thirty days, for the chart`() async throws {
+        try log([("14", 0), ("41", 1), ("7", 29), ("99", 30)])
+        let history = history()
+
+        await history.read()
+
+        #expect(history.lastThirtyDays.count == 30)
+        #expect(history.lastThirtyDays.first?.totalCost == 7)
+        #expect(history.lastThirtyDays.suffix(2).map(\.totalCost) == [41, 14])
+    }
+
+    @Test
+    func `thirty days with nothing are no chart`() async {
+        let history = history()
+
+        await history.read()
+
+        #expect(history.lastThirtyDays.isEmpty)
+    }
+
+    @Test
     func `days are any range, every date present`() async throws {
         try log([("14", 0), ("41", 1)])
 
