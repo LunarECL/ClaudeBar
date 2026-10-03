@@ -385,6 +385,16 @@ public final class JSONSettingsRepository:
         store.write(value: value, key: "providers.\(id).customCardURL")
     }
 
+    public func providerOrder() -> [String] {
+        store.read(key: "providers.order") ?? []
+    }
+
+    /// An empty order removes the key, so the file keeps meaning "use the
+    /// registration order" when nothing is stored — same rule as customCardURL.
+    public func setProviderOrder(_ order: [String]) {
+        store.write(value: order.isEmpty ? nil : order, key: "providers.order")
+    }
+
     public func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
         let stored: [String] = store.read(key: "providers.\(id).hiddenQuotaKeys") ?? []
         return Set(stored)

@@ -221,4 +221,37 @@ struct UserDefaultsProviderSettingsRepositoryTests {
         repository.setCodexVerifiedAtLeastOnce(false)
         #expect(repository.codexVerifiedAtLeastOnce() == false)
     }
+
+    // MARK: - Provider Order
+
+    @Test
+    func `providerOrder defaults to empty`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        #expect(repository.providerOrder() == [])
+    }
+
+    @Test
+    func `setProviderOrder persists value`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setProviderOrder(["gemini", "claude", "codex"])
+
+        // Read back through a fresh repository over the same suite, so the
+        // value really landed in the persistent store.
+        let reloaded = makeRepository()
+        #expect(reloaded.providerOrder() == ["gemini", "claude", "codex"])
+    }
+
+    @Test
+    func `setProviderOrder empty clears the stored order`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setProviderOrder(["gemini", "claude", "codex"])
+        repository.setProviderOrder([])
+        #expect(repository.providerOrder() == [])
+    }
 }

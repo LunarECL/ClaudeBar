@@ -33,11 +33,17 @@ struct ProvidersPane: View {
     private var providerList: some View {
         SettingsPane(
             title: "Providers",
-            subtitle: "Enable the assistants you use. Click a provider to configure it."
+            subtitle: "Enable the assistants you use and order them — the menu bar follows this order (⌘1–⌘9 included). Click a provider to configure it."
         ) {
             VStack(spacing: 8) {
-                ForEach(listedProviders, id: \.id) { provider in
-                    ProviderListRow(monitor: monitor, provider: provider) {
+                ForEach(Array(listedProviders.enumerated()), id: \.element.id) { index, provider in
+                    ProviderListRow(
+                        monitor: monitor,
+                        provider: provider,
+                        canMoveUp: index > 0,
+                        canMoveDown: index < listedProviders.count - 1,
+                        onMove: { listOrder = monitor.allProviders.map(\.id) }
+                    ) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             selectedProviderId = provider.id
                         }
@@ -97,6 +103,11 @@ struct ProvidersPane: View {
 private struct ProviderListRow: View {
     let monitor: QuotaMonitor
     let provider: any AIProvider
+    let canMoveUp: Bool
+    let canMoveDown: Bool
+    /// Runs after a move persists, so the pane's frozen list order picks the
+    /// change up immediately instead of waiting for the next appear.
+    let onMove: () -> Void
     let onSelect: () -> Void
 
     @Environment(\.appTheme) private var theme
@@ -155,6 +166,8 @@ private struct ProviderListRow: View {
                     }
                 }
 
+                reorderControls
+
                 SettingsSwitch(isOn: Binding(
                     get: { provider.isEnabled },
                     set: { newValue in
@@ -187,6 +200,34 @@ private struct ProviderListRow: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
+    }
+
+    /// Up/down controls that persist the provider order (issue #141). The
+    /// menu bar pills, the overview and ⌘1–⌘9 all read the same order through
+    /// QuotaMonitor, so this is the single place users shape it.
+    private var reorderControls: some View {
+        VStack(spacing: 0) {
+            moveButton(symbol: "chevron.up", offset: -1, enabled: canMoveUp, label: "Move \(provider.name) up")
+            moveButton(symbol: "chevron.down", offset: 1, enabled: canMoveDown, label: "Move \(provider.name) down")
+        }
+    }
+
+    private func moveButton(symbol: String, offset: Int, enabled: Bool, label: String) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                monitor.moveProvider(id: provider.id, by: offset)
+                onMove()
+            }
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(enabled ? theme.textSecondary : theme.textTertiary.opacity(0.35))
+                .frame(width: 18, height: 13)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
     }
 }
 

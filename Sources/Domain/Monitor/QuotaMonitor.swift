@@ -38,6 +38,15 @@ public final class QuotaMonitor {
     /// tests; the app injects a real provider via the convenience init.
     private let powerStateProvider: (any PowerStateProvider)?
 
+    /// Settings repository the user's provider order is read from and written
+    /// to. `nil` (tests) keeps the registration order everywhere.
+    private let settingsRepository: (any ProviderSettingsRepository)?
+
+    /// The persisted provider order (provider IDs), empty when the user never
+    /// reordered. Observable state: mutating it re-renders every view that
+    /// reads `allProviders`/`enabledProviders`.
+    private var storedProviderOrder: [String] = []
+
     /// The person's status policy, read live — every status the monitor
     /// reports, and every alert it sends, is under it.
     private let readStatusPolicy: @MainActor () -> StatusPolicy
@@ -54,10 +63,6 @@ public final class QuotaMonitor {
     /// The currently selected provider ID (for UI display)
     public var selectedProviderId: String = "claude"
 
-    /// Where a person's choices about providers are kept — hidden quotas.
-    /// `nil` hides nothing.
-    private let settingsRepository: (any ProviderSettingsRepository)?
-
     /// The quotas each product hides (#140), by product id — loaded from
     /// settings, observable so every surface follows a change at once.
     private var hiddenQuotas: [String: Set<String>] = [:]
@@ -66,6 +71,9 @@ public final class QuotaMonitor {
 
     /// Creates a QuotaMonitor with a provider repository.
     /// Automatically validates the selected provider on initialization.
+    /// When `settingsRepository` is given, providers are presented in the
+    /// persisted order (issue #141); unlisted IDs keep their registration
+    /// position and disabled providers are skipped by `enabledProviders`.
     public init(
         providers: any AIProviderRepository,
         alerter: (any QuotaAlerter)? = nil,
@@ -78,8 +86,11 @@ public final class QuotaMonitor {
         self.alerter = alerter
         self.clock = clock
         self.powerStateProvider = powerStateProvider
-        self.readStatusPolicy = statusPolicy
         self.settingsRepository = settingsRepository
+        if let settingsRepository {
+            storedProviderOrder = settingsRepository.providerOrder()
+        }
+        self.readStatusPolicy = statusPolicy
         for provider in providers.all { loadHiddenQuotas(for: provider) }
         selectFirstEnabledIfNeeded()
     }
@@ -220,14 +231,38 @@ public final class QuotaMonitor {
         providers.provider(id: id)
     }
 
-    /// Returns all providers
+    /// Returns all providers in the persisted order (registration order when
+    /// the user never reordered).
     public var allProviders: [any AIProvider] {
-        providers.all
+        ordered(providers.all)
     }
 
-    /// Returns only enabled providers
+    /// Returns only enabled providers, in the persisted order.
     public var enabledProviders: [any AIProvider] {
-        providers.enabled
+        ordered(providers.enabled)
+    }
+
+    /// Sorts the given providers by the persisted order. Listed IDs come first
+    /// in stored sequence; unlisted IDs keep their registration position after
+    /// them (ranked past the end of the stored list), so a stored order that
+    /// omits providers — or names ones that no longer exist — degrades to a
+    /// stable registration order. Disabled IDs are gone before this runs for
+    /// `enabledProviders` because the caller filters first.
+    private func ordered(_ input: [any AIProvider]) -> [any AIProvider] {
+        guard !storedProviderOrder.isEmpty else { return input }
+        let rank = Dictionary(
+            storedProviderOrder.enumerated().map { ($1, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        return input
+            .enumerated()
+            .sorted { lhs, rhs in
+                let leftRank = rank[lhs.element.id] ?? (storedProviderOrder.count + lhs.offset)
+                let rightRank = rank[rhs.element.id] ?? (storedProviderOrder.count + rhs.offset)
+                if leftRank != rightRank { return leftRank < rightRank }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
     }
 
     /// Adds a provider dynamically
@@ -464,19 +499,51 @@ public final class QuotaMonitor {
         }
     }
 
-    /// The popover's pills: one per product, its enabled logins inside.
-    public var tabs: [ProductTab] { ProductTab.tabs(of: providers.enabled) }
+    /// The popover's pills: one per product, its enabled logins inside —
+    /// the tabs follow the persisted order (issue #141), not the
+    /// registration order.
+    public var tabs: [ProductTab] { ProductTab.tabs(of: enabledProviders) }
 
     /// The tab the selected login belongs to.
     public var selectedTab: ProductTab? { tabs.first { $0.contains(selectedProviderId) } }
 
     /// Selects the tab in the given 1-based slot, counted the way the popover
-    /// lists them (⌘1 is the first pill), opening on its first login. A slot
-    /// with no tab leaves the selection alone.
+    /// lists them (⌘1 is the first pill), opening on its first login — the
+    /// slots follow the persisted order (issue #141). A slot with no tab
+    /// leaves the selection alone.
     public func selectProvider(atPosition position: Int) {
         let tabs = tabs
         guard tabs.indices.contains(position - 1), let first = tabs[position - 1].accounts.first else { return }
         selectedProviderId = first.id
+    }
+
+    /// Moves a provider up (negative offset) or down (positive offset) within
+    /// the displayed order, clamped at the boundaries, and persists the new
+    /// order. This is the one write path for reordering, so QuotaMonitor stays
+    /// the single source of truth for provider order.
+    public func moveProvider(id: String, by offset: Int) {
+        guard offset != 0 else { return }
+        let ids = ordered(providers.all).map(\.id)
+        guard let index = ids.firstIndex(of: id) else { return }
+        let newIndex = min(max(index + offset, 0), ids.count - 1)
+        guard newIndex != index else { return }
+        var reordered = ids
+        reordered.remove(at: index)
+        reordered.insert(id, at: newIndex)
+        setProviderOrder(reordered)
+    }
+
+    /// Applies a full provider order and persists it through the settings
+    /// repository (when one is wired). IDs that no longer exist in
+    /// `providers.all` — extensions removed, a deleted Codex account — are
+    /// dropped before anything is stored or persisted, so the saved order
+    /// never accumulates dead ids. IDs missing from the list keep their
+    /// registration position.
+    public func setProviderOrder(_ order: [String]) {
+        let live = Set(providers.all.map(\.id))
+        let filtered = order.filter { live.contains($0) }
+        storedProviderOrder = filtered
+        settingsRepository?.setProviderOrder(filtered)
     }
 
     /// Sets a provider's enabled state.

@@ -48,6 +48,8 @@ struct QuotaMonitorHiddenQuotasTests {
         given(mock).isEnabled(forProvider: .any).willReturn(true)
         given(mock).setEnabled(.any, forProvider: .any).willReturn()
         given(mock).hiddenQuotaKeys(forProvider: .any).willReturn(hiddenKeys)
+        given(mock).providerOrder().willReturn([])
+        given(mock).setProviderOrder(.any).willReturn()
         return mock
     }
 

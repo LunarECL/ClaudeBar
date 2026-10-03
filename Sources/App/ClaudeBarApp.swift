@@ -219,6 +219,8 @@ struct ClaudeBarApp: App {
 
         // Initialize the domain service with quota alerter
         // QuotaMonitor automatically validates selected provider on init
+        // The settings repository carries the user's provider order (issue #141),
+        // so the popover, overview and ⌘1–⌘9 follow it.
         // Alerts and every status follow the person's burn-rate setting (#357).
         // Hidden quotas (#140) are read from the same settings, per product.
         let monitor = QuotaMonitor(

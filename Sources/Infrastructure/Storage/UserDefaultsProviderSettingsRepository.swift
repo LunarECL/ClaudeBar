@@ -88,6 +88,19 @@ public final class UserDefaultsProviderSettingsRepository: ClaudeSettingsReposit
         }
     }
 
+    public func providerOrder() -> [String] {
+        userDefaults.stringArray(forKey: Keys.providerOrder) ?? []
+    }
+
+    /// An empty order removes the key: nothing stored means registration order.
+    public func setProviderOrder(_ order: [String]) {
+        if order.isEmpty {
+            userDefaults.removeObject(forKey: Keys.providerOrder)
+        } else {
+            userDefaults.set(order, forKey: Keys.providerOrder)
+        }
+    }
+
     public func hiddenQuotaKeys(forProvider id: String) -> Set<String> {
         Set(userDefaults.stringArray(forKey: Self.hiddenQuotaKeysKey(forProvider: id)) ?? [])
     }
@@ -200,6 +213,8 @@ public final class UserDefaultsProviderSettingsRepository: ClaudeSettingsReposit
         // Claude settings
         static let claudeProbeMode = "providerConfig.claudeProbeMode"
         static let claudeCliFallbackEnabled = "providerConfig.claudeCliFallbackEnabled"
+        // Provider display order (issue #141)
+        static let providerOrder = "providerConfig.providerOrder"
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
         static let codexVerifiedAtLeastOnce = "providerConfig.codexVerifiedAtLeastOnce"
