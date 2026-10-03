@@ -164,8 +164,8 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │   │                   line, or per file) · the fields of one record in the
 │       │       │   │   │                   mapping's path language: when, which model, tokens by
 │       │       │   │   │                   kind, its own cost, its identity
-│       │       │   │   ├── prices: PriceCatalog   WHAT A TOKEN COSTS — the same port Bedrock uses:
-│       │       │   │   │                   a price file beside the definition, or a cloud's price list
+│       │       │   │   ├── prices: PriceList   WHAT A TOKEN COSTS — a price file beside the
+│       │       │   │   │                   definition, or a cloud's list through Bedrock's PriceCatalog
 │       │       │   │   └── sessionGap: seconds?   a pause longer than this starts a working session
 │       │       │   └── Day  ◇              ONE DAY — date (local) · tokens: input · output · cache
 │       │       │                           write · cache read · cost: Cost (lines per model,
@@ -410,7 +410,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a day is the local calendar day; a record counts on the day its own timestamp falls in — a timestamp written in UTC (a file name) is converted, never read as local | `Day` |
 | a record written twice counts once — the last copy wins (a streamed message is logged as it grows) | `UsageLog.records` |
 | a day closes a fixed while after it ends; a closed day is summed once, kept, and never read from the logs again. Today, and the day before until it closes, are read every time | `DayLedger` |
-| a day's spend is a `Cost` with a line per model — the log's own cost wins; otherwise it is ESTIMATED from the price catalog, and says so. A model served on this Mac costs nothing; an unknown model gets the catalog's fallback price, never zero by omission | `Day.cost` · `PriceCatalog` |
+| a day's spend is a `Cost` with a line per model — the log's own cost wins; otherwise it is ESTIMATED from the price catalog, and says so. A model served on this Mac costs nothing; an unknown model gets the catalog's fallback price, never zero by omission | `Day.cost` · `PriceList` |
 | usage history is per login: an added login reads its own folder's logs; two logins' days are never summed | `Account.usageHistory` |
 | a capability is declared by the definition and reached through the login's handle (`account.usageHistory`, `account.guestPasses`), `nil` when not declared — never chosen in Swift by a provider's id | `Account` |
 | usage history is read when the popover opens, never in the background, and never carried on `Usage` | `UsageHistory` |
@@ -432,7 +432,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | `QuotaType.duration` guessing 7 days for a model quota or 30 for "Monthly" | see the law on `Window` |
 | a ViewModel or AppState | unchanged: views read the tree |
 | Claude Code sessions in the Monitor | a different question with a different *Session* — Activity's |
-| a `XxxDailyUsageAnalyzer` per tool, a Swift price table | a tool's logs and prices are data in its definition; one reader per log FORMAT, one `PriceCatalog` port, one day aggregator |
+| a `XxxDailyUsageAnalyzer` per tool, a Swift price table | a tool's logs and prices are data in its definition; every reader yields one `LogRecord`; one reader per log FORMAT, one `PriceList`, one day aggregator |
 | "today and yesterday" as a type | a view, not a fact: the page asks for a range of days |
 | `dailyUsageReport` on the usage | Usage History is another context's answer, read on its own (§9) |
 
@@ -482,7 +482,8 @@ it** — where the logs are, how a record reads, what a token costs — and that
 is data, run by the same machinery as a data source: the definition's
 `usageHistory` block is a `UsageLog.Definition`, `DataSources` builds a
 `UsageLog` from it (filled with the login's values) and reads days with its
-path language, its file access and `PriceCatalog`. `Day` is a value in the
+path language, its file access and its prices (`PriceList`; a cloud's
+through `PriceCatalog`). `Day` is a value in the
 kernel, beside `Cost`. No new arrow: `Providers → DataSources → Quota`
 already exists. A module is carved when something needs its own SDK or a
 second consumer — usage history has neither.
