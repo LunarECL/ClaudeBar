@@ -127,6 +127,9 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │                                   The ACCOUNT's values fill `{{account.x}}` when the fetch
 │       │                                   runs, as the token fills `{{token}}` — one definition,
 │       │                                   never a copy per login
+│       ├── capabilities  ◇                 WHAT ELSE IT OFFERS (§2.1) — declared in the definition, run
+│       │                                   by their own context, handed to each login filled with its
+│       │                                   values: `history` (a UsageLog) · `guestPasses` · `accounts.signIn`
 │       ├── accounts: [Account]  ◆          NEVER EMPTY. One account is the "default" — the plain login
 │       │   └── Account  ◆                  A LOGIN YOU PAY FOR — who, and what we last saw. No behaviour
 │       │       ├── id: Account.ID          `<provider>` for the default, `<provider>.<acct>` for an added one
@@ -144,6 +147,11 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │                           Budget, the Claude API Budget. The vendor sets quotas;
 │       │       │                           the user sets budgets. Set in the provider's form
 │       │       │                           (account scope), since one login's API spend is not another's
+│       │       ├── history: History?       CAPABILITY (§2.1) — THIS LOGIN'S DAYS: `days(in:)` answered
+│       │       │                           by Usage History from this login's own logs. `nil` when the
+│       │       │                           definition declares no `history` — the page asks the handle
+│       │       ├── guestPasses: GuestPasses?   CAPABILITY — "share a trial": declared by `guestPasses`,
+│       │       │                           `nil` otherwise
 │       │       └── status                  DERIVED — QUOTA HEALTH: the worst quota in its usage.
 │       │                                   The pill's and the menu-bar entry's colour
 │       ├── status                          DERIVED — the worst across its enabled accounts
@@ -184,8 +192,9 @@ Activity  ◆                                 Claude Code sessions seen through 
 UsageHistory  ◆                             "TODAY'S USAGE" · "DAILY USAGE — LAST 30 DAYS" — WHAT YOU USED,
 │                                           DAY BY DAY, from a tool's own logs on this Mac. Not a meter:
 │                                           nothing here is left, refills or is judged
-├── logs: [Account.ID: UsageLog]            one per login whose tool writes logs — keyed by the login,
-│   │                                       never summed across logins
+├── logs: [Account.ID: UsageLog]            one per login whose definition declares `history`, handed
+│   │                                       in by the provider — keyed by the login, never summed;
+│   │                                       each login reaches its own as `account.history`
 │   └── UsageLog  ◇                         THE JSON — the definition's `history`, no behaviour:
 │       ├── records                         WHERE AND HOW — files (a glob) · format (a JSON object per
 │       │                                   line, or per file) · the fields of one record in the
