@@ -411,7 +411,7 @@ struct MenuContentView: View {
                 ForEach(Array(monitor.tabs.enumerated()), id: \.element.id) { index, tab in
                     ProviderPill(
                         providerId: tab.id,
-                        providerName: tab.name,
+                        providerName: settings.shown(tab.name),
                         isSelected: tab.contains(selectedProviderId),
                         hasData: tab.accounts.contains { $0.snapshot != nil }
                     ) {
@@ -420,7 +420,7 @@ struct MenuContentView: View {
                             selectedProviderId = first.id
                         }
                     }
-                    .help(index < 9 ? "\(tab.name) (⌘\(index + 1))" : tab.name)
+                    .help(index < 9 ? "\(settings.shown(tab.name)) (⌘\(index + 1))" : settings.shown(tab.name))
                 }
             }
             .background(HorizontalScrollBooster())
@@ -486,8 +486,8 @@ struct MenuContentView: View {
             let report = RefreshReport.of(provider)
             VStack(spacing: 12) {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
-                    accountCard(
-                        displayName: displayName, snapshot: snapshot,
+                    AccountCardView(
+                        providerId: selectedProviderId, displayName: displayName, snapshot: snapshot,
                         freshness: report?.freshness ?? "Updated \(snapshot.ageDescription)"
                     )
                 } else if let freshness = report?.freshness {
@@ -537,7 +537,7 @@ struct MenuContentView: View {
                         if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
                     } label: {
                         HStack(spacing: 4) {
-                            Text(account.name).lineLimit(1)
+                            Text(settings.shown(account.name)).lineLimit(1)
                             Circle()
                                 .fill(account.lastError != nil ? theme.textTertiary
                                       : theme.statusColor(for: monitor.usage(of: account)?.overallStatus(under: settings.statusPolicy) ?? .healthy))
@@ -551,7 +551,7 @@ struct MenuContentView: View {
                         .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
                     }
                     .buttonStyle(.plain)
-                    .help(hidden ? "Show \(account.name)" : "Hide \(account.name) from this view")
+                    .help(hidden ? "Show \(settings.shown(account.name))" : "Hide \(settings.shown(account.name)) from this view")
                 }
             }
         }
@@ -564,7 +564,7 @@ struct MenuContentView: View {
         let detail = lowest.map { " is at \(Int($0.percentRemaining))% \($0.quotaType.displayName)" } ?? ""
         return HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.statusColor(for: status))
-            Text("\(worst.displayName)\(detail) — causing \(status.badgeText.capitalized)")
+            Text("\(settings.shown(worst.displayName))\(detail) — causing \(status.badgeText.capitalized)")
                 .font(.system(size: 11, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -615,7 +615,7 @@ struct MenuContentView: View {
         HStack(spacing: 8) {
             ProviderIconView(providerId: provider.id, size: 20, showGlow: false)
 
-            Text(provider.name)
+            Text(settings.shown(provider.name))
                 .fixedSize(horizontal: false, vertical: true)
                 .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
@@ -683,57 +683,6 @@ struct MenuContentView: View {
         .padding(.vertical, 4)
     }
 
-
-    private func accountCard(displayName: String, snapshot: UsageSnapshot, freshness: String) -> some View {
-        HStack(spacing: 10) {
-            // Avatar circle
-            ZStack {
-                Circle()
-                    .fill(ProviderVisualIdentityLookup.gradient(for: selectedProviderId, scheme: colorScheme))
-                    .frame(width: 32, height: 32)
-
-                Text(String(displayName.prefix(1)).uppercased())
-                    .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
-                    .foregroundStyle(.white)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(displayName)
-                        .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
-                        .lineLimit(1)
-
-                    // Account tier badge
-                    if let accountTier = snapshot.accountTier {
-                        Text(accountTier.badgeText)
-                            .font(.system(size: 8, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule()
-                                    .fill(theme.accentPrimary.opacity(0.8))
-                            )
-                    }
-                }
-
-                Text(freshness)
-                    .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
-                    .foregroundStyle(theme.textTertiary)
-            }
-
-            Spacer()
-
-            // Stale indicator
-            if snapshot.isStale {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(theme.statusWarning)
-            }
-        }
-        .glassCard(cornerRadius: 12, padding: 10)
-    }
 
     /// Collapsed state of quota-group sections, keyed by `QuotaGroup.id`.
     /// Ephemeral by design: reopening the popover starts fully expanded.

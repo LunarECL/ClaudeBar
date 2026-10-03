@@ -252,6 +252,16 @@ struct JSONSettingsRepositoryAppTests {
     }
 
     @Test
+    func `account emails show until hidden, and stay hidden`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.hideAccountEmail() == false)
+        repo.setHideAccountEmail(true)
+        #expect(repo.hideAccountEmail() == true)
+    }
+
+    @Test
     func `setShowDailyUsageCards persists value`() {
         let (repo, dir) = makeRepository()
         defer { cleanup(dir) }

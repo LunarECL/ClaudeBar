@@ -58,6 +58,10 @@ public protocol AppSettingsRepository: Sendable {
     func showDailyUsageCards() -> Bool
     func setShowDailyUsageCards(_ show: Bool)
 
+    /// *Hide account email* (#375): emails show masked in the popover and menu bar.
+    func hideAccountEmail() -> Bool
+    func setHideAccountEmail(_ hide: Bool)
+
     // MARK: - Notch
 
     /// Whether the notch live activity is shown (default: false).

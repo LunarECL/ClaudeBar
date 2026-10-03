@@ -37,6 +37,11 @@ struct MenuBarPane: View {
                     SettingsSwitch(isOn: $settings.menuBarAccountLabelsEnabled)
                         .accessibilityLabel("Show Account Labels in Menu Bar")
                 }
+                SettingsRowDivider()
+                SettingsRow(title: "Hide Account Emails", subtitle: "Mask emails as s•••@g•••.com in the menu bar and popover. The eye beside the account does the same.") {
+                    SettingsSwitch(isOn: $settings.hideAccountEmail)
+                        .accessibilityLabel("Hide Account Emails")
+                }
             }
 
             if settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled {
