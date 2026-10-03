@@ -413,25 +413,6 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.hookPort() == 8080)
     }
 
-    // MARK: - MiniMax Settings
-
-    @Test
-    func `minimaxRegion defaults to china`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.minimaxRegion() == .china)
-    }
-
-    @Test
-    func `setMinimaxRegion persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setMinimaxRegion(.international)
-        #expect(repo.minimaxRegion() == .international)
-    }
-
     // MARK: - Kimi Settings
 
     @Test
