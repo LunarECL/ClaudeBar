@@ -20,14 +20,14 @@ Start with the [README](../README.md). Something broken? See [troubleshooting](t
 | [deepseek](providers/deepseek/README.md) | Track separate DeepSeek accounts and their paid/granted balances in CNY or USD. Set up API keys, rename accounts, or troubleshoot rejected keys. |
 | [gemini](providers/gemini/README.md) | Track Gemini Code Assist quota per model tier (Pro, Flash, Flash Lite) using the Gemini CLI's Google sign-in. Use when setting up Gemini or when it shows "Authentication required" or 100% everywhere. |
 | [grok](providers/grok/README.md) | Track Grok (xAI Grok Build) credit usage for the current billing period, per-product limits and on-demand spend, using the grok CLI's sign-in. Use when setting up Grok or when it shows "Session expired". |
-| [kimi](providers/kimi/README.md) | Track Kimi Code plan and 5-hour limits through the interactive kimi CLI or the Kimi web billing API. Use when setting up Kimi or when it shows "No quota data found" or "Authentication required". |
+| [kimi](providers/kimi/README.md) | Track Kimi Code plan and 5-hour limits through the interactive kimi CLI or the Kimi web billing API. Use when setting up Kimi or when it shows "No quota data found" or "Key needed". |
 | [kiro](providers/kiro/README.md) | Track Kiro monthly plan credits and bonus credits by running `kiro-cli` and reading its `/usage` output. Use when setting up Kiro or when it shows nothing or "No quota data found in Kiro CLI output". |
 | [minimax](providers/minimax/README.md) | Track MiniMax Token Plan usage left per model, with an API key, on the International (minimax.io) or China (minimaxi.com) platform. Use when setting up MiniMax or when it shows an auth or HTTP error. |
 | [mistral](providers/mistral/README.md) | Show today's and yesterday's Mistral Vibe cost and token totals, read from Vibe's local session logs. No API key needed. Use when setting up Mistral or when its card is empty. |
 | [omp](providers/omp/README.md) | Track the rate-limit windows of every account Oh My Pi (omp) is signed into, such as Claude, Codex and Z.ai, via `omp usage --json`. Use when setting up Oh My Pi or when an account shows "No usage reported". |
 | [opencode-go](providers/opencode-go/README.md) | Track OpenCode Go rolling 5-hour, weekly and monthly usage from the opencode.ai usage API, or from the local opencode database when no API key is set. Use when setting up OpenCode Go or when its numbers differ from the dashboard. |
 | [vercel-gateway](providers/vercel-gateway/README.md) | Show your Vercel AI Gateway credit balance in dollars, using an AI Gateway API key stored in the Keychain or an environment variable. Use when setting up Vercel Gateway or when the connection test fails. |
-| [zai](providers/zai/README.md) | Track the Z.ai / Zhipu GLM Coding Plan 5-hour, weekly and MCP quotas, read from Claude Code's settings. Use when setting up Z.ai or when it shows "Authentication required". |
+| [zai](providers/zai/README.md) | Track the Z.ai / Zhipu GLM Coding Plan 5-hour, weekly and MCP quotas, from a saved key or Claude Code's settings. Use when setting up Z.ai or when it shows "Key needed". |
 
 ## Features
 
@@ -41,7 +41,7 @@ Start with the [README](../README.md). Something broken? See [troubleshooting](t
 | [notify](features/notify/README.md) | Send quota to your iPhone through the Notify! app, as a Lock Screen Live Activity, a Lock Screen widget gauge and a Home Screen widget. Use when linking a device or when a surface doesn't appear. |
 | [session-hooks](features/session-hooks/README.md) | Let Claude Code push live session events to ClaudeBar through hooks, for Started/Finished notifications, the session indicator in the popover and menu bar, and the notch. Use when turning on session tracking or when it stays silent. |
 | [status-colors](features/status-colors/README.md) | How ClaudeBar colors a quota healthy, warning, critical or depleted, the optional pace-aware burn-rate warning, and custom status colors and High Contrast. Use when a color looks wrong or hard to read. |
-| [themes](features/themes/README.md) | Pick a built-in theme (System, Light, Dark, CLI, Christmas) or import an iTerm2 .itermcolors scheme to match your terminal. Use when changing how the popover, menu bar and Settings look. |
+| [themes](features/themes/README.md) | Pick a built-in theme (System, Light, Dark, CLI, Christmas, Pop) or import an iTerm2 .itermcolors scheme to match your terminal. Use when changing how the popover, menu bar and Settings look. |
 | [touch-bar](features/touch-bar/README.md) | Show live quota gauges on a MacBook Pro Touch Bar in every app, or feed BetterTouchTool, MTMR and scripts from ~/.claudebar/status.json. Use on Touch Bar Macs or when wiring quota into another tool. |
 | [url-schemes](features/url-schemes/README.md) | Drive ClaudeBar from Raycast, Alfred, Shortcuts, BetterTouchTool or a terminal with claudebar://open, claudebar://refresh and claudebar://settings. Use when scripting ClaudeBar. |
 

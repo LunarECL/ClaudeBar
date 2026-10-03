@@ -41,6 +41,10 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
     public let verifyBeforeBackground: Bool
     /// What a refresh that was held back says until then.
     public let unverifiedMessage: String?
+    /// What a fact a worker reported means, in the reasons the screen prints:
+    /// `http.<status>`, `http.default`, `cli.missing`, `cli.nonzero`,
+    /// `cli.failed`. Nothing from the response fills it in.
+    public let errors: [ErrorFact: ErrorRef]
 
     public init(
         kind: String,
@@ -59,7 +63,8 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         requiresFiles: [String] = [],
         identity: Identity? = nil,
         verifyBeforeBackground: Bool = false,
-        unverifiedMessage: String? = nil
+        unverifiedMessage: String? = nil,
+        errors: [ErrorFact: ErrorRef] = [:]
     ) {
         self.kind = kind
         self.label = label
@@ -78,6 +83,7 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         self.identity = identity
         self.verifyBeforeBackground = verifyBeforeBackground
         self.unverifiedMessage = unverifiedMessage
+        self.errors = errors
     }
 
     public init(from decoder: Decoder) throws {
@@ -99,6 +105,105 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         identity = try container.decodeIfPresent(Identity.self, forKey: .identity)
         verifyBeforeBackground = try container.decodeIfPresent(Bool.self, forKey: .verifyBeforeBackground) ?? false
         unverifiedMessage = try container.decodeIfPresent(String.self, forKey: .unverifiedMessage)
+        let named = try container.decodeIfPresent([String: ErrorRef].self, forKey: .errors) ?? [:]
+        var errors: [ErrorFact: ErrorRef] = [:]
+        for (key, error) in named {
+            guard let fact = ErrorFact(key) else {
+                throw DecodingError.dataCorruptedError(forKey: .errors, in: container,
+                    debugDescription: "Unknown error fact '\(key)': use http.<status>, http.default, cli.missing, cli.nonzero or cli.failed")
+            }
+            errors[fact] = error
+        }
+        self.errors = errors
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(kind, forKey: .kind)
+        try container.encodeIfPresent(label, forKey: .label)
+        try container.encodeIfPresent(summary, forKey: .summary)
+        try container.encodeIfPresent(note, forKey: .note)
+        try container.encode(hidden, forKey: .hidden)
+        try container.encodeIfPresent(credential, forKey: .credential)
+        try container.encode(fetch, forKey: .fetch)
+        try container.encode(mapping, forKey: .mapping)
+        try container.encodeIfPresent(fallback, forKey: .fallback)
+        try container.encode(fallbackOn, forKey: .fallbackOn)
+        try container.encodeIfPresent(cache, forKey: .cache)
+        try container.encode(context, forKey: .context)
+        try container.encode(recover, forKey: .recover)
+        try container.encode(requiresFiles, forKey: .requiresFiles)
+        try container.encodeIfPresent(identity, forKey: .identity)
+        try container.encode(verifyBeforeBackground, forKey: .verifyBeforeBackground)
+        try container.encodeIfPresent(unverifiedMessage, forKey: .unverifiedMessage)
+        if !errors.isEmpty {
+            try container.encode(Dictionary(uniqueKeysWithValues: errors.map { ($0.key.name, $0.value) }), forKey: .errors)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, label, summary, note, hidden, credential, fetch, mapping, fallback, fallbackOn, cache, context,
+             recover, requiresFiles, identity, verifyBeforeBackground, unverifiedMessage, errors
+    }
+}
+
+extension DataSourceDefinition {
+    /// What a failure a worker reported means here: the definition's word for
+    /// its fact — the status's own, else `http.default` — or the worker's.
+    func reason(for failure: any ReportedFailure) -> UsageError {
+        guard let fact = failure.fact else { return failure.reason }
+        let meaning = errors[fact] ?? fact.broader.flatMap { errors[$0] }
+        return meaning?.usageError ?? failure.reason
+    }
+}
+
+/// A failure a worker reports as a fact, with the reason it gives when the
+/// definition says nothing about it.
+protocol ReportedFailure: Error, Sendable {
+    /// `nil` when no definition may reword it — a 429 stays a rate limit.
+    var fact: ErrorFact? { get }
+    var reason: UsageError { get }
+}
+
+/// A fact a worker reports about a failed fetch — the key of a data source's
+/// `errors`. The worker never words it; the definition may.
+public enum ErrorFact: Sendable, Hashable {
+    /// An HTTP status that is not an answer. 429 is never one: it stays a rate limit.
+    case httpStatus(Int)
+    /// Any other HTTP status that is not an answer.
+    case httpOther
+    case cliMissing
+    case cliNonzero
+    case cliFailed
+
+    /// The fact that covers this one when the definition doesn't name it.
+    var broader: ErrorFact? {
+        if case .httpStatus = self { return .httpOther }
+        return nil
+    }
+
+    init?(_ name: String) {
+        switch name {
+        case "http.default": self = .httpOther
+        case "cli.missing": self = .cliMissing
+        case "cli.nonzero": self = .cliNonzero
+        case "cli.failed": self = .cliFailed
+        default:
+            guard name.hasPrefix("http."), let status = Int(name.dropFirst(5)), (100..<600).contains(status), status != 429 else {
+                return nil
+            }
+            self = .httpStatus(status)
+        }
+    }
+
+    var name: String {
+        switch self {
+        case .httpStatus(let status): "http.\(status)"
+        case .httpOther: "http.default"
+        case .cliMissing: "cli.missing"
+        case .cliNonzero: "cli.nonzero"
+        case .cliFailed: "cli.failed"
+        }
     }
 }
 

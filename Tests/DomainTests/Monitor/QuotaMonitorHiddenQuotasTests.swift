@@ -48,6 +48,8 @@ struct QuotaMonitorHiddenQuotasTests {
         given(mock).isEnabled(forProvider: .any).willReturn(true)
         given(mock).setEnabled(.any, forProvider: .any).willReturn()
         given(mock).hiddenQuotaKeys(forProvider: .any).willReturn(hiddenKeys)
+        given(mock).providerOrder().willReturn([])
+        given(mock).setProviderOrder(.any).willReturn()
         return mock
     }
 
@@ -56,7 +58,7 @@ struct QuotaMonitorHiddenQuotasTests {
         alerter: (any QuotaAlerter)? = nil
     ) async -> (QuotaMonitor, MockProviderSettingsRepository) {
         let settings = makeSettings(hiddenKeys: hiddenKeys)
-        let provider = GeminiProvider(probe: makeGeminiProbe(), settingsRepository: settings)
+        let provider = StubGeminiProvider(probe: makeGeminiProbe(), settingsRepository: settings)
         let monitor = QuotaMonitor(
             providers: AIProviders(providers: [provider]),
             alerter: alerter,
@@ -145,7 +147,7 @@ struct QuotaMonitorHiddenQuotasTests {
     func `monitor without settings treats nothing as hidden`() async {
         // Given — no settings repository wired (existing call sites)
         let settings = makeSettings(hiddenKeys: [])
-        let provider = GeminiProvider(probe: makeGeminiProbe(), settingsRepository: settings)
+        let provider = StubGeminiProvider(probe: makeGeminiProbe(), settingsRepository: settings)
         let monitor = QuotaMonitor(
             providers: AIProviders(providers: [provider]),
             clock: TestClock()

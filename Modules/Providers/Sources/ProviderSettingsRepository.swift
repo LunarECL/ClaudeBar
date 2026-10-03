@@ -36,6 +36,23 @@ public protocol ProviderSettingsRepository: Sendable {
     /// Saves a provider's on/off setting by name.
     func setOn(_ on: Bool, _ setting: String, forProvider id: String)
 
+    /// Gets the user's provider display order as provider IDs, empty when the
+    /// user never reordered. IDs missing from the list keep their registration
+    /// position; IDs of providers that no longer exist are ignored.
+    func providerOrder() -> [String]
+
+    /// Persists the user's provider display order.
+    /// An empty list clears the stored order.
+    func setProviderOrder(_ order: [String])
+
+    /// A provider-scope setting's value by name, kept as `<id>.<setting>` —
+    /// `kimi.region` is `value("region", forProvider: "kimi")`. `nil` when
+    /// never set. Never a secret: those live in the vault.
+    func value(_ setting: String, forProvider id: String) -> String?
+
+    /// Saves it; `nil` forgets it, so the setting's default applies.
+    func setValue(_ value: String?, _ setting: String, forProvider id: String)
+
     /// Where the provider's CLI lives on this Mac, when the person chose one
     /// — *CLI location* (#210). `nil` means "find it as usual".
     func cliPath(forProvider id: String) -> String?
@@ -64,6 +81,17 @@ public extension ProviderSettingsRepository {
 
     /// Default for conformers that keep no such setting.
     func setOn(_ on: Bool, _ setting: String, forProvider id: String) {}
+
+    /// Default for conformers that keep no order: the registration order applies.
+    func providerOrder() -> [String] { [] }
+
+    /// Default for conformers that keep no order: nothing to persist.
+    func setProviderOrder(_ order: [String]) {}
+    /// Default for conformers that keep no such setting: its default applies.
+    func value(_ setting: String, forProvider id: String) -> String? { nil }
+
+    /// Default for conformers that keep no such setting.
+    func setValue(_ value: String?, _ setting: String, forProvider id: String) {}
 
     /// Default for conformers that keep no such setting: find the CLI as usual.
     func cliPath(forProvider id: String) -> String? { nil }

@@ -33,11 +33,17 @@ struct ProvidersPane: View {
     private var providerList: some View {
         SettingsPane(
             title: "Providers",
-            subtitle: "Enable the assistants you use. Click a provider to configure it."
+            subtitle: "Enable the assistants you use and order them — the menu bar follows this order (⌘1–⌘9 included). Click a provider to configure it."
         ) {
             VStack(spacing: 8) {
-                ForEach(listedProviders, id: \.id) { provider in
-                    ProviderListRow(monitor: monitor, provider: provider) {
+                ForEach(Array(listedProviders.enumerated()), id: \.element.id) { index, provider in
+                    ProviderListRow(
+                        monitor: monitor,
+                        provider: provider,
+                        canMoveUp: index > 0,
+                        canMoveDown: index < listedProviders.count - 1,
+                        onMove: { listOrder = monitor.allProviders.map(\.id) }
+                    ) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             selectedProviderId = provider.id
                         }
@@ -97,6 +103,11 @@ struct ProvidersPane: View {
 private struct ProviderListRow: View {
     let monitor: QuotaMonitor
     let provider: any AIProvider
+    let canMoveUp: Bool
+    let canMoveDown: Bool
+    /// Runs after a move persists, so the pane's frozen list order picks the
+    /// change up immediately instead of waiting for the next appear.
+    let onMove: () -> Void
     let onSelect: () -> Void
 
     @Environment(\.appTheme) private var theme
@@ -155,6 +166,8 @@ private struct ProviderListRow: View {
                     }
                 }
 
+                reorderControls
+
                 SettingsSwitch(isOn: Binding(
                     get: { provider.isEnabled },
                     set: { newValue in
@@ -172,10 +185,10 @@ private struct ProviderListRow: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .fill(theme.cardGradient)
+                    .fill(theme.cardGradient).themeShadow(theme)
                     .overlay(
                         RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                            .stroke(isHovering ? theme.glassHighlight : theme.glassBorder, lineWidth: 1)
+                            .stroke(isHovering ? theme.glassHighlight : theme.glassBorder, lineWidth: theme.cardBorderWidth)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: theme.cardCornerRadius)
@@ -187,6 +200,34 @@ private struct ProviderListRow: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
+    }
+
+    /// Up/down controls that persist the provider order (issue #141). The
+    /// menu bar pills, the overview and ⌘1–⌘9 all read the same order through
+    /// QuotaMonitor, so this is the single place users shape it.
+    private var reorderControls: some View {
+        VStack(spacing: 0) {
+            moveButton(symbol: "chevron.up", offset: -1, enabled: canMoveUp, label: "Move \(provider.name) up")
+            moveButton(symbol: "chevron.down", offset: 1, enabled: canMoveDown, label: "Move \(provider.name) down")
+        }
+    }
+
+    private func moveButton(symbol: String, offset: Int, enabled: Bool, label: String) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                monitor.moveProvider(id: provider.id, by: offset)
+                onMove()
+            }
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(enabled ? theme.textSecondary : theme.textTertiary.opacity(0.35))
+                .frame(width: 18, height: 13)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
     }
 }
 
@@ -270,60 +311,48 @@ private struct ProviderDetailView: View {
             .background(
                 Capsule()
                     .fill(theme.glassBackground)
-                    .overlay(Capsule().stroke(theme.glassBorder, lineWidth: 1))
+                    .overlay(Capsule().stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
             )
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
     }
 
-    /// The provider-specific config card, when one exists.
+    /// A provider made from a definition gets the same sections as every
+    /// other: its data source, its settings form and its accounts. A provider
+    /// still on its own card keeps that card until it moves to JSON.
     @ViewBuilder
     private var configCard: some View {
-        switch (provider as? Account)?.provider.id ?? provider.id {
-        case "claude":
-            if let claude = (provider as? Account)?.provider {
-                DataSourceSection(provider: claude, monitor: monitor)
-                ProviderAccountsCard(provider: claude, monitor: monitor)
+        if let product = (provider as? Account)?.provider {
+            let legacy = legacyCard(for: product.id)
+            DataSourceSection(provider: product, monitor: monitor)
+            if legacy == nil, !product.definition.defaultLoginSettings.isEmpty {
+                ProviderSettingsSection(provider: product)
             }
-            ClaudeBudgetCard()
-        case "codex":
-            if let codex = (provider as? Account)?.provider {
-                DataSourceSection(provider: codex, monitor: monitor)
-                ProviderAccountsCard(provider: codex, monitor: monitor)
+            if product.definition.accounts != nil {
+                ProviderAccountsCard(provider: product, monitor: monitor)
             }
-        case "kimi":
-            KimiConfigCard(monitor: monitor)
-        case "minimax":
-            MiniMaxConfigCard(monitor: monitor)
-        case "deepseek":
-            if let deepseek = (provider as? Account)?.provider {
-                ProviderAccountsCard(provider: deepseek, monitor: monitor)
+            if let legacy { legacy }
+            if product.definition.profile.origin == .custom {
+                CustomProviderCard(provider: product, monitor: monitor, onDeleted: onBack)
             }
-            DeepSeekConfigCard(monitor: monitor)
-        case "alibaba":
-            AlibabaConfigCard(monitor: monitor)
-        case "vercel-gateway":
-            VercelConfigCard(monitor: monitor)
-        case "copilot":
-            CopilotConfigCard(monitor: monitor)
-        case "zai":
-            ZaiConfigCard(monitor: monitor)
-        case "bedrock":
-            BedrockConfigCard(monitor: monitor)
-        default:
-            if let custom = (provider as? Account)?.provider, custom.definition.profile.origin == .custom {
-                DataSourceSection(provider: custom, monitor: monitor)
-                if custom.definition.accounts != nil {
-                    ProviderAccountsCard(provider: custom, monitor: monitor)
-                }
-                CustomProviderCard(provider: custom, monitor: monitor, onDeleted: onBack)
-            } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
-                ExtensionConfigCard(
-                    provider: extProvider,
-                    configRepository: AppSettings.shared.extensionConfig
-                )
-            }
+        } else if let legacy = legacyCard(for: provider.id) {
+            legacy
+        } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
+            ExtensionConfigCard(
+                provider: extProvider,
+                configRepository: AppSettings.shared.extensionConfig
+            )
+        }
+    }
+
+    /// The card a provider has before its settings are a form — gone as each
+    /// one moves to JSON (TARGET_ARCHITECTURE §8 slice 3).
+    private func legacyCard(for id: String) -> AnyView? {
+        switch id {
+        case "claude": AnyView(ClaudeBudgetCard())
+        case "deepseek": AnyView(DeepSeekConfigCard(monitor: monitor))
+        default: nil
         }
     }
 }

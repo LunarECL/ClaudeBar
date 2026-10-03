@@ -14,34 +14,36 @@ extension ProviderDefinition {
 
     /// *Key needed* — the settings this definition asks whoever adds it for.
     public var neededSettings: [String] {
-        Array(Set(dataSources.flatMap { $0.credential.map(Self.settings(in:)) ?? [] })).sorted()
+        Array(Set(dataSources.flatMap { $0.credential.map(Self.keyNames(in:)) ?? [] })).sorted()
     }
 
-    /// Where it sends a key — the host of every API that sends a credential.
+    /// Where it sends a key — the host of every URL a data source with a
+    /// credential may call, with each setting's every option spelled out, so
+    /// a region a person might pick later is listed too.
     public var keyDestinations: [String] {
-        Array(Set(dataSources.compactMap { source -> String? in
-            guard source.credential != nil, case .http(let request) = source.fetch else { return nil }
-            return URL(string: request.url)?.host ?? request.url
-        })).sorted()
+        let urls = dataSources.filter { $0.credential != nil }.flatMap(\.fetch.connection.urls)
+        return Array(Set(urls.flatMap(expandingSettings).map { URL(string: $0)?.host ?? $0 })).sorted()
     }
 
     /// Every command it runs, as typed.
     public var commands: [String] {
-        dataSources.compactMap { source in
-            switch source.fetch {
-            case .cli(let call): ([call.cli] + call.args).joined(separator: " ")
-            case .jsonRpc(let call): ([call.cli] + call.args).joined(separator: " ")
-            case .http, .file: nil
-            }
-        }
+        var seen = Set<String>()
+        return dataSources.flatMap(\.fetch.connection.commands)
+            .map { $0.joined(separator: " ") }
+            .filter { seen.insert($0).inserted }
     }
 
-    private static func settings(in lookup: CredentialLookup) -> [String] {
+    /// `text` once for each value its `{{setting.x}}` placeholders can take.
+    private func expandingSettings(_ text: String) -> [String] {
+        settings.reduce([text]) { texts, setting in texts.flatMap(setting.expanding) }
+    }
+
+    private static func keyNames(in lookup: CredentialLookup) -> [String] {
         switch lookup {
         case .setting(let name): [name]
-        case .firstOf(let lookups): lookups.flatMap(settings(in:))
-        case .refreshing(let base, _): settings(in: base)
-        case .environment, .jsonFile, .keychain: []
+        case .firstOf(let lookups): lookups.flatMap(keyNames(in:))
+        case .refreshing(let base, _), .refined(let base, _): keyNames(in: base)
+        case .environment, .jsonFile, .keychain, .browserCookies, .sqlite: []
         }
     }
 }
@@ -92,7 +94,9 @@ extension ProviderDefinition {
             enabledByDefault: enabledByDefault,
             dataSources: dataSources,
             defaultDataSource: defaultDataSource,
-            accounts: accounts
+            accounts: accounts,
+            settings: settings,
+            usageHistory: usageHistory
         )
     }
 }

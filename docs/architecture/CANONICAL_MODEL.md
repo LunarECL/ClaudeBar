@@ -111,8 +111,8 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │                       browserCookie(domain) — and how it stays fresh:
 │       │       │   │                       refresh: oauth2(tokenURL, clientId, every, on 401)
 │       │       │   ├── fetch: Fetch        HOW TO GET THE BYTES — "Data fetching method". A closed sum:
-│       │       │   │                       http(request) · jsonRpc(cli, handshake, call) · cli(args) ·
-│       │       │   │                       terminal(cli, keys) · file(path) · script(path)
+│       │       │   │                       http(request | steps) · jsonRpc(cli, handshake, call) ·
+│       │       │   │                       cli(a TUI, keys) · command(args) · file(path) · script(path)
 │       │       │   ├── mapping: Mapping    WHAT THE BYTES SAY — a closed sum:
 │       │       │   │                       json(paths, each, used|left, resets) · text(patterns) ·
 │       │       │   │                       script(file) — JavaScript in JavaScriptCore, no I/O,
@@ -127,6 +127,9 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │                                   The ACCOUNT's values fill `{{account.x}}` when the fetch
 │       │                                   runs, as the token fills `{{token}}` — one definition,
 │       │                                   never a copy per login
+│       ├── capabilities  ◇                 WHAT ELSE IT OFFERS (§2.1) — declared in the definition, run
+│       │                                   by their own context, handed to each login filled with its
+│       │                                   values: `usageHistory` (a UsageLog.Definition) · `accounts.signIn`
 │       ├── accounts: [Account]  ◆          NEVER EMPTY. One account is the "default" — the plain login
 │       │   └── Account  ◆                  A LOGIN YOU PAY FOR — who, and what we last saw. No behaviour
 │       │       ├── id: Account.ID          `<provider>` for the default, `<provider>.<acct>` for an added one
@@ -144,6 +147,32 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │                           Budget, the Claude API Budget. The vendor sets quotas;
 │       │       │                           the user sets budgets. Set in the provider's form
 │       │       │                           (account scope), since one login's API spend is not another's
+│       │       ├── usageHistory: UsageHistory?  ◆   CAPABILITY (§2.1) — "TODAY'S USAGE" · "DAILY USAGE —
+│       │       │   │                       LAST 30 DAYS": WHAT THIS LOGIN USED, DAY BY DAY, from its
+│       │       │   │                       tool's own logs on this Mac. Not a meter: nothing is left,
+│       │       │   │                       refills or is judged, and the monitor never refreshes it.
+│       │       │   │                       `nil` when the definition declares no `usageHistory`
+│       │       │   ├── days(in: DateRange) → [Day]   THE ONE READ — every view is a range of it:
+│       │       │   │                       TODAY'S USAGE is the last two, the chart the last thirty
+│       │       │   ├── ledger: DayLedger  ◇   PAST DAYS, KEPT — a closed day is summed once and kept
+│       │       │   │                       on this Mac; only the open days are read from the log
+│       │       │   ├── log: UsageLog  ◆    HOW TO EXTRACT IT — the only part that differs per
+│       │       │   │   │                   provider. Built by DataSources from the definition's
+│       │       │   │   │                   `usageHistory` (a UsageLog.Definition) filled with this
+│       │       │   │   │                   login's values (its folder); days(from:to:) reads them:
+│       │       │   │   ├── records         WHERE AND HOW — files (a glob) · format (a JSON object per
+│       │       │   │   │                   line, or per file) · the fields of one record in the
+│       │       │   │   │                   mapping's path language: when, which model, tokens by
+│       │       │   │   │                   kind, its own cost, its identity
+│       │       │   │   ├── prices: PriceList   WHAT A TOKEN COSTS — a price file beside the
+│       │       │   │   │                   definition, or a cloud's list through Bedrock's PriceCatalog
+│       │       │   │   └── sessionGap: seconds?   a pause longer than this starts a working session
+│       │       │   └── Day  ◇              ONE DAY — date (local) · tokens: input · output · cache
+│       │       │                           write · cache read · cost: Cost (lines per model,
+│       │       │                           ESTIMATED unless the log states it) · sessions ·
+│       │       │                           working time · cache savings
+│       │       ├── guestPasses: GuestPasses?   CAPABILITY — "share a trial": Claude's alone, so no definition
+│       │       │                           block — the App hands its source in; `nil` otherwise
 │       │       └── status                  DERIVED — QUOTA HEALTH: the worst quota in its usage.
 │       │                                   The pill's and the menu-bar entry's colour
 │       ├── status                          DERIVED — the worst across its enabled accounts
@@ -181,7 +210,8 @@ Response  ◇                                 "Response" — WHAT CAME BACK, bef
 
     DELIBERATELY OUTSIDE THE MONITOR
 Activity  ◆                                 Claude Code sessions seen through hooks — the notch
-UsageHistory  ◆                             "TODAY'S USAGE" — read from local logs, not a meter
+Usage History                               the context that runs each login's `usageHistory` —
+                                            outside the monitor: read when the popover opens
 Destinations                                notifications · Notify! · live activity · status export
 
     NOT IN THE MODEL (the page's)
@@ -217,7 +247,7 @@ format, never for a vendor:
 | Closed sum | Its cases' workers (`internal`) |
 |---|---|
 | `CredentialLookup` | `EnvironmentReader` · `SettingReader` · `JSONFileReader` · `KeychainReader` · `BrowserCookieReader` · `OAuth2Refresher` |
-| `Fetch` | `HTTPFetcher` · `JSONRPCFetcher` · `CLIFetcher` · `TerminalFetcher` · `FileFetcher` · `ScriptFetcher` |
+| `Fetch` | `HTTPFetcher` · `HTTPStepsFetcher` · `JSONRPCFetcher` · `CLIFetcher` (a TUI in a terminal) · `CommandFetcher` (pipes) · `FileFetcher` · `ScriptFetcher` |
 | `Mapping` | `JSONMapper` · `TextMapper` · `ScriptMapper` (JavaScriptCore; host `humanDate()`) |
 
 **Why closed sums.** The JSON decoder must know every tag, and the *Add
@@ -241,6 +271,51 @@ does all five jobs for one vendor.
 
 The three differ only in *where the file is*. Codex, DeepSeek and a provider
 someone made five minutes ago run on the same `DataSource` and the same lifecycle.
+
+## 2.1 · What a provider OWNS, what it OFFERS, and what it isn't
+
+A provider is **the product you pay for, under one or more logins**. Its
+abilities fall in three groups, and a new ability is placed by asking which
+question it answers for the person.
+
+**Owned** — rules only the provider can keep, because only it sees every login:
+
+| Ability | The rule it keeps |
+|---|---|
+| identity — name, look, links | the id is stable forever; its face and links are data |
+| its logins — add (form · folder · sign-in), remove, rename, reorder | never empty; the default login's id is the provider's; no two logins share a folder |
+| its settings | a kind owns its rule; an account's own value beats the provider's; a change rebinds the logins |
+| how it finds out — data source choice, fallback, refresh per login, *Test Connection* | the last usage survives a failure; the failed step is named; a 429 is a rate limit; a fallback is never silent |
+| derived reads — status, best and worst account | the worst account's status; the one with the most left |
+
+**Offered** — CAPABILITIES. Each answers *another* question, on its own
+cadence and often with its own store, so the provider only **declares** it in
+its definition and **hands it out per login**; its own context runs it:
+
+| Capability | The person's question | Declared as | Run by | Reached as |
+|---|---|---|---|---|
+| Usage History | *how much did I use, day by day?* | `usageHistory` | the login's `UsageHistory`, over a `UsageLog` the data-source machinery runs | `account.usageHistory` → `days(in:)` |
+| Guest passes | *can I share a trial?* | — Claude's alone: the App hands in its source | `ClaudeGuestPassSource` | `account.guestPasses` |
+| Budget | *am I spending more than I meant to?* | an account-scope setting on the cost | the cost judges it | `account.budget` |
+| Sign-in | *add another login* | `accounts.signIn` | `AccountSignIn` | `provider.signIn` |
+
+To check their usage history, the person picks a login and the page asks
+`account.usageHistory?.days(in: .last(30))`: the provider filled that login's
+`usageHistory` with its own values (its folder), and it answers from its
+ledger and that login's logs. Two logins show two histories, never summed.
+
+**The rule that keeps it open (OCP):** *how much is left?* is a data source in
+the definition — the provider does not change. Any other question is a
+capability: a block in the definition, the machinery that runs it, and an
+optional handle on `Account` that is `nil` when the definition does not
+declare it. A page asks the handle — `account.usageHistory?` — never the
+provider's id, and never `definition.usageHistory != nil` (tell, don't ask). A
+capability is never chosen in Swift by a provider's name.
+
+**Not the provider's**: the lineup, the selection, the status policy and
+alerts (Monitoring, Alerting); menu-bar text and card titles (the page);
+Claude Code sessions (Activity); where settings and secrets are kept
+(Storage — the provider uses its ports).
 
 ## 3 · The commands, and the node each lands on
 
@@ -317,6 +392,11 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a data source's definition is DATA; the code behind it is one worker per case, with ONE job, named for a protocol or format — never a vendor | `DataSource` |
 | a data source is handed only the connection its fetch needs — an HTTP fetch never holds a CLI | `DataSources` (the factory) |
 | a new provider is never a code change; a new protocol or format is one new case and one worker | `Fetch` · `Mapping` · `CredentialLookup` |
+| a case answers for itself — where it sends a key, what it runs, where its CLI lives; nothing outside it switches over the cases but the factory. Tell, don't ask: no caller reads a node's state to decide what the node could decide | `Fetch` (each case's `Connection`) |
+| a setting's kind owns its rule — a secret has no default and lives in the vault, a choice takes only its options, a path can be required to exist; the setting says what a blank means | `Setting.kind` |
+| a choice's options carry their values (*China → kimi.com*), used by name — `{{setting.region.site}}` — wherever a fetch needs them; an account's own value wins over the provider's | `Setting` |
+| two logins of a provider never share a path setting — the default login's included | `Provider.accounts` |
+| a worker reports a fact (a status, an exit code, a missing CLI) and the definition's `errors` says what it means, in a reason the screen prints — never from the response body or a secret; a 429 stays a rate limit | `DataSource` · `DataSourceError` |
 | a credential is looked up in the order the definition gives; the first that answers wins, and a refreshed token is written back where it was found | `CredentialLookup` |
 | when the active data source fails, its `fallback` is tried once; what the popover shows says which one answered | `Provider` |
 | a definition is valid before it is saved: a fetch, a mapping that produced at least one quota or a cost on Test, and every required setting filled | `ProviderDefinition` |
@@ -325,6 +405,16 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | an import says where a key will be sent, and shows any CLI command it will run, before it asks for a key or saves | `ProviderCatalog.import` |
 | an error names the step that failed — lookup, fetch or mapping — and never carries the secret or the response body | `DataSourceError` |
 | a usage says which data source produced it; a fallback is never silent | `Usage.source` |
+| a tool's usage history is DATA: where its logs are, how to read a record and what a token costs live in its definition; a new tool's logs, or a price change, never edit Swift | `UsageLog.Definition` |
+| usage history is a SERIES OF DAYS; every view — today against yesterday, the last thirty days, a chart — is a range of it, chosen by the page | `UsageHistory.days(in:)` |
+| a day is the local calendar day; a record counts on the day its own timestamp falls in — a timestamp written in UTC (a file name) is converted, never read as local | `Day` |
+| a record written twice counts once — the last copy wins (a streamed message is logged as it grows) | `UsageLog.records` |
+| a day closes a fixed while after it ends; a closed day is summed once, kept, and never read from the logs again. Today, and the day before until it closes, are read every time | `DayLedger` |
+| a day's spend is a `Cost` with a line per model — the log's own cost wins; otherwise it is ESTIMATED from the price catalog, and says so. A model served on this Mac costs nothing; an unknown model gets the catalog's fallback price, never zero by omission | `Day.cost` · `PriceList` |
+| usage history is per login: an added login reads its own folder's logs; two logins' days are never summed | `Account.usageHistory` |
+| a capability several providers can offer is declared by the definition; one only a single product has (guest passes) is a source the App hands in — never a block in the shared definition, never a vendor name in a module. Either way it is reached through the login's handle (`account.usageHistory`, `account.guestPasses`), `nil` when not offered | `Account` |
+| usage history is read when the popover opens, never in the background, and never carried on `Usage` | `UsageHistory` |
+| a day with nothing is an empty day, not a missing one — a series has every date in its range | `UsageHistory.days(in:)` |
 
 ## 6 · What is deliberately NOT in the tree
 
@@ -342,6 +432,9 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | `QuotaType.duration` guessing 7 days for a model quota or 30 for "Monthly" | see the law on `Window` |
 | a ViewModel or AppState | unchanged: views read the tree |
 | Claude Code sessions in the Monitor | a different question with a different *Session* — Activity's |
+| a `XxxDailyUsageAnalyzer` per tool, a Swift price table | a tool's logs and prices are data in its definition; every reader yields one `LogRecord`; one reader per log FORMAT, one `PriceList`, one day aggregator |
+| "today and yesterday" as a type | a view, not a fact: the page asks for a range of days |
+| `dailyUsageReport` on the usage | Usage History is another context's answer, read on its own (§9) |
 
 ## 7 · The contexts, and the modules that implement them
 
@@ -357,20 +450,19 @@ enforces it. Across a fence the same word may mean something else, as long as
 | **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* | `Modules/Monitoring` |
 | **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export | `Modules/Alerting` |
 | **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch | `Modules/Activity` |
-| **Usage History** | supporting | *what did I use today, against yesterday?* | `Modules/UsageHistory` |
+| **Usage History** | supporting | *what did I use, day by day?* | no module of its own: `UsageHistory` in `Modules/Providers` (the login owns it), `UsageLog` in `Modules/DataSources` (how it is extracted), `Day` in `Modules/Quotas` |
 | **Vault & Settings** | generic | *where is it kept?* — `settings.json`, secrets | `Modules/Storage` |
 | SDK clients | — (anti-corruption layers) | *what does this SDK say?* — a client that needs a heavy SDK gets its own module, behind a port, so only it links the SDK | `Modules/AWSClients` |
 
 ```text
                       Quota                    the shared kernel — knows nobody
-                    ▲   ▲   ▲
-          ┌─────────┘   │   └──────────┐
-    DataSources     UsageHistory    Alerting ◀──┐
-          ▲                                     │
-          │                                     │
-          │◀── AWSClients (the SDK)               │
-          │                                     │
-    Providers ◀──────────── Monitoring ─────────┘        Activity
+                    ▲            ▲
+          ┌─────────┘            └───────────┐
+    DataSources                           Alerting ◀──┐
+          ▲                                           │
+          │◀── AWSClients (the SDK)                    │
+          │                                           │
+    Providers ◀─────────────── Monitoring ────────────┘   Activity
           ▲                      ▲                      (on its own:
           │                      │                       no Quota, no Provider)
           └──────── App ─────────┘
@@ -381,6 +473,20 @@ enforces it. Across a fence the same word may mean something else, as long as
 Arrows point at the **supplier**. Nothing points back: the kernel cannot name a
 provider, Data Sources cannot name the Monitor, no module names a vendor, and
 the AWS SDK links into `AWSClients` and nowhere else.
+
+**Usage History has no module of its own** — it splits along the line every
+provider already has. What the person asks for is the login's: `Account`
+owns its `UsageHistory` (in `Providers`), which answers `days(in:)` from its
+ledger of closed days. What differs per provider is only **how to extract
+it** — where the logs are, how a record reads, what a token costs — and that
+is data, run by the same machinery as a data source: the definition's
+`usageHistory` block is a `UsageLog.Definition`, `DataSources` builds a
+`UsageLog` from it (filled with the login's values) and reads days with its
+path language, its file access and its prices (`PriceList`; a cloud's
+through `PriceCatalog`). `Day` is a value in the
+kernel, beside `Cost`. No new arrow: `Providers → DataSources → Quota`
+already exists. A module is carved when something needs its own SDK or a
+second consumer — usage history has neither.
 
 **Packaging.** One Tuist framework target per context under `Modules/`, each
 with `Sources/` and `Tests/`. The `**` globs keep working per module; a context's tests link only that
@@ -399,6 +505,8 @@ context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
 | `Quota.left` | **built** (slice 4): `Left` = `share` · `money(Money, of: Money?)` on every `UsageQuota`; status, pace, the lowest quota and the menu bar follow it, so a balance shows its money and has no pace. Legacy probes still write `100` + `dollarRemaining`, which reads as a balance; a JSON mapping writes `left: { money, of }` | `percentRemaining` leaves the call sites as providers migrate |
 | `Window` | **built** (slice 4): the kernel no longer guesses — pace uses only a stated `window.length`. Legacy probes state what the guess used to give (`conventionalWindow`, named as a convention; Bedrock's daily budget now 1 day; Cursor's monthly card none, as it chose); Claude's script and JSON and Codex's JSON state their windows, the response's word first | the conventions become each definition's word as providers migrate |
 | `Usage` | `UsageSnapshot` with `bedrockUsage`, `extensionMetrics`, `dailyUsageReport` | kernel fields only; the rest moves to their contexts |
+| `UsageHistory` · `UsageLog` · `Day` · `DayLedger` | **built** (UH1–UH6): `account.usageHistory` on every login (an added one's from `accounts.patch.usageHistory`) over a `UsageLog` from `claude.json`'s and `mistral.json`'s `usageHistory`, closed days in a `DayLedger`, the 30-day chart; still to come: the `Day` word and cost lines per model. Before: `UsageHistory` in `Domain` keyed by login, fed by two vendor-named analyzers in `Infrastructure` — `ClaudeDailyUsageAnalyzer` (JSONL under `~/.claude/projects`, `ModelPricing` as a Swift table, `ClaudeLocalInferenceDetector`, `SessionLogCache`) and `VibeSessionLogAnalyzer` (`meta.json` per session folder); the report types (`DailyUsageReport`/`Stat`) sit in `Quotas`; only today and yesterday exist, re-read from the logs on every popover open | `UsageHistory` + `DayLedger` in `Providers`, reached as `account.usageHistory`; `UsageLog` in `DataSources`, built from each definition's `usageHistory`, one reader per format, prices through a `PriceList`, one aggregator; `Day` in `Quotas`; both analyzers and `Infrastructure/Claude`, `Infrastructure/Mistral` deleted (TARGET_ARCHITECTURE §10) |
+| capabilities | guest passes chosen in Swift by name (`builtIn("claude", guestPasses: GuestPasses(source: ClaudeGuestPassSource()))`); usage history **built** as `account.usageHistory` (UH1, the default login's), still fed by an analyzer handed in by id in the App | usage history declared in the definition (built, UH1–UH6); guest passes stay a Swift source the App hands in — Claude's alone, so not definition data (TARGET_ARCHITECTURE §10.6) — both reached as `account.usageHistory` / `account.guestPasses` |
 | `Plan` | `AccountTier` with Claude cases | a name and a badge |
 | `StatusPolicy` | **built** (#357): `StatusPolicy` in `Quotas` with `quota.status(under:)` / `usage.overallStatus(under:)`; `QuotaMonitor.statusPolicy` read live from the burn-rate settings; alerts, pills, cards, Touch Bars, status export and Notify! all read under it. Left: `menuBarLabel(…)` still takes the two burn-rate values instead of the policy, and pace falls back to `quotaType.duration` when no window is known | the menu-bar label takes the policy; the `Window` law removes the guess; `StatusColorPolicy` (colours, high contrast) moves to the App |
 | `Account.budget` | two one-off settings: `app.claudeApiBudget` (+ `…Enabled`, edited in Claude's card) and `bedrock.dailyBudget`; Bedrock turns its budget into a fake `Daily Budget` quota | a `Budget` beside the account's `Cost`, judged as `BudgetStatus`, never a quota; the old keys read as the default account's budget |
@@ -429,15 +537,17 @@ Each step ships green and changes no behaviour a user can see, until the last.
 
 ## 9 · Open
 
-- **Usage History on the usage.** Claude attaches *TODAY'S USAGE* to its
-  snapshot today, and the background poll skips it (issue #204). Is it a
-  second read the popover asks for, or does `Usage` carry it?
+- ~~**Usage History on the usage.**~~ — **answered**: a second read the
+  popover asks for. Each login's `account.usageHistory` answers `days(in:)`
+  when the popover opens; `Usage` carries no daily report
+  (Mistral #419 already works this way).
 - **The mapping's reach.** When a vendor's response needs a rule the JSON
   mapping cannot say (Codex's free plan with no limits; Claude's PTY screen),
   the answer is a mapping FEATURE every provider gets — never a vendor
   escape hatch. Which features, is found provider by provider.
-- **Cost lines.** Bedrock reports cost per model, and an extension can report
-  metrics. Is that one `Cost` with lines, or a third kind of `Left`?
+- ~~**Cost lines.**~~ — **answered**: one `Cost` with lines. Bedrock's
+  per-model spend is a line each (`CostLine`), judged as a whole by the
+  account's budget; never a quota, never a third kind of `Left`.
 - ~~**A custom provider with accounts.**~~ — **answered**: the provider's.
   The form has two scopes; an account fills the ACCOUNT scope (one API key
   each, as a reference), and *Add Account* is that form. One definition

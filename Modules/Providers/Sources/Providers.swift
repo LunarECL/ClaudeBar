@@ -72,18 +72,33 @@ public enum Providers {
         accounts: [ProviderAccountConfig] = [],
         secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
+        usageHistory: UsageHistory? = nil,
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        cloudWatch: (any CloudWatchClient)? = nil,
+        priceCatalog: (any PriceCatalog)? = nil
     ) -> Provider {
         Provider(
             definition: definition,
             settings: settings,
             accounts: accounts,
             makeDataSource: { source, login in
-                DataSources.make(source, providerId: definition.id, scripts: builtInScripts, secrets: secrets?.scoped(to: login), environment: environment)
+                DataSources.make(source, providerId: definition.id, scripts: builtInScripts, secrets: secrets?.scoped(to: login),
+                                 environment: environment, cloudWatch: cloudWatch, priceCatalog: priceCatalog)
             },
             guestPasses: guestPasses,
+            // The definition says how to read each login's logs.
+            usageHistory: usageHistory ?? definition.usageHistory.map { history($0, login: definition.id, environment: environment) },
+            makeUsageHistory: { history($0, login: $1, environment: environment) },
             vault: secrets
         )
+    }
+
+    /// A login's usage history on this Mac, its closed days kept under its lineup id.
+    @MainActor
+    private static func history(_ definition: UsageLog.Definition, login: String,
+                                environment: @escaping @Sendable (String) -> String?) -> UsageHistory {
+        UsageHistory(log: DataSources.makeUsageLog(definition, scripts: builtInScripts, environment: environment),
+                     ledger: DayLedger(store: FileLedgerStore(), key: login))
     }
 
     /// A built-in provider by id — `Providers.make("codex", settings:)`.
@@ -94,8 +109,13 @@ public enum Providers {
         accounts: [ProviderAccountConfig] = [],
         secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
+        usageHistory: UsageHistory? = nil,
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        cloudWatch: (any CloudWatchClient)? = nil,
+        priceCatalog: (any PriceCatalog)? = nil
     ) throws -> Provider {
-        make(try builtIn(id), settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses, environment: environment)
+        make(try builtIn(id), settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses,
+             usageHistory: usageHistory, environment: environment,
+             cloudWatch: cloudWatch, priceCatalog: priceCatalog)
     }
 }

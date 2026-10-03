@@ -61,7 +61,7 @@ struct AddAccountSheet: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                         .background(RoundedRectangle(cornerRadius: 8).fill(theme.glassBackground))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.glassBorder, lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
@@ -69,23 +69,11 @@ struct AddAccountSheet: View {
             HStack { Spacer(); Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction) }
 
         case .form:
-            ForEach(text.fields, id: \.id) { field in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(field.label).font(.callout).foregroundStyle(theme.textSecondary)
-                    if let choices = field.choices {
-                        Picker(field.label, selection: Binding(get: { entered[field.id] ?? choices.first ?? "" },
-                                                               set: { entered[field.id] = $0 })) {
-                            ForEach(choices, id: \.self) { Text($0).tag($0) }
-                        }
-                        .labelsHidden()
-                    } else if field.secret {
-                        SecureField(field.label, text: Binding(get: { entered[field.id] ?? "" }, set: { entered[field.id] = $0 }))
-                            .textFieldStyle(.roundedBorder)
-                    } else {
-                        TextField(field.label, text: Binding(get: { entered[field.id] ?? "" }, set: { entered[field.id] = $0 }))
-                            .textFieldStyle(.roundedBorder)
-                    }
-                }
+            ForEach(text.fields) { setting in
+                SettingField(setting: setting, value: Binding(
+                    get: { setting.value(from: entered[setting.id]) },
+                    set: { entered[setting.id] = $0 }
+                ))
             }
             Text("Kept for this account only. Keys are saved in your Keychain.")
                 .font(.caption).foregroundStyle(theme.textSecondary)
@@ -189,10 +177,8 @@ struct AddAccountSheet: View {
     }
 
     private func addFromForm() {
-        var values = entered
-        for field in text.fields where values[field.id] == nil { values[field.id] = field.choices?.first }
         do {
-            added(try provider.addAccount(filling: values))
+            added(try provider.addAccount(filling: entered))
         } catch {
             step = .failed(error.localizedDescription)
         }

@@ -166,6 +166,57 @@ struct OAuth2RefresherTests {
             try await refresher().refresh(credential(expiresIn: nil, refreshToken: nil))
         }
     }
+
+    // MARK: - A refresh whose endpoint the credential names
+
+    private func issuerRefresher(network: any NetworkClient, missingIsDue: Bool = false) -> OAuth2Refresher {
+        OAuth2Refresher(
+            refresh: OAuth2Refresh(
+                tokenURL: "{{issuer}}/oauth2/token", clientId: "{{clientId}}", onStatus: [401],
+                hint: "Run `acme login` again.",
+                dueWhen: .init(expiresAt: "expiresAt", unit: .iso8601, skew: 300, missingIsDue: missingIsDue)
+            ),
+            network: network, now: { Self.now }
+        )
+    }
+
+    @Test
+    func `an ISO 8601 expiry is due within the skew, and a missing one need not be`() {
+        let expired = Credential(["token": "t", "refreshToken": "r", "expiresAt": "2023-11-14T22:13:00.123456Z"])
+        let later = Credential(["token": "t", "refreshToken": "r", "expiresAt": "2023-11-15T22:13:20Z"])
+        let none = Credential(["token": "t", "refreshToken": "r"])
+        #expect(issuerRefresher(network: MockNetworkClient()).isDue(expired))
+        #expect(issuerRefresher(network: MockNetworkClient()).isDue(later) == false)
+        #expect(issuerRefresher(network: MockNetworkClient()).isDue(none) == false)
+        #expect(issuerRefresher(network: MockNetworkClient(), missingIsDue: true).isDue(none))
+    }
+
+    @Test
+    func `the token endpoint and client come from the credential, with no doubled slash`() async throws {
+        let network = MockNetworkClient()
+        let seen = RequestBox()
+        given(network).request(.any).willProduce { request in
+            seen.request = request
+            return (Data(#"{"access_token":"new","refresh_token":"","expires_in":3600}"#.utf8), Self.response(200))
+        }
+
+        let renewed = try await issuerRefresher(network: network).refresh(
+            Credential(["token": "old", "refreshToken": "r-1", "issuer": "https://login.acme.test/"]))
+
+        #expect(seen.request?.url?.absoluteString == "https://login.acme.test/oauth2/token")
+        #expect(String(decoding: seen.request?.httpBody ?? Data(), as: UTF8.self).contains("client_id") == false)
+        #expect(renewed.token == "new")
+        #expect(renewed["refreshToken"] == "r-1") // an empty refresh token never replaces the saved one
+        #expect(renewed["expiresAt"]?.hasPrefix("2023-11-14T23:13:20") == true)
+    }
+
+    @Test
+    func `with no refresh token there is nothing to trade, so the key is needed`() async {
+        await #expect(throws: UsageError.authenticationRequired) {
+            try await issuerRefresher(network: MockNetworkClient()).refresh(Credential(["token": "old", "issuer": "https://x.test"]))
+        }
+    }
+
 }
 
 /// The last request a stub received.
@@ -177,4 +228,9 @@ private final class SentRequest: @unchecked Sendable {
         get { lock.withLock { _request } }
         set { lock.withLock { _request = newValue } }
     }
+
+}
+
+private final class RequestBox: @unchecked Sendable {
+    var request: URLRequest?
 }

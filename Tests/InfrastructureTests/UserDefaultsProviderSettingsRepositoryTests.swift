@@ -181,46 +181,6 @@ struct UserDefaultsProviderSettingsRepositoryTests {
         #expect(repository.hiddenQuotaKeys(forProvider: "gemini") == [])
     }
 
-    // MARK: - Copilot Monthly Limit Tests
-
-    @Test
-    func `copilotMonthlyLimit returns nil when not set`() {
-        // Given
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        // Then
-        #expect(repository.copilotMonthlyLimit() == nil)
-    }
-
-    @Test
-    func `copilotMonthlyLimit returns stored value when set`() {
-        // Given
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        // When
-        repository.setCopilotMonthlyLimit(300)
-
-        // Then
-        #expect(repository.copilotMonthlyLimit() == 300)
-    }
-
-    @Test
-    func `setCopilotMonthlyLimit removes value when set to nil`() {
-        // Given
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        // When - set a value first
-        repository.setCopilotMonthlyLimit(300)
-        #expect(repository.copilotMonthlyLimit() == 300)
-
-        // Then - clear it by setting nil
-        repository.setCopilotMonthlyLimit(nil)
-        #expect(repository.copilotMonthlyLimit() == nil)
-    }
-
     // MARK: - Claude CLI Fallback
 
     @Test
@@ -238,25 +198,6 @@ struct UserDefaultsProviderSettingsRepositoryTests {
 
         repository.setClaudeCliFallbackEnabled(false)
         #expect(repository.claudeCliFallbackEnabled() == false)
-    }
-
-    // MARK: - Kimi Region
-
-    @Test
-    func `kimiRegion defaults to china`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        #expect(repository.kimiRegion() == .china)
-    }
-
-    @Test
-    func `setKimiRegion persists value`() {
-        let repository = makeRepository()
-        defer { cleanupDefaults() }
-
-        repository.setKimiRegion(.international)
-        #expect(repository.kimiRegion() == .international)
     }
 
     // MARK: - Codex Verified Flag
@@ -279,5 +220,38 @@ struct UserDefaultsProviderSettingsRepositoryTests {
 
         repository.setCodexVerifiedAtLeastOnce(false)
         #expect(repository.codexVerifiedAtLeastOnce() == false)
+    }
+
+    // MARK: - Provider Order
+
+    @Test
+    func `providerOrder defaults to empty`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        #expect(repository.providerOrder() == [])
+    }
+
+    @Test
+    func `setProviderOrder persists value`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setProviderOrder(["gemini", "claude", "codex"])
+
+        // Read back through a fresh repository over the same suite, so the
+        // value really landed in the persistent store.
+        let reloaded = makeRepository()
+        #expect(reloaded.providerOrder() == ["gemini", "claude", "codex"])
+    }
+
+    @Test
+    func `setProviderOrder empty clears the stored order`() {
+        let repository = makeRepository()
+        defer { cleanupDefaults() }
+
+        repository.setProviderOrder(["gemini", "claude", "codex"])
+        repository.setProviderOrder([])
+        #expect(repository.providerOrder() == [])
     }
 }

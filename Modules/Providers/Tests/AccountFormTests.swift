@@ -62,7 +62,7 @@ struct AccountFormTests {
 
         #expect(accounts.ways == [.form])
         #expect(accounts.form.map(\.id) == ["apiKey"])
-        #expect(accounts.form.first?.secret == true)
+        #expect(accounts.form.first?.kind == .secret)
     }
 
     @Test

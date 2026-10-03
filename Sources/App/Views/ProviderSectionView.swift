@@ -26,7 +26,7 @@ struct ProviderSectionView: View {
                 Spacer()
 
                 if let email = snapshot.accountEmail {
-                    Text(email)
+                    Text(settings.shown(email))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

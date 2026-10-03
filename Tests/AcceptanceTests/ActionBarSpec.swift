@@ -51,35 +51,36 @@ struct ActionBarSpec {
         }
 
         @Test
-        func `Copilot dashboard URL is GitHub features page`() {
+        func `Copilot dashboard URL is GitHub features page`() throws {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let copilot = CopilotProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let copilot = try Providers.make("copilot", settings: settings).defaultAccount
             #expect(copilot.dashboardURL?.absoluteString == "https://github.com/settings/copilot/features")
         }
 
         @Test
-        func `Antigravity has no dashboard URL`() {
-            let antigravity = AntigravityProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
+        func `Antigravity has no dashboard URL`() throws {
+            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let antigravity = try Providers.make("antigravity", settings: settings).defaultAccount
             #expect(antigravity.dashboardURL == nil)
         }
 
         @Test
-        func `Bedrock dashboard URL is AWS console`() {
+        func `Bedrock dashboard URL is AWS console`() throws {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let bedrock = BedrockProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let bedrock = try Providers.make("bedrock", settings: settings).defaultAccount
             #expect(bedrock.dashboardURL?.absoluteString == "https://console.aws.amazon.com/bedrock/home")
         }
 
         @Test
-        func `Zai dashboard URL is Z.ai subscribe`() {
+        func `Zai dashboard URL is Z.ai subscribe`() throws {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let zai = ZaiProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let zai = try Providers.make("zai", settings: settings).defaultAccount
             #expect(zai.dashboardURL?.absoluteString == "https://z.ai/subscribe")
         }
     }

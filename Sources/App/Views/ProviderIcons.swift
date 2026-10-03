@@ -89,15 +89,6 @@ struct ProviderIconView: View {
 
     private func providerSymbol(for providerId: String) -> String {
         switch providerId {
-        case "gemini": return "sparkles"
-        case "zai": return "z.square.fill"
-        case "copilot": return "chevron.left.forwardslash.chevron.right"
-        case "minimax": return "waveform"
-        case "opencode-go": return "square.stack.3d.up.fill"
-        case "omp": return "terminal.fill"
-        case "grok": return "line.diagonal"
-        case "commandcode": return "command"
-        case "vercel-gateway": return "triangle.fill"
         default: return ProviderVisualIdentityLookup.symbolIcon(for: providerId)
         }
     }

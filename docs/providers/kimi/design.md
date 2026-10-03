@@ -1,6 +1,16 @@
-# Kimi probe research
+# Kimi: design
 
-Contributor notes for the two Kimi probes. User-facing setup is in [README.md](README.md).
+Contributor notes for Kimi's two data sources. User-facing setup is in [README.md](README.md).
+
+## As data
+
+Kimi is `Modules/Providers/Resources/Providers/kimi.json` with `kimi-cli.js` and `kimi-api.js`, run by the generic engine (TARGET_ARCHITECTURE §8.2); no Swift names it. Ported from #393.
+
+- **Region is one choice setting** whose options carry `site` and `domain`: the URL, `Origin`, `Referer`, cookie domains and dashboard are `{{setting.region.site}}` / `{{setting.region.domain}}`. Saved where the old card kept it (`kimi.region`); the old Probe Mode is the data source (`kimi.probeMode`).
+- **CLI.** A `cli` (terminal) fetch with `inputDelay: 1.5`, the `💫` / `context:` auto-responses, the trust-folder Enter and the ready markers below. Checked live with Kimi Code CLI 1.x: the screen settles, `/usage` is typed, and a signed-out CLI's "Authorization failed" now asks for `/login` instead of "No quota data found".
+- **API.** `KIMI_AUTH_TOKEN`, then the `kimi-auth` cookie (`browserCookies`, suffix-matched on the region's domain). `{{system.timeZone}}` fills `r-timezone`. 401/403 are *Key needed*.
+- **Left and Window laws.** A limit of 0, or neither `used` nor `remaining`, is no quota rather than 100%. The rate limit's window is its own `window.duration` × `timeUnit`. The plan quota is weekly only for the three weekly plans (by limit); any other plan is "Plan" with no window, where the probe called every plan weekly. The CLI's "Monthly limit" is the month ending on its reset.
+- **Accounts.** `token` is `"for": ["api"]`, `home` is `"for": ["cli"]`; *Add Account* asks for the active source's one plus Region. A CLI login runs `kimi` with `KIMI_SHARE_DIR`/`KIMI_CODE_HOME` set to its folder and `KIMI_AUTH_TOKEN`/`KIMI_API_KEY`/`KIMI_BASE_URL` unset; `requiresFiles` fails closed when the folder is gone.
 
 ## CLI mode: interactive `kimi` + `/usage`
 
@@ -104,10 +114,10 @@ A Connect-RPC endpoint used by the web console. The token is sent both as `Autho
 ### Region
 
 Kimi runs two separate platforms — China (`kimi.com`) and International
-(`kimi.ai`) — with separate accounts, cookies and quotas. `KimiRegion`
-(`Sources/Domain/Provider/Kimi/KimiRegion.swift`) carries everything that
-differs: the usage URL, Origin/Referer, console URL and cookie domains. The
-setting (`kimi.region` in settings.json, default `china`) is read per probe,
+(`kimi.ai`) — with separate accounts, cookies and quotas. The `region`
+choice setting's options carry everything that differs: the usage URL,
+Origin/Referer, console URL and cookie domain. The setting (`kimi.region` in
+settings.json, default `china`) is filled into each login's data sources,
 like MiniMax's region. The international usage URL is inferred by analogy with
 the documented kimi.com endpoint and has not been verified against a live
 international account.

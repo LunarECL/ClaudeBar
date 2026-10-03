@@ -58,7 +58,7 @@ public struct AppThemeProviderModifier: ViewModifier {
     private var effectiveColorScheme: ColorScheme {
         let mode = ThemeMode(rawValue: themeModeId)
         switch mode {
-        case .light: return .light
+        case .light, .pop: return .light
         case .dark, .cli, .christmas: return .dark
         case .system: return systemColorScheme
         case .none:
@@ -143,10 +143,10 @@ private struct ThemeCardModifier: ViewModifier {
         content
             .background(
                 RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .fill(theme.cardGradient)
+                    .fill(theme.cardGradient).themeShadow(theme)
                     .overlay(
                         RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                            .stroke(theme.glassBorder, lineWidth: 1)
+                            .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
                     )
             )
     }

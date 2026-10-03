@@ -24,7 +24,7 @@ struct DataSourceSection: View {
     @State private var cliPath = ""
     @State private var cliPathError: String?
 
-    private var text: DataSourceSectionText { DataSourceSectionText(definition: provider.definition) }
+    private var text: DataSourceSectionText { DataSourceSectionText(definition: provider.definitionAsRun) }
 
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
@@ -45,7 +45,7 @@ struct DataSourceSection: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(theme.cardGradient)
+                .fill(theme.cardGradient).themeShadow(theme)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(
@@ -254,13 +254,14 @@ struct DataSourceSection: View {
     @ViewBuilder
     private func fallbackRow(_ sentence: String) -> some View {
         if text.fallbackIsSwitchable(for: kind) {
-            Toggle(isOn: $fallbackOn) {
+            HStack(spacing: 8) {
                 Text(sentence)
                     .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
+                Spacer(minLength: 8)
+                SettingsSwitch(isOn: $fallbackOn)
+                    .accessibilityLabel(sentence)
             }
-            .toggleStyle(.switch)
-            .tint(theme.accentPrimary)
             .onChange(of: fallbackOn) { _, newValue in
                 provider.setFallbackEnabled(newValue, from: kind)
             }

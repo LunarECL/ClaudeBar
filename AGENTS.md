@@ -2,7 +2,7 @@
 
 Rules for AI coding agents (Claude Code, Codex, Cursor, …) in this repo. This is the only agent-instructions file; there is no `CLAUDE.md`. Everything else is one link away: [docs index](docs/README.md) · [architecture](docs/architecture/ARCHITECTURE.md) · [contributing](CONTRIBUTING.md) · [docs design](docs/documentation-design/README.md).
 
-ClaudeBar is a macOS menu bar app that shows AI coding quotas. It reads them from CLIs, APIs and local files for 20 built-in providers, registered in `ClaudeBarApp.init()`, plus user extensions from `~/.claudebar/extensions/`. The code is moving from three layers to modules ([MODULAR_DESIGN.md](docs/architecture/MODULAR_DESIGN.md)): Claude, Codex and DeepSeek are already JSON definitions in `Modules/Providers/Resources/Providers/`, run by one generic `Provider`; the other providers are still a folder each in `Sources/Domain/Provider/`.
+ClaudeBar is a macOS menu bar app that shows AI coding quotas. It reads them from CLIs, APIs and local files for 20 built-in providers, registered in `ClaudeBarApp.init()`, plus user extensions from `~/.claudebar/extensions/`. The code is moving from three layers to modules ([MODULAR_DESIGN.md](docs/architecture/MODULAR_DESIGN.md)). Every built-in provider is a JSON definition in `Modules/Providers/Resources/Providers/`, run by one generic `Provider`; what one needs that the engine can't say yet becomes a general rule in `DataSources`.
 
 ## Build & test
 
@@ -24,16 +24,17 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 |---|---|
 | `Modules/Quotas` | the usage model: `UsageSnapshot`, `UsageQuota`, `UsageError` (interim shapes, each marked with its final one). Imports nothing |
 | `Modules/DataSources` | `DataSource` (credential lookup → fetch → mapping) and its workers: OAuth, HTTP, JSON-RPC, CLI, JSON/text/script mapping |
-| `Modules/Providers` | the one `Provider` lifecycle, `ProviderDefinition`, added accounts, settings contracts; `Resources/Providers/<id>.json` |
+| `Modules/Providers` | the one `Provider` lifecycle, `ProviderDefinition`, added accounts, settings contracts, a login's `usageHistory` and `guestPasses`; `Resources/Providers/<id>.json` |
+| `Modules/AWSClients` | the AWS SDK (CloudWatch, Bedrock pricing) behind DataSources' `CloudWatchClient` and `PriceCatalog` ports; the only module that links AWS |
 | `Modules/Diagnostics` | `AppLog` |
-| `Sources/Domain` | `QuotaMonitor`, the legacy `XxxProvider`s, Notify!, sessions. Re-exports the modules |
-| `Sources/Infrastructure` | the legacy `XxxUsageProbe`s, storage, notifications, hooks |
+| `Sources/Domain` | `QuotaMonitor`, extension providers, Notify!, sessions. Re-exports the modules |
+| `Sources/Infrastructure` | storage, notifications, hooks, Claude's guest-pass source |
 | `Sources/App` | SwiftUI views that read the domain directly; the composition root |
 
 - **Modules never `import Domain`**, and no module's Swift names a vendor or uses `Probe`: a provider is data, and what it needs becomes a generic rule in `DataSources` → [TARGET_ARCHITECTURE.md](docs/architecture/TARGET_ARCHITECTURE.md).
 
 - **`QuotaMonitor` is the single source of truth** for provider state. No ViewModel or AppState layer; views consume the domain.
-- **Settings**: a definition-driven provider uses the generic `dataSourceKind`/`isOn` of `ProviderSettingsRepository`; a legacy provider with its own config takes a sub-protocol (read its initializer to see which). All settings persist through `JSONSettingsRepository` to `~/.claudebar/settings.json` → [docs/settings.md](docs/settings.md).
+- **Settings**: a provider's settings are its definition's `settings`, read with the generic `value`/`dataSourceKind`/`isOn` of `ProviderSettingsRepository`; a value an old card saved elsewhere is read through the compatibility tables in `JSONSettingsRepository` and `ProviderVault`. All settings persist through `JSONSettingsRepository` to `~/.claudebar/settings.json` → [docs/settings.md](docs/settings.md).
 - **Notify! and session hooks are destinations, not providers**: they get standalone repositories beside `HookSettingsRepository`, never under `ProviderSettingsRepository` → [features/notify/design.md](docs/features/notify/design.md).
 - **Themes** implement `AppThemeProvider` and register in `ThemeRegistry` → [THEME_DESIGN.md](docs/architecture/THEME_DESIGN.md). Card backgrounds use `theme.cardGradient` / `theme.glassBorder`.
 - Details and data flow: [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) (the legacy layers) and [CANONICAL_MODEL.md](docs/architecture/CANONICAL_MODEL.md) (the words).

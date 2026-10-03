@@ -32,7 +32,7 @@ struct ClaudeBudgetCard: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(theme.cardGradient)
+                .fill(theme.cardGradient).themeShadow(theme)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(
@@ -87,11 +87,8 @@ struct ClaudeBudgetCard: View {
 
             Spacer()
 
-            Toggle("", isOn: $settings.claudeApiBudgetEnabled)
-                .toggleStyle(.switch)
-                .tint(theme.accentPrimary)
-                .scaleEffect(0.8)
-                .labelsHidden()
+            SettingsSwitch(isOn: $settings.claudeApiBudgetEnabled)
+                .accessibilityLabel("Claude API Budget")
         }
     }
 
@@ -118,7 +115,7 @@ struct ClaudeBudgetCard: View {
                                 .fill(theme.glassBackground)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(theme.glassBorder, lineWidth: 1)
+                                        .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
                                 )
                         )
                         .onChange(of: budgetInput) { _, newValue in

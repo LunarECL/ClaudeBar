@@ -4,7 +4,7 @@ description: |
   Add an AI provider to ClaudeBar as a JSON definition run by the one generic
   Provider and DataSource. Use this skill when:
   (1) Adding a new AI assistant provider (like Antigravity, Cursor, etc.)
-  (2) Moving a legacy hand-written provider (`XxxProvider` + `XxxUsageProbe`) onto a definition
+  (2) A provider needs a setting, an added account, or an old saved key kept working
   (3) A provider's CLI, API or file format changed and its definition must follow
   (4) User asks "how do I add a new provider" or "create a provider for X"
 ---
@@ -20,8 +20,12 @@ no Swift for a vendor**: no `XxxProvider`, no `XxxUsageProbe`, no
 > Read first: [TARGET_ARCHITECTURE.md](../../../docs/architecture/TARGET_ARCHITECTURE.md)
 > (how a definition runs), [MODULAR_DESIGN.md](../../../docs/architecture/MODULAR_DESIGN.md)
 > (which module a file goes in), and [CANONICAL_MODEL.md](../../../docs/architecture/CANONICAL_MODEL.md)
-> (the words). Worked examples: `codex.json` and `claude.json`, with their tests in
-> `Modules/Providers/Tests/`.
+> (the words). Every built-in provider is a definition, so there is a worked
+> example for most shapes: an API key with a region (`minimax.json`), a CLI's login
+> file renewed by OAuth (`grok.json`) or by the CLI itself (`gemini.json`), a TUI
+> (`kimi.json`), a browser session over several requests (`alibaba.json`), an app's
+> local server (`antigravity.json`), cloud metrics priced into money (`bedrock.json`).
+> Their tests are in `Modules/Providers/Tests/`.
 
 ## The pieces
 
@@ -70,15 +74,35 @@ no Swift for a vendor**: no `XxxProvider`, no `XxxUsageProbe`, no
 
 | Sum | Cases |
 |---|---|
-| `credential` | `environment` · `jsonFile` (paths `$.a.b`; `~` and `${VAR:-default}`; `"…#jwt.claim"` reads a JWT claim) · `keychain` · `firstOf` · plus `"refresh": { "oauth2": … }` (form or JSON body, `dueWhen`, `every`, `onStatus`, `expiredCodes`) |
-| `fetch` | `http` (`{{token}}` and other credential fields in URL and headers) · `jsonRpc` (handshake, `call`, `then` follow-ups, `environment`) · `cli` (args, input, `autoResponses`, `readyWhen`, `screen: "rendered"`, `environment`, `workingDirectory: "dedicated"`) |
-| `mapping` | `json` (below) · `text` (error phrases, then label + regex for % left/used) · `script` (a `.js` file in JavaScriptCore, no I/O, host `humanDate()`) |
+| `credential` | `environment` · `setting` (a key pasted into ClaudeBar, in the Keychain) · `jsonFile` (paths `$.a.b`, or a list — the first that answers; `~` and `${VAR:-default}`; `record`, `defaults`) · `keychain` (`account`, `encoding: "goKeyringBase64"`) · `browserCookies` (`format: "value"\|"header"`) · `sqlite` · `firstOf` — any of them refined with `match` (a value must fit a pattern, or no key), `with` (values added) and `cookies` (named cookies read out of a Cookie header); plus `"refresh": { "oauth2": … }` or `"refresh": { "cli": … }` (the CLI renews its own file) |
+| `fetch` | `http` (`{{token}}`, `{{x#host}}`, `{{x#jwt.claim}}`, `{{system.timeZone}}`) or `"http": { "steps": [ … ] }` (`keep`, `optional`, `unless`, `attempts`, `dropEmpty`) · `jsonRpc` · `cli` — a terminal, for a TUI (`input`, `inputDelay`, `autoResponses`, `readyWhen`, `screen: "rendered"`) · `command` — pipes, exit code reported · `file` · `directory` · `localServer` (an app's server on 127.0.0.1, found through its process) · `cloudWatch` (cloud metrics through a port, priced from a `PriceCatalog`) |
+| `mapping` | `json` (below) · `text` (error phrases, then label + regex for % left/used) · `script` (a `.js` file in JavaScriptCore, no I/O; host `humanDate()`, `jsonDecimal()`, `decimalCents()`, `decimalAdd()`, `decimalMultiply()`; `context.values` from `"values"`; returns `quotas` (with `group`), `notes`, `plan`, `cost` (with `lines`), `account`, or `error`) |
 
-Per data source, also: `fallbackOn` (hand-off by failure tag), `cache.ttl`
-(also the background-refresh floor), `context` (JSON files the mapping may
-read), `recover.patchJSONFile`, `requiresFiles`, `identity`,
+Per data source, also: `errors` (`http.<status>`, `http.default`,
+`cli.missing`, `cli.nonzero`, `cli.failed` → a reason; a 429 is always a rate
+limit), `fallbackOn` (hand-off by failure tag), `fallback`, `cache.ttl` (also
+the background-refresh floor), `context` (JSON files the mapping may read),
+`recover.patchJSONFile`, `requiresFiles`, `identity`,
 `verifyBeforeBackground`. Per provider: `links.dashboardByPlan` and `accounts`
 (added logins, see `codex.json`).
+
+### Settings and added accounts
+
+```jsonc
+"settings": [
+  { "id": "apiKey", "label": "API Key", "kind": "secret", "scope": "account", "for": ["api"] },
+  { "id": "region", "label": "Region", "scope": "account", "default": "china",
+    "kind": { "choice": [ { "id": "china", "label": "China", "host": "api.acme.cn" },
+                          { "id": "intl",  "label": "International", "host": "api.acme.com" } ] } },
+  { "id": "home", "label": "Signed-in Folder", "scope": "account", "for": ["cli"], "kind": { "path": { "mustExist": true } } },
+  { "id": "authEnvVar", "label": "Environment variable", "default": "ACME_API_KEY" }
+]
+```
+
+- A kind owns its rule: `secret` (to the Keychain, fills nothing), `choice` (its options carry values), `path` (`mustExist`), `text` (`pattern`).
+- `{{setting.region.host}}` fills any string of the definition; a blank setting leaves its template unfilled (a script's `values` drop it).
+- `scope: "account"` is what *Add Account* asks for; `"for": [kind]` asks only while that data source is active, and a login without such a value runs only the sources that don't need it.
+- `accounts.patch.<kind>` changes a data source for added logins (`"firstOf": null` drops the default lookups; `{{account.home}}` fills from the login's values).
 
 ### The JSON mapping
 
@@ -170,8 +194,8 @@ kinds are unique, and the default and every fallback name an existing kind.
 Don't write vendor code. Find the **generic** shape of the need, for example
 "a list filtered by a field" or "money in minor units", and add it to
 `DataSources` test-first in `Modules/DataSources/Tests/`. Then use it from the
-JSON. [TARGET_ARCHITECTURE §8.1](../../../docs/architecture/TARGET_ARCHITECTURE.md#81--what-claude-added)
-lists the pieces Claude needed. Add your row there.
+JSON. [TARGET_ARCHITECTURE §8.1](../../../docs/architecture/TARGET_ARCHITECTURE.md#81--what-each-provider-added)
+lists the pieces each provider needed. Add your row there.
 
 Only a format no rule can read, like a terminal UI screen, gets a mapping
 script, `<id>-<what>.js`. Test it through Swift with real captured screens
@@ -179,8 +203,10 @@ script, `<id>-<what>.js`. Test it through Swift with real captured screens
 
 ### 5 · Register and give it a look
 ```swift
-// Sources/App/ClaudeBarApp.swift, in the AIProviders list
-Self.builtIn("acme", settings: settingsRepository),
+// Sources/App/ClaudeBarApp.swift
+let acme = Self.builtIn("acme", settings: settingsRepository,
+                        accounts: settingsRepository.accounts(forProvider: "acme"), secrets: vault)
+// …acme.defaultAccount in the AIProviders list, acme.accounts in the added-logins loop
 ```
 Its name, symbol and colours are `profile.look` in the JSON — no `switch id`
 table to edit. Add the icon image to the asset catalog under `look.icon`
@@ -194,14 +220,18 @@ example `fallback.enabledBySetting`) is `isOn(_:forProvider:)`.
 - One line under `## [Unreleased]` in `CHANGELOG.md`.
 - `python3 scripts/gen-docs.py && python3 scripts/check-docs.py --strict`.
 
-## Moving a legacy provider
+## Keeping what people saved
 
-Port the old `XxxUsageProbeTests` fixtures into golden tests first. They pin
-behaviour the definition must keep. Then write the JSON, switch
-`ClaudeBarApp` to `Self.builtIn("<id>", …)`, and delete `XxxProvider`,
-`XxxUsageProbe`, `XxxCredentialLoader` and their tests. Keep every saved
-settings key: the data source choice is `<id>.probeMode`, and a definition
-setting `foo` is read from `<id>.foo`.
+Every built-in provider is already a definition; when you change one, keep
+every saved value working. The data source choice is `<id>.probeMode`, and a
+setting `foo` is read from `<id>.foo`. A value kept somewhere else gets a row,
+never a branch:
+
+- a setting under another key → `JSONSettingsRepository.legacySettingKeys`
+- a setting in UserDefaults → `JSONSettingsRepository.legacyDefaultsKeys` (a saved number or list reads as text)
+- a secret in UserDefaults or an older Keychain item → `ProviderVault.legacyKeys`
+
+Each moves to its new place the first time it's saved, and each needs a test.
 
 ## Checklist
 

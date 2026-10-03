@@ -20,17 +20,32 @@ public enum Mapping: Sendable, Equatable {
 public struct ScriptMapping: Sendable, Equatable, Codable {
     public let file: String
     public let credential: [String]
+    /// Values handed to the script as `context.values` — typically
+    /// `{{setting.x}}`, a setting the person set. One that still holds a
+    /// template was left blank, and isn't there.
+    public let values: [String: String]
 
-    public init(file: String, credential: [String] = []) {
+    public init(file: String, credential: [String] = [], values: [String: String] = [:]) {
         self.file = file
         self.credential = credential
+        self.values = values
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         file = try container.decode(String.self, forKey: .file)
         credential = try container.decodeIfPresent([String].self, forKey: .credential) ?? []
+        values = try container.decodeIfPresent([String: String].self, forKey: .values) ?? [:]
     }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(file, forKey: .file)
+        if !credential.isEmpty { try container.encode(credential, forKey: .credential) }
+        if !values.isEmpty { try container.encode(values, forKey: .values) }
+    }
+
+    private enum CodingKeys: String, CodingKey { case file, credential, values }
 }
 
 // MARK: - Shared vocabulary
@@ -197,6 +212,8 @@ public enum ErrorRef: Sendable, Equatable, Codable {
     case parseFailed(String)
     case sessionExpired(String?)
     case executionFailed(String)
+    /// *CLI not found*, naming the CLI the person should install.
+    case cliNotFound(String)
 
     public var usageError: UsageError {
         switch self {
@@ -208,6 +225,7 @@ public enum ErrorRef: Sendable, Equatable, Codable {
         case .parseFailed(let reason): .parseFailed(reason)
         case .sessionExpired(let hint): .sessionExpired(hint: hint)
         case .executionFailed(let reason): .executionFailed(reason)
+        case .cliNotFound(let name): .cliNotFound(name)
         }
     }
 
@@ -226,10 +244,11 @@ public enum ErrorRef: Sendable, Equatable, Codable {
             return
         }
         let container = try decoder.container(keyedBy: TagKey.self)
-        let tag = try container.singleTag(of: ["parseFailed", "sessionExpired", "executionFailed"], in: "error")
+        let tag = try container.singleTag(of: ["parseFailed", "sessionExpired", "executionFailed", "cliNotFound"], in: "error")
         let text = try container.decode(String.self, forKey: TagKey(tag))
         switch tag {
         case "parseFailed": self = .parseFailed(text)
+        case "cliNotFound": self = .cliNotFound(text)
         case "executionFailed": self = .executionFailed(text)
         default: self = .sessionExpired(text)
         }
@@ -246,6 +265,9 @@ public enum ErrorRef: Sendable, Equatable, Codable {
         case .executionFailed(let reason):
             var container = encoder.container(keyedBy: TagKey.self)
             try container.encode(reason, forKey: TagKey("executionFailed"))
+        case .cliNotFound(let name):
+            var container = encoder.container(keyedBy: TagKey.self)
+            try container.encode(name, forKey: TagKey("cliNotFound"))
         default:
             var container = encoder.singleValueContainer()
             let tag: String = switch self {

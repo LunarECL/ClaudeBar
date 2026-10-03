@@ -161,19 +161,19 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 
 > **Reference:** [MODULAR_DESIGN.md](../../../docs/architecture/MODULAR_DESIGN.md) (modules) ·
 > [TARGET_ARCHITECTURE.md](../../../docs/architecture/TARGET_ARCHITECTURE.md) (how a provider runs) ·
-> [ARCHITECTURE.md](../../../docs/architecture/ARCHITECTURE.md) (the legacy layers)
+> [ARCHITECTURE.md](../../../docs/architecture/ARCHITECTURE.md) (the app layers)
 
 The code is mid-migration from three layers to modules. Find which side the
 behaviour lives on before you change it:
 
 | Where | Holds | Tests |
 |---|---|---|
-| `Modules/Providers/Resources/Providers/<id>.json` (+ `.js`) | a migrated provider (Claude, Codex): where the key is, how to fetch, how to read | `Modules/Providers/Tests/` (golden tests over `StubbedProvider` / `ClaudeHarness`) |
+| `Modules/Providers/Resources/Providers/<id>.json` (+ `.js`) | every built-in provider: where the key is, how to fetch, how to read | `Modules/Providers/Tests/` (golden tests over `StubbedProvider` / `ClaudeHarness`) |
 | `Modules/Providers/Sources` | `Provider` (the one lifecycle: refresh, fallback chain, accounts), `ProviderDefinition`, `AddedAccounts`, settings and account contracts | `Modules/Providers/Tests/` |
-| `Modules/DataSources/Sources` | `DataSource` and its workers: credential lookup, OAuth refresh, HTTP / JSON-RPC / CLI fetch, JSON / text / script mapping, the process runners | `Modules/DataSources/Tests/` |
+| `Modules/DataSources/Sources` | `DataSource` and its workers: credential lookups and refreshes; HTTP, steps, JSON-RPC, terminal, command, file, directory, local-server and CloudWatch fetches; JSON / text / script mapping; the process runners | `Modules/DataSources/Tests/` |
 | `Modules/Quotas/Sources` | the usage model: `UsageSnapshot`, `UsageQuota`, `UsageError`, plans and costs (interim shapes, see each type's `- Note:`) | the tests of the module that uses it |
-| `Sources/Domain` | `QuotaMonitor`, the legacy `XxxProvider` classes, Notify!, sessions, settings sub-protocols | `Tests/DomainTests/` |
-| `Sources/Infrastructure` | the legacy `XxxUsageProbe`s, storage, notifications, hooks | `Tests/InfrastructureTests/` |
+| `Sources/Domain` | `QuotaMonitor`, extension providers, Notify!, sessions, Usage History | `Tests/DomainTests/` |
+| `Sources/Infrastructure` | storage, notifications, hooks, the local-log analyzers behind Usage History | `Tests/InfrastructureTests/` |
 | `Sources/App` | SwiftUI views reading the domain directly | `Tests/AppTests/`, `Tests/AcceptanceTests/` |
 
 A bug in a migrated provider is fixed in its JSON, or generically in

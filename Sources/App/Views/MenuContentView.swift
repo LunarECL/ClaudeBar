@@ -12,8 +12,6 @@ struct MenuContentView: View {
     let monitor: QuotaMonitor
     let sessionMonitor: SessionMonitor
     let quotaAlerter: QuotaAlerter
-    /// Today's usage, read from local logs beside the providers.
-    var usageHistory: UsageHistory = UsageHistory()
     /// Closes the popover (Escape). The presentation binding lives on the App.
     var onClose: (() -> Void)?
     var onHookSettingsChanged: ((Bool) -> Void)?
@@ -304,7 +302,7 @@ struct MenuContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text("ClaudeBar")
-                        .font(.system(size: 18, weight: .bold, design: theme.fontDesign))
+                        .font(theme.displayFont(size: 18))
                         .foregroundStyle(theme.textPrimary)
 
                     // Christmas gift icon
@@ -333,6 +331,7 @@ struct MenuContentView: View {
         switch theme.id {
         case "cli": return "> usage monitor"
         case "christmas": return "Happy Holidays!"
+        case "pop": return "Your quotas, the cute way"
         default: return "AI Usage Monitor"
         }
     }
@@ -363,25 +362,34 @@ struct MenuContentView: View {
     private var statusBadge: some View {
         let statusColor = selectedProviderBadge.badgeColor(theme)
 
+        // An outlined theme fills the badge with its status colour, inked —
+        // syncing and waiting with a light "in progress" colour, never dark.
+        let outlined = theme.isOutlined
+        let fill: Color = switch selectedProviderBadge {
+        case .syncing, .awaitingData: theme.accentSecondary
+        default: statusColor
+        }
         return HStack(spacing: 6) {
             // Animated pulse dot
             PulsingStatusDot(
-                color: statusColor,
+                color: outlined ? theme.textOnStatus : statusColor,
                 isSyncing: isSelectedProviderSyncing
             )
 
             Text(statusText)
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
-                .foregroundStyle(theme.textPrimary)
+                .font(.system(size: 11, weight: outlined ? .heavy : .medium, design: theme.fontDesign))
+                .foregroundStyle(outlined ? theme.textOnStatus : theme.textPrimary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                .fill(theme.glassBackground)
+                .fill(outlined ? fill : theme.glassBackground)
+                .themeShadow(theme, scale: 0.5)
                 .overlay(
                     RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                        .stroke(statusColor.opacity(0.5), lineWidth: 1)
+                        .stroke(outlined ? theme.glassBorder : statusColor.opacity(0.5),
+                                lineWidth: outlined ? theme.cardBorderWidth * 0.8 : 1)
                 )
         )
     }
@@ -413,7 +421,7 @@ struct MenuContentView: View {
                 ForEach(Array(monitor.tabs.enumerated()), id: \.element.id) { index, tab in
                     ProviderPill(
                         providerId: tab.id,
-                        providerName: tab.name,
+                        providerName: settings.shown(tab.name),
                         isSelected: tab.contains(selectedProviderId),
                         hasData: tab.accounts.contains { $0.snapshot != nil }
                     ) {
@@ -422,9 +430,14 @@ struct MenuContentView: View {
                             selectedProviderId = first.id
                         }
                     }
-                    .help(index < 9 ? "\(tab.name) (⌘\(index + 1))" : tab.name)
+                    .help(index < 9 ? "\(settings.shown(tab.name)) (⌘\(index + 1))" : settings.shown(tab.name))
                 }
             }
+            // A scroll view clips at its edges: leave room for an outlined
+            // theme's thick outline and hard shadow.
+            .padding(.vertical, theme.isOutlined ? 5 : 0)
+            .padding(.leading, theme.isOutlined ? 2 : 0)
+            .padding(.trailing, theme.isOutlined ? 5 : 0)
             .background(HorizontalScrollBooster())
             .overlay {
                 GeometryReader { geo in
@@ -488,8 +501,8 @@ struct MenuContentView: View {
             let report = RefreshReport.of(provider)
             VStack(spacing: 12) {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
-                    accountCard(
-                        displayName: displayName, snapshot: snapshot,
+                    AccountCardView(
+                        providerId: selectedProviderId, displayName: displayName, snapshot: snapshot,
                         freshness: report?.freshness ?? "Updated \(snapshot.ageDescription)"
                     )
                 } else if let freshness = report?.freshness {
@@ -539,7 +552,7 @@ struct MenuContentView: View {
                         if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
                     } label: {
                         HStack(spacing: 4) {
-                            Text(account.name).lineLimit(1)
+                            Text(settings.shown(account.name)).lineLimit(1)
                             Circle()
                                 .fill(account.lastError != nil ? theme.textTertiary
                                       : theme.statusColor(for: monitor.usage(of: account)?.overallStatus(under: settings.statusPolicy) ?? .healthy))
@@ -549,11 +562,11 @@ struct MenuContentView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Capsule().fill(hidden ? Color.clear : theme.glassBackground))
-                        .overlay(Capsule().stroke(theme.glassBorder, lineWidth: 1))
+                        .overlay(Capsule().stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
                         .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
                     }
                     .buttonStyle(.plain)
-                    .help(hidden ? "Show \(account.name)" : "Hide \(account.name) from this view")
+                    .help(hidden ? "Show \(settings.shown(account.name))" : "Hide \(settings.shown(account.name)) from this view")
                 }
             }
         }
@@ -566,7 +579,7 @@ struct MenuContentView: View {
         let detail = lowest.map { " is at \(Int($0.percentRemaining))% \($0.quotaType.displayName)" } ?? ""
         return HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.statusColor(for: status))
-            Text("\(worst.displayName)\(detail) — causing \(status.badgeText.capitalized)")
+            Text("\(settings.shown(worst.displayName))\(detail) — causing \(status.badgeText.capitalized)")
                 .font(.system(size: 11, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -617,7 +630,7 @@ struct MenuContentView: View {
         HStack(spacing: 8) {
             ProviderIconView(providerId: provider.id, size: 20, showGlow: false)
 
-            Text(provider.name)
+            Text(settings.shown(provider.name))
                 .fixedSize(horizontal: false, vertical: true)
                 .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
@@ -685,57 +698,6 @@ struct MenuContentView: View {
         .padding(.vertical, 4)
     }
 
-
-    private func accountCard(displayName: String, snapshot: UsageSnapshot, freshness: String) -> some View {
-        HStack(spacing: 10) {
-            // Avatar circle
-            ZStack {
-                Circle()
-                    .fill(ProviderVisualIdentityLookup.gradient(for: selectedProviderId, scheme: colorScheme))
-                    .frame(width: 32, height: 32)
-
-                Text(String(displayName.prefix(1)).uppercased())
-                    .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
-                    .foregroundStyle(.white)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(displayName)
-                        .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
-                        .lineLimit(1)
-
-                    // Account tier badge
-                    if let accountTier = snapshot.accountTier {
-                        Text(accountTier.badgeText)
-                            .font(.system(size: 8, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule()
-                                    .fill(theme.accentPrimary.opacity(0.8))
-                            )
-                    }
-                }
-
-                Text(freshness)
-                    .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
-                    .foregroundStyle(theme.textTertiary)
-            }
-
-            Spacer()
-
-            // Stale indicator
-            if snapshot.isStale {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(theme.statusWarning)
-            }
-        }
-        .glassCard(cornerRadius: 12, padding: 10)
-    }
 
     /// Collapsed state of quota-group sections, keyed by `QuotaGroup.id`.
     /// Ephemeral by design: reopening the popover starts fully expanded.
@@ -881,19 +843,15 @@ struct MenuContentView: View {
 
             // Show Extra usage cost card if available (Pro with Extra usage enabled)
             if let costUsage = snapshot.costUsage {
-                let budget = settings.claudeApiBudgetEnabled ? settings.claudeApiBudget : nil
+                // The Claude API budget judges Claude's own cost, never another provider's.
+                let budget = settings.claudeApiBudgetEnabled && snapshot.providerId.hasPrefix("claude") ? settings.claudeApiBudget : nil
                 CostStatCard(costUsage: costUsage, budget: budget, delay: Double(snapshot.quotas.count) * 0.08)
-            }
-
-            // Show Bedrock usage card if available
-            if let bedrockUsage = snapshot.bedrockUsage {
-                BedrockUsageCard(usage: bedrockUsage, delay: Double(snapshot.quotas.count) * 0.08)
             }
 
             // Show daily usage cards from JSONL session analysis (e.g., Claude Code)
             // Controlled via Settings toggle or ~/.claudebar/settings.json
             if settings.showDailyUsageCards,
-               let report = usageHistory.report(for: snapshot.providerId) ?? snapshot.dailyUsageReport {
+               let report = (monitor.provider(for: snapshot.providerId) as? Account)?.usageHistory?.report ?? snapshot.dailyUsageReport {
                 let baseDelay = Double(snapshot.quotas.count + 1) * 0.08
                 HStack(spacing: 10) {
                     DailyUsageCardView(metric: .cost, report: report, delay: baseDelay)
@@ -904,6 +862,13 @@ struct MenuContentView: View {
                 if report.today.workingTime > 0 || report.previous.workingTime > 0 {
                     DailyUsageCardView(metric: .workingTime, report: report, delay: baseDelay + 0.16)
                 }
+            }
+
+            // The same login's last thirty days, as a chart.
+            if settings.showDailyUsageCards,
+               let days = (monitor.provider(for: snapshot.providerId) as? Account)?.usageHistory?.lastThirtyDays,
+               !days.isEmpty {
+                UsageHistoryChartView(days: days, delay: Double(snapshot.quotas.count + 4) * 0.08)
             }
 
             // Show extension metrics cards (from extension probes)
@@ -1015,16 +980,19 @@ struct MenuContentView: View {
                     ZStack {
                         Circle()
                             .fill(theme.shareGradient)
+                            .themeShadow(theme, scale: 0.6)
+                            .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                             .frame(width: 32, height: 32)
 
+                        // On a printed theme's light candy fill, the icon is ink.
                         if isFetchingPasses {
                             ProgressView()
                                 .scaleEffect(0.5)
-                                .tint(.white)
+                                .tint(theme.isOutlined ? theme.textPrimary : .white)
                         } else {
                             Image(systemName: "gift.fill")
                                 .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(theme.isOutlined ? theme.textPrimary : .white)
                         }
                     }
                 }
@@ -1043,6 +1011,8 @@ struct MenuContentView: View {
                 ZStack {
                     Circle()
                         .fill(theme.glassBackground)
+                        .themeShadow(theme, scale: 0.6)
+                        .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                         .frame(width: 32, height: 32)
 
                     Image(systemName: "gearshape.fill")
@@ -1069,6 +1039,8 @@ struct MenuContentView: View {
                 ZStack {
                     Circle()
                         .fill(theme.glassBackground)
+                        .themeShadow(theme, scale: 0.6)
+                        .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                         .frame(width: 32, height: 32)
 
                     Image(systemName: "xmark")
@@ -1106,7 +1078,7 @@ struct MenuContentView: View {
             }
         }
         for provider in monitor.enabledProviders {
-            await usageHistory.read(for: provider.id)
+            await (provider as? Account)?.usageHistory?.read()
         }
     }
 
@@ -1122,7 +1094,7 @@ struct MenuContentView: View {
             Task { _ = try? await provider.refresh(kind) }
         }
         // Today's usage is read with the popover open, never in the background.
-        let history = members.map { member in Task { await usageHistory.read(for: member.id) } }
+        let history = members.compactMap { ($0 as? Account)?.usageHistory }.map { history in Task { await history.read() } }
         for refresh in refreshes { await refresh.value }
         for read in history { await read.value }
     }
@@ -1183,16 +1155,24 @@ struct ProviderPill: View {
             .background(
                 ZStack {
                     if isSelected {
-                        RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                            .fill(theme.accentGradient)
-                            .shadow(color: theme.accentPrimary.opacity(0.3), radius: 6, y: 2)
+                        if theme.isOutlined {
+                            // Printed: an inked chip with a hard shadow, no glow.
+                            RoundedRectangle(cornerRadius: theme.pillCornerRadius)
+                                .fill(theme.accentGradient)
+                                .themeShadow(theme, scale: 0.5)
+                        } else {
+                            RoundedRectangle(cornerRadius: theme.pillCornerRadius)
+                                .fill(theme.accentGradient)
+                                .shadow(color: theme.accentPrimary.opacity(0.3), radius: 6, y: 2)
+                        }
                     } else {
                         RoundedRectangle(cornerRadius: theme.pillCornerRadius)
                             .fill(isHovering ? theme.hoverOverlay : theme.glassBackground)
                     }
 
                     RoundedRectangle(cornerRadius: theme.pillCornerRadius)
-                        .stroke(isSelected ? theme.accentPrimary.opacity(0.5) : theme.glassBorder, lineWidth: 1)
+                        .stroke(isSelected && !theme.isOutlined ? theme.accentPrimary.opacity(0.5) : theme.glassBorder,
+                                lineWidth: theme.cardBorderWidth)
                 }
             )
         }
@@ -1391,7 +1371,7 @@ struct WrappedStatCard: View {
                    let dollarCap = quota.formattedDollarCap {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(dollarUsed)
-                            .font(.system(size: 20, weight: .heavy, design: theme.fontDesign))
+                            .font(theme.displayFont(size: 20, weight: .heavy))
                             .foregroundStyle(theme.textPrimary)
 
                         Text("of \(dollarCap)")
@@ -1403,12 +1383,12 @@ struct WrappedStatCard: View {
                     .layoutPriority(1)
                 } else if let dollarText = quota.formattedDollarRemaining {
                     Text(dollarText)
-                        .font(.system(size: 18, weight: .bold, design: theme.fontDesign))
+                        .font(theme.displayFont(size: 18))
                         .foregroundStyle(theme.textPrimary)
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text("\(Int(quota.displayPercent(mode: effectiveDisplayMode)))")
-                            .font(.system(size: 26, weight: .bold, design: theme.fontDesign))
+                            .font(theme.displayFont(size: 26))
                             .foregroundStyle(effectiveDisplayMode == .pace ? paceColor : theme.textPrimary)
 
                         Text("%")
@@ -1479,10 +1459,10 @@ struct WrappedStatCard: View {
         .background(
             ZStack {
                 RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .fill(theme.cardGradient)
+                    .fill(theme.cardGradient).themeShadow(theme)
 
                 RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .stroke(theme.glassBorder, lineWidth: 1)
+                    .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             }
         )
         .scaleEffect(isHovering ? 1.015 : 1.0)
@@ -1518,7 +1498,7 @@ struct LoadingSpinnerView: View {
         VStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .stroke(theme.textTertiary, lineWidth: 3)
+                    .stroke(theme.isOutlined ? theme.progressTrack : theme.textTertiary, lineWidth: theme.isOutlined ? 4 : 3)
                     .frame(width: 50, height: 50)
 
                 Circle()
@@ -1574,26 +1554,39 @@ struct WrappedActionButton: View {
                 }
 
                 Text(label)
-                    .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                    .font(.system(size: 12, weight: theme.isOutlined ? .bold : .medium, design: theme.fontDesign))
                     .fixedSize()
             }
-            .foregroundStyle(isHovering ? .white : theme.textPrimary)
+            .foregroundStyle(isHovering && !theme.isOutlined ? .white : theme.textPrimary)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
                 ZStack {
-                    Capsule()
-                        .fill(isHovering ? AnyShapeStyle(gradient) : AnyShapeStyle(theme.glassBackground))
+                    if theme.isOutlined {
+                        // Printed: a paper chip on a hard shadow, mint under the
+                        // pointer, sky while it works — never greyed out.
+                        Capsule()
+                            .fill(isLoading ? theme.accentSecondary : (isHovering ? theme.statusHealthy : theme.glassBackground))
+                            .themeShadow(theme, scale: isHovering ? 1 : 0.75)
+                    } else {
+                        Capsule()
+                            .fill(isHovering ? AnyShapeStyle(gradient) : AnyShapeStyle(theme.glassBackground))
+                    }
 
                     Capsule()
-                        .stroke(theme.glassBorder, lineWidth: 1)
+                        .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
                 }
             )
-            .shadow(color: isHovering ? theme.accentPrimary.opacity(0.3) : .clear, radius: 8, y: 2)
+            .offset(x: theme.isOutlined && isHovering ? -1 : 0, y: theme.isOutlined && isHovering ? -1 : 0)
+            .shadow(color: isHovering && !theme.isOutlined ? theme.accentPrimary.opacity(0.3) : .clear, radius: 8, y: 2)
+            .animation(.easeOut(duration: 0.12), value: isHovering)
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
-        .disabled(isLoading)
+        // A disabled button is dimmed; a printed theme shows its sky "working"
+        // chip at full strength instead, and simply ignores clicks meanwhile.
+        .disabled(isLoading && !theme.isOutlined)
+        .allowsHitTesting(!isLoading)
     }
 }
 
@@ -1806,181 +1799,4 @@ struct UpdateBadge: View {
     }
 }
 
-// MARK: - Bedrock Usage Card
 
-/// Displays AWS Bedrock usage with cost and per-model breakdown.
-struct BedrockUsageCard: View {
-    let usage: BedrockUsageSummary
-    let delay: Double
-
-    @Environment(\.appTheme) private var theme
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var isHovering = false
-    @State private var animateIn = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header with cost
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "cloud.fill")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(ProviderVisualIdentityLookup.color(for: "bedrock", scheme: colorScheme))
-
-                        Text("TODAY'S USAGE")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(theme.textSecondary)
-                            .tracking(0.5)
-                    }
-
-                    // Large cost number
-                    Text(usage.formattedTotalCost)
-                        .font(.system(size: 36, weight: .bold, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
-                }
-
-                Spacer()
-
-                // Stats column
-                VStack(alignment: .trailing, spacing: 4) {
-                    StatPill(icon: "number", value: "\(usage.totalInvocations)", label: "calls")
-                    StatPill(icon: "text.word.spacing", value: usage.formattedTotalTokens, label: "tokens")
-                }
-            }
-
-            // Model breakdown (if multiple models)
-            if usage.modelUsages.count > 0 {
-                Divider()
-                    .background(theme.glassBorder)
-
-                VStack(spacing: 6) {
-                    ForEach(usage.modelsBySpend.prefix(3), id: \.model.id) { modelUsage in
-                        HStack {
-                            Text(modelUsage.model.displayName)
-                                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
-                                .foregroundStyle(theme.textSecondary)
-                                .lineLimit(1)
-
-                            Spacer()
-
-                            Text(modelUsage.formattedCost)
-                                .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
-                                .foregroundStyle(theme.textPrimary)
-                        }
-                    }
-
-                    // Show "and X more" if more than 3 models
-                    if usage.modelUsages.count > 3 {
-                        Text("and \(usage.modelUsages.count - 3) more...")
-                            .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textTertiary)
-                    }
-                }
-            }
-
-            // Budget progress (if set)
-            if let budgetPercent = usage.budgetPercentUsed,
-               let budgetFormatted = usage.formattedDailyBudget {
-                Divider()
-                    .background(theme.glassBorder)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Daily Budget")
-                            .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textSecondary)
-
-                        Spacer()
-
-                        Text("\(Int(min(budgetPercent, 100)))% of \(budgetFormatted)")
-                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(budgetPercent > 90 ? theme.statusCritical : theme.textPrimary)
-                    }
-
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(theme.progressTrack)
-
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(budgetPercent > 90 ? theme.statusCritical : theme.accentPrimary)
-                                .frame(width: geo.size.width * min(CGFloat(budgetPercent) / 100, 1.0))
-                        }
-                    }
-                    .frame(height: 4)
-                }
-            }
-
-            // Time period
-            HStack(spacing: 3) {
-                Image(systemName: "clock.fill")
-                    .font(.system(size: 8))
-
-                Text("Since \(formattedPeriodStart)")
-                    .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
-            }
-            .foregroundStyle(theme.textTertiary)
-        }
-        .padding(14)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .fill(theme.cardGradient)
-
-                RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .stroke(theme.glassBorder, lineWidth: 1)
-            }
-        )
-        .scaleEffect(isHovering ? 1.01 : 1.0)
-        .opacity(animateIn ? 1 : 0)
-        .offset(y: animateIn ? 0 : 10)
-        .animation(.easeOut(duration: 0.5).delay(delay), value: animateIn)
-        .animation(.easeOut(duration: 0.15), value: isHovering)
-        .onHover { isHovering = $0 }
-        .onAppear { animateIn = true }
-    }
-
-    // Cached formatter to avoid recreation overhead
-    private static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter
-    }()
-
-    private var formattedPeriodStart: String {
-        Self.timeFormatter.string(from: usage.periodStart)
-    }
-}
-
-// MARK: - Stat Pill (for Bedrock card)
-
-private struct StatPill: View {
-    let icon: String
-    let value: String
-    let label: String
-
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(theme.textTertiary)
-
-            Text(value)
-                .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
-                .foregroundStyle(theme.textPrimary)
-
-            Text(label)
-                .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
-                .foregroundStyle(theme.textTertiary)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            Capsule()
-                .fill(theme.glassBackground)
-        )
-    }
-}

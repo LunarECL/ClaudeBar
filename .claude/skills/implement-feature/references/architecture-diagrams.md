@@ -14,9 +14,9 @@ Provider, DataSource, Fetch, Mapping, Usage, Quota, Plan, Cost.
            │                              │
            ▼                              ▼
 ┌──────────────────────┐        ┌──────────────────────────────────────┐
-│ Domain (legacy)      │        │ Providers                            │
+│ Domain               │        │ Providers                            │
 │ QuotaMonitor,        │──────▶ │ Provider (one lifecycle), Definition,│
-│ legacy XxxProviders, │        │ AddedAccounts, settings contracts    │
+│ extension providers, │        │ AddedAccounts, settings contracts    │
 │ Notify!, sessions    │        │ Resources/Providers/<id>.json (+.js) │
 └──────────────────────┘        └──────────────────┬───────────────────┘
                                                    ▼

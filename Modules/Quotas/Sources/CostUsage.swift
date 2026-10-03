@@ -6,6 +6,31 @@ import Foundation
 /// - Note: Interim — today's shape, moved unchanged into the kernel.
 ///   Final version (docs/architecture/CANONICAL_MODEL.md) — becomes `Cost`, of a kind `api` · `extraUsage`: money gone over a period,
 ///   judged by a `Budget`, never shown as a quota (§0.1, §5).
+/// One part of a cost — a model's share of the day's spend.
+public struct CostLine: Sendable, Equatable, Hashable {
+    public let label: String
+    public let amount: Decimal
+    /// What it was spent on, as the vendor counts it — "1.2M tokens · 40 calls".
+    public let detail: String?
+
+    public init(label: String, amount: Decimal, detail: String? = nil) {
+        self.label = label
+        self.amount = amount
+        self.detail = detail
+    }
+
+    /// "$0.55"
+    public var formattedAmount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: amount as NSDecimalNumber) ?? "$\(amount)"
+    }
+}
+
 public struct CostUsage: Sendable, Equatable, Hashable {
     public enum Kind: Sendable, Equatable, Hashable {
         case apiCost
@@ -46,6 +71,9 @@ public struct CostUsage: Sendable, Equatable, Hashable {
     /// Human-readable reset text (e.g., "Resets Jan 1, 2026")
     public let resetText: String?
 
+    /// The parts it is made of, largest first — empty when it isn't broken down.
+    public let lines: [CostLine]
+
     // MARK: - Initialization
 
     public init(
@@ -59,8 +87,10 @@ public struct CostUsage: Sendable, Equatable, Hashable {
         kind: Kind = .apiCost,
         capturedAt: Date = Date(),
         resetsAt: Date? = nil,
-        resetText: String? = nil
+        resetText: String? = nil,
+        lines: [CostLine] = []
     ) {
+        self.lines = lines
         self.kind = kind
         self.totalCost = totalCost
         self.budget = budget

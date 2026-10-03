@@ -8,18 +8,25 @@ import JavaScriptCore
 /// The script defines `read(response, context)`:
 ///
 /// - `response` — `{ status, headers, text, json }` (`json` is the parsed body, or `null`)
-/// - `context` — `{ now, timeZone, credential, ...files }`: epoch seconds, the
-///   current zone's identifier, the credential values the definition lets it
-///   see, and each declared context file's fields
+/// - `context` — `{ now, timeZone, credential, values, ...files }`: epoch
+///   seconds, the current zone's identifier, the credential values the
+///   definition lets it see, the settings it hands over (`values`), and each
+///   declared context file's fields
 ///
-/// and returns `{ quotas, plan, cost, account }` or `{ error }`. It may call
-/// `humanDate(text)` for an epoch-seconds reset time, or `null`.
+/// and returns `{ quotas, notes, plan, cost, account }` or `{ error }` — a cost
+/// may carry `lines`, its parts, and a quota its `group`, with `notes` for a
+/// group that has nothing to measure. It may call
+/// `humanDate(text)` for an epoch-seconds reset time, or `null`;
+/// `jsonDecimal(text)` to parse JSON keeping every number as its exact text;
+/// and `decimalCents(amount)` to round such an amount to cents without a
+/// binary float — money stays exact (CANONICAL §5, `Money`).
 ///
 /// The context has no file, network or process access: the script turns text
 /// into numbers and nothing else.
 struct ScriptMapper: Reading {
     let file: String
     let source: String?
+    var values: [String: String] = [:]
     let now: @Sendable () -> Date
 
     func read(_ response: Response, facts: MappingFacts, providerId: String) throws -> UsageSnapshot {
@@ -40,8 +47,9 @@ struct ScriptMapper: Reading {
             HumanDate.parse(text, now: clock()).map { $0.timeIntervalSince1970 } ?? NSNull()
         }
         context.setObject(humanDate, forKeyedSubscript: "humanDate" as NSString)
-        context.setObject(try Self.inputJSON(response, facts: facts, now: now()), forKeyedSubscript: "__input" as NSString)
+        context.setObject(try Self.inputJSON(response, facts: facts, values: values, now: now()), forKeyedSubscript: "__input" as NSString)
 
+        context.evaluateScript(DecimalScript.source)
         context.evaluateScript(source)
         if let exception {
             throw UsageError.parseFailed("Mapping script '\(file)' failed to load: \(exception)")
@@ -65,11 +73,13 @@ struct ScriptMapper: Reading {
         return try result.snapshot(providerId: providerId, capturedAt: now())
     }
 
-    private static func inputJSON(_ response: Response, facts: MappingFacts, now: Date) throws -> String {
+    private static func inputJSON(_ response: Response, facts: MappingFacts, values: [String: String], now: Date) throws -> String {
         var context: [String: Any] = [
             "now": now.timeIntervalSince1970,
             "timeZone": TimeZone.current.identifier,
             "credential": facts.credential,
+            // A blank setting never filled its template.
+            "values": values.filter { !$0.value.contains("{{") },
         ]
         for (name, fields) in facts.context {
             context[name] = fields
@@ -99,9 +109,11 @@ struct ScriptOutput: Decodable {
         let resetsAt: Double?
         let resetText: String?
         let windowSeconds: Double?
+        /// The account or source it belongs to, when a report holds several.
+        let group: String?
 
         private enum CodingKeys: String, CodingKey {
-            case type, name, percentRemaining, left, resetsAt, resetText, windowSeconds
+            case type, name, percentRemaining, left, resetsAt, resetText, windowSeconds, group
         }
 
         private struct MoneyLeft: Decodable {
@@ -132,10 +144,17 @@ struct ScriptOutput: Decodable {
             resetsAt = try container.decodeIfPresent(Double.self, forKey: .resetsAt)
             resetText = try container.decodeIfPresent(String.self, forKey: .resetText)
             windowSeconds = try container.decodeIfPresent(Double.self, forKey: .windowSeconds)
+            group = try container.decodeIfPresent(String.self, forKey: .group)
         }
     }
 
     struct Cost: Decodable {
+        struct Line: Decodable {
+            let label: String
+            let used: Money
+            let detail: String?
+        }
+
         let kind: CostRule.Kind?
         /// Decimal strings keep money exact; numbers are accepted too.
         let used: Money
@@ -143,6 +162,7 @@ struct ScriptOutput: Decodable {
         let apiDurationSeconds: Double?
         let resetsAt: Double?
         let resetText: String?
+        let lines: [Line]?
     }
 
     struct Account: Decodable {
@@ -171,7 +191,16 @@ struct ScriptOutput: Decodable {
         }
     }
 
+    /// A line under a group with nothing to measure — "No usage reported".
+    struct Note: Decodable {
+        let group: String
+        let text: String
+        /// The row's own name, unique in the report — the group's, unless said.
+        let label: String?
+    }
+
     let quotas: [Quota]?
+    let notes: [Note]?
     let plan: String?
     let cost: Cost?
     let account: Account?
@@ -187,7 +216,8 @@ struct ScriptOutput: Decodable {
                 providerId: providerId,
                 resetsAt: quota.resetsAt.map { Date(timeIntervalSince1970: $0) },
                 resetText: quota.resetText,
-                windowDuration: quota.windowSeconds
+                windowDuration: quota.windowSeconds,
+                group: quota.group
             )
         }
         let costUsage = cost.map { cost in
@@ -199,7 +229,8 @@ struct ScriptOutput: Decodable {
                 kind: cost.kind == .extraUsage ? .extraUsage : .apiCost,
                 capturedAt: capturedAt,
                 resetsAt: cost.resetsAt.map { Date(timeIntervalSince1970: $0) },
-                resetText: cost.resetText
+                resetText: cost.resetText,
+                lines: (cost.lines ?? []).map { CostLine(label: $0.label, amount: $0.used.value, detail: $0.detail) }
             )
         }
         return UsageSnapshot(
@@ -210,7 +241,10 @@ struct ScriptOutput: Decodable {
             accountOrganization: account?.organization,
             loginMethod: account?.loginMethod,
             accountTier: plan.map(Self.tier),
-            costUsage: costUsage
+            costUsage: costUsage,
+            extensionMetrics: notes.flatMap { notes in
+                notes.isEmpty ? nil : notes.map { ExtensionMetric(label: $0.label ?? $0.group, value: $0.text, unit: "", group: $0.group) }
+            }
         )
     }
 

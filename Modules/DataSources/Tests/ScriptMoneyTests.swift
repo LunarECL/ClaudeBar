@@ -29,6 +29,30 @@ struct ScriptMoneyTests {
     }
 
     @Test
+    func `a cost carries its lines, each exact, against the user's budget`() throws {
+        let usage = try read(#"{quotas:[],cost:{used:'4.10',limit:'10',lines:[{label:'Claude Sonnet 4',used:'3.70',detail:'1.2M tokens'},{label:'Nova Pro',used:'0.40'}]}}"#)
+        let cost = try #require(usage.costUsage)
+        #expect(cost.totalCost == Decimal(string: "4.10")!)
+        #expect(cost.budget == 10)
+        #expect(cost.lines == [CostLine(label: "Claude Sonnet 4", amount: Decimal(string: "3.70")!, detail: "1.2M tokens"),
+                               CostLine(label: "Nova Pro", amount: Decimal(string: "0.40")!)])
+        #expect(usage.quotas.isEmpty)
+    }
+
+    @Test
+    func `a quota can name the group it belongs to`() throws {
+        let usage = try read(#"{quotas:[{type:'time',name:'Kimi 5h',percentRemaining:40,group:'Kimi'},{type:'time',name:'Solo',percentRemaining:9}]}"#)
+        #expect(usage.quotas.map(\.group) == ["Kimi", nil])
+    }
+
+    @Test
+    func `a group with nothing to measure carries a note`() throws {
+        let usage = try read(#"{quotas:[{type:'time',name:'Kimi 5h',percentRemaining:40,group:'Kimi'}],notes:[{group:'Copilot · me',text:'No usage reported'}]}"#)
+        #expect(usage.quotaGroups.map(\.title) == ["Kimi", "Copilot · me"])
+        #expect(usage.quotaGroups.last?.note == "No usage reported")
+    }
+
+    @Test
     func `existing percentage scripts keep working`() throws {
         let usage = try read(#"{quotas:[{type:'session',percentRemaining:37}]}"#)
         #expect(usage.quotas.first?.left == .share(37))

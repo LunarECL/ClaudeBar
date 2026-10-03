@@ -111,6 +111,49 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.customCardURL(forProvider: "gemini") == nil)
     }
 
+    // MARK: - Provider Order
+
+    @Test
+    func `providerOrder defaults to empty`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.providerOrder() == [])
+    }
+
+    @Test
+    func `setProviderOrder persists value`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setProviderOrder(["gemini", "claude", "codex"])
+
+        // Read back through a fresh repository over the same file, so the
+        // value really hit settings.json and not just memory.
+        let store = JSONSettingsStore(fileURL: dir.appendingPathComponent("settings.json"))
+        let reloaded = JSONSettingsRepository(store: store)
+        #expect(reloaded.providerOrder() == ["gemini", "claude", "codex"])
+    }
+
+    @Test
+    func `setProviderOrder empty clears the stored order`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setProviderOrder(["gemini", "claude", "codex"])
+        repo.setProviderOrder([])
+        #expect(repo.providerOrder() == [])
+    }
+
+    @Test
+    func `providerOrder round-trips a partial order`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setProviderOrder(["codex"])
+        #expect(repo.providerOrder() == ["codex"])
+    }
+
     // MARK: - Hidden Quota Keys (issue #140)
 
     @Test
@@ -234,149 +277,6 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.codexVerifiedAtLeastOnce() == false)
     }
 
-    // MARK: - Kimi Settings
-
-    @Test
-    func `kimiProbeMode defaults to cli`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.kimiProbeMode() == .cli)
-    }
-
-    @Test
-    func `setKimiProbeMode persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setKimiProbeMode(.api)
-        #expect(repo.kimiProbeMode() == .api)
-    }
-
-    // MARK: - Zai Settings
-
-    @Test
-    func `zaiConfigPath defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.zaiConfigPath() == "")
-    }
-
-    @Test
-    func `setZaiConfigPath persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setZaiConfigPath("/custom/path")
-        #expect(repo.zaiConfigPath() == "/custom/path")
-    }
-
-    @Test
-    func `glmAuthEnvVar defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.glmAuthEnvVar() == "")
-    }
-
-    @Test
-    func `setGlmAuthEnvVar persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setGlmAuthEnvVar("GLM_TOKEN")
-        #expect(repo.glmAuthEnvVar() == "GLM_TOKEN")
-    }
-
-    // MARK: - Copilot Settings
-
-    @Test
-    func `copilotProbeMode defaults to billing`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.copilotProbeMode() == .billing)
-    }
-
-    @Test
-    func `setCopilotProbeMode persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setCopilotProbeMode(.copilotAPI)
-        #expect(repo.copilotProbeMode() == .copilotAPI)
-    }
-
-    @Test
-    func `copilotAuthEnvVar defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.copilotAuthEnvVar() == "")
-    }
-
-    @Test
-    func `copilotMonthlyLimit defaults to nil`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.copilotMonthlyLimit() == nil)
-    }
-
-    @Test
-    func `setCopilotMonthlyLimit persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setCopilotMonthlyLimit(100)
-        #expect(repo.copilotMonthlyLimit() == 100)
-    }
-
-    // MARK: - Bedrock Settings
-
-    @Test
-    func `awsProfileName defaults to empty string`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.awsProfileName() == "")
-    }
-
-    @Test
-    func `bedrockRegions defaults to us-east-1`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.bedrockRegions() == ["us-east-1"])
-    }
-
-    @Test
-    func `setBedrockRegions persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setBedrockRegions(["us-west-2", "eu-west-1"])
-        #expect(repo.bedrockRegions() == ["us-west-2", "eu-west-1"])
-    }
-
-    @Test
-    func `bedrockDailyBudget defaults to nil`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.bedrockDailyBudget() == nil)
-    }
-
-    @Test
-    func `setBedrockDailyBudget persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setBedrockDailyBudget(25.50)
-        #expect(repo.bedrockDailyBudget() == 25.50)
-    }
-
     // MARK: - Hook Settings
 
     @Test
@@ -411,44 +311,6 @@ struct JSONSettingsRepositoryProviderTests {
 
         repo.setHookPort(8080)
         #expect(repo.hookPort() == 8080)
-    }
-
-    // MARK: - MiniMax Settings
-
-    @Test
-    func `minimaxRegion defaults to china`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.minimaxRegion() == .china)
-    }
-
-    @Test
-    func `setMinimaxRegion persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setMinimaxRegion(.international)
-        #expect(repo.minimaxRegion() == .international)
-    }
-
-    // MARK: - Kimi Settings
-
-    @Test
-    func `kimiRegion defaults to china`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        #expect(repo.kimiRegion() == .china)
-    }
-
-    @Test
-    func `setKimiRegion persists value`() {
-        let (repo, dir) = makeRepository()
-        defer { cleanup(dir) }
-
-        repo.setKimiRegion(.international)
-        #expect(repo.kimiRegion() == .international)
     }
 
 }

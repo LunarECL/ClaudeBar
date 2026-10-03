@@ -28,6 +28,17 @@ final class InMemoryProviderSettings: MultiAccountSettingsRepository, @unchecked
         flags["\(id).\(setting)"] = on
     }
 
+    /// `"<provider>.<setting>"` → value, as `settings.json` keeps them.
+    private var values: [String: String] = [:]
+
+    func value(_ setting: String, forProvider id: String) -> String? {
+        values["\(id).\(setting)"]
+    }
+
+    func setValue(_ value: String?, _ setting: String, forProvider id: String) {
+        values["\(id).\(setting)"] = value
+    }
+
     func isEnabled(forProvider id: String) -> Bool {
         enabled[id] ?? true
     }

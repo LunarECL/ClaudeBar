@@ -5,7 +5,7 @@ import Foundation
 ///
 /// - Note: Interim — today's shape, moved unchanged into the kernel.
 ///   Final version (docs/architecture/CANONICAL_MODEL.md) — leaves the kernel for `UsageHistory` (§7) with `DailyUsageReport`.
-public struct DailyUsageStat: Sendable, Equatable {
+public struct DailyUsageStat: Sendable, Equatable, Codable {
     /// The date this stat represents (day granularity)
     public let date: Date
 

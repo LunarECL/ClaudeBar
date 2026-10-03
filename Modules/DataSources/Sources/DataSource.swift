@@ -53,6 +53,12 @@ public struct DataSource: Sendable {
     /// background refresh floor while this data source is active.
     public var cacheTTL: TimeInterval? { definition.cache?.ttl }
 
+    /// The data source that takes over when this one finds no key — its
+    /// `fallbackOn.authenticationRequired` — or `nil` when it has its key.
+    public var handOffWithoutKey: String? {
+        hasKey ? nil : definition.fallbackOn[UsageError.authenticationRequired.tag]
+    }
+
     /// Whether the key lookup finds a key — *OAuth credentials found*.
     /// `true` for a data source that needs none.
     public var hasKey: Bool {
@@ -60,9 +66,10 @@ public struct DataSource: Sendable {
         return (try? credentials.find()) != nil
     }
 
-    /// *Configured*: the key answers (when one is needed), belongs to the
-    /// expected account, and the CLI exists.
+    /// *Configured*: the files it needs exist, the key answers (when one is
+    /// needed), belongs to the expected account, and the CLI exists.
     public func isReady() async -> Bool {
+        guard requiredFiles.allSatisfy({ FileManager.default.fileExists(atPath: $0) }) else { return false }
         var credential: Credential?
         if let credentials {
             guard let found = try? credentials.find() else { return false }
@@ -211,7 +218,7 @@ public struct DataSource: Sendable {
             return (try await fetcher.fetch(with: found?.credential), found?.credential)
         } catch let refused as HTTPStatusError {
             guard let refresher, let current = found, refresher.retryStatuses.contains(refused.status) else {
-                throw DataSourceError(.fetch, refused.reason)
+                throw fetchError(refused)
             }
             AppLog.probes.info("\(providerId) \(kind): HTTP \(refused.status), refreshing the token once")
             let renewed: FoundCredential
@@ -224,10 +231,10 @@ public struct DataSource: Sendable {
             do {
                 return (try await fetcher.fetch(with: renewed.credential), renewed.credential)
             } catch {
-                throw Self.fetchError(error)
+                throw fetchError(error)
             }
         } catch {
-            throw Self.fetchError(error)
+            throw fetchError(error)
         }
     }
 
@@ -253,7 +260,8 @@ public struct DataSource: Sendable {
         return fresh
     }
 
-    /// Refreshes the token and writes it back where it was found.
+    /// Refreshes the token and writes it back where it was found — or, when
+    /// its owner renewed it, reads it again from there.
     private func refreshed(_ found: FoundCredential, by refresher: any CredentialRefreshing) async throws -> FoundCredential {
         var renewed = found
         do {
@@ -261,15 +269,18 @@ public struct DataSource: Sendable {
         } catch {
             throw DataSourceError.wrap(error, as: .lookup)
         }
+        guard refresher.writesBack else {
+            guard let reread = try? credentials?.find() else { throw DataSourceError(.lookup, .authenticationRequired) }
+            return reread
+        }
         renewed.save?(renewed.credential)
         return renewed
     }
 
-    private static func fetchError(_ error: Error) -> DataSourceError {
-        if let refused = error as? HTTPStatusError {
-            return DataSourceError(.fetch, refused.reason)
-        }
-        return DataSourceError.wrap(error, as: .fetch)
+    /// A worker's failure, worded by the definition.
+    private func fetchError(_ error: Error) -> DataSourceError {
+        guard let failure = error as? any ReportedFailure else { return DataSourceError.wrap(error, as: .fetch) }
+        return DataSourceError(.fetch, definition.reason(for: failure))
     }
 }
 
@@ -319,6 +330,9 @@ protocol CredentialFinding: Sendable {
 
 protocol CredentialRefreshing: Sendable {
     var retryStatuses: [Int] { get }
+    /// Whether the renewed credential is ClaudeBar's to write back, or the
+    /// owner wrote it and it is read again.
+    var writesBack: Bool { get }
     func isDue(_ credential: Credential) -> Bool
     func refresh(_ credential: Credential) async throws -> Credential
 }
@@ -339,9 +353,14 @@ protocol Recovering: Sendable {
 }
 
 /// An HTTP answer outside 2xx, kept with its status so a refresh can be tried.
-struct HTTPStatusError: Error, Sendable {
+struct HTTPStatusError: ReportedFailure {
     let status: Int
     let reason: UsageError
+
+    var fact: ErrorFact? {
+        if case .rateLimited = reason { return nil }
+        return .httpStatus(status)
+    }
 }
 
 /// The last usage and a rate limit's end, kept between refreshes.
