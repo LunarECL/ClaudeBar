@@ -197,6 +197,8 @@ public enum ErrorRef: Sendable, Equatable, Codable {
     case parseFailed(String)
     case sessionExpired(String?)
     case executionFailed(String)
+    /// *CLI not found*, naming the CLI the person should install.
+    case cliNotFound(String)
 
     public var usageError: UsageError {
         switch self {
@@ -208,6 +210,7 @@ public enum ErrorRef: Sendable, Equatable, Codable {
         case .parseFailed(let reason): .parseFailed(reason)
         case .sessionExpired(let hint): .sessionExpired(hint: hint)
         case .executionFailed(let reason): .executionFailed(reason)
+        case .cliNotFound(let name): .cliNotFound(name)
         }
     }
 
@@ -226,10 +229,11 @@ public enum ErrorRef: Sendable, Equatable, Codable {
             return
         }
         let container = try decoder.container(keyedBy: TagKey.self)
-        let tag = try container.singleTag(of: ["parseFailed", "sessionExpired", "executionFailed"], in: "error")
+        let tag = try container.singleTag(of: ["parseFailed", "sessionExpired", "executionFailed", "cliNotFound"], in: "error")
         let text = try container.decode(String.self, forKey: TagKey(tag))
         switch tag {
         case "parseFailed": self = .parseFailed(text)
+        case "cliNotFound": self = .cliNotFound(text)
         case "executionFailed": self = .executionFailed(text)
         default: self = .sessionExpired(text)
         }
@@ -246,6 +250,9 @@ public enum ErrorRef: Sendable, Equatable, Codable {
         case .executionFailed(let reason):
             var container = encoder.container(keyedBy: TagKey.self)
             try container.encode(reason, forKey: TagKey("executionFailed"))
+        case .cliNotFound(let name):
+            var container = encoder.container(keyedBy: TagKey.self)
+            try container.encode(name, forKey: TagKey("cliNotFound"))
         default:
             var container = encoder.singleValueContainer()
             let tag: String = switch self {

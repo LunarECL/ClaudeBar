@@ -33,7 +33,7 @@ struct AccountsCardText {
     }
 
     /// What *Add Account*'s form asks for.
-    var fields: [ProviderDefinition.Accounts.Field] { provider.definition.accounts?.form ?? [] }
+    var fields: [Setting] { provider.definition.accountSettings }
 
     /// The login a person runs themselves to sign in to `folder`.
     func signInCommand(in folder: String) -> String? {

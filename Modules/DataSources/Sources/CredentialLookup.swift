@@ -20,10 +20,37 @@ public indirect enum CredentialLookup: Sendable, Equatable {
     case keychain(KeychainCredential)
     /// A key the person gave ClaudeBar (*API KEY*), kept in its vault.
     case setting(String)
+    /// Cookies of a site the person is signed in to in a browser — *COOKIE SOURCE*.
+    case browserCookies(BrowserCookieCredential)
     /// The first lookup that answers wins.
     case firstOf([CredentialLookup])
     /// A lookup whose token is kept fresh by an OAuth 2 refresh.
     case refreshing(CredentialLookup, OAuth2Refresh)
+}
+
+/// `{ "domains": ["{{setting.region.site}}"], "names": ["auth"], "format": "value" }`
+/// — the first browser store holding one of the names answers. `value` is the
+/// first cookie's value; `header` is `name=value; …` of every one found.
+public struct BrowserCookieCredential: Sendable, Equatable, Codable {
+    public enum Format: String, Sendable, Equatable, Codable { case value, header }
+
+    /// Matched as suffixes; `{{setting.x}}` is filled in by the provider.
+    public let domains: [String]
+    public let names: [String]
+    public let format: Format
+
+    public init(domains: [String], names: [String], format: Format = .value) {
+        self.domains = domains
+        self.names = names
+        self.format = format
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        domains = try container.decode([String].self, forKey: .domains)
+        names = try container.decode([String].self, forKey: .names)
+        format = try container.decodeIfPresent(Format.self, forKey: .format) ?? .value
+    }
 }
 
 /// What a lookup found: the token and the values that travel with it
@@ -195,7 +222,7 @@ public struct OAuth2Refresh: Sendable, Equatable, Codable {
 // MARK: - JSON
 
 extension CredentialLookup: Codable {
-    private static let tags = ["environment", "jsonFile", "keychain", "setting", "firstOf"]
+    private static let tags = ["environment", "jsonFile", "keychain", "setting", "browserCookies", "firstOf"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
@@ -209,6 +236,8 @@ extension CredentialLookup: Codable {
             base = .keychain(try container.decode(KeychainCredential.self, forKey: TagKey("keychain")))
         case "setting":
             base = .setting(try container.decode(String.self, forKey: TagKey("setting")))
+        case "browserCookies":
+            base = .browserCookies(try container.decode(BrowserCookieCredential.self, forKey: TagKey("browserCookies")))
         default:
             base = .firstOf(try container.decode([CredentialLookup].self, forKey: TagKey("firstOf")))
         }
@@ -235,6 +264,8 @@ extension CredentialLookup: Codable {
             try container.encode(item, forKey: TagKey("keychain"))
         case .setting(let name):
             try container.encode(name, forKey: TagKey("setting"))
+        case .browserCookies(let cookies):
+            try container.encode(cookies, forKey: TagKey("browserCookies"))
         case .firstOf(let lookups):
             try container.encode(lookups, forKey: TagKey("firstOf"))
         case .refreshing(let base, let refresh):
@@ -254,6 +285,7 @@ extension CredentialLookup {
         case .jsonFile(let file): [file.path]
         case .keychain(let item): ["Keychain “\(item.service)”"]
         case .setting: ["API key saved in ClaudeBar"]
+        case .browserCookies(let cookies): ["Browser cookies for \(cookies.domains.first ?? "the site")"]
         case .firstOf(let lookups): lookups.flatMap(\.lookupOrder)
         case .refreshing(let base, _): base.lookupOrder
         }
@@ -265,7 +297,7 @@ extension CredentialLookup {
         switch self {
         case .refreshing(let base, let refresh): refresh.hint ?? base.hint
         case .firstOf(let lookups): lookups.lazy.compactMap(\.hint).first
-        case .environment, .jsonFile, .keychain, .setting: nil
+        case .environment, .jsonFile, .keychain, .setting, .browserCookies: nil
         }
     }
 }

@@ -341,6 +341,15 @@ public final class JSONSettingsRepository:
         store.write(value: on, key: "\(id).\(setting)")
     }
 
+    /// `<id>.<setting>` — e.g. `kimi.region`, the key the Kimi card writes.
+    public func value(_ setting: String, forProvider id: String) -> String? {
+        store.read(key: "\(id).\(setting)")
+    }
+
+    public func setValue(_ value: String?, _ setting: String, forProvider id: String) {
+        store.write(value: value, key: "\(id).\(setting)")
+    }
+
     public func setEnabled(_ enabled: Bool, forProvider id: String) {
         store.write(value: enabled, key: "providers.\(id).isEnabled")
     }

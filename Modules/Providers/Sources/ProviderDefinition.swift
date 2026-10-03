@@ -9,7 +9,8 @@ import Foundation
 /// keeps the laws below.
 public struct ProviderDefinition: Sendable, Equatable, Codable {
     public struct Links: Sendable, Equatable, Codable {
-        public let dashboard: URL?
+        /// The dashboard as written — `{{setting.x}}` may fill it per login.
+        public let dashboardTemplate: String?
         public let status: URL?
         /// A different dashboard for some plans — `{ "claudeApi": "…" }`. Keyed
         /// by the plan names mapping scripts use (`claudeMax`, `claudePro`,
@@ -17,7 +18,11 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         public let dashboardByPlan: [String: URL]
 
         public init(dashboard: URL? = nil, status: URL? = nil, dashboardByPlan: [String: URL] = [:]) {
-            self.dashboard = dashboard
+            self.init(dashboardTemplate: dashboard?.absoluteString, status: status, dashboardByPlan: dashboardByPlan)
+        }
+
+        public init(dashboardTemplate: String?, status: URL? = nil, dashboardByPlan: [String: URL] = [:]) {
+            self.dashboardTemplate = dashboardTemplate
             self.status = status
             self.dashboardByPlan = dashboardByPlan
         }
@@ -25,16 +30,35 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             self.init(
-                dashboard: try container.decodeIfPresent(URL.self, forKey: .dashboard),
+                dashboardTemplate: try container.decodeIfPresent(String.self, forKey: .dashboard),
                 status: try container.decodeIfPresent(URL.self, forKey: .status),
                 dashboardByPlan: try container.decodeIfPresent([String: URL].self, forKey: .dashboardByPlan) ?? [:]
             )
         }
 
-        /// The dashboard for the plan the last usage reported, else the default.
-        public func dashboard(for plan: AccountTier?) -> URL? {
-            guard let plan, let url = dashboardByPlan[Self.key(for: plan)] else { return dashboard }
-            return url
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(dashboardTemplate, forKey: .dashboard)
+            try container.encodeIfPresent(status, forKey: .status)
+            try container.encode(dashboardByPlan, forKey: .dashboardByPlan)
+        }
+
+        private enum CodingKeys: String, CodingKey { case dashboard, status, dashboardByPlan }
+
+        /// The dashboard, when it names no setting.
+        public var dashboard: URL? { dashboard(filling: [:]) }
+
+        /// The dashboard for the plan the last usage reported, else the
+        /// default with a login's settings filled in — `Setting.fills`.
+        public func dashboard(for plan: AccountTier?, settings: [String: String] = [:]) -> URL? {
+            if let plan, let url = dashboardByPlan[Self.key(for: plan)] { return url }
+            return dashboard(filling: settings)
+        }
+
+        private func dashboard(filling settings: [String: String]) -> URL? {
+            guard var text = dashboardTemplate else { return nil }
+            for (name, value) in settings { text = text.replacingOccurrences(of: "{{setting.\(name)}}", with: value) }
+            return text.contains("{{") ? nil : URL(string: text)
         }
 
         static func key(for plan: AccountTier) -> String {
@@ -59,6 +83,14 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     public let defaultDataSource: String
     /// Logins added beside the default one, and how they differ.
     public let accounts: Accounts?
+    /// What it needs from the person — the provider's `SettingsForm`. The
+    /// account-scope ones are what *Add Account* asks for.
+    public let settings: [Setting]
+
+    /// What *Add Account*'s form asks for: the account-scope settings.
+    public var accountSettings: [Setting] { settings.filter { $0.scope == .account } }
+
+    public func setting(_ id: String) -> Setting? { settings.first { $0.id == id } }
 
     /// Logins a person adds beside the default one (Codex, #326). An added
     /// login runs the SAME data sources with `patch` merged in (RFC 7396) and
@@ -71,32 +103,9 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         /// `folder` then checks — so a sign-in needs a folder rule.
         public let signIn: SignInCall?
         /// …or by filling in the account's own settings — an API key, a
-        /// region. A secret field is kept in the vault, under the account.
-        public let form: [Field]
-
-        /// One setting *Add Account*'s form asks for.
-        public struct Field: Sendable, Equatable, Codable {
-            public let id: String
-            public let label: String
-            public let secret: Bool
-            /// The only values it takes, when it is a choice.
-            public let choices: [String]?
-
-            public init(id: String, label: String, secret: Bool = false, choices: [String]? = nil) {
-                self.id = id
-                self.label = label
-                self.secret = secret
-                self.choices = choices
-            }
-
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.container(keyedBy: CodingKeys.self)
-                id = try container.decode(String.self, forKey: .id)
-                label = try container.decode(String.self, forKey: .label)
-                secret = try container.decodeIfPresent(Bool.self, forKey: .secret) ?? false
-                choices = try container.decodeIfPresent([String].self, forKey: .choices)
-            }
-        }
+        /// region. Account scope; a secret is kept in the vault, under the
+        /// account. Written here or as `settings` with `"scope": "account"`.
+        public let form: [Setting]
         /// By data source kind, what an added login changes — its own folder,
         /// its identity check, no fallback to the shared terminal. `null`
         /// leaves that data source out for added logins.
@@ -187,7 +196,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             [signIn.map { _ in .signIn }, folder.map { _ in .folder }, form.isEmpty ? nil : .form].compactMap { $0 }
         }
 
-        public init(folder: Folder? = nil, signIn: SignInCall? = nil, form: [Field] = [], patch: [String: JSONValue] = [:]) {
+        public init(folder: Folder? = nil, signIn: SignInCall? = nil, form: [Setting] = [], patch: [String: JSONValue] = [:]) {
             self.signIn = signIn
             self.form = form
             self.folder = folder
@@ -198,12 +207,23 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             folder = try container.decodeIfPresent(Folder.self, forKey: .folder)
             signIn = try container.decodeIfPresent(SignInCall.self, forKey: .signIn)
-            form = try container.decodeIfPresent([Field].self, forKey: .form) ?? []
+            form = try (container.decodeIfPresent([Setting].self, forKey: .form) ?? []).map(\.inAccountScope)
             if signIn != nil, folder == nil {
                 throw DecodingError.dataCorruptedError(forKey: .signIn, in: container,
                     debugDescription: "accounts.signIn needs accounts.folder to check the folder it signs into")
             }
             patch = try container.decodeIfPresent([String: JSONValue].self, forKey: .patch) ?? [:]
+        }
+
+        private enum CodingKeys: String, CodingKey { case folder, signIn, form, patch }
+
+        /// The form is written once, as the definition's account-scope
+        /// `settings`; `accounts.form` is only read, from files made before.
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(folder, forKey: .folder)
+            try container.encodeIfPresent(signIn, forKey: .signIn)
+            try container.encode(patch, forKey: .patch)
         }
     }
 
@@ -213,28 +233,68 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         enabledByDefault: Bool = true,
         dataSources: [DataSourceDefinition],
         defaultDataSource: String,
-        accounts: Accounts? = nil
+        accounts: Accounts? = nil,
+        settings: [Setting] = []
     ) {
         self.profile = profile
         self.cli = cli
         self.enabledByDefault = enabledByDefault
         self.dataSources = dataSources
         self.defaultDataSource = defaultDataSource
-        self.accounts = accounts
+        // One form: the account-scope settings are also what *Add Account* asks.
+        let form = accounts?.form ?? []
+        let all = settings + form.filter { field in !settings.contains { $0.id == field.id } }
+        self.settings = all
+        let accountScope = all.filter { $0.scope == .account }
+        if let accounts {
+            self.accounts = Accounts(folder: accounts.folder, signIn: accounts.signIn, form: accountScope, patch: accounts.patch)
+        } else {
+            self.accounts = accountScope.isEmpty ? nil : Accounts(form: accountScope)
+        }
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        profile = try container.decode(ProviderProfile.self, forKey: .profile)
-        cli = try container.decodeIfPresent(String.self, forKey: .cli)
-        enabledByDefault = try container.decodeIfPresent(Bool.self, forKey: .enabledByDefault) ?? true
-        dataSources = try container.decode([DataSourceDefinition].self, forKey: .dataSources)
-        defaultDataSource = try container.decode(String.self, forKey: .defaultDataSource)
-        accounts = try container.decodeIfPresent(Accounts.self, forKey: .accounts)
+        let accounts = try container.decodeIfPresent(Accounts.self, forKey: .accounts)
+        let settings = try container.decodeIfPresent([Setting].self, forKey: .settings) ?? []
+        // A file says each setting once: at the top, or in the old account form.
+        if let twice = accounts?.form.first(where: { field in settings.contains { $0.id == field.id } }) {
+            throw DecodingError.dataCorruptedError(forKey: .settings, in: container,
+                debugDescription: "Setting '\(twice.id)' is in both settings and accounts.form")
+        }
+        self.init(
+            profile: try container.decode(ProviderProfile.self, forKey: .profile),
+            cli: try container.decodeIfPresent(String.self, forKey: .cli),
+            enabledByDefault: try container.decodeIfPresent(Bool.self, forKey: .enabledByDefault) ?? true,
+            dataSources: try container.decode([DataSourceDefinition].self, forKey: .dataSources),
+            defaultDataSource: try container.decode(String.self, forKey: .defaultDataSource),
+            accounts: accounts,
+            settings: settings
+        )
+        try validateSettings()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(profile, forKey: .profile)
+        try container.encodeIfPresent(cli, forKey: .cli)
+        try container.encode(enabledByDefault, forKey: .enabledByDefault)
+        try container.encode(dataSources, forKey: .dataSources)
+        try container.encode(defaultDataSource, forKey: .defaultDataSource)
+        try container.encodeIfPresent(accounts, forKey: .accounts)
+        if !settings.isEmpty { try container.encode(settings, forKey: .settings) }
     }
 
     enum CodingKeys: String, CodingKey {
-        case profile, cli, enabledByDefault, dataSources, defaultDataSource, accounts
+        case profile, cli, enabledByDefault, dataSources, defaultDataSource, accounts, settings
+    }
+
+    /// Each setting's id is used once.
+    private func validateSettings() throws {
+        var ids = Set<String>()
+        for setting in settings where !ids.insert(setting.id).inserted {
+            throw DefinitionError.duplicateSetting(id, setting.id)
+        }
     }
 
     /// Decodes and checks the laws: at least one data source, kinds unique,
@@ -296,13 +356,10 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         let binary = binary.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let cli, !binary.isEmpty, binary != cli else { return self }
         let sources = try dataSources.map { source -> DataSourceDefinition in
-            let tag: String
-            switch source.fetch {
-            case .cli(let call) where call.cli == cli: tag = "cli"
-            case .jsonRpc(let call) where call.cli == cli: tag = "jsonRpc"
-            default: return source
-            }
-            return try source.patched(with: .object(["fetch": .object([tag: .object(["cli": .string(binary)])])]))
+            let fetch = source.fetch.runningCLI(cli, at: binary)
+            guard fetch != source.fetch else { return source }
+            let json = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(fetch))
+            return try source.patched(with: .object(["fetch": json]))
         }
         var accounts = accounts
         if let signIn = accounts?.signIn, signIn.cli == cli {
@@ -320,8 +377,16 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             enabledByDefault: enabledByDefault,
             dataSources: sources,
             defaultDataSource: defaultDataSource,
-            accounts: accounts
+            accounts: accounts,
+            settings: settings
         )
+    }
+}
+
+extension Setting {
+    /// The same setting, asked for by *Add Account*.
+    var inAccountScope: Setting {
+        Setting(id: id, label: label, kind: kind, scope: .account, default: self.default)
     }
 }
 
@@ -332,6 +397,7 @@ public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {
     case missingFile(String)
     case missingAccountValue(String, String)
     case duplicateProvider(String)
+    case duplicateSetting(String, String)
 
     public var errorDescription: String? {
         switch self {
@@ -341,6 +407,7 @@ public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {
         case .missingFile(let name): "No provider definition named '\(name)'"
         case .missingAccountValue(let id, let name): "A '\(id)' account has no saved '\(name)'"
         case .duplicateProvider(let id): "A provider named '\(id)' already exists"
+        case .duplicateSetting(let id, let setting): "Provider '\(id)' lists setting '\(setting)' twice"
         }
     }
 }

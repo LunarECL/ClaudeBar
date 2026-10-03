@@ -502,16 +502,7 @@ struct AddProviderSheet: View {
     /// again — keys are never copied.
     private var needsKeyForCopy: Bool {
         guard case .copy(let source) = draft.start else { return false }
-        return source.dataSources.contains { $0.credential.map(Self.usesSavedKey) ?? false }
-    }
-
-    private static func usesSavedKey(_ lookup: CredentialLookup) -> Bool {
-        switch lookup {
-        case .setting: true
-        case .firstOf(let lookups): lookups.contains(where: usesSavedKey)
-        case .refreshing(let base, _): usesSavedKey(base)
-        case .environment, .jsonFile, .keychain: false
-        }
+        return !source.neededSettings.isEmpty
     }
 
     // MARK: - Save

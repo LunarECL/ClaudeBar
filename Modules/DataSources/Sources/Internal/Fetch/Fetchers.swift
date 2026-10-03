@@ -67,9 +67,12 @@ struct HTTPFetcher: Fetching {
             }
         }
 
-        switch http.statusCode {
-        case 200..<300:
+        // A 429 is always a rate limit, whatever a request accepts.
+        if http.statusCode != 429, request.accepts(http.statusCode) {
             return Response(status: http.statusCode, headers: headers, body: data)
+        }
+        // The status is the fact; the definition's `errors` may word it.
+        switch http.statusCode {
         case 401, 403:
             throw HTTPStatusError(status: http.statusCode, reason: .authenticationRequired)
         case 429:
@@ -109,7 +112,7 @@ struct JSONRPCFetcher: Fetching {
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        let directory = call.workingDirectory == .dedicated ? CLIWorkingDirectory.resolve() : nil
+        let directory = call.workingDirectory?.url
         let transport = try makeTransport(call.cli, call.args, Self.environment(call.environment), directory)
         defer { transport.close() }
 
@@ -131,7 +134,7 @@ struct JSONRPCFetcher: Fetching {
 
     /// The app's environment changed as the call asks, or `nil` to inherit it
     /// untouched. Each process gets its own; the app's is never mutated.
-    static func environment(_ change: CLICall.Environment) -> [String: String]? {
+    static func environment(_ change: ProcessEnvironment) -> [String: String]? {
         guard !change.unset.isEmpty || !change.set.isEmpty else { return nil }
         var environment = ProcessInfo.processInfo.environment
         for name in change.unset { environment.removeValue(forKey: name) }
@@ -176,10 +179,59 @@ final class RPCSession: @unchecked Sendable {
     }
 }
 
-/// `cli` — runs the CLI in a terminal and answers with what the screen showed,
-/// drawn by a terminal emulator first when the call asks for it.
+/// `command` — runs a command over pipes and answers with what it printed. A
+/// missing CLI, a non-zero exit and a failed launch are reported as facts the
+/// definition's `errors` may word.
+struct CommandFetcher: Fetching {
+    /// The executor for a command with this environment.
+    typealias MakeExecutor = @Sendable (ProcessEnvironment) -> any CLIExecutor
+
+    let call: CommandCall
+    let makeExecutor: MakeExecutor
+
+    func isReady() -> Bool {
+        makeExecutor(call.environment).locate(call.cli) != nil
+    }
+
+    func fetch(with credential: Credential?) async throws -> Response {
+        let environment = try call.environment.filled(with: credential)
+        let executor = makeExecutor(environment)
+        guard executor.locate(call.cli) != nil else { throw CLIMissingError(cli: call.cli) }
+        let result: CLIResult
+        do {
+            result = try await executor.execute(
+                binary: call.cli,
+                args: call.args,
+                input: nil,
+                timeout: call.timeout,
+                workingDirectory: call.workingDirectory?.url,
+                autoResponses: [:]
+            )
+        } catch UsageError.cliNotFound {
+            // Gone between the check and the run.
+            throw CLIMissingError(cli: call.cli)
+        } catch let error as UsageError {
+            throw error
+        } catch {
+            AppLog.probes.error("\(call.cli) could not start")
+            throw CLILaunchError(cli: call.cli)
+        }
+        guard result.exitCode == 0 else {
+            AppLog.probes.error("\(call.cli) exited with \(result.exitCode)")
+            throw CLIExitError(cli: call.cli, exitCode: result.exitCode)
+        }
+        AppLog.probes.debug("\(call.cli) answered (\(result.output.count) chars)")
+        return Response(text: result.output)
+    }
+
+    /// Plain pipes, with a PATH that finds the tools a login shell would.
+    static let system: MakeExecutor = { environment in PipeCLIExecutor(environment: environment) }
+}
+
+/// `cli` — drives a CLI in a terminal and answers with what the screen
+/// showed, drawn by a terminal emulator first when the session asks for it.
 struct CLIFetcher: Fetching {
-    /// The executor for one call: its environment changes and ready markers.
+    /// The executor for one session: its environment changes and ready markers.
     typealias MakeExecutor = @Sendable (CLICall) -> any CLIExecutor
 
     let call: CLICall
@@ -193,7 +245,7 @@ struct CLIFetcher: Fetching {
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        let directory = call.workingDirectory == .dedicated ? CLIWorkingDirectory.resolve() : nil
+        let directory = call.workingDirectory?.url
         let result: CLIResult
         do {
             if let plan = call.session {
@@ -226,7 +278,7 @@ struct CLIFetcher: Fetching {
         }
     }
 
-    /// The real terminal: `DefaultCLIExecutor` with the call's environment and ready markers.
+    /// The real terminal: `DefaultCLIExecutor` with the session's environment and ready markers.
     static let system: MakeExecutor = { call in
         DefaultCLIExecutor(
             environmentExclusions: call.environment.unset,
@@ -235,6 +287,50 @@ struct CLIFetcher: Fetching {
                 ? nil
                 : CLICompletionRule(readyMarkers: call.readyWhen.map { CLICompletionRule.Marker($0.text, endsRow: $0.endsRow) })
         )
+    }
+}
+
+/// A command whose CLI isn't on this Mac — `errors["cli.missing"]`.
+struct CLIMissingError: ReportedFailure {
+    let cli: String
+    var fact: ErrorFact? { .cliMissing }
+    var reason: UsageError { .cliNotFound(cli) }
+}
+
+/// A command that exited non-zero — `errors["cli.nonzero"]`.
+struct CLIExitError: ReportedFailure {
+    let cli: String
+    let exitCode: Int32
+    var fact: ErrorFact? { .cliNonzero }
+    var reason: UsageError { .executionFailed("`\(cli)` exited with code \(exitCode)") }
+}
+
+/// A command that could not be started — `errors["cli.failed"]`.
+struct CLILaunchError: ReportedFailure {
+    let cli: String
+    var fact: ErrorFact? { .cliFailed }
+    var reason: UsageError { .executionFailed("`\(cli)` could not be started") }
+}
+
+extension ProcessEnvironment {
+    /// The environment with `{{token}}` and `{{setting.x}}` filled in. A value
+    /// that names something unknown means the key is missing.
+    func filled(with credential: Credential?) throws -> ProcessEnvironment {
+        var values: [String: String] = [:]
+        for (name, template) in set {
+            guard let value = Template.fill(template, with: credential) else { throw UsageError.authenticationRequired }
+            values[name] = value
+        }
+        return ProcessEnvironment(unset: unset, set: values)
+    }
+}
+
+extension WorkingDirectory {
+    /// Where the process starts.
+    var url: URL? {
+        switch self {
+        case .dedicated: CLIWorkingDirectory.resolve()
+        }
     }
 }
 
