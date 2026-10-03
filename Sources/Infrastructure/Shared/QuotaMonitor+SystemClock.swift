@@ -6,7 +6,6 @@ public extension QuotaMonitor {
         alerter: (any QuotaAlerter)? = nil,
         settingsRepository: (any ProviderSettingsRepository)? = nil,
         powerStateProvider: (any PowerStateProvider)? = SystemPowerStateProvider(),
-        settingsRepository: (any ProviderSettingsRepository)? = nil,
         statusPolicy: @escaping @MainActor () -> StatusPolicy = { .absolute }
     ) {
         self.init(
@@ -15,7 +14,6 @@ public extension QuotaMonitor {
             clock: SystemClock(),
             settingsRepository: settingsRepository,
             powerStateProvider: powerStateProvider,
-            settingsRepository: settingsRepository,
             statusPolicy: statusPolicy
         )
     }

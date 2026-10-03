@@ -152,6 +152,8 @@ struct JSONSettingsRepositoryProviderTests {
 
         repo.setProviderOrder(["codex"])
         #expect(repo.providerOrder() == ["codex"])
+    }
+
     // MARK: - Hidden Quota Keys (issue #140)
 
     @Test

@@ -63,10 +63,6 @@ public final class QuotaMonitor {
     /// The currently selected provider ID (for UI display)
     public var selectedProviderId: String = "claude"
 
-    /// Where a person's choices about providers are kept — hidden quotas.
-    /// `nil` hides nothing.
-    private let settingsRepository: (any ProviderSettingsRepository)?
-
     /// The quotas each product hides (#140), by product id — loaded from
     /// settings, observable so every surface follows a change at once.
     private var hiddenQuotas: [String: Set<String>] = [:]
@@ -84,7 +80,6 @@ public final class QuotaMonitor {
         clock: any Clock,
         settingsRepository: (any ProviderSettingsRepository)? = nil,
         powerStateProvider: (any PowerStateProvider)? = nil,
-        settingsRepository: (any ProviderSettingsRepository)? = nil,
         statusPolicy: @escaping @MainActor () -> StatusPolicy = { .absolute }
     ) {
         self.providers = providers
@@ -96,7 +91,6 @@ public final class QuotaMonitor {
             storedProviderOrder = settingsRepository.providerOrder()
         }
         self.readStatusPolicy = statusPolicy
-        self.settingsRepository = settingsRepository
         for provider in providers.all { loadHiddenQuotas(for: provider) }
         selectFirstEnabledIfNeeded()
     }

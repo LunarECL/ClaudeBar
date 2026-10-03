@@ -23,6 +23,8 @@ struct QuotaMonitorProviderOrderTests {
         given(mock).setEnabled(.any, forProvider: .any).willReturn()
         given(mock).providerOrder().willReturn(order)
         given(mock).setProviderOrder(.any).willReturn()
+        given(mock).hiddenQuotaKeys(forProvider: .any).willReturn([])
+        given(mock).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
         return mock
     }
 
