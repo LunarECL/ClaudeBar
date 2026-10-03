@@ -60,6 +60,22 @@ struct CommandTests {
     }
 
     @Test
+    func `a CLI gone between the check and the run is still a missing CLI the definition can word`() async throws {
+        let executor = MockCLIExecutor()
+        given(executor).locate(.any).willReturn("/usr/local/bin/acme")
+        given(executor).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
+            .willThrow(UsageError.cliNotFound("acme"))
+        let definition = try decode("""
+        {"kind":"cli","fetch":{"command":{"cli":"acme"}},"mapping":{"json":{"quotas":[]}},
+         "errors":{"cli.missing":{"cliNotFound":"Acme CLI"}}}
+        """)
+
+        await #expect { try await make(definition, executor: executor).fetchUsage() } throws: {
+            ($0 as? DataSourceError)?.reason == .cliNotFound("Acme CLI")
+        }
+    }
+
+    @Test
     func `the token reaches the command through its environment only`() throws {
         let environment = try ProcessEnvironment(set: ["ACME_TOKEN": "{{token}}"]).filled(with: Credential(["token": "k-1"]))
         #expect(environment.set == ["ACME_TOKEN": "k-1"])

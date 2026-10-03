@@ -67,7 +67,8 @@ struct HTTPFetcher: Fetching {
             }
         }
 
-        if request.accepts(http.statusCode) {
+        // A 429 is always a rate limit, whatever a request accepts.
+        if http.statusCode != 429, request.accepts(http.statusCode) {
             return Response(status: http.statusCode, headers: headers, body: data)
         }
         // The status is the fact; the definition's `errors` may word it.
@@ -206,6 +207,9 @@ struct CommandFetcher: Fetching {
                 workingDirectory: call.workingDirectory?.url,
                 autoResponses: [:]
             )
+        } catch UsageError.cliNotFound {
+            // Gone between the check and the run.
+            throw CLIMissingError(cli: call.cli)
         } catch let error as UsageError {
             throw error
         } catch {

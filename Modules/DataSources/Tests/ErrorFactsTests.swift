@@ -66,6 +66,13 @@ struct ErrorFactsTests {
         #expect(response.status == 404)
     }
 
+    @Test
+    func `a 429 stays a rate limit even when a request lists it as accepted`() async throws {
+        let definition = try decode("{}", fetch: #"{"http":{"url":"https://acme.test/usage","acceptedStatuses":[200,429]}}"#)
+        let source = make(definition, status: 429, headers: ["Retry-After": "30"])
+        #expect(await reason(source) == .rateLimited(retryAt: Self.now.addingTimeInterval(30)))
+    }
+
     @Test(arguments: [#"{"http.429":"noData"}"#, #"{"http.abc":"noData"}"#, #"{"cli.exit":"noData"}"#])
     func `an unknown fact or a 429 rule is refused`(_ errors: String) {
         #expect(throws: DecodingError.self) { try decode(errors) }

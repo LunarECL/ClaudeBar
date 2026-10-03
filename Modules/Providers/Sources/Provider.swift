@@ -153,10 +153,12 @@ public final class Provider {
         guard entry.secrets.isEmpty || vault != nil else {
             throw UsageError.executionFailed("ClaudeBar can't keep this key securely here.")
         }
-        // Forget the old value wherever it was, then keep the new one where it goes.
-        vault?.delete(id, provider: self.id)
         settings.setValue(entry.values[id], id, forProvider: self.id)
-        try keep(entry.secrets, for: self.id)
+        if entry.secrets.isEmpty {
+            vault?.delete(id, provider: self.id)
+        } else {
+            try keep(entry.secrets, for: self.id)
+        }
         for account in accounts { bind(account) }
     }
 
@@ -187,13 +189,17 @@ public final class Provider {
     }
 
     /// Saves keys in the vault under a login, reading each back: an ad-hoc
-    /// build's Keychain can seem to save and keep nothing. On a refusal none
-    /// of them stays.
+    /// build's Keychain can seem to save and keep nothing. On a refusal every
+    /// key goes back to what it was — a key being replaced is never lost.
     private func keep(_ secrets: [String: String], for login: String) throws {
+        let before = secrets.keys.reduce(into: [String: String?]()) { $0[$1] = vault?.secret($1, provider: login) }
         for (name, value) in secrets {
             vault?.save(value, name, provider: login)
             guard vault?.secret(name, provider: login) == value else {
-                for name in secrets.keys { vault?.delete(name, provider: login) }
+                for (name, previous) in before {
+                    vault?.delete(name, provider: login)
+                    if let previous { vault?.save(previous, name, provider: login) }
+                }
                 throw UsageError.executionFailed("ClaudeBar couldn't keep this key securely.")
             }
         }
