@@ -90,6 +90,18 @@ struct HTTPStepsTests {
         #expect(sent.body(at: "/usage") == "{}")
     }
 
+    @Test(arguments: [(401, "authenticationRequired"), (429, "rateLimited")])
+    func `an optional step's refused key or rate limit is never swallowed`(_ status: Int, _ tag: String) async throws {
+        let source = make(try decode("""
+        {"kind":"api","fetch":{"http":{"steps":[
+           {"name":"project","request":{"url":"https://acme.test/project"},"optional":true},
+           {"name":"usage","request":{"url":"https://acme.test/usage"}}]}},
+         "mapping":{"json":{"quotas":[{"kind":"weekly","usedPercent":"used"}]}}}
+        """), network: network(["/project": (status, ""), "/usage": (200, #"{"used":10}"#)], sent: Sent()))
+
+        await #expect { try await source.fetchUsage() } throws: { ($0 as? DataSourceError)?.reason.tag == tag }
+    }
+
     @Test
     func `a step is skipped when the value it would find is already known`() async throws {
         let sent = Sent()

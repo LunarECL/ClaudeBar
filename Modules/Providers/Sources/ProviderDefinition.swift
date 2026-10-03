@@ -214,6 +214,17 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             }
             patch = try container.decodeIfPresent([String: JSONValue].self, forKey: .patch) ?? [:]
         }
+
+        private enum CodingKeys: String, CodingKey { case folder, signIn, form, patch }
+
+        /// The form is written once, as the definition's account-scope
+        /// `settings`; `accounts.form` is only read, from files made before.
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(folder, forKey: .folder)
+            try container.encodeIfPresent(signIn, forKey: .signIn)
+            try container.encode(patch, forKey: .patch)
+        }
     }
 
     public init(
@@ -244,14 +255,21 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let accounts = try container.decodeIfPresent(Accounts.self, forKey: .accounts)
+        let settings = try container.decodeIfPresent([Setting].self, forKey: .settings) ?? []
+        // A file says each setting once: at the top, or in the old account form.
+        if let twice = accounts?.form.first(where: { field in settings.contains { $0.id == field.id } }) {
+            throw DecodingError.dataCorruptedError(forKey: .settings, in: container,
+                debugDescription: "Setting '\(twice.id)' is in both settings and accounts.form")
+        }
         self.init(
             profile: try container.decode(ProviderProfile.self, forKey: .profile),
             cli: try container.decodeIfPresent(String.self, forKey: .cli),
             enabledByDefault: try container.decodeIfPresent(Bool.self, forKey: .enabledByDefault) ?? true,
             dataSources: try container.decode([DataSourceDefinition].self, forKey: .dataSources),
             defaultDataSource: try container.decode(String.self, forKey: .defaultDataSource),
-            accounts: try container.decodeIfPresent(Accounts.self, forKey: .accounts),
-            settings: try container.decodeIfPresent([Setting].self, forKey: .settings) ?? []
+            accounts: accounts,
+            settings: settings
         )
         try validateSettings()
     }

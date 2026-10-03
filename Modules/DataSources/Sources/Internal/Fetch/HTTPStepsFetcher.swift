@@ -27,7 +27,9 @@ struct HTTPStepsFetcher: Fetching {
                 }
                 last = response
             } catch {
-                guard step.optional else { throw error }
+                // A refused key or a rate limit is the whole data source's
+                // business: refresh-and-retry, or the remembered wait.
+                guard step.optional, !Self.concernsEveryStep(error) else { throw error }
                 AppLog.probes.info("http step \(step.name): failed, going on without it")
             }
         }
@@ -50,6 +52,14 @@ struct HTTPStepsFetcher: Fetching {
             } catch let error as UsageError where error.tag == "executionFailed" && attempt < step.attempts {
                 attempt += 1
             }
+        }
+    }
+
+    private static func concernsEveryStep(_ error: Error) -> Bool {
+        guard let refused = error as? HTTPStatusError else { return false }
+        switch refused.reason {
+        case .authenticationRequired, .rateLimited: return true
+        default: return false
         }
     }
 

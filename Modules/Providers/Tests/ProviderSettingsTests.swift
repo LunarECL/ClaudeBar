@@ -118,6 +118,23 @@ struct ProviderSettingsTests {
         #expect(acme.accounts.count == 1)
     }
 
+    @Test
+    func `a key the vault refuses to replace leaves the old key in place`() throws {
+        let vault = ReplacementRefusingVault(["acme.apiKey": "sk-old"])
+        let acme = try providerWith(vault: vault)
+
+        #expect(throws: UsageError.self) { try acme.set("apiKey", to: "sk-new") }
+
+        #expect(vault.secret("apiKey", provider: "acme") == "sk-old")
+    }
+
+    @Test
+    func `a setting declared twice, at the top and in the account form, is refused`() {
+        let json = Self.acme.replacingOccurrences(of: #""defaultDataSource":"api"}"#,
+            with: #""defaultDataSource":"api","accounts":{"form":[{"id":"region","label":"Region","choices":["x"]}]}}"#)
+        #expect(throws: DecodingError.self) { try ProviderDefinition.parse(Data(json.utf8)) }
+    }
+
     private func providerWith(vault: any SecretVault) throws -> Provider {
         Provider(definition: try ProviderDefinition.parse(Data(Self.acme.utf8)), settings: settings,
                  makeDataSource: { source, _ in DataSources.make(source, providerId: "acme") },
@@ -148,6 +165,19 @@ final class RefusingVault: SecretVault, @unchecked Sendable {
     func secret(_ name: String, provider: String) -> String? { nil }
     func save(_ value: String, _ name: String, provider: String) {}
     @discardableResult func delete(_ name: String, provider: String) -> Bool { false }
+}
+
+/// A Keychain that keeps a key once, then seems to take a new value but
+/// overwrites it with garbage — a replacement that doesn't read back.
+private final class ReplacementRefusingVault: SecretVault, @unchecked Sendable {
+    var secrets: [String: String]
+    init(_ secrets: [String: String]) { self.secrets = secrets }
+    func secret(_ name: String, provider: String) -> String? { secrets["\(provider).\(name)"] }
+    func save(_ value: String, _ name: String, provider: String) {
+        let key = "\(provider).\(name)"
+        secrets[key] = secrets[key] == nil ? value : "corrupted"
+    }
+    @discardableResult func delete(_ name: String, provider: String) -> Bool { secrets.removeValue(forKey: "\(provider).\(name)") != nil }
 }
 
 /// What a stubbed network was sent, in order.
