@@ -325,10 +325,12 @@ struct MenuContentView: View {
 
             Spacer()
 
-            // Status Badge: a provider's status, so not on the Leaderboard tab.
-            if !showsLeaderboard {
-                statusBadge
-            }
+            // Status Badge: a provider's status, so not shown on the Leaderboard
+            // tab — but its space is kept, so the header doesn't jump on switching.
+            statusBadge
+                .opacity(showsLeaderboard ? 0 : 1)
+                .accessibilityHidden(showsLeaderboard)
+                .allowsHitTesting(!showsLeaderboard)
         }
         .opacity(animateIn ? 1 : 0)
         .offset(y: animateIn ? 0 : -10)
