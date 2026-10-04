@@ -24,6 +24,7 @@ Its neighbours own the rest:
 | how a login's own logs become days: dedup, prices, the ledger | [design.md](design.md) and [TARGET_ARCHITECTURE §10](../../architecture/TARGET_ARCHITECTURE.md#10--usage-history-as-data) |
 | Claude's data sources (CLI, API) and their fallbacks | [providers/claude/design.md](../../providers/claude/design.md) |
 | added logins and `accounts.patch` | [multi-account/design.md](../multi-account/design.md) |
+| the tree lines and the two laws (`UsageHistory.otherApps`, `Account.needsSetup`) this design adds | [CANONICAL_MODEL.md](../../architecture/CANONICAL_MODEL.md) §1, §5; [TARGET_ARCHITECTURE §10.2](../../architecture/TARGET_ARCHITECTURE.md#102--the-definition-usagehistory-beside-datasources) |
 
 ---
 

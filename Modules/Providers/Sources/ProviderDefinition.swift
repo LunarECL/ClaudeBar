@@ -98,7 +98,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         public let title: String
         public let text: String
         public let url: URL?
-        /// The button that opens `url` — *Set up Claude Code*.
+        /// The button that opens `url`, named for what it sets up.
         public let button: String
 
         public init(title: String, text: String, url: URL? = nil, button: String = "Set up") {

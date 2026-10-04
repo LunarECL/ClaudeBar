@@ -21,7 +21,7 @@ public final class UsageHistory {
     public var knowsCost: Bool { log.knowsCost }
 
     /// The app this history counts, when it isn't the login's own tool —
-    /// *Claude Desktop* beside Claude Code's logs.
+    /// another app on this Mac that uses the same plan.
     public let label: String?
     /// Other apps on this Mac that use the same plan, each its own history:
     /// shown under its own name, never added to this one's days.
