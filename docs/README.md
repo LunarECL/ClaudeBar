@@ -35,6 +35,7 @@ Start with the [README](../README.md). Something broken? See [troubleshooting](t
 |---|---|
 | [daily-usage](features/daily-usage/README.md) | Daily usage cards in the popover show today's estimated cost, tokens and working time against yesterday, read from local Claude Code (and Mistral Vibe) session logs. Use when the cards are missing or the numbers look off. |
 | [extensions](features/extensions/README.md) | Add your own quota source to ClaudeBar with a manifest.json and a script that prints JSON, in ~/.claudebar/extensions/. Use when writing an extension or when one doesn't show up. |
+| [in-use](features/in-use/README.md) | Choose which Claude or Codex login new terminal sessions start with — switch by hand, get a nudge when it runs low, or let ClaudeBar switch. Use when you have personal and work logins and want the next `claude` on the one with room. |
 | [leaderboard](features/leaderboard/README.md) | Join the ClaudeBar Leaderboard with a username, share daily token totals from Claude, Codex or Mistral, and see your rank. Use when joining, changing what you share, or leaving. |
 | [menu-bar](features/menu-bar/README.md) | Show quota percentage and reset countdown for up to three providers right in the menu bar, one or two windows each, single-line or stacked. Use when choosing what the menu bar label shows. |
 | [multi-account](features/multi-account/README.md) | Track more than one Claude or Codex login side by side — sign in with your browser or choose a signed-in folder, name each account, pin them to the menu bar, and sign in again when a session expires. Use when you have personal and work accounts. |
@@ -44,6 +45,6 @@ Start with the [README](../README.md). Something broken? See [troubleshooting](t
 | [status-colors](features/status-colors/README.md) | How ClaudeBar colors a quota healthy, warning, critical or depleted, the optional pace-aware burn-rate warning, and custom status colors and High Contrast. Use when a color looks wrong or hard to read. |
 | [themes](features/themes/README.md) | Pick a built-in theme (System, Light, Dark, CLI, Christmas, Pop) or import an iTerm2 .itermcolors scheme to match your terminal. Use when changing how the popover, menu bar and Settings look. |
 | [touch-bar](features/touch-bar/README.md) | Show live quota gauges on a MacBook Pro Touch Bar in every app, or feed BetterTouchTool, MTMR and scripts from ~/.claudebar/status.json. Use on Touch Bar Macs or when wiring quota into another tool. |
-| [url-schemes](features/url-schemes/README.md) | Drive ClaudeBar from Raycast, Alfred, Shortcuts, BetterTouchTool or a terminal with claudebar://open, claudebar://refresh and claudebar://settings. Use when scripting ClaudeBar. |
+| [url-schemes](features/url-schemes/README.md) | Drive ClaudeBar from Raycast, Alfred, Shortcuts, BetterTouchTool or a terminal with claudebar://open, claudebar://refresh, claudebar://settings and claudebar://use. Use when scripting ClaudeBar. |
 
 Guides: [troubleshooting](troubleshooting.md) · [settings](settings.md) · [architecture](architecture/ARCHITECTURE.md) · [contributing](../CONTRIBUTING.md) · [documentation design](documentation-design/README.md)

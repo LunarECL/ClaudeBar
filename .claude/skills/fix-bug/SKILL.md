@@ -51,6 +51,15 @@ Fix bugs using Chicago School TDD, root cause analysis, and rich domain design.
 3. **Actual**: What IS happening (current behavior)
 4. **Root cause**: WHY it's happening (code analysis)
 
+### Find the law it breaks
+
+The design docs are the source of truth ([AGENTS.md](../../../AGENTS.md#design-docs-are-the-source-of-truth)).
+A bug is usually a law in [CANONICAL_MODEL.md](../../../docs/architecture/CANONICAL_MODEL.md) §5 (or a feature's
+`design.md`) that the code breaks: find the law and its **one owner**, and fix it there, not
+at a call site. If the right fix changes a law or moves it to another owner, that is a
+design change: update the doc and ask the user to confirm before fixing. If no law covers
+it, propose the law first.
+
 ### Locate in Architecture
 
 > **Reference:** [MODULAR_DESIGN.md](../../../docs/architecture/MODULAR_DESIGN.md) (modules) ·

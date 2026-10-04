@@ -29,11 +29,13 @@ struct ClaudeBarApp: App {
         secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil,
         usageHistory: UsageHistory? = nil,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        // Every product gets the record; `inUse` exists only where its definition declares it.
+        loginsInUse: (any LoginsInUse)? = DiskLoginsInUse()
     ) -> Provider {
         do {
             return try Providers.make(id, settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses,
-                                      usageHistory: usageHistory, environment: environment)
+                                      usageHistory: usageHistory, environment: environment, loginsInUse: loginsInUse)
         } catch {
             preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
         }
@@ -42,6 +44,9 @@ struct ClaudeBarApp: App {
     /// The main domain service - monitors all AI providers
     /// This is the single source of truth for providers and their state
     @State private var monitor: QuotaMonitor
+
+    /// *New terminal sessions* — which login `claude` / `codex` start with.
+    @State private var newSessions: NewSessions
 
     /// Monitors Claude Code sessions via hook events
     @State private var sessionMonitor: SessionMonitor
@@ -213,10 +218,20 @@ struct ClaudeBarApp: App {
         for definition in ProviderCatalog().custom() {
             Providers.register(custom: definition)
             let custom = Providers.make(definition, settings: settingsRepository,
-                                        accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault)
+                                        accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault,
+                                        loginsInUse: DiskLoginsInUse())
             for account in custom.accounts { repository.add(account) }
         }
         AppLog.providers.info("Created \(repository.all.count) providers")
+
+        // *In use*: every product whose definition declares it — chosen by the
+        // definition, never by a provider's name (CANONICAL §2.1).
+        let products = repository.all.compactMap { ($0 as? Account)?.provider }
+            .reduce(into: [Provider]()) { kept, product in if !kept.contains(where: { $0 === product }) { kept.append(product) } }
+        let newSessions = NewSessions(products: products,
+                                      shellLines: ShellSetup(commands: products.compactMap { $0.inUse?.command }),
+                                      announcer: InUseNotifications())
+        self.newSessions = newSessions
 
         // Initialize the domain service with quota alerter
         // QuotaMonitor automatically validates selected provider on init
@@ -231,6 +246,8 @@ struct ClaudeBarApp: App {
             statusPolicy: { AppSettings.shared.statusPolicy }
         )
         self.monitor = monitor
+        // *In use* follows every refresh: Switch when low, or a login worth moving to.
+        monitor.onRefreshed { refreshed in await newSessions.review(refreshed) }
         AppLog.monitor.info("QuotaMonitor initialized")
 
         let sessionMonitor = SessionMonitor()
@@ -391,6 +408,18 @@ struct ClaudeBarApp: App {
         case .settings:
             openWindow(id: "settings")
             NSApp.activate(ignoringOtherApps: true)
+        case let .use(providerId, name):
+            switch newSessions.use(providerId: providerId, account: name) {
+            case .used:
+                break
+            case .unknown:
+                AppLog.ui.info("claudebar://use names no login that can be used for new sessions")
+            case .waitingForSetup:
+                // The shell lines aren't there yet: the popover shows the setup.
+                monitor.selectedProviderId = providerId
+                isMenuPresented = true
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
     }
 
@@ -410,6 +439,7 @@ struct ClaudeBarApp: App {
                     .appThemeProvider(themeModeId: settings.themeMode)
                 #endif
             }
+            .environment(newSessions)
             // Opening/closing the dropdown flips `isMenuPresented`, which makes
             // SwiftUI re-evaluate the scene and wipe the AppKit-drawn button
             // image. The dropdown's lifecycle maps 1:1 to those flips, so
@@ -455,6 +485,7 @@ struct ClaudeBarApp: App {
                 .appThemeProvider(themeModeId: settings.themeMode)
                 #endif
             }
+            .environment(newSessions)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 980, height: 660)

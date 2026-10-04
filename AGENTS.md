@@ -39,6 +39,19 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 - **Themes** implement `AppThemeProvider` and register in `ThemeRegistry` → [THEME_DESIGN.md](docs/architecture/THEME_DESIGN.md). Card backgrounds use `theme.cardGradient` / `theme.glassBorder`.
 - Details and data flow: [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) (the legacy layers) and [CANONICAL_MODEL.md](docs/architecture/CANONICAL_MODEL.md) (the words).
 
+## Design docs are the source of truth
+
+The design leads; code follows it. Before any change, in this order:
+
+1. **Read the design.** [CANONICAL_MODEL.md](docs/architecture/CANONICAL_MODEL.md) (the tree, the words the screen prints, each law and its one owner, owned vs offered abilities), [TARGET_ARCHITECTURE.md](docs/architecture/TARGET_ARCHITECTURE.md) (the pieces, their one job, the flows) and the feature's or provider's own `design.md`.
+2. **Place the change in it.** Which node owns it? Is it the product's lifecycle, or another question (a **capability**: declared in the definition, reached through a handle that is `nil` when not declared, never a flag or a provider's name)? Does it follow something the Monitor does (an extension point, never an edit to the Monitor)?
+3. **Write the design change first** when the docs don't say it or say otherwise: the tree, the law and its owner, the pieces table. Code that disagrees with the docs is behind; never quietly bend the design to match the code.
+4. **Ask the person to confirm the design** (the doc change, a diagram, the laws and owners) before writing code. No implementation until they approve.
+5. **Implement to the doc.** SRP: a type changes for one reason (`Provider` only when the lifecycle does). OCP: a new provider, CLI or policy is data or a new case, never an edit to a neighbour. Views render and tell; they never compare, count, inspect folders or read quotas to decide.
+6. **Ship the docs with the code**: status lines, build truth, laws.
+
+UI changes come with a mockup in `design-concept/<feature>/` first, and, once built, screenshots of the real UI on mock data (`scripts/demo-screenshots.sh`), never real names, emails or usage.
+
 ## TDD is the default
 
 - Write the failing test first. Swift Testing (`@Suite`, `@Test`, `#expect`) with Mockable (`given(mock).method().willReturn(…)`).
@@ -69,7 +82,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 ## When you are…
 
 - adding a provider → `add-provider` skill
-- adding a feature → `implement-feature` skill
+- adding a feature → `implement-feature` skill (all four start with *Design docs are the source of truth* above)
 - fixing a bug → `fix-bug` skill
 - improving existing behaviour → `improvement` skill
 - releasing or debugging CI → `github-actions` skill, [docs/release/](docs/release/RELEASE_SETUP.md)

@@ -175,6 +175,15 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │                           block — the App hands its source in; `nil` otherwise
 │       │       └── status                  DERIVED — QUOTA HEALTH: the worst quota in its usage.
 │       │                                   The pill's and the menu-bar entry's colour
+│       ├── inUse: InUse?  ◆                CAPABILITY (§2.1) — "New terminal sessions use work":
+│       │   │                               WHICH LOGIN THE NEXT `claude` / `codex` STARTS WITH. Not the
+│       │   │                               monitor's: every login is still fetched and shown. `nil` when
+│       │   │                               the definition's `accounts.signIn` names no folder variable
+│       │   ├── login: Account              the one in use — the plain login until another is chosen
+│       │   ├── logins: [Account]           the plain login and every folder login; a choice when > 1
+│       │   ├── command: TerminalCommand ◇  `claude` + `CLAUDE_CONFIG_DIR` — from `accounts.signIn`
+│       │   ├── worthSwitchingTo: Account?  DERIVED — the login in use is low, another has more left
+│       │   └── switchWhenLow: SwitchWhenLow  ◆   opt-in: isOn · below · mayPick(login)
 │       ├── status                          DERIVED — the worst across its enabled accounts
 │       └── bestAccount                     DERIVED — the enabled account with the most left: "switch to work"
 │
@@ -212,6 +221,9 @@ Response  ◇                                 "Response" — WHAT CAME BACK, bef
 Activity  ◆                                 Claude Code sessions seen through hooks — the notch
 Usage History                               the context that runs each login's `usageHistory` —
                                             outside the monitor: read when the popover opens
+New sessions  ◆                             In use's shell side — the lines that make `claude` start on the
+                                            login in use; a choice waits for them. Follows refreshes
+                                            through the Monitor's one extension point, `onRefreshed`
 Destinations                                notifications · Notify! · live activity · status export
 
     NOT IN THE MODEL (the page's)
@@ -298,6 +310,7 @@ its definition and **hands it out per login**; its own context runs it:
 | Guest passes | *can I share a trial?* | — Claude's alone: the App hands in its source | `ClaudeGuestPassSource` | `account.guestPasses` |
 | Budget | *am I spending more than I meant to?* | an account-scope setting on the cost | the cost judges it | `account.budget` |
 | Sign-in | *add another login* | `accounts.signIn` | `AccountSignIn` | `provider.signIn` |
+| In use | *which login does my next terminal session start with?* | `accounts.signIn` — its CLI and the variable that points it at a folder | `InUse` over the `LoginsInUse` record; `NewSessions` over the `ShellLines` port for the shell | `provider.inUse` · `account.isInUse` |
 
 To check their usage history, the person picks a login and the page asks
 `account.usageHistory?.days(in: .last(30))`: the provider filled that login's
@@ -336,6 +349,9 @@ Claude Code sessions (Activity); where settings and secrets are kept
 | *Edit* · *Delete* a custom provider | `catalog.replace(definition)` · `catalog.remove(id)` | built-ins can only be disabled |
 | *Export…* | `definition.exported()` → a `.json` file | carries the lookup order and the setting names — never a key |
 | *Import provider* | `catalog.import(file)` → `definition.missingSettings` | says where a key will be sent, and shows a CLI command, BEFORE asking |
+| *Use* on a chip, *Use for New Terminal Sessions* (right-click), the Settings radio, `claudebar://use`, a notification | `newSessions.use(account)` → `provider.inUse.use(account)` | waits for the shell lines when they aren't there; the plain login never waits |
+| *Add to ~/.zshrc* · *Copy — I'll Add It* · *Remove* | `newSessions.setUp()` · `setUpByHand()` · `turnOff()` | the lines are shown before they are written |
+| turns on *Switch when low*, sets its threshold, unticks a login | `inUse.switchWhenLow.isOn` · `.below` · `.setMayPick(_:_:)` | off by default |
 | sets a Daily Budget · the Claude API Budget | `account.budget = …` (an account-scope setting) | judges that login's cost only |
 | turns the burn-rate warning on, sets its threshold | `monitor.statusPolicy = …` | every status and every alert follows at once |
 | chooses status colours · high contrast | — the page's theme | how a status looks, never what it is |
@@ -351,6 +367,9 @@ account.status                       → Status       QUOTA HEALTH: the worst qu
 account.sync.lastError               → DataSourceError?  FETCH HEALTH: which step failed — never a Status
 provider.status                      → Status       the worst across its enabled accounts
 provider.bestAccount                 → Account?     the most left — "switch to work"
+provider.inUse?.login                → Account      the login new terminal sessions start with
+account.isInUse · account.canBeInUse → Bool         the chip's mark; whether it can be chosen
+newSessions.state(of: provider)      → State?       the strip: waiting for setup · worth switching · in use
 usage.quota(named:)                  → Quota?
 usage.isStale                        → Bool         older than 5 minutes
 quota.status(under: StatusPolicy)    → Status
@@ -374,6 +393,12 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | accounts are SIMULTANEOUS — every enabled login is fetched and shown side by side under its provider; the popover shows the selected provider's. (A vendor that allows one live login at a time would add an `active` account; none does today) | `Monitor.selection` |
 | one definition serves every account: the account's values fill `{{account.x}}` when the fetch runs; a data source is never copied per login | `DataSource` |
 | status is QUOTA health, derived from usage; a failed fetch is FETCH health, in `sync` — a key that expired never turns the menu bar red | `Account.status` · `Account.sync` |
+| *in use* is the TERMINAL's choice, not the monitor's: every enabled login is still fetched and shown; only new `claude` / `codex` sessions start on the login in use. It is not the `active` account the law above rules out | `InUse` |
+| the login in use is the plain login or a folder login of the same product; only its folder is recorded, nowhere else, **under its CLI's name** (`in-use/claude`) — the shell starts a CLI, not a product; nothing recorded, or a folder no login has, is the plain login; removing it goes back to the plain login | `InUse` · `LoginsInUse` |
+| **a CLI is wrapped once**, however many products run it: two products on `claude` share its record, and the last choice wins | `NewSessions` (its commands, each once) · `ShellSetup` |
+| a choice waits for the shell lines, and the plain login never waits; turning off removes the lines and puts every CLI back on its plain login | `NewSessions` |
+| *Switch when low* is off until turned on, moves only below its threshold, only to a ticked login with more left, and never touches a running session; a login worth switching to is told once per low | `SwitchWhenLow` · `InUse.review` |
+| the Monitor knows nothing that follows a refresh: In use, and anything after it, observes through `onRefreshed` | `QuotaMonitor` |
 | a disabled account is paused, not forgotten; a provider whose accounts are all disabled reads as disabled | `Account.isEnabled` |
 | a failed refresh keeps the last usage and records the error beside it — what we saw is never erased by failing to look again | `Account.sync` |
 | at most one refresh per account is in flight | `Provider` |
@@ -435,6 +460,8 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a `XxxDailyUsageAnalyzer` per tool, a Swift price table | a tool's logs and prices are data in its definition; every reader yields one `LogRecord`; one reader per log FORMAT, one `PriceList`, one day aggregator |
 | "today and yesterday" as a type | a view, not a fact: the page asks for a range of days |
 | `dailyUsageReport` on the usage | Usage History is another context's answer, read on its own (§9) |
+| a `canChooseInUse` flag, In use on `Provider` itself | a capability is a handle that is `nil` when not declared (§2.1); the product's lifecycle doesn't change for it |
+| copying a login's tokens to the default place, a proxy in front of the CLI | refresh tokens rotate; a proxy would carry prompts and break provider terms. In use moves a folder path, nothing else |
 
 ## 7 · The contexts, and the modules that implement them
 
@@ -451,6 +478,7 @@ enforces it. Across a fence the same word may mean something else, as long as
 | **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export | `Modules/Alerting` |
 | **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch | `Modules/Activity` |
 | **Usage History** | supporting | *what did I use, day by day?* | no module of its own: `UsageHistory` in `Modules/Providers` (the login owns it), `UsageLog` in `Modules/DataSources` (how it is extracted), `Day` in `Modules/Quotas` |
+| **In use** | supporting | *which login does my next terminal session start with?* | no module of its own: `InUse`, `SwitchWhenLow`, `LoginsInUse` in `Modules/Providers` (the product owns the choice); `NewSessions`, `ShellLines`, `InUseAnnouncer` in `Domain`; `ShellSetup`, `InUseNotifications` in `Infrastructure`. Wired onto Monitoring by the App, never the other way |
 | **Vault & Settings** | generic | *where is it kept?* — `settings.json`, secrets | `Modules/Storage` |
 | SDK clients | — (anti-corruption layers) | *what does this SDK say?* — a client that needs a heavy SDK gets its own module, behind a port, so only it links the SDK | `Modules/AWSClients` |
 
@@ -511,6 +539,7 @@ context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
 | `StatusPolicy` | **built** (#357): `StatusPolicy` in `Quotas` with `quota.status(under:)` / `usage.overallStatus(under:)`; `QuotaMonitor.statusPolicy` read live from the burn-rate settings; alerts, pills, cards, Touch Bars, status export and Notify! all read under it. Left: `menuBarLabel(…)` still takes the two burn-rate values instead of the policy, and pace falls back to `quotaType.duration` when no window is known | the menu-bar label takes the policy; the `Window` law removes the guess; `StatusColorPolicy` (colours, high contrast) moves to the App |
 | `Account.budget` | two one-off settings: `app.claudeApiBudget` (+ `…Enabled`, edited in Claude's card) and `bedrock.dailyBudget`; Bedrock turns its budget into a fake `Daily Budget` quota | a `Budget` beside the account's `Cost`, judged as `BudgetStatus`, never a quota; the old keys read as the default account's budget |
 | page state | `MenuBarLabel`, `CountdownColon`, `PopoverContentHeight`, `MenuBarStackedSize` in `Domain/Provider`; `menuBarLabel(…)` on `QuotaMonitor` | the App |
+| In use | **built** (`feat/in-use`): `provider.inUse` from `accounts.signIn`, `LoginsInUse` (`~/.claudebar/in-use/<command>`, one per CLI), `SwitchWhenLow`, `NewSessions` + `ShellSetup` (zsh, bash, fish), `QuotaMonitor.onRefreshed`, `InUseAnnouncer` → `InUseNotifications`, `claudebar://use` — [in-use design](../features/in-use/design.md) | an env-variable record for API-key providers |
 | `ProviderDefinition` · *Add Provider* | **built** (#354): *Start from API · CLI · File · Copy a provider* → *Connect* (*Test Connection*) → *Map fields* (click a value, live card; money, % used/left, a balance; a CLI's text by its line) → *Look* → *Save*; `ProviderDraft` → `ProviderCatalog` (`~/.claudebar/providers/<id>.json`, origin custom, minted id) and the key in the vault (`setting`); *Delete*. Not yet: *Edit*, several quotas from one response. **Export/Import built** (#355): `exported()` names keys, never holds them; `review(file)` shows where a key goes, every command (Add waits for *I trust this command*), the keys needed; a taken id is re-minted | Edit |
 
 ### The order of the work

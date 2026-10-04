@@ -45,6 +45,10 @@ struct ProviderAccountsCard: View {
                     }
             }
 
+            if let inUse = provider.inUse, inUse.offersChoice {
+                InUseSettingsSection(inUse: inUse)
+            }
+
             if !text.ways.isEmpty {
                 Button { adding = true } label: {
                     Label("Add Account", systemImage: "plus.circle")
@@ -116,6 +120,7 @@ private struct AccountRow: View {
     let onRemove: () -> Void
     let onReauth: () -> Void
     @Environment(\.appTheme) private var theme
+    @Environment(NewSessions.self) private var newSessions
 
     /// The avatar's colour is the page's, by position — not a setting.
     private static let palette: [Color] = [.purple, .orange, .teal, .pink, .blue, .green]
@@ -127,6 +132,15 @@ private struct AccountRow: View {
             Image(systemName: "line.3.horizontal")
                 .foregroundStyle(theme.textTertiary)
                 .help("Drag to reorder")
+            if account.canBeInUse {
+                Button { newSessions.use(account) } label: {
+                    Image(systemName: account.isInUse ? "largecircle.fill.circle" : "circle")
+                        .foregroundStyle(account.isInUse ? theme.accentPrimary : theme.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .help("Use for new terminal sessions")
+                .accessibilityLabel(account.isInUse ? "In use for new terminal sessions" : "Use for new terminal sessions")
+            }
             Text(String(account.displayName.prefix(1)).uppercased())
                 .font(.caption.bold())
                 .foregroundStyle(.white)
@@ -143,6 +157,12 @@ private struct AccountRow: View {
                 }
             }
             Spacer(minLength: 8)
+            if let left = account.percentLeft {
+                Text("\(Int(left))% left")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(theme.textSecondary)
+            }
+            if account.isInUse { InUseBadge() }
             if text.needsReauth(account) {
                 Button("Re-auth", action: onReauth)
                     .controlSize(.small)
