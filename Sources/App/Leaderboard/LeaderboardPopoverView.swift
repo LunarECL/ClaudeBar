@@ -347,16 +347,12 @@ struct LeaderboardStandingsView: View {
                     .accessibilityLabel(mine?.standing.map { "Rank \($0.rank)" } ?? "Not ranked yet")
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text(membership.username?.description ?? "")
+                        Text(membership.username.map { leaderboardName($0.value, hidden: settings.hideLeaderboardName) } ?? "")
                             .font(.system(size: 15, weight: .bold, design: theme.fontDesign))
                             .foregroundStyle(theme.textPrimary)
                             .lineLimit(1)
-                        // An eye in the popover is always a toggle: this one shows or hides
-                        // you on the web board, like Settings' "Show me on the web board".
-                        PrivacyEyeBadge(isHidden: Binding(
-                            get: { !membership.isVisible },
-                            set: { hidden in Task { try? await membership.setVisible(!hidden) } }
-                        ), what: "you on the web board")
+                        // Like every eye in the popover: masks the text beside it on screen.
+                        PrivacyEyeBadge(isHidden: $settings.hideLeaderboardName, what: "your username")
                     }
                     Text("\(Self.tokens(mine?.standing?.total ?? 0)) tokens")
                         .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
@@ -392,7 +388,8 @@ struct LeaderboardStandingsView: View {
 
     private var boardCard: some View {
         LeaderboardBoardCard(
-            top: top, mine: mine?.standing, myUsername: membership.username?.value, error: error,
+            top: top, mine: mine?.standing, myUsername: membership.username?.value,
+            hidesMyName: settings.hideLeaderboardName, error: error,
             period: $period, provider: $provider,
             sharedProviders: membership.sharing.sorted().map { ($0, leaderboardProviderName($0, in: monitor)) })
     }

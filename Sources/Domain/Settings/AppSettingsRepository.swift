@@ -71,6 +71,10 @@ public protocol AppSettingsRepository: Sendable {
     func hideLeaderboardCountry() -> Bool
     func setHideLeaderboardCountry(_ hide: Bool)
 
+    /// Your Leaderboard username shows as `@i•••` in the popover.
+    func hideLeaderboardName() -> Bool
+    func setHideLeaderboardName(_ hide: Bool)
+
     // MARK: - Notch
 
     /// Whether the notch live activity is shown (default: false).

@@ -64,6 +64,11 @@ final class Leaderboard {
     }
 }
 
+/// Your username as the popover prints it: `@itshan`, or `@i•••` when hidden.
+func leaderboardName(_ username: String, hidden: Bool) -> String {
+    hidden ? "@\(username.prefix(1))•••" : "@\(username)"
+}
+
 /// A two-letter country as people read it, "🇳🇱 Netherlands", or `🌍 ••` when
 /// *hide my globe country* is on.
 func leaderboardCountryLabel(_ code: String, hidden: Bool) -> String {

@@ -187,6 +187,14 @@ public final class AppSettings {
         }
     }
 
+    /// Your Leaderboard username shows as `@i•••` in the popover, for screen
+    /// shares. Other members' names and Settings stay in full.
+    public var hideLeaderboardName: Bool {
+        didSet {
+            repository.setHideLeaderboardName(hideLeaderboardName)
+        }
+    }
+
     /// Whether to show daily usage report cards (API Cost, Token Usage, Working Time)
     public var showDailyUsageCards: Bool {
         didSet {
@@ -434,6 +442,7 @@ public final class AppSettings {
         self.showDailyUsageCards = repository.showDailyUsageCards()
         self.hideAccountEmail = repository.hideAccountEmail()
         self.hideLeaderboardCountry = repository.hideLeaderboardCountry()
+        self.hideLeaderboardName = repository.hideLeaderboardName()
         self.notchEnabled = repository.notchEnabled()
         self.touchBarEnabled = repository.touchBarEnabled()
         self.notifyEnabled = repository.isNotifyEnabled()

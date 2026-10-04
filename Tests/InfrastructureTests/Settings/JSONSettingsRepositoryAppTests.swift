@@ -282,6 +282,16 @@ struct JSONSettingsRepositoryAppTests {
     }
 
     @Test
+    func `your leaderboard name shows until hidden, and stays hidden`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.hideLeaderboardName() == false)
+        repo.setHideLeaderboardName(true)
+        #expect(repo.hideLeaderboardName() == true)
+    }
+
+    @Test
     func `setShowDailyUsageCards persists value`() {
         let (repo, dir) = makeRepository()
         defer { cleanup(dir) }
