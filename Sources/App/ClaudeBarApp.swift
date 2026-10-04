@@ -226,6 +226,17 @@ struct ClaudeBarApp: App {
                                         loginsInUse: DiskLoginsInUse())
             for account in custom.accounts { repository.add(account) }
         }
+        // Extensions (~/.claudebar/extensions), read as definitions whose
+        // sections answer together (TARGET §12); what was saved for one moves once.
+        let extensions = Extensions.catalog()
+        ExtensionSettingsUpgrade.run(extensions, store: .shared, settings: settingsRepository, vault: vault)
+        for definition in extensions {
+            Providers.register(custom: definition)
+            let extended = Providers.make(definition, settings: settingsRepository,
+                                          accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault,
+                                          loginsInUse: DiskLoginsInUse())
+            for account in extended.accounts { repository.add(account) }
+        }
         AppLog.providers.info("Created \(repository.all.count) providers")
 
         // *In use*: every product whose definition declares it — chosen by the
@@ -301,17 +312,6 @@ struct ClaudeBarApp: App {
         // Uploads only once the user joined; until then it reads nothing.
         leaderboard = Leaderboard(monitor: monitor)
         leaderboard.start()
-
-        // Load user extensions from ~/.claudebar/extensions/
-        let extensionRegistry = ExtensionRegistry(
-            settingsRepository: settingsRepository,
-            configRepository: AppSettings.shared.extensionConfig
-        )
-        let extensionProviders = extensionRegistry.loadExtensions(into: monitor)
-        ProviderVisualIdentityLookup.registerExtensionIcons(from: extensionProviders)
-        if !extensionProviders.isEmpty {
-            AppLog.providers.info("Loaded \(extensionProviders.count) extension provider(s): \(extensionProviders.map(\.name).joined(separator: ", "))")
-        }
 
         // Start hook server if hooks are enabled
         if settingsRepository.isHookEnabled() {

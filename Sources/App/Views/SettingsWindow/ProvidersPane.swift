@@ -327,11 +327,6 @@ private struct ProviderDetailView: View {
             }
         } else if let legacy = legacyCard(for: provider.id) {
             legacy
-        } else if let extProvider = provider as? ExtensionProvider, extProvider.manifest.hasConfig {
-            ExtensionConfigCard(
-                provider: extProvider,
-                configRepository: AppSettings.shared.extensionConfig
-            )
         }
     }
 

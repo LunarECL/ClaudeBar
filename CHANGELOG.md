@@ -7,18 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Breaking:** extensions' `dailyUsage`, `metricsRow` and `statusBanner` sections are no longer read; their quotas, cost and health check still show. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/extensions/README.md) ([#467](https://github.com/tddworks/ClaudeBar/pull/467))
+
 ### Changed
 - **Settings → Providers, one row per provider:** with two Claude accounts, Claude is one row showing each account's usage, its page is titled Claude, and its switch turns the whole provider on or off. Each account keeps its own Pause, and your current setup carries over. ([#469](https://github.com/tddworks/ClaudeBar/pull/469))
+- A provider whose CLI isn't installed, or that you never signed in to, now reads Not set up instead of Unavailable, and shows any daily usage it can still read. ([#198](https://github.com/tddworks/ClaudeBar/issues/198))
+- Extensions now show like any provider: their settings sit on the provider's page in Settings and their secret fields move to the Keychain. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/extensions/README.md) ([#467](https://github.com/tddworks/ClaudeBar/pull/467))
+
+### Fixed
+- In overview mode, and with several accounts, a provider with no usage no longer reads Healthy: it says Unavailable, Not set up or Syncing, like the header does. ([#259](https://github.com/tddworks/ClaudeBar/issues/259))
 
 ### Added
 - **In use:** with more than one Claude or Codex login, choose which one your next `claude` / `codex` starts with, from the popover, Settings or `claudebar://use`. ClaudeBar suggests a switch when the login in use runs low, or switches for you if you turn that on. ([#465](https://github.com/tddworks/ClaudeBar/pull/465))
 - Claude Desktop's tokens today now show as their own card under Claude, even without Claude Code. Without it, Claude says what your limits need, with a button to set that up, instead of an error. Thanks @jsvisa. ([#198](https://github.com/tddworks/ClaudeBar/issues/198))
-
-### Changed
-- A provider whose CLI isn't installed, or that you never signed in to, now reads Not set up instead of Unavailable, and shows any daily usage it can still read. ([#198](https://github.com/tddworks/ClaudeBar/issues/198))
-
-### Fixed
-- In overview mode, and with several accounts, a provider with no usage no longer reads Healthy: it says Unavailable, Not set up or Syncing, like the header does. ([#259](https://github.com/tddworks/ClaudeBar/issues/259))
 
 ---
 

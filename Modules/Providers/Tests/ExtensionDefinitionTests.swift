@@ -120,4 +120,31 @@ struct ExtensionDefinitionTests {
 
         #expect(Extensions.catalog(in: root).map(\.id) == ["ext-example-provider"])
     }
+
+    @Test
+    func `a folder without a manifest is not an extension`() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("notes", isDirectory: true), withIntermediateDirectories: true)
+
+        #expect(Extensions.catalog(in: root).isEmpty)
+    }
+
+    @Test
+    func `no extensions folder is no extensions`() {
+        #expect(Extensions.catalog(in: root.appendingPathComponent("missing")).isEmpty)
+    }
+
+    @Test
+    func `a config id becomes the environment variable name scripts read`() throws {
+        let definition = try Extensions.definition(manifest: Data("""
+        {"id":"names","name":"Names","version":"1",
+         "config":[{"id":"apiKey","label":"Key","type":"secret"},{"id":"port","label":"Port","type":"number"},
+                   {"id":"base-url","label":"URL","type":"string"},{"id":"monthlyBudget","label":"Budget","type":"number"}],
+         "sections":[{"id":"quotas","type":"quotaGrid","probe":{"command":"./probe.sh"}}]}
+        """.utf8), folder: root)
+        guard case .script(let call) = definition.dataSources[0].fetch else { Issue.record("a script"); return }
+
+        #expect(Set(call.secrets.keys) == ["CLAUDEBAR_API_KEY"])
+        #expect(Set(call.environment.keys) == ["CLAUDEBAR_PORT", "CLAUDEBAR_BASE_URL", "CLAUDEBAR_MONTHLY_BUDGET"])
+    }
 }
