@@ -1092,6 +1092,20 @@ CANONICAL §8: *"the same `Provider`, with script fetches"*. The person's
 | 4 | `Fetch.script` + the manifest → definition reader; extensions load as `Provider`s, their sections mapped as 12.2; `ExtensionProvider` goes | the last other conformer · golden tests on `docs/features/extensions/example-provider`; quotas and cost read the same |
 | 5 | Delete `AIProvider` and the test stubs (`StubClaudeProvider` …) | done · the build has no `AIProvider` |
 
+#### Slice 1 in detail — Settings by product
+
+Mockup: `design-concept/settings-by-product/index.html`.
+
+| Piece | Rule |
+|---|---|
+| a Providers row | the **product**: its name, "*n* accounts" when there is more than one, **each login's usage** (one meter per login, by name), its switch. An extension keeps its own row until slice 4 |
+| the page | titled by the product; its switch is the product's; its logins are the Accounts card, each with its own *Pause* |
+| `Provider.isEnabled` | **its own setting**: off hides every login — no pill, no menu-bar entry, no refresh, no alert — and keeps every login and its settings. The lineup is the enabled logins **of enabled products** |
+| `Account.isEnabled` | the login's own *Pause*, its own setting — never the product's. A product whose logins are all paused reads as disabled (CANONICAL §5) |
+| upgrade | today `providers.<id>.isEnabled` is the plain login's switch. Read once: **off while another login of it is on** meant *the plain login was paused* — kept as its pause, the product on; **otherwise** it meant *the product was off* — kept as the product's switch. Nobody's setup changes |
+
 ### 12.4 · Decided
 
+- ~~**The product's switch.**~~ **Answered (2026-10-04): its own setting**, as CANONICAL §1 says (*"off hides every login"*); each login's *Pause* stays its own; the upgrade rule above keeps everyone's setup. Not chosen: a switch that pauses every login, which would also resume logins paused on purpose.
+- ~~**Settings rows lose a login's usage.**~~ **Answered:** the product row shows each login's usage, one meter per login.
 - ~~**Extension sections a definition can't say yet.**~~ **Answered (2026-10-04): they map into the account's own model** — daily usage → `usageHistory` (a script as its source), metrics → `usage.cost` + history, health check → fetch health. Free-form metrics and `statusBanner` have no domain meaning and are **retired**, announced in the release before they go; either can return as a general rule when an issue asks, problem-first. `Usage.extensionMetrics` and `dailyUsageReport` then leave the kernel (CANONICAL §8).
