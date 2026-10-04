@@ -64,6 +64,7 @@ struct LeaderboardJoinView: View {
     @State private var isJoining = false
     @State private var showPayload = false
     @State private var preview: [DailyTokens] = []
+    @State private var sharesCountry = false
 
     private var username: Username? { Username(name) }
 
@@ -73,7 +74,10 @@ struct LeaderboardJoinView: View {
         let rows = preview.map { day in
             "    {\"provider\": \"\(day.provider)\", \"day\": \"\(day.day)\",\n     \"input\": \(day.input), \"output\": \(day.output), \"cacheWrite\": \(day.cacheWrite),\n     \"cacheRead\": \(day.cacheRead), \"unsplit\": \(day.unsplit)}"
         }
-        return "PUT /usage\n{\n  \"today\": \"\(today)\",\n  \"days\": [\n\(rows.isEmpty ? "    (no tokens today yet)" : rows.joined(separator: ",\n"))\n  ]\n}"
+        let body = "PUT /usage\n{\n  \"today\": \"\(today)\",\n  \"days\": [\n\(rows.isEmpty ? "    (no tokens today yet)" : rows.joined(separator: ",\n"))\n  ]\n}"
+        return body + (sharesCountry
+            ? "\n\n+ the server keeps your country, from where\n  your requests come from — never sent by this Mac"
+            : "")
     }
     private var shareable: [String] { leaderboard.membership.shareableProviders.sorted() }
 
@@ -131,6 +135,16 @@ struct LeaderboardJoinView: View {
                     .padding(4)
                 }
 
+                CardLabel(text: "THE GLOBE").padding(.top, 4)
+                ProviderPill(providerId: "globe", providerName: "Also show my country on the globe", isSelected: sharesCountry,
+                             hasData: true, symbol: "globe.europe.africa.fill") { sharesCountry.toggle() }
+                    .accessibilityAddTraits(sharesCountry ? .isSelected : [])
+                    .padding(.horizontal, 4)
+                Text("Only your country, counted with others, never your city or IP. Off unless you tick it.")
+                    .font(.system(size: 11, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 DisclosureGroup("Exactly what gets uploaded", isExpanded: $showPayload) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Signed as @\(username?.value ?? "you"), hourly. This is today; the first upload sends each of the last 30 days the same way. Nothing else leaves this Mac.")
@@ -187,7 +201,7 @@ struct LeaderboardJoinView: View {
         isJoining = true
         defer { isJoining = false }
         do {
-            try await leaderboard.join(as: username, sharing: sharing)
+            try await leaderboard.join(as: username, sharing: sharing, sharesCountry: sharesCountry)
             error = nil
         } catch {
             self.error = (error as? LeaderboardError)?.errorDescription ?? error.localizedDescription
@@ -211,6 +225,7 @@ struct LeaderboardStandingsView: View {
     @State private var mine: MemberSummary?
     @State private var top: [Standing] = []
     @State private var error: String?
+    @State private var globe: GlobeSummary?
 
     private var view: BoardView { BoardView(period: period, provider: provider) }
     private var membership: LeaderboardMembership { leaderboard.membership }
@@ -218,11 +233,79 @@ struct LeaderboardStandingsView: View {
     var body: some View {
         VStack(spacing: 12) {
             rankCard
+            if membership.showsGlobeHint { globeHint }
             boardCard
+            globeLine
             footer
         }
         .task(id: view) { await load() }
+        .task { globe = try? await leaderboard.globe() }
         .task(id: membership.lastUpload) { await load() }
+    }
+
+    // MARK: The globe
+
+    /// The one-time *NEW* card: offers the globe to members who haven't
+    /// opted in, until they turn it on or dismiss it.
+    private var globeHint: some View {
+        LeaderboardCard {
+            HStack(alignment: .top, spacing: 10) {
+                Text("NEW")
+                    .font(.system(size: 9, weight: .heavy, design: theme.fontDesign))
+                    .foregroundStyle(theme.textOnStatus)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().fill(theme.accentPrimary))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("🌍 Put your country on the globe")
+                        .font(.system(size: 13, weight: .bold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textPrimary)
+                    Text("Only your country, from where your requests come from, counted with others. Never your city or IP.")
+                        .font(.system(size: 11, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Button { membership.dismissGlobeHint() } label: {
+                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).foregroundStyle(theme.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
+            }
+            HStack(spacing: 8) {
+                Button { Task { try? await membership.setSharesCountry(true) } } label: {
+                    Label("Turn on", systemImage: "globe.europe.africa.fill")
+                        .font(.system(size: 11, weight: .bold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textOnStatus)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Capsule().fill(theme.accentGradient))
+                }
+                .buttonStyle(.plain)
+                Link("See the globe", destination: leaderboard.globePage)
+                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+            }
+        }
+    }
+
+    /// *🌍 MEMBERS IN N COUNTRIES* — links to the globe on the web board.
+    @ViewBuilder
+    private var globeLine: some View {
+        Link(destination: leaderboard.globePage) {
+            HStack(spacing: 6) {
+                Text("🌍")
+                Text(globeText)
+                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textSecondary)
+                Spacer(minLength: 4)
+                Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold)).foregroundStyle(theme.textTertiary)
+            }
+            .padding(.horizontal, 4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var globeText: String {
+        guard let count = globe?.countries.count, count > 0 else { return "See where ClaudeBar is used" }
+        return count == 1 ? "Members in 1 country · see the globe" : "Members in \(count) countries · see the globe"
     }
 
     // MARK: Your rank
