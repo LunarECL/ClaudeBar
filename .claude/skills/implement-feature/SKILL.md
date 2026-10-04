@@ -231,6 +231,8 @@ A bug in a migrated provider is fixed in its JSON, or generically in
 
 ## TDD Workflow (Chicago School)
 
+Name each test `should <outcome> [when <situation>]`, in the person's words, never a method, type or mechanism verb → [Naming tests](references/tdd-patterns.md#naming-tests).
+
 We follow **Chicago school TDD** (state-based testing):
 - Test **state changes** and **return values**, not interactions
 - Focus on the "what" (observable outcomes), not the "how" (method calls)
@@ -244,7 +246,7 @@ Test state and computed properties:
 ```swift
 @Suite
 struct FeatureModelTests {
-    @Test func `model computes status from state`() {
+    @Test func `should be normal when half is left`() {
         // Given - set up initial state
         let model = FeatureModel(value: 50)
 
@@ -252,7 +254,7 @@ struct FeatureModelTests {
         #expect(model.status == .normal)
     }
 
-    @Test func `model state changes correctly`() {
+    @Test func `should have 70 left and stay healthy after using 30 of 100`() {
         // Given
         var model = FeatureModel(value: 100)
 
@@ -273,7 +275,7 @@ Stub dependencies to return data, assert on resulting state:
 ```swift
 @Suite
 struct FeatureServiceTests {
-    @Test func `service returns parsed data on success`() async throws {
+    @Test func `should load three items when the service answers`() async throws {
         // Given - stub dependency to return data (not verify calls)
         let mockClient = MockNetworkClient()
         given(mockClient).fetch(any()).willReturn(validResponseData)

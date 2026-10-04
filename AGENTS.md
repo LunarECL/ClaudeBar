@@ -56,6 +56,7 @@ UI changes come with a mockup in `design-concept/<feature>/` first, and, once bu
 
 - Write the failing test first. Swift Testing (`@Suite`, `@Test`, `#expect`) with Mockable (`given(mock).method().willReturn(…)`).
 - **Chicago school**: assert on resulting state and return values; stub dependencies, don't `verify()` calls.
+- **Name a test for the behaviour it guards**: `` `should <outcome> [when <situation>]` `` in the person's words, never a method, type or mechanism verb. Rename an old test when you change its file; don't sweep → [Naming tests](.claude/skills/implement-feature/references/tdd-patterns.md#naming-tests).
 - Protocols that cross a boundary are `@Mockable` so tests never touch a real CLI, network or Keychain.
 
 ## Logging
@@ -75,7 +76,7 @@ UI changes come with a mockup in `design-concept/<feature>/` first, and, once bu
 
 ## Changes that touch docs
 
-- User-visible change → one line under `## [Unreleased]` in `CHANGELOG.md`: the effect in the user's words, ≤300 chars, absolute issue/PR link (it's shown in Sparkle's update dialog).
+- User-visible change → one line under `## [Unreleased]` in `CHANGELOG.md`, under its one heading (`Removed` → `Changed` → `Fixed` → `Added`): the effect in the user's words, ≤300 chars, absolute issue/PR link, and `→ [docs](…)` on `Added`/`Changed` (it's shown in Sparkle's update dialog).
 - Provider behaviour or probe research → that provider's `docs/providers/<id>/README.md` (users) or `design.md` (contributors).
 - Which file for which change: [update rules](docs/documentation-design/README.md#update-rules). Run `python3 scripts/gen-docs.py && python3 scripts/check-docs.py --strict` before pushing.
 

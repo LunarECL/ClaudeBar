@@ -132,7 +132,7 @@ struct LeaderboardPane: View {
                         get: { membership.sharing.contains(id) },
                         set: { on in
                             if on { try? membership.share(id) } else { membership.stopSharing(id) }
-                            Task { await leaderboard.uploader.uploadDue() }
+                            Task { await leaderboard.uploader.uploadNow() }
                         }
                     ))
                 }

@@ -126,8 +126,13 @@ There is no `Leaderboard` type on the app side that holds standings. The app doe
 // Join: the membership makes its key, the server answers whether the name is free.
 try await membership.join(as: Username("tokenwhale"), sharing: [.claude, .codex])
 
-// Hourly, and once right after joining (driver, like NotifyPublishDriver).
+// The driver checks every few minutes and when the Mac wakes; the uploader decides
+// whether an hour has passed by the clock (driver, like NotifyPublishDriver).
 await uploader.uploadDue()                       // asks the membership for its days; never filters itself
+
+// An upload you asked for always goes: Refresh (on any tab), joining,
+// switching a shared provider on or off.
+await uploader.uploadNow()
 
 // Settings
 membership.share(.mistral)                       // throws if Mistral has no usage history on this Mac
@@ -160,6 +165,8 @@ let days = membership.dailyTokens(from: usageHistories, in: range)
 | Your private key never leaves your Mac and is never logged | `SigningKeyStore` (Keychain, with the UserDefaults fallback Notify! uses for ad-hoc builds) |
 | Uploading a day again replaces it; it never adds | Server |
 | A missed hour, or a Mac asleep for days, heals on the next upload | `LeaderboardUploader`: uploads from the day of `lastUpload` to today, at most 30 days, and on join the last 30 |
+| Uploads stay hourly by the clock, even after the Mac sleeps | `LeaderboardUploader.uploadDue()`: uploads only when there is no `lastUpload` or it is at least an hour old by the wall clock. The App driver only asks often (every 5 minutes and on wake) and never decides |
+| An upload you asked for always goes, hour or not | `LeaderboardUploader.uploadNow()`: Refresh in the popover, whatever tab is open, joining, and switching a shared provider |
 | Every write and every private read is signed by the member's key | Server |
 | Who you are comes from the verified signature, never from a parameter | Server |
 | A signed request is accepted once, and only within 5 minutes of its timestamp | Server |
@@ -267,7 +274,7 @@ A destination, not a provider, so it sits beside Notify! (AGENTS.md: destination
 | `UsageLog.Tokens.inputIncludesCacheRead` | Generic engine rule | A log whose input count already holds its cache reads; the engine takes them out, so input means the same for every provider |
 | `LeaderboardMembership` | The laws of §4 on this Mac | Only ticked providers leave; only providers with usage history can be ticked; a provider's logins are summed |
 | `RequestSigner` | The canonical string, signed with CryptoKit Ed25519 | Pinned by `Tests/DomainTests/Leaderboard/vectors.json`; the server checks an identical copy |
-| `LeaderboardUploader` + App driver | Uploads 30 days on join, then hourly from `lastUpload` | `lastUpload` moves only on success |
+| `LeaderboardUploader` + App driver | Uploads 30 days on join, then hourly from `lastUpload`, and now when you ask | `lastUpload` moves only on success. The driver asks `uploadDue()` every 5 minutes and on `NSWorkspace.didWakeNotification`; a `Timer`'s clock stops while the Mac sleeps, so the hour is the uploader's to judge |
 | Server | The server's laws of §4 | Private repo `tddworks/claudebar-server`; deployed with the `cf` CLI |
 
 | Piece | Home |
@@ -275,7 +282,7 @@ A destination, not a provider, so it sits beside Notify! (AGENTS.md: destination
 | `LeaderboardMembership`, `DailyTokens`, `Username`, `BoardView`, `Standing`, `LeaderboardUploader` | `Sources/Domain/Leaderboard/` |
 | `@Mockable` ports `LeaderboardAPI` and `SigningKeyStore`; plain `LeaderboardSettingsRepository` (like Notify!'s) and `@MainActor` `TokenLogs`, faked in tests | `Sources/Domain/Leaderboard/` |
 | `LeaderboardHTTPClient`, `CredentialSigningKeyStore`; settings as `leaderboard.*` in `JSONSettingsRepository` | `Sources/Infrastructure/` |
-| `Leaderboard` (wiring + hourly timer), `MonitorTokenLogs`, popover tab, `LeaderboardPane` | `Sources/App/` |
+| `Leaderboard` (wiring, the 5-minute check and the wake observer, `refresh()` for the popover's Refresh), `MonitorTokenLogs`, popover tab, `LeaderboardPane` | `Sources/App/` |
 | Server and board page | Private repo `tddworks/claudebar-server` |
 
 ## 8 · Build sequence
@@ -287,7 +294,7 @@ Test-first slices, each green on its own. All nine are built; deployment is the 
 3. **Request signing.** Pins the canonical string and a signature against fixed vectors, shared with the Worker.
 4. **Worker: join, upload, board** (in `tddworks/claudebar-server`). Pins: bad signature 401, replay 401, stale timestamp 401, re-upload replaces, future day 400, hidden member off the board, ties by username.
 5. **Worker: `/me`, rename, hide, delete** (in `tddworks/claudebar-server`). Pins: delete removes every row; a member can only ever read their own rows.
-6. **`LeaderboardUploader`.** Pins: join uploads 30 days; an hourly upload resumes from `lastUpload`; a failed upload doesn't move `lastUpload`.
+6. **`LeaderboardUploader`.** Pins: join uploads 30 days; an hourly upload resumes from `lastUpload`; a failed upload doesn't move `lastUpload`; `uploadDue()` skips when `lastUpload` is under an hour old by the clock and uploads once it is an hour or more; `uploadNow()` uploads regardless.
 7. **Leaving.** Pins: the key is forgotten only after the server's 2xx; a failed delete leaves the member joined and says so.
 8. **App surfaces.** Popover tab and Settings pane, per the design concept.
 9. **Board page** on GitHub Pages.

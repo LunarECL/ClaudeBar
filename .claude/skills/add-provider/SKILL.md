@@ -142,6 +142,8 @@ A list of values means *the first that answers*; a number is a constant.
 
 ## TDD workflow (Chicago school)
 
+Name each test `should <outcome> [when <situation>]`, in the person's words, never a method, type or mechanism verb → [Naming tests](../implement-feature/references/tdd-patterns.md#naming-tests).
+
 ### 1 · Research and fixtures
 Find where the usage really comes from (CLI command, endpoint, local file) and
 capture **real** responses, redacted, including the failure answers: logged
@@ -158,14 +160,14 @@ through the real `Provider` over stubbed connections with `StubbedProvider`
 @Suite
 struct AcmeDefinitionTests {
     @Test
-    func `acme json keeps the definition laws`() throws {
+    func `should read Acme from its API by default`() throws {
         let acme = try ProviderFactory.builtIn("acme")
         #expect(acme.dataSources.map(\.kind) == ["api"])
         #expect(acme.defaultDataSource == "api")
     }
 
     @Test
-    func `api reads the session window`() async throws {
+    func `should show the session window when the API answers`() async throws {
         let stub = try StubbedProvider(providerId: "acme")
         defer { stub.cleanUp() }
         stub.environment = ["ACME_API_KEY": "test-key"]
@@ -178,7 +180,7 @@ struct AcmeDefinitionTests {
     }
 
     @Test
-    func `api without a key says so at the lookup step`() async throws {
+    func `should say the key is missing when the API has no key`() async throws {
         let stub = try StubbedProvider(providerId: "acme")
         defer { stub.cleanUp() }
         let acme = try stub.make("acme")
