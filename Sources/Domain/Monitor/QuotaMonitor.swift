@@ -516,6 +516,31 @@ public final class QuotaMonitor {
     /// registration order.
     public var tabs: [ProductTab] { ProductTab.tabs(of: enabledProviders) }
 
+    /// Settings → Providers: every product, on or off, each with all its
+    /// logins, in the pane's order (TARGET §12, slice 1).
+    public var productTabs: [ProductTab] { ProductTab.tabs(of: allProviders) }
+
+    /// A product's switch — off hides every login of it and keeps them; the
+    /// selection moves off a product that is turned off.
+    public func setProductEnabled(_ tab: ProductTab, enabled: Bool) {
+        if let product = tab.provider {
+            product.isEnabled = enabled
+        } else if var only = tab.accounts.first {
+            only.isEnabled = enabled
+        }
+        if !enabled { selectFirstEnabledIfNeeded() }
+    }
+
+    /// Moves a product, its logins together, past its neighbour.
+    public func moveProduct(id: String, by offset: Int) {
+        var groups = productTabs.map { $0.accounts.map(\.id) }
+        guard offset != 0, let index = productTabs.firstIndex(where: { $0.id == id }) else { return }
+        let newIndex = min(max(index + offset, 0), groups.count - 1)
+        guard newIndex != index else { return }
+        groups.insert(groups.remove(at: index), at: newIndex)
+        setProviderOrder(groups.flatMap { $0 })
+    }
+
     /// The tab the selected login belongs to.
     public var selectedTab: ProductTab? { tabs.first { $0.contains(selectedProviderId) } }
 

@@ -15,6 +15,20 @@ public struct ProductTab: Identifiable {
     /// The product behind a tab of logins; `nil` for a legacy provider.
     public var provider: Provider? { (accounts.first as? Account)?.provider }
 
+    /// The product's switch: its own, or a legacy provider's (TARGET §12).
+    public var isEnabled: Bool { provider?.isEnabled ?? accounts.first?.isEnabled ?? false }
+
+    /// A login's name on the product's row — only when there are several to
+    /// tell apart; one login is just the product.
+    public func loginName(_ login: any AIProvider) -> String? {
+        guard accounts.count > 1 else { return nil }
+        return (login as? Account)?.displayName ?? login.name
+    }
+
+    /// What the product's page configures: its plain login, whose id the
+    /// configuration is keyed by — or a legacy provider itself.
+    public var page: (any AIProvider)? { provider?.defaultAccount ?? accounts.first }
+
     public func contains(_ lineupId: String) -> Bool {
         accounts.contains { $0.id == lineupId }
     }
