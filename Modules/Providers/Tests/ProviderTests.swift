@@ -113,7 +113,7 @@ struct ProviderTests {
     // MARK: - Refresh
 
     @Test
-    func `a refresh records the usage, under the login's own id, and who answered`() async throws {
+    func `should show a login's usage under its own id and say which data source answered`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 30)
         let acme = acme(network, logins: ["work"])
@@ -128,7 +128,7 @@ struct ProviderTests {
     }
 
     @Test
-    func `a failed refresh keeps the last usage and says which step failed`() async throws {
+    func `should keep the last usage and say which step failed when a refresh fails`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.backup, used: 30)
         let acme = acme(network)
@@ -144,7 +144,7 @@ struct ProviderTests {
     }
 
     @Test
-    func `one login failing leaves another's usage alone`() async throws {
+    func `should leave another login's usage alone when one login fails`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, login: "home", used: 10)
         network.fail(Self.backup)
@@ -159,7 +159,7 @@ struct ProviderTests {
     }
 
     @Test
-    func `overlapping refreshes of one login share one request`() async throws {
+    func `should ask the provider once when one login is refreshed twice at the same time`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 30)
         network.held = true
@@ -177,7 +177,7 @@ struct ProviderTests {
     // MARK: - Fallback
 
     @Test
-    func `when the active data source fails its fallback answers, and says so`() async throws {
+    func `should show the fallback's usage, and say it answered, when the chosen data source fails`() async throws {
         let network = AcmeNetwork()
         network.fail(Self.api)
         network.answer(Self.backup, used: 40)
@@ -190,7 +190,7 @@ struct ProviderTests {
     }
 
     @Test
-    func `when every data source fails the active one's failure is reported`() async throws {
+    func `should report the chosen data source's failure when every data source fails`() async throws {
         let network = AcmeNetwork()
         network.fail(Self.api, status: 401)
         network.fail(Self.backup, status: 500)
@@ -202,7 +202,7 @@ struct ProviderTests {
     }
 
     @Test
-    func `a fallback switched off is not tried`() async throws {
+    func `should not ask the fallback when the person switched it off`() async throws {
         let network = AcmeNetwork()
         network.fail(Self.api)
         network.answer(Self.backup, used: 40)
@@ -215,7 +215,7 @@ struct ProviderTests {
     }
 
     @Test
-    func `a rate limit is not a reason to ask the fallback`() async throws {
+    func `should not ask the fallback when the chosen data source is rate-limited`() async throws {
         let network = AcmeNetwork()
         network.fail(Self.api, status: 429)
         network.answer(Self.backup, used: 40)
@@ -227,7 +227,7 @@ struct ProviderTests {
     }
 
     @Test
-    func `a login whose patch leaves out the active data source uses the next on its fallback chain`() async throws {
+    func `should use the next data source on the fallback chain when a login cannot use the chosen one`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.backup, used: 25)
         var patch = Self.loginPatch
@@ -244,7 +244,7 @@ struct ProviderTests {
     // MARK: - The data source choice — one for every login
 
     @Test
-    func `choosing a data source is saved, and an unknown one is refused`() {
+    func `should save the chosen data source and refuse one the provider does not have`() {
         let settings = InMemoryProviderSettings()
         let acme = acme(AcmeNetwork(), settings: settings)
 
@@ -256,7 +256,7 @@ struct ProviderTests {
     }
 
     @Test
-    func `a cached data source sets how often the background may ask`() {
+    func `should ask in the background no more often than the chosen data source's cache allows`() {
         let acme = acme(AcmeNetwork())
 
         #expect(acme.backgroundRefreshFloor == .seconds(600))
@@ -267,7 +267,7 @@ struct ProviderTests {
     // MARK: - Held back until checked (#216)
 
     @Test
-    func `a background refresh waits for one the person asked for`() async throws {
+    func `should not ask in the background until the person has refreshed once, when the data source must be checked first (#216)`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 30)
         let acme = acme(network, definition: Self.acme(verifyBeforeBackground: true))
@@ -283,7 +283,7 @@ struct ProviderTests {
     // MARK: - Status across logins
 
     @Test
-    func `status is the worst enabled login, and the best has the most left`() async throws {
+    func `should take the worst enabled login's status, and call the login with the most left the best`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 40)
         network.answer(Self.api, login: "low", used: 90)
@@ -299,7 +299,7 @@ struct ProviderTests {
     }
 
     @Test
-    func `the worst login is the one that makes the provider's status, and nobody when all is well`() async throws {
+    func `should name the login that makes the provider's status, and none when all is well`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 40)
         network.answer(Self.api, login: "low", used: 90)
