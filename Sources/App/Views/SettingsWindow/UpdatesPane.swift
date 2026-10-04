@@ -103,6 +103,10 @@ struct UpdatesPane: View {
     }
 
     private var lastCheckText: String {
+        // A failed check must not read as "up to date".
+        if let failure = sparkleUpdater?.lastFailureMessage {
+            return failure
+        }
         if let lastCheck = sparkleUpdater?.lastUpdateCheckDate {
             "Last checked: \(lastCheck.formatted(date: .abbreviated, time: .shortened))"
         } else {

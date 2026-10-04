@@ -1,6 +1,7 @@
 #if ENABLE_SPARKLE
 import Sparkle
 import SwiftUI
+import Infrastructure
 
 /// Delegate to receive update notifications from Sparkle
 private class SparkleUpdaterDelegate: NSObject, SPUUpdaterDelegate, @unchecked Sendable {
@@ -21,6 +22,39 @@ private class SparkleUpdaterDelegate: NSObject, SPUUpdaterDelegate, @unchecked S
         let wrapper = self.wrapper
         Task { @MainActor in
             wrapper?.clearUpdateAvailable()
+            // A failed check is not "up to date" — record it as a failure so
+            // the pane and the logs can tell the two apart.
+            wrapper?.recordFailure("Update check failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// The update cycle was aborted (check, download or install failure that
+    /// Sparkle surfaced to the user driver).
+    func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
+        let wrapper = self.wrapper
+        Task { @MainActor in
+            wrapper?.recordFailure("Update aborted: \(error.localizedDescription)")
+        }
+    }
+
+    func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: any Error) {
+        let wrapper = self.wrapper
+        Task { @MainActor in
+            wrapper?.recordFailure(
+                "Update v\(item.displayVersionString) download failed: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    func updater(
+        _ updater: SPUUpdater,
+        didFinishUpdateCycleForUpdateCheck updateCheck: SPUUpdateCheck,
+        error: (any Error)?
+    ) {
+        guard let error else { return }
+        let wrapper = self.wrapper
+        Task { @MainActor in
+            wrapper?.recordFailure("Update cycle failed: \(error.localizedDescription)")
         }
     }
 
@@ -66,6 +100,10 @@ final class SparkleUpdater {
 
     /// The version string of the available update
     private(set) var availableVersion: String?
+
+    /// Why the last update check or install failed, or nil when the updater
+    /// last succeeded. A failed check must not look like "up to date".
+    private(set) var lastFailureMessage: String?
 
     /// Whether the updater is available (bundle is properly configured)
     var isAvailable: Bool {
@@ -147,6 +185,7 @@ final class SparkleUpdater {
         guard let controller = controller, controller.updater.canCheckForUpdates else {
             return
         }
+        warnIfAnotherInstanceIsRunning()
         // Bring app to front so update window appears above other windows
         NSApp.activate(ignoringOtherApps: true)
         controller.checkForUpdates(nil)
@@ -158,15 +197,47 @@ final class SparkleUpdater {
     }
 
     /// Called by delegate when an update is found
-    fileprivate func setUpdateAvailable(version: String) {
+    func setUpdateAvailable(version: String) {
         isUpdateAvailable = true
         availableVersion = version
+        lastFailureMessage = nil
     }
 
     /// Called by delegate when no update is found
-    fileprivate func clearUpdateAvailable() {
+    func clearUpdateAvailable() {
         isUpdateAvailable = false
         availableVersion = nil
+        lastFailureMessage = nil
+    }
+
+    /// Records why an update check or install failed, into state the Updates
+    /// pane can show and into `AppLog.updates` so the failure is diagnosable
+    /// afterwards. Sparkle alerts are transient; until now a failure left no
+    /// trace in ClaudeBar's own logs at all.
+    func recordFailure(_ message: String) {
+        AppLog.updates.error(message)
+        lastFailureMessage = message
+    }
+
+    /// Sparkle's installer terminates and watches only the *first* running
+    /// app with our bundle ID. With a second ClaudeBar instance alive (a
+    /// debug run, a test harness) the install handshake can pick the wrong
+    /// one: the update fails on the spot, yet lands on the next launch when
+    /// Sparkle completes the staged installation.
+    static func hasConflictingInstances(_ runningInstanceCount: Int) -> Bool {
+        runningInstanceCount > 1
+    }
+
+    /// Logs the second-instance risk while the user is still looking at the
+    /// updater, not afterwards when only "it said failed but it updated" is left.
+    private func warnIfAnotherInstanceIsRunning() {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).count
+        if Self.hasConflictingInstances(running) {
+            AppLog.updates.warning(
+                "\(running) ClaudeBar instances are running; Sparkle's installer watches only the first, so the update may fail now and complete on the next launch. Quit the other instance and retry."
+            )
+        }
     }
 
     /// Check if running from a proper .app bundle
