@@ -10,8 +10,8 @@ With more than one Claude or Codex login ([multiple accounts](../multi-account/R
 
 Any of these:
 
-- **Popover:** under the account chips, *New terminal sessions use **personal** ▾*. Pick another login. Right-clicking a chip has **Use for New Terminal Sessions** too.
-- **Settings → Providers → Claude (or Codex) → Accounts:** the *New terminal sessions* menu, or **Use for New Terminal Sessions** in a login's ⋯ menu.
+- **Popover:** the login in use has an **IN USE** badge on its chip; every other login's chip ends in **Use**. One click switches. Right-clicking a chip has **Use for New Terminal Sessions** too.
+- **Settings → Providers → Claude (or Codex) → Accounts:** the radio button on a login's row.
 - **A link:** `open "claudebar://use?provider=claude&account=work"` ([URL schemes](../url-schemes/README.md)). The account is its name, its email or `default` for the plain login.
 
 The login in use has a terminal mark on its chip.

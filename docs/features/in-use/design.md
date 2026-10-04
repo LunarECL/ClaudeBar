@@ -71,7 +71,7 @@ NewSessions  ◆  (Domain)             products (those with inUse) · shell · i
 
 ```swift
 if let state = newSessions.state(of: product) { InUseStrip(state: state) }   // the strip renders a state
-newSessions.use(login)                                                       // chip, menu, Settings, banner
+newSessions.use(login)                                                       // a chip's Use, its right-click, the Settings radio, the banner
 switch newSessions.use(providerId: id, account: name) { … }                 // claudebar://use
 monitor.onRefreshed { await newSessions.review($0) }                         // the composition root wires it
 if let inUse = provider.inUse, inUse.offersChoice { InUseSettingsSection(inUse: inUse) }

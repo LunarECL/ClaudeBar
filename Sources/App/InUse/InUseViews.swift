@@ -179,15 +179,26 @@ struct InUseSettingsSection: View {
 
 /// "IN USE" — on the chip and the Settings row of the login new sessions start with.
 struct InUseBadge: View {
+    /// The badge's gap to a chip's edge on every side; its corners are the
+    /// chip's radius less that gap.
+    static let inset: CGFloat = 4
+
+    /// A chip's height: a provider pill's, drawn the same way.
+    static func chipHeight(in theme: any AppThemeProvider) -> CGFloat { 25 }
     @Environment(\.appTheme) private var theme
+
+    /// The gap from the chip's edge: the inset, from the inside of its outline,
+    /// which is stroked across the edge — half of it falls inside.
+    static func gap(in theme: any AppThemeProvider) -> CGFloat { (inset + theme.cardBorderWidth / 2).rounded() }
 
     var body: some View {
         Text("IN USE")
             .font(.system(size: 8, weight: .heavy, design: theme.fontDesign))
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1.5)
+            .padding(.horizontal, 6)
+            .frame(height: Self.chipHeight(in: theme) - 2 * Self.gap(in: theme))
             .foregroundStyle(theme.textPrimary)
-            .background(Capsule().fill(theme.statusWarning.opacity(0.35)))
+            .background(RoundedRectangle(cornerRadius: max(theme.pillCornerRadius - Self.gap(in: theme), 2))
+                .fill(theme.statusWarning.opacity(0.35)))
             .accessibilityLabel("In use for new terminal sessions")
     }
 }
