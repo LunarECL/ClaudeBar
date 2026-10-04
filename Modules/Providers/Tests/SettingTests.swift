@@ -15,13 +15,13 @@ struct SettingTests {
     """
 
     @Test
-    func `a choice's option fills the setting and every value it carries`() throws {
+    func `should fill in the chosen option and every value it carries`() throws {
         let setting = try decode(region)
         #expect(setting.fills(for: "international") == ["region": "international", "region.site": "acme.com"])
     }
 
     @Test
-    func `a blank is the default, and a choice without one takes its first option`() throws {
+    func `should use the default for a blank, or the first option when a choice has no default`() throws {
         #expect(try decode(region).value(from: "  ") == "china")
         let noDefault = try decode(#"{"id":"plan","label":"Plan","kind":{"choice":["pro","max"]}}"#)
         #expect(noDefault.value(from: nil) == "pro")
@@ -29,27 +29,27 @@ struct SettingTests {
     }
 
     @Test
-    func `a secret fills nothing — a key reaches a fetch only by its lookup`() throws {
+    func `should never fill a key into a request except by looking it up`() throws {
         let key = try decode(#"{"id":"apiKey","label":"API key","kind":"secret"}"#)
         #expect(key.fills(for: "sk-1").isEmpty)
     }
 
     @Test
-    func `a secret with a default is refused`() {
+    func `should refuse a key that comes with a default`() {
         #expect(throws: DecodingError.self) {
             try decode(#"{"id":"apiKey","label":"API key","kind":"secret","default":"sk-0"}"#)
         }
     }
 
     @Test
-    func `the form before kinds still decodes`() throws {
+    func `should still read settings written in the older form`() throws {
         #expect(try decode(#"{"id":"apiKey","label":"API key","secret":true}"#).kind == .secret)
         #expect(try decode(#"{"id":"region","label":"Region","choices":["a","b"]}"#).kind
             == .choice([Setting.Option(id: "a"), Setting.Option(id: "b")]))
     }
 
     @Test
-    func `each kind checks its own value`() throws {
+    func `should say what is wrong with a choice, text or folder the person entered`() throws {
         let paths = FakePaths(folders: ["/Users/me/.acme-work"])
         #expect(try decode(region).check("mars", paths: paths) == "Choose a Region from the list.")
         #expect(try decode(region).check("china", paths: paths) == nil)
@@ -63,14 +63,14 @@ struct SettingTests {
     }
 
     @Test
-    func `a path setting tells its own value among a login's values`() throws {
+    func `should find a login's folder among its values, and no folder for a choice`() throws {
         let folder = try decode(#"{"id":"home","label":"Folder","scope":"account","kind":"path"}"#)
         #expect(folder.path(in: ["home": "/Users/me/work"]) == "/Users/me/work")
         #expect(try decode(region).path(in: ["region": "china"]) == nil)
     }
 
     @Test
-    func `only a path can be the same place as another login's`() throws {
+    func `should treat two spellings of one folder as the same place, but never two equal choices`() throws {
         let paths = FakePaths(folders: [], aliases: ["~/.acme": "/Users/me/.acme"])
         let folder = try decode(#"{"id":"home","label":"Folder","kind":"path"}"#)
         #expect(folder.isSamePlace("~/.acme", as: "/Users/me/.acme", paths: paths))
@@ -78,7 +78,7 @@ struct SettingTests {
     }
 
     @Test
-    func `a setting round-trips as written`() throws {
+    func `should keep a setting as written when it is saved and read back`() throws {
         let setting = try decode(region)
         #expect(try JSONDecoder().decode(Setting.self, from: JSONEncoder().encode(setting)) == setting)
     }

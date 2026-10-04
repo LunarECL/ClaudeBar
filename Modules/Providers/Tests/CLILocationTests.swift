@@ -27,7 +27,7 @@ struct CLILocationTests {
     }
 
     @Test
-    func `every login's cli data sources run the chosen location`() throws {
+    func `should run the CLI from the chosen location for every login`() throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         let codex = try stub.makeProvider("codex", accounts: [login("work")], isExecutable: { _ in true })
@@ -44,7 +44,7 @@ struct CLILocationTests {
     }
 
     @Test
-    func `clearing the location goes back to finding the cli as usual`() throws {
+    func `should go back to finding the CLI as usual when the location is cleared`() throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         let codex = try stub.makeProvider("codex", isExecutable: { _ in true })
@@ -58,7 +58,7 @@ struct CLILocationTests {
     }
 
     @Test
-    func `a location that isn't a program is refused, and nothing changes`() throws {
+    func `should refuse a location that is not a program and change nothing`() throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         let codex = try stub.makeProvider("codex", isExecutable: { _ in false })
@@ -70,7 +70,7 @@ struct CLILocationTests {
     }
 
     @Test
-    func `a saved location is used after a relaunch`() throws {
+    func `should use the saved CLI location after a relaunch`() throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         try stub.makeProvider("codex", isExecutable: { _ in true }).configuration.setCLIPath(Self.path)
@@ -81,7 +81,7 @@ struct CLILocationTests {
     }
 
     @Test
-    func `adding an account signs in with the chosen location`() async throws {
+    func `should sign in a new account with the CLI at the chosen location`() async throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         let codex = try stub.makeProvider("codex", isExecutable: { _ in true })
