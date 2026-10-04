@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" href="app-icon.png">
     <meta property="og:title" content="ClaudeBar — every AI quota, one macOS menu bar">
     <meta property="og:description" content="Track usage quotas across 20 AI coding assistants from your macOS menu bar. Native SwiftUI, free and open source.">
-    <meta property="og:image" content="https://claudebar.tddworks.com/screenshots/screenshot-latest.png">
+    <meta property="og:image" content="https://claudebar.tddworks.com/screenshots/og-card.png">
     <link rel="canonical" href="https://claudebar.tddworks.com/">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
@@ -59,7 +59,6 @@
             --shadow-2: 0 1px 3px rgba(16, 18, 24, 0.05), 0 10px 28px rgba(16, 18, 24, 0.075);
             --shadow-3: 0 3px 10px rgba(16, 18, 24, 0.07), 0 32px 72px rgba(16, 18, 24, 0.17);
             --grain: 0.038;
-            --bloom: 0.42;
 
             --sans: 'Schibsted Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
             --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
@@ -90,7 +89,6 @@
                 --shadow-3: 0 4px 14px rgba(0, 0, 0, 0.5), 0 36px 80px rgba(0, 0, 0, 0.6);
                 --mark-tint-amt: 32%;
                 --grain: 0.055;
-                --bloom: 0.3;
             }
         }
 
@@ -117,7 +115,6 @@
             --shadow-3: 0 4px 14px rgba(0, 0, 0, 0.5), 0 36px 80px rgba(0, 0, 0, 0.6);
             --mark-tint-amt: 32%;
             --grain: 0.055;
-            --bloom: 0.3;
         }
 
         *, *::before, *::after { box-sizing: border-box; }
@@ -417,30 +414,16 @@
         }
 
         /* Product shot */
-        .shot { position: relative; justify-self: center; width: 100%; max-width: 460px; }
-
-        .shot .bloom {
-            position: absolute;
-            inset: 6% -14% -10% -14%;
-            z-index: 0;
-            opacity: var(--bloom);
-            filter: blur(58px);
-            background:
-                radial-gradient(circle at 22% 26%, #34d399 0%, transparent 55%),
-                radial-gradient(circle at 78% 22%, #a78bfa 0%, transparent 55%),
-                radial-gradient(circle at 68% 82%, #f472b6 0%, transparent 55%),
-                radial-gradient(circle at 18% 76%, #60a5fa 0%, transparent 55%);
-            pointer-events: none;
-        }
+        .shot { position: relative; justify-self: center; width: 100%; max-width: 360px; }
 
         .shot img {
             position: relative;
             z-index: 1;
             display: block;
             width: 100%;
-            border-radius: 22px;
-            border: 1px solid var(--hair);
-            box-shadow: var(--shadow-3);
+            height: auto;
+            /* The popover itself, no frame: one soft shadow that follows its corners. */
+            filter: drop-shadow(0 24px 48px rgb(30 27 46 / 0.18)) drop-shadow(0 2px 6px rgb(30 27 46 / 0.08));
             animation: hover-drift 9s ease-in-out infinite;
         }
 
@@ -634,21 +617,18 @@
         .theme-stage {
             position: relative;
             margin-top: 36px;
-            aspect-ratio: 1 / 1;
-            max-width: 620px;
+            aspect-ratio: 400 / 900;
+            max-width: 380px;
             margin-inline: auto;
-            border-radius: 24px;
-            overflow: hidden;
-            border: 1px solid var(--hair);
-            box-shadow: var(--shadow-3);
-            background: var(--paper-2);
         }
 
         .theme-stage img {
             position: absolute;
             inset: 0;
             width: 100%; height: 100%;
-            object-fit: cover;
+            object-fit: contain;
+            object-position: top center;
+            filter: drop-shadow(0 24px 48px rgb(30 27 46 / 0.18)) drop-shadow(0 2px 6px rgb(30 27 46 / 0.08));
             opacity: 0;
             transition: opacity 0.45s ease;
         }
@@ -732,12 +712,12 @@
            reaches it too — a media query only ever sees the system preference. */
         .sponsor-logo { width: 190px; flex-shrink: 0; }
         .sponsor-logo img { width: 100%; }
-        .sponsor-logo .on-dark { display: none; }
-        :root[data-theme="dark"] .sponsor-logo .on-light { display: none; }
-        :root[data-theme="dark"] .sponsor-logo .on-dark { display: block; }
+        .sponsor-logo .on-dark, .shot .on-dark { display: none; }
+        :root[data-theme="dark"] :is(.sponsor-logo, .shot) .on-light { display: none; }
+        :root[data-theme="dark"] :is(.sponsor-logo, .shot) .on-dark { display: block; }
         @media (prefers-color-scheme: dark) {
-            :root:not([data-theme="light"]) .sponsor-logo .on-light { display: none; }
-            :root:not([data-theme="light"]) .sponsor-logo .on-dark { display: block; }
+            :root:not([data-theme="light"]) :is(.sponsor-logo, .shot) .on-light { display: none; }
+            :root:not([data-theme="light"]) :is(.sponsor-logo, .shot) .on-dark { display: block; }
         }
         .sponsor-mark { display: flex; align-items: center; gap: 12px; }
         .sponsor-mark img { width: 56px; height: 56px; border-radius: 13px; }
@@ -864,7 +844,7 @@
             .hero { padding-top: 66px; }
             .lede { max-width: none; }
             .legend-layout { grid-template-columns: 1fr; gap: 44px; }
-            .shot { max-width: 420px; }
+            .shot { max-width: 320px; }
         }
 
         @media (max-width: 780px) {
@@ -996,9 +976,10 @@
                 </div>
 
                 <div class="shot rise" style="--d:0.36s">
-                    <div class="bloom" aria-hidden="true"></div>
-                    <img src="screenshots/screenshot-latest.png" width="1024" height="1024"
+                    <img class="on-light" src="screenshots/screenshot-latest.png" width="400" height="844"
                          alt="The ClaudeBar popover showing Claude session and weekly quotas at 85% and 62% remaining, plus cost, token and working-time cards.">
+                    <img class="on-dark" src="screenshots/Screenshot-dark.png" width="400" height="844"
+                         aria-hidden="true" alt="">
                 </div>
             </div>
 
@@ -1112,11 +1093,11 @@
             </div>
 
             <div class="theme-stage rise">
-                <img data-shot="light" data-active="1" src="screenshots/Screenshot-light.png" width="1024" height="1024" alt="ClaudeBar in the Light theme.">
-                <img data-shot="dark" src="screenshots/Screenshot-dark.png" width="1024" height="1024" loading="lazy" alt="ClaudeBar in the Dark theme.">
-                <img data-shot="cli" src="screenshots/Screenshot-cli-dark.png" width="1024" height="1024" loading="lazy" alt="ClaudeBar in the CLI theme.">
-                <img data-shot="pop" src="screenshots/Screenshot-pop.png" width="1024" height="1024" loading="lazy" alt="ClaudeBar in the Pop theme.">
-                <img data-shot="xmas" src="screenshots/Christmas-theme.png" width="1024" height="1024" loading="lazy" alt="ClaudeBar in the Christmas theme.">
+                <img data-shot="light" data-active="1" src="screenshots/Screenshot-light.png" width="400" height="844" alt="ClaudeBar in the Light theme.">
+                <img data-shot="dark" src="screenshots/Screenshot-dark.png" width="400" height="844" loading="lazy" alt="ClaudeBar in the Dark theme.">
+                <img data-shot="cli" src="screenshots/Screenshot-cli-dark.png" width="400" height="844" loading="lazy" alt="ClaudeBar in the CLI theme.">
+                <img data-shot="pop" src="screenshots/Screenshot-pop.png" width="400" height="900" loading="lazy" alt="ClaudeBar in the Pop theme.">
+                <img data-shot="xmas" src="screenshots/Christmas-theme.png" width="400" height="844" loading="lazy" alt="ClaudeBar in the Christmas theme.">
             </div>
 
             <p class="theme-cap rise">
@@ -1163,7 +1144,7 @@
                 <div class="feat" style="--f:#d98a15">
                     <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 3.6a8.4 8.4 0 000 16.8c1.4 0 2-.9 2-1.9 0-1.6-1.4-1.7-1.4-3 0-1 .8-1.7 2-1.7h2.2a3.6 3.6 0 003.6-3.6c0-3.7-3.6-6.6-8.4-6.6z"/><circle cx="8.4" cy="10.2" r="1.05" fill="currentColor" stroke="none"/><circle cx="12" cy="7.8" r="1.05" fill="currentColor" stroke="none"/><circle cx="15.6" cy="9.6" r="1.05" fill="currentColor" stroke="none"/></svg></div>
                     <h3>Five themes, or yours</h3>
-                    <p>Light, Dark, System, CLI and Christmas ship built in. Import an <code>.itermcolors</code> file and ClaudeBar generates a theme from it.</p>
+                    <p>Light, Dark, System, CLI, Pop and Christmas ship built in. Import an <code>.itermcolors</code> file and ClaudeBar generates a theme from it.</p>
                 </div>
                 <div class="feat" style="--f:#0e8f9e">
                     <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 10-2.6 5.9"/><path d="M20 6.6V12h-5.4"/></svg></div>
