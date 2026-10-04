@@ -156,8 +156,20 @@ struct UsageHistoryTests {
         #expect(desk.report?.today.totalTokens == 74_422)
         #expect(desk.knowsCost == false)
         #expect(history.usedOtherApps.map(\.label) == ["Desk"])
+        #expect(history.hasUsage)
         #expect(history.label == nil)
         #expect(history.report?.today.totalTokens == 1000)
+    }
+
+    @Test
+    func `another app's usage alone is usage the login can show`() async throws {
+        try desk(74_422)
+        let history = historyWithDesk()
+
+        await history.read()
+
+        #expect(history.report == nil)
+        #expect(history.hasUsage)
     }
 
     @Test
@@ -169,6 +181,7 @@ struct UsageHistoryTests {
 
         #expect(history.otherApps.first?.report == nil)
         #expect(history.usedOtherApps.isEmpty)
+        #expect(!history.hasUsage)
     }
 
     @Test

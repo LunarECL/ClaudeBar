@@ -17,6 +17,10 @@ public enum ProviderBadgeState: Equatable, Sendable {
     /// Nothing to read with yet — no CLI on this Mac, or no sign-in (#198).
     /// Waiting for the person, not failing.
     case notSetUp
+    /// Waiting for setup, but its usage is read — Claude Desktop's tokens
+    /// without Claude Code. The person did set it up; the card says what the
+    /// limits need, and the header says nothing (#198).
+    case usageOnly
     /// No probe has produced data yet (first launch, provider just enabled).
     case awaitingData
     /// We have numbers, and this is what they say.
@@ -27,7 +31,8 @@ public enum ProviderBadgeState: Equatable, Sendable {
     ///   - quotaStatus: status derived from the latest snapshot, nil when there is none.
     ///   - hasError: whether the last probe attempt failed.
     ///   - needsSetup: whether that failure is only that nothing is set up yet.
-    public init(isSyncing: Bool, quotaStatus: QuotaStatus?, hasError: Bool, needsSetup: Bool = false) {
+    ///   - readsUsage: whether usage history is read all the same.
+    public init(isSyncing: Bool, quotaStatus: QuotaStatus?, hasError: Bool, needsSetup: Bool = false, readsUsage: Bool = false) {
         if isSyncing {
             self = .syncing
         } else if let quotaStatus {
@@ -35,7 +40,7 @@ public enum ProviderBadgeState: Equatable, Sendable {
             // error from a later failed refresh.
             self = .quota(quotaStatus)
         } else if needsSetup {
-            self = .notSetUp
+            self = readsUsage ? .usageOnly : .notSetUp
         } else if hasError {
             self = .unavailable
         } else {

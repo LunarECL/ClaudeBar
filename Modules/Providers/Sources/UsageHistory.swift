@@ -28,6 +28,8 @@ public final class UsageHistory {
     public let otherApps: [UsageHistory]
     /// The other apps used today or yesterday — the ones with a card.
     public var usedOtherApps: [UsageHistory] { otherApps.filter { $0.report != nil } }
+    /// Whether there is anything to show — this login's days or another app's.
+    public var hasUsage: Bool { report != nil || !usedOtherApps.isEmpty }
 
     private let log: UsageLog
     private let ledger: DayLedger?

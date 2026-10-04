@@ -219,9 +219,11 @@ Each slice is test-first and green before the next.
 7. **Not set up, and Today without limits.** A login with no usage whose last
    refresh found no CLI (`cliNotFound`) or no sign-in (`authenticationRequired`)
    is `Account.needsSetup`. The popover then shows the definition's `setup`
-   (title, text, a button to its `url`) instead of an error, the header badge
-   reads *NOT SET UP* instead of *UNAVAILABLE*, and the Today section follows,
-   with the Claude Desktop card. Any other failure is still an error.
+   (title, text, a button to its `url`) instead of an error, and the Today
+   section follows, with the Claude Desktop card. The header badge reads *NOT
+   SET UP* instead of *UNAVAILABLE*, and shows nothing while usage history is
+   read (`ProviderBadgeState.usageOnly`): a Desktop user did set Claude up.
+   Any other failure is still an error.
 8. **Docs.** A row in [README.md](README.md)'s *Reads* table; the Claude README
    says Desktop's tokens appear under Today; one CHANGELOG line.
 
@@ -246,6 +248,11 @@ Each slice is test-first and green before the next.
 5. ~~**A new top-level key (`localApps`) or inside `usageHistory`?**~~ Inside
    `usageHistory`. The added-login merge patch can then remove it with `null`,
    with no new rule, and the definition says that an app's usage is usage history.
+7. **Limits without Claude Code.** The Desktop user's real question is how
+   close they are to their limit, and Desktop's token count doesn't answer it.
+   Limits need a claude.ai sign-in, which today only Claude Code provides.
+   ClaudeBar signing in itself would answer it, if Anthropic allows that
+   outside Claude Code. #198 stays open for it.
 6. ~~**One record list, merged into the login's totals?**~~ No. Desktop's file has
    no model, so the price list would charge it at Sonnet rates and invent a cost,
    and the Claude Code card would no longer mean Claude Code.

@@ -450,7 +450,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a capability several providers can offer is declared by the definition; one only a single product has (guest passes) is a source the App hands in — never a block in the shared definition, never a vendor name in a module. Either way it is reached through the login's handle (`account.usageHistory`, `account.guestPasses`), `nil` when not offered | `Account` |
 | usage history is read when the popover opens, never in the background, and never carried on `Usage` | `UsageHistory` |
 | another app's usage on this Mac (Claude Desktop) is its OWN history under its own name: never summed with the login's days, never a data source, never a quota; the usual login reads it, an added login's patch removes it | `UsageHistory.otherApps` |
-| a login with no usage whose CLI isn't on this Mac, or that never signed in, is NOT SET UP — fetch health, not a failure: it says what setting up takes, keeps showing the usage history it can read, and the badge reads *NOT SET UP*, not *UNAVAILABLE*. Any other failure stays an error | `Account.needsSetup` |
+| a login with no usage whose CLI isn't on this Mac, or that never signed in, is NOT SET UP — fetch health, not a failure: it says what setting up takes, keeps showing the usage history it can read, and the badge reads *NOT SET UP*, not *UNAVAILABLE* — or nothing, while that usage history shows: a Claude Desktop user did set Claude up, only the limits need more. Any other failure stays an error | `Account.needsSetup` · `ProviderBadgeState` |
 | a day with nothing is an empty day, not a missing one — a series has every date in its range | `UsageHistory.days(in:)` |
 
 ## 6 · What is deliberately NOT in the tree

@@ -30,6 +30,16 @@ struct ProviderBadgeStateTests {
     }
 
     @Test
+    func `waiting for setup while its usage is read says nothing alarming`() {
+        // A Claude Desktop user: no Claude Code, so no limits — but Desktop's
+        // tokens today are read. They did set Claude up; NOT SET UP would blame them (#198).
+        let state = ProviderBadgeState(isSyncing: false, quotaStatus: nil, hasError: true, needsSetup: true, readsUsage: true)
+
+        #expect(state == .usageOnly)
+        #expect(!state.hasData)
+    }
+
+    @Test
     func `stale numbers still win over a later setup failure`() {
         let state = ProviderBadgeState(isSyncing: false, quotaStatus: .healthy, hasError: true, needsSetup: true)
 

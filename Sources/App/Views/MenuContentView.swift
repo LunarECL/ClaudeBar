@@ -368,7 +368,9 @@ struct MenuContentView: View {
             needsSetup: {
                 let members = monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? []
                 return !members.isEmpty && members.allSatisfy { ($0 as? Account)?.needsSetup == true }
-            }()
+            }(),
+            readsUsage: (monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? [])
+                .contains { ($0 as? Account)?.usageHistory?.hasUsage == true }
         )
     }
 
@@ -385,7 +387,10 @@ struct MenuContentView: View {
         case .syncing, .awaitingData: theme.accentSecondary
         default: statusColor
         }
+        // Nothing to say about limits it can't read while its usage shows
+        // below: hidden, not removed, so the header keeps its height.
         return headerPill(text: statusText, color: statusColor, fill: fill, pulsing: isSelectedProviderSyncing)
+            .opacity(selectedProviderBadge == .usageOnly ? 0 : 1)
     }
 
     /// *NOT JOINED · RANKED · UPLOAD FAILED* — the Leaderboard tab's own pill.
