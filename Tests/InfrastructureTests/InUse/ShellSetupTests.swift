@@ -1,0 +1,161 @@
+import Foundation
+import Testing
+@testable import Infrastructure
+
+/// The shell lines behind *In use*: each `claude` / `codex` reads the login
+/// chosen in ClaudeBar and starts on its folder. Written once between
+/// markers, removable without touching anything else in the file.
+@Suite(.serialized)
+struct ShellSetupTests {
+    private let home: URL
+    private let setup: ShellSetup
+
+    init() throws {
+        home = FileManager.default.temporaryDirectory.appendingPathComponent("shell-setup-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        setup = ShellSetup(commands: [
+            .init(name: "claude", variable: "CLAUDE_CONFIG_DIR", providerId: "claude"),
+            .init(name: "codex", variable: "CODEX_HOME", providerId: "codex"),
+        ], home: home)
+    }
+
+    // MARK: - Where
+
+    @Test
+    func `each shell has its own file`() {
+        #expect(setup.file(for: .zsh).path == home.appendingPathComponent(".zshrc").path)
+        #expect(setup.file(for: .bash).path == home.appendingPathComponent(".bash_profile").path)
+        #expect(setup.file(for: .fish).path == home.appendingPathComponent(".config/fish/conf.d/claudebar-in-use.fish").path)
+    }
+
+    @Test
+    func `the shell is the person's login shell, zsh when unknown`() {
+        #expect(ShellSetup.Shell.login("/bin/bash") == .bash)
+        #expect(ShellSetup.Shell.login("/opt/homebrew/bin/fish") == .fish)
+        #expect(ShellSetup.Shell.login("/bin/zsh") == .zsh)
+        #expect(ShellSetup.Shell.login(nil) == .zsh)
+    }
+
+    // MARK: - Install and remove
+
+    @Test
+    func `installing adds one block and keeps the rest of the file`() throws {
+        try write(".zshrc", "export PATH=\"$HOME/bin:$PATH\"\n")
+
+        try setup.install(.zsh)
+        try setup.install(.zsh)
+
+        let text = try read(".zshrc")
+        #expect(text.hasPrefix("export PATH=\"$HOME/bin:$PATH\"\n"))
+        #expect(text.components(separatedBy: ShellSetup.begin).count == 2)
+        #expect(setup.isInstalled(.zsh))
+    }
+
+    @Test
+    func `installing makes the file when there is none`() throws {
+        try setup.install(.zsh)
+
+        #expect(setup.isInstalled(.zsh))
+    }
+
+    @Test
+    func `removing takes out only ClaudeBar's block`() throws {
+        try write(".zshrc", "alias ll='ls -l'\n")
+        try setup.install(.zsh)
+        try append(".zshrc", "export EDITOR=vim\n")
+
+        try setup.remove(.zsh)
+
+        #expect(try read(".zshrc") == "alias ll='ls -l'\nexport EDITOR=vim\n")
+        #expect(!setup.isInstalled(.zsh))
+    }
+
+    @Test
+    func `fish gets a file of its own, and removing deletes it`() throws {
+        try setup.install(.fish)
+        #expect(setup.isInstalled(.fish))
+        #expect(try read(".config/fish/conf.d/claudebar-in-use.fish").contains("function claude"))
+
+        try setup.remove(.fish)
+
+        #expect(!FileManager.default.fileExists(atPath: setup.file(for: .fish).path))
+    }
+
+    // MARK: - What the lines do, run in the real shells
+
+    @Test(arguments: [ShellSetup.Shell.zsh, .bash])
+    func `a new session starts on the folder chosen in ClaudeBar`(shell: ShellSetup.Shell) throws {
+        try setup.install(shell)
+        try record("claude", "/Users/you/.claude-work")
+
+        #expect(try run(shell, "claude") == "CLAUDE_CONFIG_DIR=/Users/you/.claude-work args=--version")
+    }
+
+    @Test(arguments: [ShellSetup.Shell.zsh, .bash])
+    func `with nothing chosen the CLI runs as it always did`(shell: ShellSetup.Shell) throws {
+        try setup.install(shell)
+
+        #expect(try run(shell, "claude") == "CLAUDE_CONFIG_DIR= args=--version")
+        #expect(try run(shell, "codex", environment: ["CODEX_HOME": "/mine"]) == "CODEX_HOME=/mine args=--version")
+    }
+
+    @Test(arguments: [ShellSetup.Shell.zsh, .bash])
+    func `an alias for the CLI is replaced by a function that runs the same program`(shell: ShellSetup.Shell) throws {
+        let program = try fakeCLI("claude", in: "local")
+        try write(shell == .zsh ? ".zshrc" : ".bash_profile", "alias claude=\"\(program.path)\"\n")
+        try setup.install(shell)
+        try record("claude", "/Users/you/.claude-work")
+
+        #expect(try run(shell, "claude", path: false) == "CLAUDE_CONFIG_DIR=/Users/you/.claude-work args=--version")
+    }
+
+    // MARK: - Helpers
+
+    private func write(_ name: String, _ text: String) throws {
+        let url = home.appendingPathComponent(name)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(text.utf8).write(to: url)
+    }
+
+    private func append(_ name: String, _ text: String) throws {
+        try write(name, try read(name) + text)
+    }
+
+    private func read(_ name: String) throws -> String {
+        try String(contentsOf: home.appendingPathComponent(name), encoding: .utf8)
+    }
+
+    private func record(_ providerId: String, _ folder: String) throws {
+        try write(".claudebar/in-use/\(providerId)", folder)
+    }
+
+    /// A stand-in CLI that prints the variable it was started with.
+    @discardableResult
+    private func fakeCLI(_ name: String, in folder: String = "bin") throws -> URL {
+        let variable = name == "claude" ? "CLAUDE_CONFIG_DIR" : "CODEX_HOME"
+        let url = home.appendingPathComponent("\(folder)/\(name)")
+        try write("\(folder)/\(name)", "#!/bin/sh\necho \"\(variable)=$\(variable) args=$*\"\n")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        return url
+    }
+
+    /// Runs `<command> --version` in `shell` with the installed file sourced,
+    /// as an interactive session would.
+    private func run(_ shell: ShellSetup.Shell, _ command: String, environment: [String: String] = [:], path: Bool = true) throws -> String {
+        if path { try fakeCLI(command) }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell == .zsh ? "/bin/zsh" : "/bin/bash")
+        let file = setup.file(for: shell).path
+        let script = shell == .bash ? "shopt -s expand_aliases; . '\(file)'\n\(command) --version" : ". '\(file)'\n\(command) --version"
+        process.arguments = ["-f", "-c", script].filter { shell == .zsh || $0 != "-f" }
+        process.environment = ["HOME": home.path, "PATH": home.appendingPathComponent("bin").path + ":/usr/bin:/bin"]
+            .merging(environment) { _, given in given }
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        process.waitUntilExit()
+        return String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
