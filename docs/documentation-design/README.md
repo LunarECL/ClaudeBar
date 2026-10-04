@@ -77,7 +77,7 @@ docs/
     └── multi-account/
 ```
 
-Outside this design and left alone: the website (`docs/index.html`), **`docs/appcast.xml`** (Sparkle reads it from that URL; moving it breaks auto-update for every installed copy), `docs/screenshots/` and `docs/sponsors/`. They are pages or assets, not docs, and `check-docs` skips them. HTML mockups and design pages live outside `docs/`, in `design-concept/`.
+Outside this design and left alone: the website ([`website/`](../../website/README.md), served at claudebar.tddworks.com; `docs/index.html` only points there), **`docs/appcast.xml`** (Sparkle reads it from that URL; moving it breaks auto-update for every installed copy), `docs/screenshots/` and `docs/sponsors/`. They are pages or assets, not docs, and `check-docs` skips them. HTML mockups and design pages live outside `docs/`, in `design-concept/`.
 
 File-by-file detail, written from the reader's side with a mockup of each file: [layout.md](layout.md).
 
