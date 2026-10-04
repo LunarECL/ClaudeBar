@@ -572,7 +572,7 @@ key in `errors`, and the reason it gives when the definition says nothing.
 | Fact | Key | Without a rule |
 |---|---|---|
 | an HTTP status that is not an answer | `http.<status>`, else `http.default` | today's wording (`HTTP error: 500`, *Key needed* on 401/403) |
-| a command's CLI is not on this Mac | `cli.missing` | *CLI not found* |
+| a command's (or a terminal's) CLI is not on this Mac | `cli.missing` | *CLI not found* — a login with no usage then reads *NOT SET UP* (CANONICAL §5) |
 | a command exited non-zero | `cli.nonzero` | "`acme` exited with code 2" |
 | a command could not start | `cli.failed` | "`acme` could not be started" |
 
@@ -868,6 +868,17 @@ data. The reading rules every format shares:
   without `stats`). Otherwise a missing token field counts 0.
 - **`id`**'s paths together are a record's identity; a record missing any of
   them is never merged with another.
+
+**Other apps.** `usageHistory.otherApps` lists apps on this Mac that use
+the same plan and keep their own count, each `{label, records, prices?}`:
+Claude Desktop's `buddy-tokens.json` is `format: json`, `tokens.total`, and
+`at: {"field": "$.tokens-today.date", "format": "yyyy-MM-dd"}` — a field read
+with a format, local unless it names a `timeZone`. Each is its own
+`UsageHistory` with its own ledger key (`<login>/<label>`), shown as its own
+card, never summed with the login's days; without prices it has tokens and
+no cost. An added login's patch sets `otherApps` to `null`. A token count that
+is negative or not whole drops the record. Design:
+[other-apps-design.md](../features/daily-usage/other-apps-design.md).
 
 ### 10.3 · Thirty days without re-reading thirty days: the ledger
 

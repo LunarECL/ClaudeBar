@@ -289,6 +289,9 @@ struct CLIFetcher: Fetching {
                     autoResponses: call.autoResponses
                 )
             }
+        } catch UsageError.cliNotFound {
+            // A fact, so the definition's `errors["cli.missing"]` words it.
+            throw CLIMissingError(cli: call.cli)
         } catch let error as UsageError {
             throw error
         } catch {

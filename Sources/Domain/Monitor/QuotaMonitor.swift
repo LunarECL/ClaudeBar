@@ -519,6 +519,21 @@ public final class QuotaMonitor {
     /// The tab the selected login belongs to.
     public var selectedTab: ProductTab? { tabs.first { $0.contains(selectedProviderId) } }
 
+    /// The logins the popover shows: the selected tab's, or the selected
+    /// provider alone.
+    public var selectedLogins: [any AIProvider] { selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? [] }
+
+    /// One login's quota status under the person's policy; `nil` with no usage.
+    public func status(of login: any AIProvider) -> QuotaStatus? {
+        usage(of: login)?.overallStatus(under: statusPolicy)
+    }
+
+    /// The selected tab's worst quota status; `nil` while no login has usage.
+    public var selectedTabStatus: QuotaStatus? { selectedLogins.compactMap { status(of: $0) }.max() }
+
+    /// What the popover's header says about the selected tab.
+    public var selectedBadge: ProviderBadgeState { ProviderBadgeState(of: selectedLogins, quotaStatus: selectedTabStatus) }
+
     /// Selects the tab in the given 1-based slot, counted the way the popover
     /// lists them (⌘1 is the first pill), opening on its first login — the
     /// slots follow the persisted order (issue #141). A slot with no tab

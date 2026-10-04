@@ -1385,6 +1385,30 @@ struct QuotaMonitorTests {
     }
 
     @Test
+    func `the selected tab's badge and status come from its logins' usage`() async {
+        let settings = makeSettingsRepository()
+        let probe = MockUsageProbe()
+        given(probe).isAvailable().willReturn(true)
+        given(probe).probe().willReturn(UsageSnapshot(
+            providerId: "claude",
+            quotas: [UsageQuota(percentRemaining: 15, quotaType: .session, providerId: "claude")],
+            capturedAt: Date()
+        ))
+        let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+        let monitor = makeMonitor(providers: AIProviders(providers: [claude]))
+        #expect(monitor.selectedLogins.map(\.id) == ["claude"])
+        #expect(monitor.selectedTabStatus == nil)
+        #expect(monitor.selectedBadge == .awaitingData)
+        #expect(monitor.status(of: claude) == nil)
+
+        await monitor.refresh(providerId: "claude")
+
+        #expect(monitor.selectedTabStatus == .critical)
+        #expect(monitor.selectedBadge == .quota(.critical))
+        #expect(monitor.status(of: claude) == .critical)
+    }
+
+    @Test
     func `selectProvider updates selectedProviderId for enabled provider`() {
         // Given
         let settings = makeSettingsRepository()

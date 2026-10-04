@@ -350,28 +350,10 @@ struct MenuContentView: View {
         }
     }
 
-    /// Status of the selected tab — the worst of its logins that have
-    /// usage — nil when none has a snapshot.
-    private var selectedProviderStatus: QuotaStatus? {
-        let members = monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? []
-        return members.compactMap { monitor.usage(of: $0)?.overallStatus(under: settings.statusPolicy) }.max()
-    }
-
-    /// What the header pill says. A provider that failed to probe reads as
-    /// "UNAVAILABLE" rather than borrowing a green "HEALTHY" it has no data
-    /// for (#259).
-    private var selectedProviderBadge: ProviderBadgeState {
-        ProviderBadgeState(
-            isSyncing: isSelectedProviderSyncing,
-            quotaStatus: selectedProviderStatus,
-            hasError: (monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? []).allSatisfy { $0.lastError != nil }
-        )
-    }
-
-    /// Whether the selected provider is currently syncing
-    private var isSelectedProviderSyncing: Bool {
-        (monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? []).contains { $0.isSyncing }
-    }
+    /// What the header pill says — the monitor's word for the selected tab.
+    /// A provider that failed to probe reads as "UNAVAILABLE" rather than
+    /// borrowing a green "HEALTHY" it has no data for (#259).
+    private var selectedProviderBadge: ProviderBadgeState { monitor.selectedBadge }
 
     private var statusBadge: some View {
         let statusColor = selectedProviderBadge.badgeColor(theme)
@@ -381,7 +363,10 @@ struct MenuContentView: View {
         case .syncing, .awaitingData: theme.accentSecondary
         default: statusColor
         }
-        return headerPill(text: statusText, color: statusColor, fill: fill, pulsing: isSelectedProviderSyncing)
+        // Nothing to say about limits it can't read while its usage shows
+        // below: hidden, not removed, so the header keeps its height.
+        return headerPill(text: statusText, color: statusColor, fill: fill, pulsing: selectedProviderBadge == .syncing)
+            .opacity(selectedProviderBadge.showsBadge ? 1 : 0)
     }
 
     /// *NOT JOINED · RANKED · UPLOAD FAILED* — the Leaderboard tab's own pill.
@@ -559,6 +544,10 @@ struct MenuContentView: View {
             }
             .opacity(animateIn ? 1 : 0)
             .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
+        } else if let account = selectedProvider as? Account, account.needsSetup {
+            setupContent(account)
+                .opacity(animateIn ? 1 : 0)
+                .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
         } else if selectedProvider?.isSyncing == true {
             loadingState
         } else {
@@ -604,7 +593,7 @@ struct MenuContentView: View {
                                 Text(settings.shown(account.name)).lineLimit(1)
                                 Circle()
                                     .fill(account.lastError != nil ? theme.textTertiary
-                                          : theme.statusColor(for: monitor.usage(of: account)?.overallStatus(under: settings.statusPolicy) ?? .healthy))
+                                          : theme.statusColor(for: monitor.status(of: account) ?? .healthy))
                                     .frame(width: 6, height: 6)
                             }
                         }
@@ -651,7 +640,7 @@ struct MenuContentView: View {
 
     /// "Work is at 18% Session — causing Warning": the aggregate names its cause.
     private func worstAccountCallout(_ worst: Account) -> some View {
-        let status = monitor.usage(of: worst)?.overallStatus(under: settings.statusPolicy) ?? worst.status
+        let status = monitor.status(of: worst) ?? worst.status
         let lowest = monitor.usage(of: worst)?.lowestQuota
         let detail = lowest.map { " is at \(Int($0.percentRemaining))% \($0.quotaType.displayName)" } ?? ""
         return HStack(spacing: 8) {
@@ -695,6 +684,8 @@ struct MenuContentView: View {
                 }
                 statsGrid(snapshot: snapshot)
                     .opacity(report?.isLastSeen == true ? 0.55 : 1)
+            } else if let account = provider as? Account, account.needsSetup {
+                setupContent(account)
             } else if provider.isSyncing {
                 LoadingSpinnerView()
             } else {
@@ -714,9 +705,11 @@ struct MenuContentView: View {
 
             Spacer()
 
-            let status = monitor.usage(of: provider)?.overallStatus(under: settings.statusPolicy) ?? .healthy
-            Text(provider.isSyncing ? "Syncing..." : status.badgeText)
-                .badge(theme.statusColor(for: status))
+            // The same word the header uses: no "HEALTHY" without data (#259).
+            let badge = ProviderBadgeState(of: [provider], quotaStatus: monitor.status(of: provider))
+            Text(badge.badgeText)
+                .badge(badge.badgeColor(theme))
+                .opacity(badge.showsBadge ? 1 : 0)
         }
         .padding(.horizontal, 4)
     }
@@ -925,33 +918,8 @@ struct MenuContentView: View {
                 CostStatCard(costUsage: costUsage, budget: budget, delay: Double(snapshot.quotas.count) * 0.08)
             }
 
-            // Show daily usage cards from JSONL session analysis (e.g., Claude Code)
-            // Controlled via Settings toggle or ~/.claudebar/settings.json
-            if settings.showDailyUsageCards,
-               let report = (monitor.provider(for: snapshot.providerId) as? Account)?.usageHistory?.report ?? snapshot.dailyUsageReport {
-                let baseDelay = Double(snapshot.quotas.count + 1) * 0.08
-                // Logs that can't be priced show no cost rather than a made-up $0.
-                let knowsCost = (monitor.provider(for: snapshot.providerId) as? Account)?.usageHistory?.knowsCost ?? true
-                HStack(spacing: 10) {
-                    if knowsCost {
-                        DailyUsageCardView(metric: .cost, report: report, delay: baseDelay)
-                            .frame(maxWidth: .infinity)
-                    }
-                    DailyUsageCardView(metric: .tokens, report: report, delay: baseDelay + 0.08)
-                        .frame(maxWidth: .infinity)
-                }
-                if report.today.workingTime > 0 || report.previous.workingTime > 0 {
-                    DailyUsageCardView(metric: .workingTime, report: report, delay: baseDelay + 0.16)
-                }
-            }
-
-            // The same login's last thirty days, as a chart.
-            if settings.showDailyUsageCards,
-               let history = (monitor.provider(for: snapshot.providerId) as? Account)?.usageHistory,
-               !history.lastThirtyDays.isEmpty {
-                UsageHistoryChartView(days: history.lastThirtyDays, delay: Double(snapshot.quotas.count + 4) * 0.08,
-                                      measure: history.knowsCost ? .cost : .tokens, showsCost: history.knowsCost)
-            }
+            todaySection(account: monitor.provider(for: snapshot.providerId) as? Account,
+                         fallback: snapshot.dailyUsageReport, after: snapshot.quotas.count)
 
             // Show extension metrics cards (from extension probes)
             if let extensionMetrics = snapshot.extensionMetrics?.filter({ $0.group == nil }),
@@ -973,6 +941,83 @@ struct MenuContentView: View {
             }
         }
         .padding(.top, 4)
+    }
+
+    /// *TODAY* — the login's own daily usage cards, a card per other app on
+    /// this Mac (Claude Desktop), and the thirty-day chart. Shown under the
+    /// limits, and under the setup card when there are none yet (#198).
+    @ViewBuilder
+    private func todaySection(account: Account?, fallback: DailyUsageReport?, after cards: Int) -> some View {
+        let history = account?.usageHistory
+        if settings.showDailyUsageCards, let report = history?.report ?? fallback {
+            let baseDelay = Double(cards + 1) * 0.08
+            // Logs that can't be priced show no cost rather than a made-up $0.
+            let knowsCost = history?.knowsCost ?? true
+            HStack(spacing: 10) {
+                if knowsCost {
+                    DailyUsageCardView(metric: .cost, report: report, delay: baseDelay)
+                        .frame(maxWidth: .infinity)
+                }
+                DailyUsageCardView(metric: .tokens, report: report, delay: baseDelay + 0.08)
+                    .frame(maxWidth: .infinity)
+            }
+            if report.hasWorkingTime {
+                DailyUsageCardView(metric: .workingTime, report: report, delay: baseDelay + 0.16)
+            }
+        }
+
+        // Other apps on this Mac that use the same plan (Claude Desktop):
+        // a tokens card each, shown even when the login's own logs are empty.
+        if settings.showDailyUsageCards, let apps = history?.usedOtherApps, !apps.isEmpty {
+            let appDelay = Double(cards + 3) * 0.08
+            TwoColumnCardGrid(items: apps, id: \.label) { app in
+                if let report = app.report {
+                    DailyUsageCardView(metric: .tokens, report: report, delay: appDelay, title: app.label)
+                }
+            }
+        }
+
+        // The same login's last thirty days, as a chart.
+        if settings.showDailyUsageCards, let history, !history.lastThirtyDays.isEmpty {
+            UsageHistoryChartView(days: history.lastThirtyDays, delay: Double(cards + 4) * 0.08,
+                                  measure: history.knowsCost ? .cost : .tokens, showsCost: history.knowsCost)
+        }
+    }
+
+    /// *NOT SET UP* — nothing to read the limits with yet. Says what it
+    /// takes, in the definition's words, and keeps what can be read: today.
+    private func setupContent(_ account: Account) -> some View {
+        VStack(spacing: 12) {
+            setupCard(account)
+            todaySection(account: account, fallback: nil, after: 0)
+        }
+    }
+
+    private func setupCard(_ account: Account) -> some View {
+        let setup = account.setupNotice
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "gauge.with.dots.needle.0percent")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.textSecondary)
+                Text(setup.title)
+                    .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+                Spacer()
+            }
+            Text(setup.text)
+                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .foregroundStyle(theme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let url = setup.url {
+                Button(setup.button) { NSWorkspace.shared.open(url) }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
     }
 
     private var loadingState: some View {

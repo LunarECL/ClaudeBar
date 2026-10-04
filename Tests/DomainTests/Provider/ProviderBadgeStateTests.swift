@@ -22,6 +22,31 @@ struct ProviderBadgeStateTests {
     }
 
     @Test
+    func `a provider waiting to be set up is not set up, not unavailable`() {
+        let state = ProviderBadgeState(isSyncing: false, quotaStatus: nil, hasError: true, needsSetup: true)
+
+        #expect(state == .notSetUp)
+        #expect(!state.hasData)
+    }
+
+    @Test
+    func `waiting for setup while its usage is read says nothing alarming`() {
+        // A Claude Desktop user: no Claude Code, so no limits — but Desktop's
+        // tokens today are read. They did set Claude up; NOT SET UP would blame them (#198).
+        let state = ProviderBadgeState(isSyncing: false, quotaStatus: nil, hasError: true, needsSetup: true, readsUsage: true)
+
+        #expect(state == .usageOnly)
+        #expect(!state.hasData)
+    }
+
+    @Test
+    func `stale numbers still win over a later setup failure`() {
+        let state = ProviderBadgeState(isSyncing: false, quotaStatus: .healthy, hasError: true, needsSetup: true)
+
+        #expect(state == .quota(.healthy))
+    }
+
+    @Test
     func `a snapshot reports its own quota status`() {
         let state = ProviderBadgeState(isSyncing: false, quotaStatus: .warning, hasError: false)
 
@@ -41,4 +66,61 @@ struct ProviderBadgeStateTests {
         #expect(ProviderBadgeState(isSyncing: true, quotaStatus: nil, hasError: true) == .syncing)
         #expect(ProviderBadgeState(isSyncing: true, quotaStatus: .healthy, hasError: false) == .syncing)
     }
+
+    // MARK: - A tab of logins
+
+    @MainActor @Test
+    func `a tab whose every login waits for setup is not set up`() {
+        let state = ProviderBadgeState(of: [Login(needsSetup: true), Login(needsSetup: true)], quotaStatus: nil)
+        #expect(state == .notSetUp)
+    }
+
+    @MainActor @Test
+    func `a tab where one login's usage is read says nothing alarming`() {
+        let state = ProviderBadgeState(of: [Login(needsSetup: true, readsUsage: true)], quotaStatus: nil)
+        #expect(state == .usageOnly)
+        #expect(!state.showsBadge)
+    }
+
+    @MainActor @Test
+    func `one login failing for real makes the tab unavailable, not waiting for setup`() {
+        let state = ProviderBadgeState(of: [Login(needsSetup: true), Login(failed: true)], quotaStatus: nil)
+        #expect(state == .unavailable)
+        #expect(state.showsBadge)
+    }
+
+    @MainActor @Test
+    func `a tab with no logins is awaiting data`() {
+        #expect(ProviderBadgeState(of: [], quotaStatus: nil) == .awaitingData)
+    }
+
+    @MainActor @Test
+    func `a login syncing makes the tab syncing`() {
+        #expect(ProviderBadgeState(of: [Login(syncing: true), Login(failed: true)], quotaStatus: nil) == .syncing)
+    }
+}
+
+/// A login as the badge sees it.
+@MainActor
+private final class Login: AIProvider {
+    let id = UUID().uuidString
+    let name = "Acme"
+    let cliCommand = "acme"
+    let dashboardURL: URL? = nil
+    var isEnabled = true
+    let isSyncing: Bool
+    let snapshot: UsageSnapshot? = nil
+    let lastError: Error?
+    let needsSetup: Bool
+    let readsUsage: Bool
+
+    init(needsSetup: Bool = false, readsUsage: Bool = false, failed: Bool = false, syncing: Bool = false) {
+        self.needsSetup = needsSetup
+        self.readsUsage = readsUsage
+        self.lastError = needsSetup || failed ? UsageError.noData : nil
+        self.isSyncing = syncing
+    }
+
+    func isAvailable() async -> Bool { true }
+    func refresh() async throws -> UsageSnapshot { throw UsageError.noData }
 }

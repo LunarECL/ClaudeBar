@@ -88,6 +88,14 @@ public protocol AIProvider: AnyObject, Sendable, Identifiable where ID == String
     /// snapshot-cache TTL, so a fast user interval can't drive redundant HTTP
     /// (and 429s) in the background (issue #204).
     var backgroundRefreshFloor: Duration? { get }
+
+    /// *NOT SET UP* — nothing to read its limits with yet (no CLI, no
+    /// sign-in): waiting for the person, not failing.
+    var needsSetup: Bool { get }
+
+    /// Whether it shows usage it could read all the same — its own days or
+    /// another app's on this Mac.
+    var readsUsage: Bool { get }
 }
 
 // MARK: - Default Implementations
@@ -106,4 +114,10 @@ public extension AIProvider {
 
     /// Default: no provider-imposed background cadence floor.
     var backgroundRefreshFloor: Duration? { nil }
+
+    /// Default: a provider that isn't data is never waiting for setup.
+    var needsSetup: Bool { false }
+
+    /// Default: no usage history.
+    var readsUsage: Bool { false }
 }
