@@ -29,11 +29,12 @@ struct ClaudeBarApp: App {
         secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil,
         usageHistory: UsageHistory? = nil,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        loginsInUse: (any LoginsInUse)? = nil
     ) -> Provider {
         do {
             return try Providers.make(id, settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses,
-                                      usageHistory: usageHistory, environment: environment)
+                                      usageHistory: usageHistory, environment: environment, loginsInUse: loginsInUse)
         } catch {
             preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
         }
@@ -42,6 +43,9 @@ struct ClaudeBarApp: App {
     /// The main domain service - monitors all AI providers
     /// This is the single source of truth for providers and their state
     @State private var monitor: QuotaMonitor
+
+    /// *New terminal sessions* — which login `claude` / `codex` start with.
+    @State private var newSessions: NewSessions
 
     /// Monitors Claude Code sessions via hook events
     @State private var sessionMonitor: SessionMonitor
@@ -112,11 +116,16 @@ struct ClaudeBarApp: App {
             // Guest passes run the same Claude CLI, at its CLI location (#210).
             guestPasses: GuestPasses(source: ClaudeGuestPassSource(
                 claudeBinary: { settingsRepository.cliPath(forProvider: "claude") ?? "claude" }
-            ))
+            )),
+            // *In use*: which login new `claude` sessions start with.
+            loginsInUse: DiskLoginsInUse()
         )
         // Codex is data: Modules/Providers/Resources/Providers/codex.json — the
         // product once, with the logins added beside the default one (#326).
-        let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
+        let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"),
+                                 loginsInUse: DiskLoginsInUse())
+        self.newSessions = NewSessions(products: [claude, codex],
+                                       shellLines: ShellSetup(commands: [claude, codex].compactMap(\.terminalCommand)))
 
         let vault = ProviderVault()
         // These are data: their keys, regions and environment variables are
@@ -391,6 +400,18 @@ struct ClaudeBarApp: App {
         case .settings:
             openWindow(id: "settings")
             NSApp.activate(ignoringOtherApps: true)
+        case let .use(providerId, name):
+            guard let account = newSessions.product(providerId)?.account(named: name), account.canBeInUse else {
+                AppLog.ui.info("claudebar://use names no login that can be used for new sessions")
+                return
+            }
+            newSessions.use(account)
+            // The shell lines aren't there yet: the popover shows the setup.
+            if newSessions.isWaiting(in: account.provider) {
+                monitor.selectedProviderId = account.provider.id
+                isMenuPresented = true
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
     }
 
@@ -410,6 +431,7 @@ struct ClaudeBarApp: App {
                     .appThemeProvider(themeModeId: settings.themeMode)
                 #endif
             }
+            .environment(newSessions)
             // Opening/closing the dropdown flips `isMenuPresented`, which makes
             // SwiftUI re-evaluate the scene and wipe the AppKit-drawn button
             // image. The dropdown's lifecycle maps 1:1 to those flips, so
@@ -455,6 +477,7 @@ struct ClaudeBarApp: App {
                 .appThemeProvider(themeModeId: settings.themeMode)
                 #endif
             }
+            .environment(newSessions)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 980, height: 660)

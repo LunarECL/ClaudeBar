@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import Domain
 @testable import Infrastructure
 
 /// The shell lines behind *In use*: each `claude` / `codex` reads the login
@@ -14,8 +15,8 @@ struct ShellSetupTests {
         home = FileManager.default.temporaryDirectory.appendingPathComponent("shell-setup-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
         setup = ShellSetup(commands: [
-            .init(name: "claude", variable: "CLAUDE_CONFIG_DIR", providerId: "claude"),
-            .init(name: "codex", variable: "CODEX_HOME", providerId: "codex"),
+            TerminalCommand(name: "claude", variable: "CLAUDE_CONFIG_DIR", providerId: "claude"),
+            TerminalCommand(name: "codex", variable: "CODEX_HOME", providerId: "codex"),
         ], home: home)
     }
 
@@ -30,10 +31,10 @@ struct ShellSetupTests {
 
     @Test
     func `the shell is the person's login shell, zsh when unknown`() {
-        #expect(ShellSetup.Shell.login("/bin/bash") == .bash)
-        #expect(ShellSetup.Shell.login("/opt/homebrew/bin/fish") == .fish)
-        #expect(ShellSetup.Shell.login("/bin/zsh") == .zsh)
-        #expect(ShellSetup.Shell.login(nil) == .zsh)
+        #expect(LoginShell.login("/bin/bash") == .bash)
+        #expect(LoginShell.login("/opt/homebrew/bin/fish") == .fish)
+        #expect(LoginShell.login("/bin/zsh") == .zsh)
+        #expect(LoginShell.login(nil) == .zsh)
     }
 
     // MARK: - Install and remove
@@ -83,24 +84,24 @@ struct ShellSetupTests {
 
     // MARK: - What the lines do, run in the real shells
 
-    @Test(arguments: [ShellSetup.Shell.zsh, .bash])
-    func `a new session starts on the folder chosen in ClaudeBar`(shell: ShellSetup.Shell) throws {
+    @Test(arguments: [LoginShell.zsh, .bash])
+    func `a new session starts on the folder chosen in ClaudeBar`(shell: LoginShell) throws {
         try setup.install(shell)
         try record("claude", "/Users/you/.claude-work")
 
         #expect(try run(shell, "claude") == "CLAUDE_CONFIG_DIR=/Users/you/.claude-work args=--version")
     }
 
-    @Test(arguments: [ShellSetup.Shell.zsh, .bash])
-    func `with nothing chosen the CLI runs as it always did`(shell: ShellSetup.Shell) throws {
+    @Test(arguments: [LoginShell.zsh, .bash])
+    func `with nothing chosen the CLI runs as it always did`(shell: LoginShell) throws {
         try setup.install(shell)
 
         #expect(try run(shell, "claude") == "CLAUDE_CONFIG_DIR= args=--version")
         #expect(try run(shell, "codex", environment: ["CODEX_HOME": "/mine"]) == "CODEX_HOME=/mine args=--version")
     }
 
-    @Test(arguments: [ShellSetup.Shell.zsh, .bash])
-    func `an alias for the CLI is replaced by a function that runs the same program`(shell: ShellSetup.Shell) throws {
+    @Test(arguments: [LoginShell.zsh, .bash])
+    func `an alias for the CLI is replaced by a function that runs the same program`(shell: LoginShell) throws {
         let program = try fakeCLI("claude", in: "local")
         try write(shell == .zsh ? ".zshrc" : ".bash_profile", "alias claude=\"\(program.path)\"\n")
         try setup.install(shell)
@@ -141,7 +142,7 @@ struct ShellSetupTests {
 
     /// Runs `<command> --version` in `shell` with the installed file sourced,
     /// as an interactive session would.
-    private func run(_ shell: ShellSetup.Shell, _ command: String, environment: [String: String] = [:], path: Bool = true) throws -> String {
+    private func run(_ shell: LoginShell, _ command: String, environment: [String: String] = [:], path: Bool = true) throws -> String {
         if path { try fakeCLI(command) }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell == .zsh ? "/bin/zsh" : "/bin/bash")

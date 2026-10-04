@@ -185,6 +185,12 @@ public final class QuotaMonitor {
                 currentStatus: newStatus
             )
         }
+        // *In use*: new sessions move when the person asked, else a login
+        // worth moving to is told once.
+        if let login = provider as? Account, login.provider.canChooseInUse,
+           let notice = try? login.provider.reviewInUse() {
+            await alerter?.inUse(InUseAlert(notice, of: login.provider))
+        }
     }
 
     /// Refreshes a single provider by its ID.

@@ -45,6 +45,10 @@ struct ProviderAccountsCard: View {
                     }
             }
 
+            if provider.offersInUse {
+                InUseSettingsSection(provider: provider)
+            }
+
             if !text.ways.isEmpty {
                 Button { adding = true } label: {
                     Label("Add Account", systemImage: "plus.circle")
@@ -116,6 +120,7 @@ private struct AccountRow: View {
     let onRemove: () -> Void
     let onReauth: () -> Void
     @Environment(\.appTheme) private var theme
+    @Environment(NewSessions.self) private var newSessions
 
     /// The avatar's colour is the page's, by position — not a setting.
     private static let palette: [Color] = [.purple, .orange, .teal, .pink, .blue, .green]
@@ -136,6 +141,11 @@ private struct AccountRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.displayName)
                     .foregroundStyle(account.isEnabled ? theme.textPrimary : theme.textTertiary)
+                if account.isInUse, account.provider.offersInUse {
+                    Label("In use for new terminal sessions", systemImage: "terminal.fill")
+                        .font(.caption2.bold())
+                        .foregroundStyle(theme.accentPrimary)
+                }
                 if let email = account.accountEmail, email != account.displayName {
                     Text(email).font(.caption).foregroundStyle(theme.textSecondary).textSelection(.enabled)
                 } else if account.isDefault {
@@ -155,6 +165,11 @@ private struct AccountRow: View {
             .foregroundStyle(isPinned ? theme.accentPrimary : theme.textTertiary)
             .help(isPinned ? "Shown in the menu bar" : "Show in the menu bar")
             Menu {
+                if account.canBeInUse, account.provider.offersInUse {
+                    Button("Use for New Terminal Sessions") { newSessions.use(account) }
+                        .disabled(account.isInUse)
+                    Divider()
+                }
                 Button("Rename…", action: onRename)
                 Button(account.isEnabled ? "Pause" : "Resume") { account.isEnabled.toggle() }
                 if !account.isDefault {

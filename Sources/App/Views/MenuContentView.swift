@@ -19,6 +19,7 @@ struct MenuContentView: View {
 
     @Environment(\.appTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(NewSessions.self) private var newSessions
     #if ENABLE_SPARKLE
     @Environment(\.sparkleUpdater) private var sparkleUpdater
     #endif
@@ -571,6 +572,9 @@ struct MenuContentView: View {
     private func accountsContent(_ tab: ProductTab) -> some View {
         VStack(spacing: 12) {
             accountChips(tab)
+            if let product = tab.provider, product.offersInUse {
+                InUseStrip(provider: product)
+            }
             ForEach(tab.accounts.filter { !hiddenAccountIds.contains($0.id) }, id: \.id) { account in
                 providerSection(provider: account)
             }
@@ -590,10 +594,17 @@ struct MenuContentView: View {
                     .foregroundStyle(theme.textTertiary)
                 ForEach(tab.accounts, id: \.id) { account in
                     let hidden = hiddenAccountIds.contains(account.id)
+                    let login = account as? Account
                     Button {
                         if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
                     } label: {
                         HStack(spacing: 4) {
+                            if login?.isInUse == true {
+                                Image(systemName: "terminal.fill")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(theme.accentPrimary)
+                                    .accessibilityLabel("In use for new terminal sessions")
+                            }
                             Text(settings.shown(account.name)).lineLimit(1)
                             Circle()
                                 .fill(account.lastError != nil ? theme.textTertiary
@@ -609,6 +620,14 @@ struct MenuContentView: View {
                     }
                     .buttonStyle(.plain)
                     .help(hidden ? "Show \(settings.shown(account.name))" : "Hide \(settings.shown(account.name)) from this view")
+                    .contextMenu {
+                        if let login, login.canBeInUse {
+                            Button(login.isInUse ? "In Use for New Terminal Sessions" : "Use for New Terminal Sessions") {
+                                newSessions.use(login)
+                            }
+                            .disabled(login.isInUse)
+                        }
+                    }
                 }
             }
         }

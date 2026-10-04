@@ -114,7 +114,7 @@ diff:
 | **account values** | the account-scope settings that fill `{{account.x}}` — a folder, a login id, a region | secrets |
 | **account secret** | an account-scope secret (an API key) — a *name*, its value in the vault under that account | a value in `settings.json` |
 | **way to add** (`accounts.ways`) | how the definition lets a person add one — the keys it has: `signIn` · `folder` · `form` | a data source kind |
-| **signed-in folder** | the folder an added login lives in, and who made it — the person, or ClaudeBar by signing in | the default login's folder |
+| **signed-in folder** | the folder an added login lives in, and who made it — the person, or ClaudeBar by signing in. Put [*in use*](../in-use/design.md), the person's terminal starts on it too | the default login's folder |
 | **identity** | the fact that names a login (email, account id) and the rule that a fetch must still match it | the label |
 | **label** | the name a person gave an account ("work") | the email |
 | **display name** | what the pill says: label, else email, else the provider's name | the menu bar label |

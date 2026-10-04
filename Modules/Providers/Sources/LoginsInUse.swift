@@ -41,3 +41,32 @@ public struct DiskLoginsInUse: LoginsInUse {
         root.appendingPathComponent(providerId)
     }
 }
+
+/// What *In use* has to tell the person after a refresh.
+public enum InUseNotice: Equatable {
+    /// *Switch when low* moved new sessions from one login to another.
+    case switched(from: Account, to: Account)
+    /// The login in use is low and `to` has more left.
+    case worthSwitching(from: Account, to: Account)
+
+    public static func == (lhs: InUseNotice, rhs: InUseNotice) -> Bool {
+        switch (lhs, rhs) {
+        case let (.switched(a, b), .switched(c, d)), let (.worthSwitching(a, b), .worthSwitching(c, d)): a === c && b === d
+        default: false
+        }
+    }
+}
+
+/// The command new terminal sessions run, and the variable that starts it on
+/// a login's folder: `claude` with `CLAUDE_CONFIG_DIR`.
+public struct TerminalCommand: Sendable, Equatable {
+    public let name: String
+    public let variable: String
+    public let providerId: String
+
+    public init(name: String, variable: String, providerId: String) {
+        self.name = name
+        self.variable = variable
+        self.providerId = providerId
+    }
+}

@@ -1,49 +1,27 @@
+import Domain
 import Foundation
 
-/// The shell lines behind *In use*: a function per CLI that reads the login
+/// The shell lines behind *In use* (`ShellLines` on disk): a function per CLI that reads the login
 /// chosen in ClaudeBar (`~/.claudebar/in-use/<provider>`, see
 /// `LoginsInUse`) and starts the CLI on that folder. An empty record runs the
 /// CLI exactly as before. The lines live between two markers, so installing
 /// twice writes them once and removing takes out nothing else; fish gets a
 /// file of its own.
-public struct ShellSetup: Sendable {
-    /// A CLI the lines wrap: `claude`, started with `CLAUDE_CONFIG_DIR`.
-    public struct Command: Sendable, Equatable {
-        public let name: String
-        public let variable: String
-        public let providerId: String
-
-        public init(name: String, variable: String, providerId: String) {
-            self.name = name
-            self.variable = variable
-            self.providerId = providerId
-        }
-    }
-
-    public enum Shell: String, CaseIterable, Sendable {
-        case zsh, bash, fish
-
-        /// The person's login shell, from `$SHELL` — zsh, macOS's own, when unknown.
-        public static func login(_ path: String? = ProcessInfo.processInfo.environment["SHELL"]) -> Shell {
-            let name = path.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
-            return Shell(rawValue: name) ?? .zsh
-        }
-    }
-
+public struct ShellSetup: ShellLines {
     static let begin = "# >>> claudebar in-use >>>"
     static let end = "# <<< claudebar in-use <<<"
 
-    public let commands: [Command]
+    public let commands: [TerminalCommand]
     public let home: URL
 
-    public init(commands: [Command], home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+    public init(commands: [TerminalCommand], home: URL = FileManager.default.homeDirectoryForCurrentUser) {
         self.commands = commands
         self.home = home
     }
 
     /// Where the lines go. Terminal on macOS starts bash as a login shell,
     /// which reads `.bash_profile`.
-    public func file(for shell: Shell) -> URL {
+    public func file(for shell: LoginShell) -> URL {
         switch shell {
         case .zsh: home.appendingPathComponent(".zshrc")
         case .bash: home.appendingPathComponent(".bash_profile")
@@ -51,12 +29,12 @@ public struct ShellSetup: Sendable {
         }
     }
 
-    public func isInstalled(_ shell: Shell) -> Bool {
+    public func isInstalled(_ shell: LoginShell) -> Bool {
         (try? String(contentsOf: file(for: shell), encoding: .utf8))?.contains(Self.begin) ?? false
     }
 
     /// The lines, as the setup sheet shows them and `install` writes them.
-    public func block(for shell: Shell) -> String {
+    public func lines(for shell: LoginShell) -> String {
         let existing = (try? String(contentsOf: file(for: shell), encoding: .utf8)) ?? ""
         let body = commands.map { command -> String in
             let record = "$HOME/.claudebar/in-use/\(command.providerId)"
@@ -95,17 +73,17 @@ public struct ShellSetup: Sendable {
     }
 
     /// Writes the block, replacing any earlier one, and keeps the rest of the file.
-    public func install(_ shell: Shell) throws {
+    public func install(_ shell: LoginShell) throws {
         let url = file(for: shell)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let block = block(for: shell)
+        let block = lines(for: shell)
         let rest = ((try? String(contentsOf: url, encoding: .utf8)) ?? "").removingBlock()
         let text = shell == .fish ? block : rest + (rest.isEmpty || rest.hasSuffix("\n") ? "" : "\n") + block
         try Data(text.utf8).write(to: url, options: .atomic)
     }
 
     /// Takes the block out — and fish's own file with it.
-    public func remove(_ shell: Shell) throws {
+    public func remove(_ shell: LoginShell) throws {
         let url = file(for: shell)
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
         if shell == .fish {

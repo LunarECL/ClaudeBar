@@ -74,6 +74,17 @@ public final class Account: AIProvider {
         return SignedInFolder(url: URL(fileURLWithPath: path), madeBy: madeBy ?? .folder)
     }
 
+    // MARK: - In use
+
+    /// The login new terminal sessions of its provider start with.
+    public var isInUse: Bool { provider.canChooseInUse && provider.inUse === self }
+
+    /// Whether new terminal sessions can start on it: the plain login, or a folder.
+    public var canBeInUse: Bool { provider.loginsForNewSessions.contains { $0 === self } }
+
+    /// *Use for new sessions*.
+    public func useForNewSessions() throws { try provider.use(self) }
+
     /// The email the data source reported, else the one it was added with.
     public var accountEmail: String? { snapshot?.accountEmail ?? email }
 

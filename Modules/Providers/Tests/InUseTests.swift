@@ -109,6 +109,55 @@ struct InUseTests {
         #expect(throws: (any Error).self) { try codex.use(codex.defaultAccount) }
     }
 
+    @Test
+    func `a login is found by its name, its id, or default for the plain login`() throws {
+        let (stub, codex, work) = try twoLogins()
+        defer { stub.cleanUp() }
+
+        #expect(codex.account(named: "Work") === work)
+        #expect(codex.account(named: "work") === work)
+        #expect(codex.account(named: work.id) === work)
+        #expect(codex.account(named: "default") === codex.defaultAccount)
+        #expect(codex.account(named: "someone") == nil)
+    }
+
+    // MARK: - What each login can do — the screens only ask these
+
+    @Test
+    func `the login in use says so, and every folder login can be put in use`() throws {
+        let (stub, codex, work) = try twoLogins()
+        defer { stub.cleanUp() }
+
+        try work.useForNewSessions()
+
+        #expect(work.isInUse)
+        #expect(!codex.defaultAccount.isInUse)
+        #expect(work.canBeInUse && codex.defaultAccount.canBeInUse)
+        #expect(codex.loginsForNewSessions.map(\.id) == [codex.defaultAccount.id, work.id])
+        #expect(codex.offersInUse)
+    }
+
+    @Test
+    func `with one login there is nothing to choose between`() throws {
+        let stub = try StubbedProvider(providerId: "codex")
+        defer { stub.cleanUp() }
+        let codex = try stub.makeProvider("codex")
+
+        #expect(codex.canChooseInUse)
+        #expect(!codex.offersInUse)
+    }
+
+    @Test
+    func `a provider names the command and the variable its new sessions start with`() throws {
+        let (stub, codex, _) = try twoLogins()
+        defer { stub.cleanUp() }
+        let gemini = try StubbedProvider(providerId: "gemini")
+        defer { gemini.cleanUp() }
+
+        #expect(codex.terminalCommand == TerminalCommand(name: "codex", variable: "CODEX_HOME", providerId: "codex"))
+        #expect(try gemini.makeProvider("gemini").terminalCommand == nil)
+    }
+
     // MARK: - Low: suggest, or switch when the person asked
 
     @Test
@@ -204,6 +253,43 @@ struct InUseTests {
         #expect(again.mayPick(again.defaultAccount))
     }
 
+    // MARK: - After each refresh: what is worth telling the person
+
+    @Test
+    func `a login worth switching to is told once, not on every refresh`() async throws {
+        let (stub, codex, work) = try twoLogins()
+        defer { stub.cleanUp() }
+        try await usage(stub, codex, me: 92, work: 15)
+
+        #expect(try codex.reviewInUse() == .worthSwitching(from: codex.defaultAccount, to: work))
+        #expect(try codex.reviewInUse() == nil)
+    }
+
+    @Test
+    func `after the login in use recovers, the next low is told again`() async throws {
+        let (stub, codex, work) = try twoLogins()
+        defer { stub.cleanUp() }
+        try await usage(stub, codex, me: 92, work: 15)
+        _ = try codex.reviewInUse()
+
+        try await usage(stub, codex, me: 30, work: 15)
+        #expect(try codex.reviewInUse() == nil)
+        try await usage(stub, codex, me: 95, work: 15)
+
+        #expect(try codex.reviewInUse() == .worthSwitching(from: codex.defaultAccount, to: work))
+    }
+
+    @Test
+    func `with switch when low on, the switch is what is told`() async throws {
+        let (stub, codex, work) = try twoLogins()
+        defer { stub.cleanUp() }
+        codex.switchesWhenLow = true
+        try await usage(stub, codex, me: 95, work: 15)
+
+        #expect(try codex.reviewInUse() == .switched(from: codex.defaultAccount, to: work))
+        #expect(codex.inUse === work)
+    }
+
     // MARK: - Helpers
 
     /// Codex with the plain login *me* and an added folder login *work*.
@@ -223,6 +309,7 @@ struct InUseTests {
 
     /// Both logins refreshed with these percentages used.
     private func usage(_ stub: StubbedProvider, _ codex: Provider, me: Int, work: Int) async throws {
+        stub.network.reset([.given])
         for (id, used) in [("me", me), ("work", work)] {
             given(stub.network).request(.matching { @Sendable in $0.value(forHTTPHeaderField: "ChatGPT-Account-Id") == id })
                 .willReturn((Data(#"{"rate_limit":{"primary_window":{"used_percent":\#(used)}}}"#.utf8), StubbedProvider.response(200)))

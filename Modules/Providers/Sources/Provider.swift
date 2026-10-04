@@ -46,6 +46,8 @@ public final class Provider {
     private let loginsInUse: (any LoginsInUse)?
     /// The login new terminal sessions start with, by lineup id.
     private var inUseId: String
+    /// The suggestion already told — `<in use>><suggested>` — so a low is told once.
+    @ObservationIgnored private var told: String?
     /// What a path setting asks of this Mac.
     private let paths: any PathChecking
     /// Whether a path is a program the CLI location may point at.
@@ -506,7 +508,7 @@ public final class Provider {
         guard canChooseInUse, let loginsInUse else {
             throw UsageError.executionFailed("\(name) can't choose a login for new sessions.")
         }
-        guard accounts.contains(where: { $0 === account }), account.isDefault || account.folder != nil else {
+        guard loginsForNewSessions.contains(where: { $0 === account }) else {
             throw UsageError.executionFailed("This login can't be used for new \(name) sessions.")
         }
         try loginsInUse.use(account.isDefault ? nil : account.folder?.url, for: id)
@@ -514,11 +516,54 @@ public final class Provider {
         AppLog.providers.info("\(id): new sessions use \(account.isDefault ? "the plain login" : "an added login")")
     }
 
+    /// The logins new sessions can start with: the plain login and every
+    /// login that is a folder.
+    public var loginsForNewSessions: [Account] {
+        canChooseInUse ? accounts.filter { $0.isDefault || $0.folder != nil } : []
+    }
+
+    /// Whether there is a choice to offer: more than one login to start on.
+    public var offersInUse: Bool { loginsForNewSessions.count > 1 }
+
+    /// The command new terminal sessions run and the variable that points it
+    /// at a login's folder — `claude` and `CLAUDE_CONFIG_DIR`.
+    public var terminalCommand: TerminalCommand? {
+        guard canChooseInUse, let call = definition.accounts?.signIn else { return nil }
+        return TerminalCommand(name: call.cli, variable: call.homeVariable, providerId: id)
+    }
+
+    /// The login a person or a link names: its id, its account id
+    /// (`default` for the plain login), its name or its email — any case.
+    public func account(named name: String) -> Account? {
+        let wanted = name.lowercased()
+        return accounts.first { $0.id.lowercased() == wanted || $0.accountId.lowercased() == wanted }
+            ?? accounts.first { $0.displayName.lowercased() == wanted || $0.accountEmail?.lowercased() == wanted }
+    }
+
     /// The login worth switching to: the one in use is low (critical or
     /// out), and another enabled login has more left — the most.
     public var suggestedLogin: Account? {
         guard canChooseInUse, inUse.status >= .critical, let left = remaining(inUse) else { return nil }
         return logins(withMoreThan: left, tickedOnly: false).first
+    }
+
+    /// What to tell the person after a refresh: that new sessions moved
+    /// (*Switch when low*), or — once per low — which login is worth moving
+    /// to. `nil` when there is nothing new.
+    public func reviewInUse() throws -> InUseNotice? {
+        let from = inUse
+        if let to = try switchIfLow() {
+            told = nil
+            return .switched(from: from, to: to)
+        }
+        guard let to = suggestedLogin else {
+            told = nil
+            return nil
+        }
+        let pair = "\(from.id)>\(to.id)"
+        guard told != pair else { return nil }
+        told = pair
+        return .worthSwitching(from: from, to: to)
     }
 
     // MARK: Switch when low — opt-in
@@ -572,7 +617,7 @@ public final class Provider {
     /// `left`, the most first.
     private func logins(withMoreThan left: Double, tickedOnly: Bool) -> [Account] {
         accounts
-            .filter { $0 !== inUse && $0.isEnabled && ($0.isDefault || $0.folder != nil) && (!tickedOnly || mayPick($0)) }
+            .filter { $0 !== inUse && $0.isEnabled && $0.canBeInUse && (!tickedOnly || mayPick($0)) }
             .compactMap { account in remaining(account).flatMap { $0 > left ? (account, $0) : nil } }
             .sorted { $0.1 > $1.1 }
             .map(\.0)
