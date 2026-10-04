@@ -237,7 +237,7 @@ public final class Provider {
     public var definitionAsRun: ProviderDefinition {
         let sources = (try? sources(for: [:], isDefault: true)) ?? running.dataSources
         return ProviderDefinition(profile: running.profile, cli: running.cli, enabledByDefault: running.enabledByDefault,
-                                  dataSources: sources, defaultDataSource: running.defaultDataSource,
+                                  dataSources: sources, defaultDataSource: running.defaultDataSource, together: running.together,
                                   accounts: running.accounts, settings: running.settings, usageHistory: running.usageHistory,
                                   setup: running.setup)
     }
@@ -626,7 +626,7 @@ public final class Provider {
         }
         // Overlapping refreshes of one login share one result.
         if let running = refreshTasks[account.id] { return try await running.value }
-        let task = Task { try await run(account, from: active, kind) }
+        let task = Task { definition.together ? try await runTogether(account) : try await run(account, from: active, kind) }
         refreshTasks[account.id] = task
         defer { refreshTasks[account.id] = nil }
         let usage = try await task.value
@@ -716,6 +716,51 @@ public final class Provider {
         }
         account.fail(reported ?? UsageError.noData)
         throw account.lastError ?? UsageError.noData
+    }
+
+    /// `together` — every data source of the login answers at once; the usage
+    /// is their union in the definition's order. A failed one is left out of
+    /// it and shows beside it as fetch health; the refresh fails only when
+    /// all do.
+    private func runTogether(_ account: Account) async throws -> UsageSnapshot {
+        account.isSyncing = true
+        defer { account.isSyncing = false }
+        let sources = dataSources(for: account)
+        let results = await withTaskGroup(of: (Int, Result<UsageSnapshot, Error>).self) { group in
+            for (index, source) in sources.enumerated() {
+                group.addTask {
+                    do { return (index, .success(try await source.fetchUsage())) } catch { return (index, .failure(error)) }
+                }
+            }
+            var results: [(Int, Result<UsageSnapshot, Error>)] = []
+            for await result in group { results.append(result) }
+            return results.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+        let answered = results.compactMap { try? $0.get() }
+        guard let first = answered.first else {
+            let error = results.lazy.compactMap { result -> Error? in
+                if case .failure(let error) = result { return error } else { return nil }
+            }.first ?? UsageError.noData
+            account.fail(error)
+            throw account.lastError ?? error
+        }
+        let metrics = answered.flatMap { $0.extensionMetrics ?? [] }
+        let union = UsageSnapshot(
+            providerId: first.providerId,
+            quotas: answered.flatMap(\.quotas),
+            capturedAt: Date(),
+            accountEmail: answered.lazy.compactMap(\.accountEmail).first,
+            accountTier: answered.lazy.compactMap(\.accountTier).first,
+            costUsage: answered.lazy.compactMap(\.costUsage).first,
+            extensionMetrics: metrics.isEmpty ? nil : metrics
+        )
+        let kind = sources.indices.first { if case .success = results[$0] { return true } else { return false } }.map { sources[$0].kind }
+        let usage = account.succeed(identified(union, for: account), from: kind ?? definition.defaultDataSource)
+        let failed = results.lazy.compactMap { result -> Error? in
+            if case .failure(let error) = result { return error } else { return nil }
+        }.first
+        if let failed { account.noteFailure(failed) }
+        return usage
     }
 
     /// An added login is checked by being added; the default login once an

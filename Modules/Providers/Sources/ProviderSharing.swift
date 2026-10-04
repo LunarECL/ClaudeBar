@@ -94,6 +94,7 @@ extension ProviderDefinition {
             enabledByDefault: enabledByDefault,
             dataSources: dataSources,
             defaultDataSource: defaultDataSource,
+            together: together,
             accounts: accounts,
             settings: settings,
             usageHistory: usageHistory,

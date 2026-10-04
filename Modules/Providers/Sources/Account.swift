@@ -189,6 +189,19 @@ public final class Account: AIProvider {
         return usage
     }
 
+    /// Some of its data sources failed while others answered (`together`):
+    /// the usage they gave stays, and the failure shows beside it as fetch
+    /// health — never wiping what was seen.
+    func noteFailure(_ error: Error) {
+        if let failure = error as? DataSourceError {
+            lastError = failure.reason
+            lastFailedStep = failure.step
+        } else {
+            lastError = error
+            lastFailedStep = nil
+        }
+    }
+
     func fail(_ error: Error) {
         if let failure = error as? DataSourceError {
             lastError = failure.reason
