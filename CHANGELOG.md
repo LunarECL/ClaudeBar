@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Claude Desktop's tokens today now show as their own card under Claude's daily usage, read from Desktop's local counter. Tokens only, on your usual login; your limits still come from Claude Code. Thanks @jsvisa. ([#198](https://github.com/tddworks/ClaudeBar/issues/198))
+
 ---
 
 ## [0.5.3] - 2026-10-04

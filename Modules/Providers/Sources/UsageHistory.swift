@@ -26,6 +26,8 @@ public final class UsageHistory {
     /// Other apps on this Mac that use the same plan, each its own history:
     /// shown under its own name, never added to this one's days.
     public let otherApps: [UsageHistory]
+    /// The other apps used today or yesterday — the ones with a card.
+    public var usedOtherApps: [UsageHistory] { otherApps.filter { $0.report != nil } }
 
     private let log: UsageLog
     private let ledger: DayLedger?

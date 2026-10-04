@@ -910,6 +910,19 @@ struct MenuContentView: View {
                 }
             }
 
+            // Other apps on this Mac that use the same plan (Claude Desktop):
+            // a tokens card each, shown even when the login's own logs are empty.
+            if settings.showDailyUsageCards,
+               let apps = (monitor.provider(for: snapshot.providerId) as? Account)?.usageHistory?.usedOtherApps,
+               !apps.isEmpty {
+                let appDelay = Double(snapshot.quotas.count + 3) * 0.08
+                TwoColumnCardGrid(items: apps, id: \.label) { app in
+                    if let report = app.report {
+                        DailyUsageCardView(metric: .tokens, report: report, delay: appDelay, title: app.label)
+                    }
+                }
+            }
+
             // The same login's last thirty days, as a chart.
             if settings.showDailyUsageCards,
                let history = (monitor.provider(for: snapshot.providerId) as? Account)?.usageHistory,

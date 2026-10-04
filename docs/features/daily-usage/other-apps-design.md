@@ -6,12 +6,14 @@ description: Contributor design for showing another app's daily tokens, such as 
 
 User guide: [README.md](README.md) · Mockup: [design-concept/claude-desktop-tokens](../../../design-concept/claude-desktop-tokens/index.html)
 
-**Status: DESIGN, not built.** Proposed on 2026-10-04 in place of
-[PR #446](https://github.com/tddworks/ClaudeBar/pull/446), which adds the same
-file as a third Claude data source. Nothing below exists yet except where a line
-says *exists*. What does exist: `usageHistory`, `UsageLog`, its `json` format,
-`tokens.total`, `UsageHistory`, `DayLedger`, and the merge patch that
-`accounts.patch` applies.
+**Status: BUILT, slices 1–6 and 8; slice 7 is DESIGN.** Built on 2026-10-04 in
+place of [PR #446](https://github.com/tddworks/ClaudeBar/pull/446), which adds the
+same file as a third Claude data source; its fixtures are the tests here. Built:
+`UsageLog.At.formatted`, whole non-negative counts, `UsageLog.OtherApp` and
+`Definition.otherApps`, `UsageHistory.label` / `otherApps` / `usedOtherApps`,
+Claude's entry and patch line, and the popover card. Not built: the Today section
+when a provider has no snapshot (slice 7), so a user without Claude Code doesn't
+see the card yet.
 
 This document owns **an app's usage that sits beside a login's own logs**: how a
 definition declares it, which login shows it, and how its days are counted.
@@ -96,7 +98,8 @@ Provider "claude"
          └─ UsageHistory "Claude Desktop"   its own log, ledger and label; no prices, so knowsCost is false
             ├─ label                        the card's name, from the definition
             ├─ log: UsageLog                the entry's `records`: format json, `tokens.total`          [exists]
-            └─ ledger: DayLedger            keyed "<login>/<label>", apart from the login's own days     [new key]
+            └─ ledger: DayLedger            keyed "<login>/<label>", apart from the login's own days
+                                            (the login's own fingerprint ignores otherApps, so no kept day re-sums)
 Account (added login)
 └─ usageHistory                             the patch sets otherApps to null, so it has none
 ```
@@ -137,9 +140,9 @@ An `otherApps` entry is a `UsageLog.Definition` plus a `label`. It has no
 await account.usageHistory?.read()
 
 // The view lays out cards and makes no decisions.
-for app in history.otherApps {
+TwoColumnCardGrid(items: history.usedOtherApps, id: \.label) { app in
     if let report = app.report {
-        DailyUsageCardView(metric: .tokens, report: report, title: app.label)
+        DailyUsageCardView(metric: .tokens, report: report, delay: delay, title: app.label)
     }
 }
 ```
@@ -159,7 +162,8 @@ Asks to avoid:
 | An other app shows on the usual login only | `claude.json`'s `accounts.patch`: `"otherApps": null` (merge patch, *exists*) |
 | An other app's tokens are never added to the login's own totals | `UsageHistory`: each other app is its own history with its own report |
 | Without prices, an app shows tokens and no cost | `UsageLog.knowsCost` (*exists*) |
-| A count is on the day its file names, in the user's time zone | `UsageLog.At`: a field read with a `format`, local unless `timeZone` says otherwise (**new**, §Rich types) |
+| A count is on the day its file names, in the user's time zone | `UsageLog.At`: a field read with a `format`, local unless `timeZone` says otherwise (§Rich types) |
+| A token count is a whole, non-negative number; anything else drops the record | `RecordShape.record(from:)` |
 | No card when the app has been used neither today nor yesterday (a missing file included) | `UsageHistory.read`: `report` is nil when both days are empty (*exists*) |
 | A closed day is kept once and never read again | `DayLedger`, under a key apart from the login's (*exists*, new key) |
 

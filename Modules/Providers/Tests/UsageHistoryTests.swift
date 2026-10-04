@@ -155,6 +155,7 @@ struct UsageHistoryTests {
         #expect(desk.label == "Desk")
         #expect(desk.report?.today.totalTokens == 74_422)
         #expect(desk.knowsCost == false)
+        #expect(history.usedOtherApps.map(\.label) == ["Desk"])
         #expect(history.label == nil)
         #expect(history.report?.today.totalTokens == 1000)
     }
@@ -167,6 +168,7 @@ struct UsageHistoryTests {
         await history.read()
 
         #expect(history.otherApps.first?.report == nil)
+        #expect(history.usedOtherApps.isEmpty)
     }
 
     @Test
