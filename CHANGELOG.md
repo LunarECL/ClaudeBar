@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Leaderboard profile links: add your X, Instagram or GitHub handle when you join or in Settings → Leaderboard, and it shows as an icon after your name on the board that opens your profile. Handles aren't verified, and the board says so. ([#PR](https://github.com/tddworks/ClaudeBar/pulls))
+- Leaderboard profile links: add your X, Instagram or GitHub handle when you join or in Settings → Leaderboard, and it shows as an icon after your name on the board that opens your profile. Handles aren't verified, and the board says so. ([#462](https://github.com/tddworks/ClaudeBar/pull/462))
 - Leaderboard globe: opt in to put your country on the web board's globe of where ClaudeBar is used. Only your country is kept, never your city or IP; it shows once three members there opt in. An eye hides it in the popover, and Turn off removes it. ([#460](https://github.com/tddworks/ClaudeBar/pull/460))
 
 ---
