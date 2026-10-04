@@ -19,6 +19,7 @@ struct MenuContentView: View {
 
     @Environment(\.appTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(NewSessions.self) private var newSessions
     #if ENABLE_SPARKLE
     @Environment(\.sparkleUpdater) private var sparkleUpdater
     #endif
@@ -579,6 +580,9 @@ struct MenuContentView: View {
     private func accountsContent(_ tab: ProductTab) -> some View {
         VStack(spacing: 12) {
             accountChips(tab)
+            if let product = tab.provider, let state = newSessions.state(of: product) {
+                InUseStrip(state: state)
+            }
             ForEach(tab.accounts.filter { !hiddenAccountIds.contains($0.id) }, id: \.id) { account in
                 providerSection(provider: account)
             }
@@ -598,27 +602,58 @@ struct MenuContentView: View {
                     .foregroundStyle(theme.textTertiary)
                 ForEach(tab.accounts, id: \.id) { account in
                     let hidden = hiddenAccountIds.contains(account.id)
-                    Button {
-                        if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(settings.shown(account.name)).lineLimit(1)
-                            Circle()
-                                .fill(account.lastError != nil ? theme.textTertiary
-                                      : theme.statusColor(for: monitor.usage(of: account)?.overallStatus(under: settings.statusPolicy) ?? .healthy))
-                                .frame(width: 6, height: 6)
+                    let login = account as? Account
+                    HStack(spacing: 4) {
+                        Button {
+                            if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
+                        } label: {
+                            HStack(spacing: 4) {
+                                if login?.isInUse == true { InUseBadge() }
+                                Text(settings.shown(account.name)).lineLimit(1)
+                                Circle()
+                                    .fill(account.lastError != nil ? theme.textTertiary
+                                          : theme.statusColor(for: monitor.usage(of: account)?.overallStatus(under: settings.statusPolicy) ?? .healthy))
+                                    .frame(width: 6, height: 6)
+                            }
                         }
-                        .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(hidden ? Color.clear : theme.glassBackground))
-                        .overlay(Capsule().stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
-                        .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
+                        .buttonStyle(.plain)
+                        .help(hidden ? "Show \(settings.shown(account.name))" : "Hide \(settings.shown(account.name)) from this view")
+                        // One click switches: the other logins end in "Use".
+                        if let login, login.canBeInUse, !login.isInUse {
+                            Button { newSessions.use(login) } label: {
+                                Text("Use")
+                                    .font(.system(size: 10, weight: .bold, design: theme.fontDesign))
+                                    .foregroundStyle(theme.accentPrimary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Use \(settings.shown(account.name)) for new terminal sessions")
+                            .accessibilityLabel("Use \(settings.shown(account.name)) for new terminal sessions")
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .help(hidden ? "Show \(settings.shown(account.name))" : "Hide \(settings.shown(account.name)) from this view")
+                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    // The provider pills' shape and height. A leading IN USE badge sits
+                    // concentric: the same gap on its left as above and below it.
+                    .frame(height: InUseBadge.chipHeight(in: theme))
+                    .padding(.leading, login?.isInUse == true ? InUseBadge.gap(in: theme) : 10)
+                    .padding(.trailing, 10)
+                    .background(RoundedRectangle(cornerRadius: theme.pillCornerRadius).fill(hidden ? Color.clear : theme.glassBackground))
+                    // Stroked across the edge, as the provider pills and the cards are:
+                    // its anti-aliasing falls evenly on both sides, so the bottom edge
+                    // is as heavy as the top. (strokeBorder lost the bottom's half pixel.)
+                    .overlay(RoundedRectangle(cornerRadius: theme.pillCornerRadius).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
+                    .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
+                    .contextMenu {
+                        if let login, login.canBeInUse {
+                            Button("Use for New Terminal Sessions") { newSessions.use(login) }.disabled(login.isInUse)
+                        }
+                    }
                 }
             }
+            // As the provider pills: a scroll view clips at its edges, so leave
+            // room for an outlined theme's thick outline.
+            .padding(.vertical, theme.isOutlined ? 5 : 1)
+            .padding(.leading, theme.isOutlined ? 2 : 1)
+            .padding(.trailing, theme.isOutlined ? 5 : 1)
         }
     }
 

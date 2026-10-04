@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **In use:** with more than one Claude or Codex login, choose which one your next `claude` / `codex` starts with, from the popover, Settings or `claudebar://use`. ClaudeBar suggests a switch when the login in use runs low, or switches for you if you turn that on. ([#465](https://github.com/tddworks/ClaudeBar/pull/465))
 - Claude Desktop's tokens today now show as their own card under Claude, even without Claude Code. Without it, Claude reads Not set up, with a button to set it up for your limits, instead of an error. Thanks @jsvisa. ([#198](https://github.com/tddworks/ClaudeBar/issues/198))
 
 ### Changed

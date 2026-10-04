@@ -17,6 +17,8 @@ struct StubbedProvider {
     let launches = Launches()
     /// The login folders adding and removing accounts makes and deletes.
     let folders = InMemoryLoginFolders()
+    /// Which login new terminal sessions start with — *In use*.
+    let loginsInUse = InMemoryLoginsInUse()
     let home: URL
     let settings: InMemoryProviderSettings
     var environment: [String: String] = [:]
@@ -68,6 +70,7 @@ struct StubbedProvider {
                 )
             },
             folders: folders,
+            loginsInUse: loginsInUse,
             isExecutable: isExecutable
         )
     }

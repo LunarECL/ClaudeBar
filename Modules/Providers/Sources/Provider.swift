@@ -42,6 +42,9 @@ public final class Provider {
     private let vault: (any SecretVault)?
     /// Where added logins' folders are made and deleted.
     private let folders: any LoginFolders
+    /// *In use* — which login new terminal sessions start with; `nil` when
+    /// this product's CLI can't be started on a login's folder.
+    public private(set) var inUse: InUse?
     /// What a path setting asks of this Mac.
     private let paths: any PathChecking
     /// Whether a path is a program the CLI location may point at.
@@ -65,6 +68,7 @@ public final class Provider {
         usageHistory: UsageHistory? = nil,
         makeUsageHistory: ((UsageLog.Definition, String) -> UsageHistory)? = nil,
         folders: any LoginFolders = DiskLoginFolders(),
+        loginsInUse: (any LoginsInUse)? = nil,
         vault: (any SecretVault)? = nil,
         paths: any PathChecking = DiskPaths(),
         isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
@@ -99,6 +103,10 @@ public final class Provider {
                                  order.firstIndex(of: rhs.element.accountId) ?? order.count + rhs.offset)
             return left < right
         }.map(\.element)
+        if let loginsInUse, let call = definition.accounts?.signIn, definition.accounts?.folder != nil {
+            inUse = InUse(provider: self, command: TerminalCommand(name: call.cli, variable: call.homeVariable),
+                          record: loginsInUse, switchWhenLow: SwitchWhenLow(providerId: definition.id, settings: settings))
+        }
     }
 
     /// A provider whose data sources ignore which login they run for — the
@@ -110,11 +118,12 @@ public final class Provider {
         makeDataSource: @escaping (DataSourceDefinition) -> DataSource,
         guestPasses: GuestPasses? = nil,
         folders: any LoginFolders = DiskLoginFolders(),
+        loginsInUse: (any LoginsInUse)? = nil,
         isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) {
         self.init(definition: definition, settings: settings, accounts: accounts,
                   makeDataSource: { source, _ in makeDataSource(source) },
-                  guestPasses: guestPasses, folders: folders, isExecutable: isExecutable)
+                  guestPasses: guestPasses, folders: folders, loginsInUse: loginsInUse, isExecutable: isExecutable)
     }
 
     // MARK: - CLI location
@@ -303,6 +312,7 @@ public final class Provider {
         for setting in definition.accountSettings {
             vault?.delete(setting.id, provider: account.id)
         }
+        inUse?.forget(account)
         accounts.removeAll { $0.id == account.id }
         bound[account.id] = nil
         usageHistories[account.id] = nil
@@ -463,6 +473,14 @@ public final class Provider {
         }
         try await runner.signInAgain(call, in: folder.url)
         return try await refresh(account, .interactive)
+    }
+
+    /// The login a person or a link names: its id, its account id
+    /// (`default` for the plain login), its name or its email — any case.
+    public func account(named name: String) -> Account? {
+        let wanted = name.lowercased()
+        return accounts.first { $0.id.lowercased() == wanted || $0.accountId.lowercased() == wanted }
+            ?? accounts.first { $0.displayName.lowercased() == wanted || $0.accountEmail?.lowercased() == wanted }
     }
 
     /// More than one enabled login, so each needs telling apart by name.

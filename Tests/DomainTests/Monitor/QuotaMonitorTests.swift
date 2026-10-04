@@ -121,6 +121,41 @@ struct QuotaMonitorTests {
 
     // MARK: - Single Provider Monitoring
 
+    // MARK: - After a refresh: the one extension point
+
+    @Test
+    func `every observer hears each refreshed login, and the monitor knows none of them`() async throws {
+        let settings = makeSettingsRepository()
+        let probe = MockUsageProbe()
+        given(probe).isAvailable().willReturn(true)
+        given(probe).probe().willReturn(UsageSnapshot(providerId: "claude", quotas: [], capturedAt: Date()))
+        let provider = StubClaudeProvider(probe: probe, settingsRepository: settings)
+        let monitor = makeMonitor(providers: AIProviders(providers: [provider]))
+        var heard: [String] = []
+        monitor.onRefreshed { heard.append("first:\($0.id)") }
+        monitor.onRefreshed { heard.append("second:\($0.id)") }
+
+        await monitor.refresh(providerId: "claude")
+
+        #expect(heard == ["first:claude", "second:claude"])
+    }
+
+    @Test
+    func `a failed refresh is not heard`() async throws {
+        let settings = makeSettingsRepository()
+        let probe = MockUsageProbe()
+        given(probe).isAvailable().willReturn(true)
+        given(probe).probe().willThrow(UsageError.timeout)
+        let provider = StubClaudeProvider(probe: probe, settingsRepository: settings)
+        let monitor = makeMonitor(providers: AIProviders(providers: [provider]))
+        var heard = 0
+        monitor.onRefreshed { _ in heard += 1 }
+
+        await monitor.refresh(providerId: "claude")
+
+        #expect(heard == 0)
+    }
+
     @Test
     func `monitor can refresh a provider by ID`() async throws {
         // Given

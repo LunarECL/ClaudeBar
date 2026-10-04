@@ -75,7 +75,8 @@ public enum Providers {
         usageHistory: UsageHistory? = nil,
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
         cloudWatch: (any CloudWatchClient)? = nil,
-        priceCatalog: (any PriceCatalog)? = nil
+        priceCatalog: (any PriceCatalog)? = nil,
+        loginsInUse: (any LoginsInUse)? = nil
     ) -> Provider {
         Provider(
             definition: definition,
@@ -89,6 +90,7 @@ public enum Providers {
             // The definition says how to read each login's logs.
             usageHistory: usageHistory ?? definition.usageHistory.map { history($0, login: definition.id, environment: environment) },
             makeUsageHistory: { history($0, login: $1, environment: environment) },
+            loginsInUse: loginsInUse,
             vault: secrets
         )
     }
@@ -113,10 +115,11 @@ public enum Providers {
         usageHistory: UsageHistory? = nil,
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
         cloudWatch: (any CloudWatchClient)? = nil,
-        priceCatalog: (any PriceCatalog)? = nil
+        priceCatalog: (any PriceCatalog)? = nil,
+        loginsInUse: (any LoginsInUse)? = nil
     ) throws -> Provider {
         make(try builtIn(id), settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses,
              usageHistory: usageHistory, environment: environment,
-             cloudWatch: cloudWatch, priceCatalog: priceCatalog)
+             cloudWatch: cloudWatch, priceCatalog: priceCatalog, loginsInUse: loginsInUse)
     }
 }
