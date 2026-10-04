@@ -68,9 +68,9 @@ extension ProviderLook {
 
 // MARK: - AIProvider Visual Identity Helper
 
-/// Extension to access visual identity from any AIProvider.
+/// Extension to access visual identity from Account.
 /// Uses type casting to dispatch to the correct implementation.
-extension AIProvider {
+extension Account {
     /// Returns the visual identity if this provider conforms to ProviderVisualIdentity
     public var visualIdentity: ProviderVisualIdentity? {
         self as? ProviderVisualIdentity

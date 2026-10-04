@@ -90,19 +90,19 @@ public final class QuotaMonitor {
     /// A provider's usage as every surface reads it: without the quotas the
     /// person hid for its product, so a quota they don't watch is never shown
     /// and never sets a status or an alert.
-    public func usage(of provider: any AIProvider) -> UsageSnapshot? {
+    public func usage(of provider: Account) -> UsageSnapshot? {
         provider.snapshot?.hiding(hiddenQuotaKeys(for: provider))
     }
 
     /// The quota keys hidden for a provider's product — shared by its accounts.
-    public func hiddenQuotaKeys(for provider: any AIProvider) -> Set<String> {
+    public func hiddenQuotaKeys(for provider: Account) -> Set<String> {
         hiddenQuotas[Self.productId(of: provider)] ?? []
     }
 
     /// Hides or shows one quota for a provider's product, saved. Refused —
     /// `false` — when it would hide the last quota the provider reports.
     @discardableResult
-    public func setQuota(_ key: String, hidden: Bool, for provider: any AIProvider) -> Bool {
+    public func setQuota(_ key: String, hidden: Bool, for provider: Account) -> Bool {
         let product = Self.productId(of: provider)
         var keys = hiddenQuotas[product] ?? []
         if hidden {
@@ -123,15 +123,19 @@ public final class QuotaMonitor {
     }
 
     /// The product a lineup entry belongs to — `codex` for `codex.<acct>`.
-    private static func productId(of provider: any AIProvider) -> String {
-        (provider as? Account)?.provider.id ?? provider.id
-    }
+    private static func productId(of login: Account) -> String { login.provider.id }
 
     // MARK: - The logins
 
-    private var logins: [Account] { providers.logins }
-    private var lineup: [Account] { providers.lineup }
-    private func login(id: String) -> Account? { providers.login(id: id) }
+    /// Every login, on or off, in the pane's order.
+    public var logins: [Account] { providers.logins }
+
+    /// The lineup — the enabled logins of enabled providers, in the pane's
+    /// order: what the pills, menu bar, refreshes and alerts show.
+    public var lineup: [Account] { providers.lineup }
+
+    /// The login with the given lineup id (`claude`, `codex.<acct>`).
+    public func login(id: String) -> Account? { providers.login(id: id) }
 
     // MARK: - Monitoring Operations
 
@@ -233,16 +237,6 @@ public final class QuotaMonitor {
 
     // MARK: - Queries
 
-    /// The login with the given lineup id (`claude`, `codex.<acct>`).
-    public func provider(for id: String) -> Account? {
-        login(id: id)
-    }
-
-    /// Every login, in the pane's order.
-    public var allProviders: [Account] { logins }
-
-    /// The lineup, in the pane's order.
-    public var enabledProviders: [Account] { lineup }
 
     /// Returns the lowest quota across all enabled providers
     public func lowestQuota() -> UsageQuota? {
@@ -312,7 +306,7 @@ public final class QuotaMonitor {
         guard showPercentage || showDuration else { return [] }
         var seen = Set<String>()
         return providerIds.filter { seen.insert($0).inserted }.prefix(2).compactMap { id in
-            guard let provider = enabledProviders.first(where: { $0.id == id }) else { return nil }
+            guard let provider = lineup.first(where: { $0.id == id }) else { return nil }
             let config = configurations[id] ?? MenuBarProviderSettings()
             let key = config.primaryQuotaKey.isEmpty
                 ? usage(of: provider)?.quotas.first?.quotaType.quotaKey : config.primaryQuotaKey
@@ -323,10 +317,10 @@ public final class QuotaMonitor {
                     mode: mode, burnRateWarningEnabled: burnRateWarningEnabled,
                     burnRateThreshold: burnRateThreshold
                   ) else {
-                return MenuBarProviderLabel(providerId: id, providerName: provider.name,
+                return MenuBarProviderLabel(providerId: id, providerName: provider.lineupName,
                                             label: MenuBarLabel(text: "—", status: .healthy))
             }
-            return MenuBarProviderLabel(providerId: id, providerName: provider.name, label: label,
+            return MenuBarProviderLabel(providerId: id, providerName: provider.lineupName, label: label,
                                         stacked: config.stacked, stackedSize: MenuBarStackedSize(storedRawValue: config.stackedSize))
         }
     }
@@ -356,7 +350,7 @@ public final class QuotaMonitor {
         burnRateThreshold: Double = 1.5
     ) -> MenuBarLabel? {
         let primaryQuotaKey = primaryQuotaKey.isEmpty
-            ? (enabledProviders.first { $0.id == providerId }.flatMap { usage(of: $0) }?.quotas.first?.quotaType.quotaKey ?? "")
+            ? (lineup.first { $0.id == providerId }.flatMap { usage(of: $0) }?.quotas.first?.quotaType.quotaKey ?? "")
             : primaryQuotaKey
         func segment(forQuotaKey quotaKey: String) -> (text: String, status: QuotaStatus)? {
             let percentage = showPercentage
@@ -446,13 +440,13 @@ public final class QuotaMonitor {
     // MARK: - Selection
 
     /// The currently selected provider (from enabled providers)
-    public var selectedProvider: Account? {
+    public var selectedLogin: Account? {
         lineup.first { $0.id == selectedProviderId }
     }
 
     /// Status of the currently selected provider (for menu bar icon)
     public var selectedProviderStatus: QuotaStatus {
-        selectedProvider.flatMap { usage(of: $0) }?.overallStatus(under: statusPolicy) ?? .healthy
+        selectedLogin.flatMap { usage(of: $0) }?.overallStatus(under: statusPolicy) ?? .healthy
     }
 
     /// Whether any provider is currently refreshing
@@ -470,20 +464,16 @@ public final class QuotaMonitor {
     /// The popover's pills: one per product, its enabled logins inside —
     /// the tabs follow the persisted order (issue #141), not the
     /// registration order.
-    public var tabs: [ProductTab] { ProductTab.tabs(of: enabledProviders) }
+    public var tabs: [ProductTab] { ProductTab.tabs(of: lineup) }
 
     /// Settings → Providers: every product, on or off, each with all its
     /// logins, in the pane's order (TARGET §12, slice 1).
-    public var productTabs: [ProductTab] { ProductTab.tabs(of: allProviders) }
+    public var productTabs: [ProductTab] { ProductTab.tabs(of: logins) }
 
     /// A product's switch — off hides every login of it and keeps them; the
     /// selection moves off a product that is turned off.
     public func setProductEnabled(_ tab: ProductTab, enabled: Bool) {
-        if let product = tab.provider {
-            product.isEnabled = enabled
-        } else if var only = tab.accounts.first {
-            only.isEnabled = enabled
-        }
+        tab.provider.isEnabled = enabled
         if !enabled { selectFirstEnabledIfNeeded() }
     }
 
@@ -492,10 +482,10 @@ public final class QuotaMonitor {
 
     /// The logins the popover shows: the selected tab's, or the selected
     /// provider alone.
-    public var selectedLogins: [any AIProvider] { selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? [] }
+    public var selectedLogins: [Account] { selectedTab?.accounts ?? selectedLogin.map { [$0] } ?? [] }
 
     /// One login's quota status under the person's policy; `nil` with no usage.
-    public func status(of login: any AIProvider) -> QuotaStatus? {
+    public func status(of login: Account) -> QuotaStatus? {
         usage(of: login)?.overallStatus(under: statusPolicy)
     }
 

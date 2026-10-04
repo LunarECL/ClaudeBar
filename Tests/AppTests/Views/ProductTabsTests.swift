@@ -22,7 +22,7 @@ struct ProductTabsTests {
                               probeConfig: ["codexHome": "/tmp/\(id)", "chatgptAccountId": id])
     }
 
-    private func lineup() throws -> (claude: Provider, codex: Provider, all: [any AIProvider]) {
+    private func lineup() throws -> (claude: Provider, codex: Provider, all: [Account]) {
         let settings = settings()
         let claude = try ProviderFactory.make("claude", settings: settings)
         let codex = try ProviderFactory.make("codex", settings: settings, accounts: [login("work"), login("side")])
@@ -45,7 +45,7 @@ struct ProductTabsTests {
         let (_, codex, _) = try lineup()
         codex.move(codex.accounts[2], to: 0)
         codex.accounts[1].isEnabled = false
-        let shown = (codex.accounts.filter(\.isEnabled) as [any AIProvider])
+        let shown = (codex.accounts.filter(\.isEnabled) as [Account])
 
         let tab = try #require(ProductTab.tabs(of: shown).first)
 

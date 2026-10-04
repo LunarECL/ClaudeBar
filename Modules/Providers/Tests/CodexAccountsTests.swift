@@ -126,8 +126,8 @@ struct CodexAccountsTests {
 
         #expect(first.id == "codex.a")
         #expect(second.id == "codex.b")
-        #expect(first.name == "a@example.com")
-        #expect(second.name == "b@example.com")
+        #expect(first.lineupName == "a@example.com")
+        #expect(second.lineupName == "b@example.com")
         #expect(usage.providerId == "codex.a")
         #expect(usage.quotas.first?.providerId == "codex.a")
         #expect(second.snapshot == nil)
@@ -257,7 +257,7 @@ struct CodexAccountsTests {
 
         #expect(codex.accounts.count == 3)
         #expect(codex.defaultAccount.id == "codex")
-        #expect(added.map(\.name) == ["a@example.com", "b@example.com"])
+        #expect(added.map(\.lineupName) == ["a@example.com", "b@example.com"])
         #expect(Set(codex.accounts.map(\.id)).count == 3)
         #expect(added[1].isEnabled)
         #expect(stub.settings.isEnabled(forProvider: added[0].id) == false)

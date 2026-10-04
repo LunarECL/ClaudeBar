@@ -19,9 +19,8 @@ struct ProvidersPane: View {
 
     var body: some View {
         if let productId = selectedProviderId,
-           let tab = monitor.productTabs.first(where: { $0.id == productId }),
-           let page = tab.page {
-            ProviderDetailView(monitor: monitor, tab: tab, provider: page) {
+           let tab = monitor.productTabs.first(where: { $0.id == productId }) {
+            ProviderDetailView(monitor: monitor, tab: tab, provider: tab.page) {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     selectedProviderId = nil
                 }
@@ -226,7 +225,7 @@ private struct ProviderDetailView: View {
     /// The product: its name and its switch head the page.
     let tab: ProductTab
     /// What the page configures — the product's plain login (`tab.page`).
-    let provider: any AIProvider
+    let provider: Account
     let onBack: () -> Void
 
     @Environment(\.appTheme) private var theme
@@ -309,24 +308,21 @@ private struct ProviderDetailView: View {
 
     /// A provider made from a definition gets the same sections as every
     /// other: its data source, its settings form and its accounts. A provider
-    /// still on its own card keeps that card until it moves to JSON.
+    /// still on its own card keeps that card beside them until it moves to JSON.
     @ViewBuilder
     private var configCard: some View {
-        if let product = (provider as? Account)?.provider {
-            let legacy = legacyCard(for: product.id)
-            DataSourceSection(provider: product, monitor: monitor)
-            if legacy == nil, !product.definition.defaultLoginSettings.isEmpty {
-                ProviderSettingsSection(provider: product)
-            }
-            if product.definition.accounts != nil {
-                ProviderAccountsCard(provider: product, monitor: monitor)
-            }
-            if let legacy { legacy }
-            if product.definition.profile.origin == .custom {
-                CustomProviderCard(provider: product, monitor: monitor, onDeleted: onBack)
-            }
-        } else if let legacy = legacyCard(for: provider.id) {
-            legacy
+        let product = provider.provider
+        let legacy = legacyCard(for: product.id)
+        DataSourceSection(provider: product, monitor: monitor)
+        if legacy == nil, !product.definition.defaultLoginSettings.isEmpty {
+            ProviderSettingsSection(provider: product)
+        }
+        if product.definition.accounts != nil {
+            ProviderAccountsCard(provider: product, monitor: monitor)
+        }
+        if let legacy { legacy }
+        if product.definition.profile.origin == .custom {
+            CustomProviderCard(provider: product, monitor: monitor, onDeleted: onBack)
         }
     }
 
@@ -348,7 +344,7 @@ private struct ProviderDetailView: View {
 /// quota is never shown and never sets a status or an alert, anywhere: the
 /// monitor leaves it out of the usage every surface reads.
 private struct QuotaVisibilityCard: View {
-    let provider: any AIProvider
+    let provider: Account
     let monitor: QuotaMonitor
 
     @Environment(\.appTheme) private var theme
@@ -368,12 +364,12 @@ private struct QuotaVisibilityCard: View {
                         toggleRow(quota)
                     }
                 }
-                Text(refused ?? "Turn off a quota you don't use: it disappears everywhere and no longer sets \(provider.name)'s status or alerts.")
+                Text(refused ?? "Turn off a quota you don't use: it disappears everywhere and no longer sets \(provider.lineupName)'s status or alerts.")
                     .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(refused == nil ? theme.textTertiary : theme.statusWarning)
                     .padding(.top, 8)
             } else {
-                Text("No quotas to choose from yet. Refresh \(provider.name) once, then pick the ones you watch.")
+                Text("No quotas to choose from yet. Refresh \(provider.lineupName) once, then pick the ones you watch.")
                     .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
@@ -387,7 +383,7 @@ private struct QuotaVisibilityCard: View {
                 get: { !monitor.hiddenQuotaKeys(for: provider).contains(key) },
                 set: { watched in
                     refused = monitor.setQuota(key, hidden: !watched, for: provider)
-                        ? nil : "Keep at least one quota: \(provider.name) needs something to watch."
+                        ? nil : "Keep at least one quota: \(provider.lineupName) needs something to watch."
                 }
             ))
         }

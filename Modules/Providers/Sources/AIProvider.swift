@@ -38,9 +38,6 @@ public protocol AIProvider: AnyObject, Sendable, Identifiable where ID == String
     /// Unique identifier for the provider (e.g., "claude", "codex", "gemini")
     var id: String { get }
 
-    /// Display name for the provider (e.g., "Claude", "Codex", "Gemini")
-    var name: String { get }
-
     /// CLI command used to invoke the provider
     var cliCommand: String { get }
 

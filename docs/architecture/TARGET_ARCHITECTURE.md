@@ -1060,7 +1060,7 @@ it holds, and casts to find out.
 | pills, menu-bar entries, Touch Bar, notch, alerts, `onRefreshed` | **a login** | `Account` |
 | Settings → Providers rows and pages | **a product** | `Provider` — one row per product; its logins in the Accounts card |
 | `ProductTab` (`provider: Provider?` from its first account) | a product | `Provider` itself |
-| `Account.name` (product or login, by count) | two things | `account.displayName` for the login; `provider.name` for the product; the page decides which to print |
+| `Account.name` (product or login, by count) | two things | `account.lineupName` — *the name the lineup prints*: the product's while it is the only login, else the login's; one owner, never re-decided by a page (corrected 2026-10-04: "the page decides" would copy the rule into every view). `account.displayName` is the login's own; `provider.name` the product's |
 | `isEnabled` on `AIProvider` | a login's pause *and* a product's toggle | `account.isEnabled` (pause) · `provider.isEnabled` (hide every login — CANONICAL §8, ) |
 | `RefreshKind`, `refresh(kind)`, `backgroundRefreshFloor` | the lifecycle | `Provider` (already there) |
 
@@ -1095,7 +1095,7 @@ stay for extensions).
 | 1 ✅ | **Settings by product**: Providers rows and pages take a `Provider` (from `ProductTab`); the page is titled *Claude*, its toggle is `provider.isEnabled` (hides every login), its logins are the Accounts card | the visible problem · one row per product; the toggle hides every login and keeps their settings; extensions keep their own row |
 | 2 ✅ | **Extensions as definitions**: `Fetch.script`; a definition's data sources can **answer together** (each section one, the usage their union, a failed one left out); the manifest → definition reader; sections mapped as 12.2; `ExtensionProvider` goes | every lineup member is an `Account` · golden tests on `docs/features/extensions/example-provider`: quotas and cost read the same; config fields as settings; a failing section left out |
 | 3 ✅ | **`Providers`** (CRUD of the providers you keep, their order and the derived `lineup: [Account]`), held by the Monitor; `AIProviderRepository` and `AIProviders` go; the test stubs become definitions over stubbed connections | the cause, in the domain · every Monitor test |
-| 4 | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
+| 4 ✅ | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
 | 5 | Delete `AIProvider` | done · the build has no `AIProvider` |
 | 6 | **`Provider` by role** (SRP): one product plays different roles in different contexts — refreshed in Monitoring, configured in Settings, a set of logins in Accounts, a terminal choice in In use (already `InUse`), a history in Usage History (already `UsageHistory`). Each role becomes its own type the product hands out, as `inUse` is; `Provider` keeps only the lifecycle (TARGET §1: it changes when the lifecycle changes). *Designed and confirmed when slice 5 is done* | `Provider` small again · each role's tests move with it |
 
@@ -1152,6 +1152,26 @@ Monitor  ◆                      watches: refresh, alerts, selection, status, o
 It lives in `Modules/Providers` (the Providers context; it needs the catalog,
 the vault and the settings, never the Monitor). `AIProviderRepository` and
 `AIProviders` are what it replaces.
+
+#### Slice 4 in detail — views take `Account` or `Provider`
+
+> **Status: BUILT** (2026-10-04, confirmed the same day). No view casts to
+> `Account` any more; `AIProvider` is left only as the protocol `Account`
+> conforms to, for slice 5 to delete. The tab rule of the popover header's
+> badge reads `ProviderBadgeState.Login` facts, so it is tested without a login.
+
+| Today | Becomes | Why |
+|---|---|---|
+| `any AIProvider` in views, `ProductTab`, `ProviderBadgeState`, `RefreshReport`, `NewSessions.review`, the Monitor's queries | `Account` | every one of them holds a login |
+| `extension AIProvider` (visual identity) | `extension Account` | the face is the product's, reached from the login |
+| `account.name` | `account.lineupName` | one name, one meaning (12.1) |
+| `monitor.allProviders` · `enabledProviders` · `provider(for:)` · `selectedProvider` · `selectedLogins` | `monitor.logins` · `lineup` · `login(id:)` · `selectedLogin` · `selectedLogins` (`[Account]`) | the words of the tree (CANONICAL §1); a login is never called a provider |
+| `ProductTab.provider: Provider?`, `page: (any AIProvider)?` | `provider: Provider`, `page: Account` | every tab is a product now; nothing is legacy |
+| `MultiAccountProvider`, `AccountPickerView`, `AccountManagementCard` | deleted | nothing conforms or shows them since accounts became the provider's |
+
+`selectedProviderId` keeps its name and value (a lineup id): the status export
+file and `claudebar://` links carry it. Nothing on screen changes; mock-data screenshots
+of the pills, menu bar, Settings → Providers and the overview confirm it.
 
 ### 12.4 · Decided
 

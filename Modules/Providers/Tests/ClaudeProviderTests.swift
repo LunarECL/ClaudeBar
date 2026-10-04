@@ -52,7 +52,7 @@ struct ClaudeProviderTests {
         let provider = try claude.provider()
 
         #expect(provider.id == "claude")
-        #expect(provider.name == "Claude")
+        #expect(provider.lineupName == "Claude")
         #expect(provider.cliCommand == "claude")
         #expect(provider.dashboardURL == URL(string: "https://claude.ai/new#settings/usage"))
         #expect(provider.statusPageURL == URL(string: "https://status.anthropic.com"))

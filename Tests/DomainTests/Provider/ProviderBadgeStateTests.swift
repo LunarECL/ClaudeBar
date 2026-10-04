@@ -91,7 +91,7 @@ struct ProviderBadgeStateTests {
 
     @MainActor @Test
     func `a tab with no logins is awaiting data`() {
-        #expect(ProviderBadgeState(of: [], quotaStatus: nil) == .awaitingData)
+        #expect(ProviderBadgeState(of: [ProviderBadgeState.Login](), quotaStatus: nil) == .awaitingData)
     }
 
     @MainActor @Test
@@ -101,26 +101,7 @@ struct ProviderBadgeStateTests {
 }
 
 /// A login as the badge sees it.
-@MainActor
-private final class Login: AIProvider {
-    let id = UUID().uuidString
-    let name = "Acme"
-    let cliCommand = "acme"
-    let dashboardURL: URL? = nil
-    var isEnabled = true
-    let isSyncing: Bool
-    let snapshot: UsageSnapshot? = nil
-    let lastError: Error?
-    let needsSetup: Bool
-    let readsUsage: Bool
-
-    init(needsSetup: Bool = false, readsUsage: Bool = false, failed: Bool = false, syncing: Bool = false) {
-        self.needsSetup = needsSetup
-        self.readsUsage = readsUsage
-        self.lastError = needsSetup || failed ? UsageError.noData : nil
-        self.isSyncing = syncing
-    }
-
-    func isAvailable() async -> Bool { true }
-    func refresh() async throws -> UsageSnapshot { throw UsageError.noData }
+private func Login(needsSetup: Bool = false, readsUsage: Bool = false, failed: Bool = false, syncing: Bool = false) -> ProviderBadgeState.Login {
+    // A login waiting for setup also carries the error that says so.
+    ProviderBadgeState.Login(isSyncing: syncing, failed: needsSetup || failed, needsSetup: needsSetup, readsUsage: readsUsage)
 }

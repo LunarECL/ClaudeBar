@@ -98,7 +98,7 @@ struct QuotaMonitorHiddenQuotasTests {
     @Test
     func `the usage every surface reads leaves the hidden quota out`() async throws {
         let (monitor, _) = await makeRefreshedGeminiMonitor(hiddenKeys: ["model:gemini-2.0-flash"])
-        let gemini = try #require(monitor.provider(for: "gemini"))
+        let gemini = try #require(monitor.login(id: "gemini"))
 
         let usage = try #require(monitor.usage(of: gemini))
 
@@ -110,7 +110,7 @@ struct QuotaMonitorHiddenQuotasTests {
     func `hiding a quota is saved and takes effect at once`() async throws {
         let (monitor, settings) = await makeRefreshedGeminiMonitor(hiddenKeys: [])
         given(settings).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
-        let gemini = try #require(monitor.provider(for: "gemini"))
+        let gemini = try #require(monitor.login(id: "gemini"))
 
         #expect(monitor.setQuota("model:gemini-2.0-flash", hidden: true, for: gemini))
 
@@ -123,7 +123,7 @@ struct QuotaMonitorHiddenQuotasTests {
     func `the last visible quota can't be hidden`() async throws {
         let (monitor, settings) = await makeRefreshedGeminiMonitor(hiddenKeys: ["session", "weekly"])
         given(settings).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
-        let gemini = try #require(monitor.provider(for: "gemini"))
+        let gemini = try #require(monitor.login(id: "gemini"))
 
         #expect(monitor.setQuota("model:gemini-2.0-flash", hidden: true, for: gemini) == false)
 
@@ -135,7 +135,7 @@ struct QuotaMonitorHiddenQuotasTests {
     func `showing a quota again brings it back`() async throws {
         let (monitor, settings) = await makeRefreshedGeminiMonitor(hiddenKeys: ["model:gemini-2.0-flash"])
         given(settings).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
-        let gemini = try #require(monitor.provider(for: "gemini"))
+        let gemini = try #require(monitor.login(id: "gemini"))
 
         #expect(monitor.setQuota("model:gemini-2.0-flash", hidden: false, for: gemini))
 

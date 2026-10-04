@@ -91,7 +91,7 @@ public final class Account: AIProvider {
     /// What setting this login up takes: its definition's words, or its
     /// name and what failed when the definition says nothing.
     public var setupNotice: ProviderDefinition.Setup {
-        provider.definition.setup ?? .fallback(for: name, error: lastError)
+        provider.definition.setup ?? .fallback(for: lineupName, error: lastError)
     }
 
     public var readsUsage: Bool { usageHistory?.hasUsage == true }
@@ -143,9 +143,10 @@ public final class Account: AIProvider {
 
     // MARK: - AIProvider (forwarded to the provider)
 
-    /// The pill's name: the product's while this is the only login to tell
-    /// apart, else the account's own.
-    public var name: String { provider.hasSeveralAccounts ? displayName : provider.name }
+    /// *The name the lineup prints* — on a pill, the menu bar, an alert: the
+    /// product's while this is the only login to tell apart, else the
+    /// login's own (TARGET §12.1). Pages never re-decide it.
+    public var lineupName: String { provider.hasSeveralAccounts ? displayName : provider.name }
 
     public var cliCommand: String { provider.definition.cli ?? "" }
     /// The dashboard for the plan the last usage reported (#328).

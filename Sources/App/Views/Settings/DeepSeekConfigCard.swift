@@ -285,7 +285,7 @@ struct DeepSeekConfigCard: View {
             deepSeekApiKeyInput = ""
         }
 
-        guard let provider = monitor.provider(for: "deepseek") else {
+        guard let provider = monitor.login(id: "deepseek") else {
             deepSeekTestResult = "Failed: DeepSeek provider is not registered"
             return
         }

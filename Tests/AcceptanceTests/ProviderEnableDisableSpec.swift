@@ -140,7 +140,7 @@ struct ProviderEnableDisableSpec {
 
             // Then — Codex appears, Claude still selected
             #expect(codex.isEnabled == true)
-            #expect(monitor.enabledProviders.count == 2)
+            #expect(monitor.lineup.count == 2)
             #expect(monitor.selectedProviderId == "claude")
         }
     }

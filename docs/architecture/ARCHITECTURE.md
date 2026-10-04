@@ -94,9 +94,9 @@ public struct UsageQuota: Sendable, Equatable {
 public final class QuotaMonitor {
     public let providers: Providers        // the providers you keep: add, delete, order, lineup
 
-    public var allProviders: [Account]     // every login
-    public var enabledProviders: [Account] // the lineup
-    public func provider(for id: String) -> Account?
+    public var logins: [Account]           // every login
+    public var lineup: [Account]           // the lineup
+    public func login(id: String) -> Account?
 }
 ```
 
@@ -132,8 +132,8 @@ struct MenuContentView: View {
     let monitor: QuotaMonitor  // Injected from app
 
     var body: some View {
-        ForEach(monitor.enabledProviders, id: \.id) { provider in
-            ProviderPill(provider: provider)
+        ForEach(monitor.lineup, id: \.id) { login in
+            ProviderPill(provider: login)
         }
     }
 }

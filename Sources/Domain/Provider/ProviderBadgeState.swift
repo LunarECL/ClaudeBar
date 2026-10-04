@@ -52,12 +52,35 @@ public enum ProviderBadgeState: Equatable, Sendable {
     /// unavailable only when every one failed; not set up only when every one
     /// is waiting for setup — and nothing alarming while any shows usage.
     @MainActor
-    public init(of logins: [any AIProvider], quotaStatus: QuotaStatus?) {
+    public init(of logins: [Account], quotaStatus: QuotaStatus?) {
+        self.init(of: logins.map { Login(isSyncing: $0.isSyncing, failed: $0.lastError != nil,
+                                         needsSetup: $0.needsSetup, readsUsage: $0.readsUsage) },
+                  quotaStatus: quotaStatus)
+    }
+
+    /// What the badge reads of one login.
+    public struct Login: Sendable {
+        let isSyncing: Bool
+        let failed: Bool
+        let needsSetup: Bool
+        let readsUsage: Bool
+
+        public init(isSyncing: Bool = false, failed: Bool = false, needsSetup: Bool = false, readsUsage: Bool = false) {
+            self.isSyncing = isSyncing
+            self.failed = failed
+            self.needsSetup = needsSetup
+            self.readsUsage = readsUsage
+        }
+    }
+
+    /// A tab's state from its logins: syncing when one is, failed or waiting
+    /// for setup only when every one is, usage read when one reads it.
+    public init(of logins: [Login], quotaStatus: QuotaStatus?) {
         self.init(
             isSyncing: logins.contains { $0.isSyncing },
             quotaStatus: quotaStatus,
-            hasError: !logins.isEmpty && logins.allSatisfy { $0.lastError != nil },
-            needsSetup: !logins.isEmpty && logins.allSatisfy { $0.needsSetup },
+            hasError: !logins.isEmpty && logins.allSatisfy(\.failed),
+            needsSetup: !logins.isEmpty && logins.allSatisfy(\.needsSetup),
             readsUsage: logins.contains { $0.readsUsage }
         )
     }

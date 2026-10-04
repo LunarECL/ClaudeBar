@@ -43,9 +43,9 @@ struct ThemesSpec {
 
             // Then — unique identities for theme mapping
             #expect(claude.id == "claude")
-            #expect(claude.name == "Claude")
+            #expect(claude.lineupName == "Claude")
             #expect(codex.id == "codex")
-            #expect(codex.name == "Codex")
+            #expect(codex.lineupName == "Codex")
             #expect(claude.id != codex.id)
         }
     }

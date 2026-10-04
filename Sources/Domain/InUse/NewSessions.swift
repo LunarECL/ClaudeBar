@@ -136,10 +136,10 @@ public final class NewSessions {
 
     /// After a login's refresh: *Switch when low* moves new sessions, or a
     /// login worth moving to is announced — once per low.
-    public func review(_ refreshed: any AIProvider) async {
-        guard let login = refreshed as? Account, let inUse = login.provider.inUse,
+    public func review(_ refreshed: Account) async {
+        guard let inUse = refreshed.provider.inUse,
               let notice = try? inUse.review() else { return }
-        await announcer?.announce(InUseAlert(notice, of: login.provider))
+        await announcer?.announce(InUseAlert(notice, of: refreshed.provider))
     }
 
     /// *Add to ~/.zshrc* — writes the lines, then makes the waiting choice.

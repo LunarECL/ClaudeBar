@@ -57,7 +57,7 @@ struct AddProviderSpec {
 
             // Then — "OpenRouter" appears with $12.40 of $50.00, no reset and no percentage of a window
             #expect(saved.profile.origin == .custom)
-            #expect(monitor.allProviders.map(\.name) == ["OpenRouter"])
+            #expect(monitor.logins.map(\.lineupName) == ["OpenRouter"])
             let credits = try #require(openRouter.snapshot?.quotas.first)
             #expect(credits.left == .money(Money(Decimal(string: "12.4")!, currency: "USD"), of: Money(50, currency: "USD")))
             #expect(credits.resetsAt == nil)

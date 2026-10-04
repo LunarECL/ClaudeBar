@@ -113,8 +113,8 @@ struct ProviderSelectionSpec {
             )
 
             // Then — only Claude appears
-            #expect(monitor.enabledProviders.count == 1)
-            #expect(monitor.enabledProviders.first?.id == "claude")
+            #expect(monitor.lineup.count == 1)
+            #expect(monitor.lineup.first?.id == "claude")
         }
 
         @Test
@@ -129,7 +129,7 @@ struct ProviderSelectionSpec {
             )
 
             // Then
-            #expect(monitor.enabledProviders.count == 2)
+            #expect(monitor.lineup.count == 2)
         }
     }
 

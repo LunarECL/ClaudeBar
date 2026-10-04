@@ -165,13 +165,13 @@ public final class QuotaMonitor {
     // The providers you keep: add, delete, order, the derived lineup
     public let providers: Providers
 
-    public var allProviders: [Account]       // every login
-    public var enabledProviders: [Account]   // the lineup
-    public func provider(for id: String) -> Account?
+    public var logins: [Account]   // every login
+    public var lineup: [Account]   // the lineup
+    public func login(id: String) -> Account?
 
     // Selection state
     public var selectedProviderId: String
-    public var selectedProvider: Account?
+    public var selectedLogin: Account?
     public var selectedProviderStatus: QuotaStatus
 }
 
@@ -181,8 +181,8 @@ struct MenuContentView: View {
 
     var body: some View {
         // Use delegation methods, not monitor.providers.enabled
-        ForEach(monitor.enabledProviders, id: \.id) { provider in
-            ProviderPill(provider: provider)
+        ForEach(monitor.lineup, id: \.id) { login in
+            ProviderPill(provider: login)
         }
     }
 }

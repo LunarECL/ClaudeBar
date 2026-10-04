@@ -311,7 +311,7 @@ struct CommandCodeDefinitionTests {
     @Test func `definition preserves identity and initial state`() throws {
         let provider = try make().defaultAccount
         #expect(provider.id == "commandcode")
-        #expect(provider.name == "Command Code")
+        #expect(provider.lineupName == "Command Code")
         #expect(provider.cliCommand == "cmd")
         #expect(provider.dashboardURL?.absoluteString == "https://commandcode.ai/usage")
         #expect(provider.isEnabled)

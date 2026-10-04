@@ -729,7 +729,7 @@ struct QuotaMonitorTests {
         let monitor = makeMonitor(providers: kept([provider]))
 
         // When
-        let found = monitor.provider(for: "claude")
+        let found = monitor.login(id: "claude")
 
         // Then
         #expect(found?.id == "claude")
@@ -741,7 +741,7 @@ struct QuotaMonitorTests {
         let monitor = makeMonitor(providers: kept([]))
 
         // When
-        let found = monitor.provider(for: "unknown")
+        let found = monitor.login(id: "unknown")
 
         // Then
         #expect(found == nil)
@@ -1188,11 +1188,11 @@ struct QuotaMonitorTests {
         let monitor = makeMonitor(providers: kept([claude, codex]))
 
         // Then
-        #expect(monitor.allProviders.count == 2)
+        #expect(monitor.logins.count == 2)
     }
 
     @Test
-    func `enabledProviders returns only enabled providers`() {
+    func `the lineup holds only enabled logins`() {
         // Given
         let settings = makeSettingsRepository()
         let claude = stubbedLogin("claude", probe: MockUsageProbe(), settings: settings)
@@ -1201,8 +1201,8 @@ struct QuotaMonitorTests {
         let monitor = makeMonitor(providers: kept([claude, codex]))
 
         // Then
-        #expect(monitor.enabledProviders.count == 1)
-        #expect(monitor.enabledProviders.first?.id == "claude")
+        #expect(monitor.lineup.count == 1)
+        #expect(monitor.lineup.first?.id == "claude")
     }
 
     // MARK: - Lowest Quota
@@ -1264,7 +1264,7 @@ struct QuotaMonitorTests {
         monitor.selectedProviderId = "codex"
 
         // Then
-        #expect(monitor.selectedProvider?.id == "codex")
+        #expect(monitor.selectedLogin?.id == "codex")
     }
 
     @Test
@@ -1277,7 +1277,7 @@ struct QuotaMonitorTests {
         monitor.selectedProviderId = "claude"
 
         // Then
-        #expect(monitor.selectedProvider == nil)
+        #expect(monitor.selectedLogin == nil)
     }
 
     @Test
@@ -1459,7 +1459,7 @@ struct QuotaMonitorTests {
         let monitor = makeMonitor(providers: repository)
 
         // Then
-        #expect(monitor.allProviders.count == 2)
+        #expect(monitor.logins.count == 2)
     }
 
     // MARK: - Quota Alerter

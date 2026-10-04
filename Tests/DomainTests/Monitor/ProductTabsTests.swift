@@ -37,7 +37,7 @@ struct ProductTabsTests {
         monitor.setProductEnabled(monitor.productTabs[0], enabled: false)
 
         #expect(!monitor.productTabs[0].isEnabled)
-        #expect(!monitor.enabledProviders.contains { $0.id.hasPrefix("codex") })
+        #expect(!monitor.lineup.contains { $0.id.hasPrefix("codex") })
         #expect(codex.accounts.allSatisfy(\.isEnabled) == true)
     }
 
@@ -58,8 +58,8 @@ struct ProductTabsTests {
         monitor.providers.move("claude", by: -1)
 
         #expect(monitor.productTabs.map(\.id) == ["claude", "codex"])
-        #expect(monitor.allProviders.map(\.id).prefix(1) == ["claude"])
-        #expect(monitor.allProviders.map(\.id).suffix(2) == ["codex", "codex.work"])
+        #expect(monitor.logins.map(\.id).prefix(1) == ["claude"])
+        #expect(monitor.logins.map(\.id).suffix(2) == ["codex", "codex.work"])
     }
 
     @Test

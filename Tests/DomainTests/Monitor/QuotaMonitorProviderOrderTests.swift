@@ -59,8 +59,8 @@ struct QuotaMonitorProviderOrderTests {
         let repository = makeProviders(settings: settings)
         let monitor = makeMonitor(providers: repository, settings: settings)
 
-        #expect(monitor.enabledProviders.map(\.id) == ["claude", "codex", "gemini"])
-        #expect(monitor.allProviders.map(\.id) == ["claude", "codex", "gemini"])
+        #expect(monitor.lineup.map(\.id) == ["claude", "codex", "gemini"])
+        #expect(monitor.logins.map(\.id) == ["claude", "codex", "gemini"])
     }
 
     @Test
@@ -69,7 +69,7 @@ struct QuotaMonitorProviderOrderTests {
         let repository = makeProviders(settings: settings)
         let monitor = makeMonitor(providers: repository, settings: settings)
 
-        #expect(monitor.enabledProviders.map(\.id) == ["gemini", "claude", "codex"])
+        #expect(monitor.lineup.map(\.id) == ["gemini", "claude", "codex"])
     }
 
     @Test
@@ -78,7 +78,7 @@ struct QuotaMonitorProviderOrderTests {
         let repository = makeProviders(settings: settings)
         let monitor = makeMonitor(providers: repository, settings: settings)
 
-        #expect(monitor.allProviders.map(\.id) == ["gemini", "claude", "codex"])
+        #expect(monitor.logins.map(\.id) == ["gemini", "claude", "codex"])
     }
 
     @Test
@@ -89,7 +89,7 @@ struct QuotaMonitorProviderOrderTests {
         let repository = makeProviders(settings: settings)
         let monitor = makeMonitor(providers: repository, settings: settings)
 
-        #expect(monitor.allProviders.map(\.id) == ["gemini", "claude", "codex"])
+        #expect(monitor.logins.map(\.id) == ["gemini", "claude", "codex"])
     }
 
     @Test
@@ -99,9 +99,9 @@ struct QuotaMonitorProviderOrderTests {
         repository.provider(id: "codex")?.isEnabled = false
         let monitor = makeMonitor(providers: repository, settings: settings)
 
-        #expect(monitor.enabledProviders.map(\.id) == ["gemini", "claude"])
+        #expect(monitor.lineup.map(\.id) == ["gemini", "claude"])
         // ... while allProviders still shows the full persisted order
-        #expect(monitor.allProviders.map(\.id) == ["gemini", "claude", "codex"])
+        #expect(monitor.logins.map(\.id) == ["gemini", "claude", "codex"])
     }
 
     // MARK: - Keyboard selection follows the persisted order
@@ -144,7 +144,7 @@ struct QuotaMonitorProviderOrderTests {
 
         monitor.providers.move("gemini", by: -2)
 
-        #expect(monitor.enabledProviders.map(\.id) == ["gemini", "claude", "codex"])
+        #expect(monitor.lineup.map(\.id) == ["gemini", "claude", "codex"])
         monitor.selectProvider(atPosition: 1)
         #expect(monitor.selectedProviderId == "gemini")
     }

@@ -211,7 +211,7 @@ final class StatusItemLabelDriver {
 
     private func currentLabelContent() -> LabelContent {
         let primaryQuotaKey = settings.menuBarPercentageQuotaKey.isEmpty
-            ? (monitor.provider(for: settings.menuBarPercentageProviderId).flatMap { monitor.usage(of: $0) }?.quotas.first?.quotaType.quotaKey ?? "session")
+            ? (monitor.login(id: settings.menuBarPercentageProviderId).flatMap { monitor.usage(of: $0) }?.quotas.first?.quotaType.quotaKey ?? "session")
             : settings.menuBarPercentageQuotaKey
         let freshLabel = monitor.menuBarLabel(
             providerId: settings.menuBarPercentageProviderId,
@@ -242,11 +242,11 @@ final class StatusItemLabelDriver {
         )
         let hasCountdownColon = ([label].compactMap { $0 } + additionalLabels.map(\.label))
             .contains { !CountdownColon.ranges(in: $0.text).isEmpty }
-        let primaryProvider = monitor.enabledProviders.first { $0.id == settings.menuBarPercentageProviderId }
+        let primaryProvider = monitor.lineup.first { $0.id == settings.menuBarPercentageProviderId }
         let showsQuota = settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled
         let shownIds = [settings.menuBarPercentageProviderId] + additionalLabels.map(\.providerId)
         let accountNames = MenuBarAccountName.names(Dictionary(uniqueKeysWithValues: Set(shownIds).compactMap { id in
-            (monitor.enabledProviders.first { $0.id == id } as? Account)
+            monitor.login(id: id)
                 .flatMap { $0.provider.hasSeveralAccounts ? (id, settings.shown($0.displayName)) : nil }
         }))
         let primaryProviderName = Self.showsPrimaryLogo(
@@ -254,7 +254,7 @@ final class StatusItemLabelDriver {
             hasOtherReadouts: !additionalLabels.isEmpty,
             hasAccountName: accountNames[settings.menuBarPercentageProviderId] != nil,
             logoAlways: settings.menuBarProviderLogoEnabled
-        ) ? primaryProvider.map { settings.shown($0.name) } : nil
+        ) ? primaryProvider.map { settings.shown($0.lineupName) } : nil
 
         return LabelContent(
             label: label,
@@ -291,7 +291,7 @@ final class StatusItemLabelDriver {
     /// we have nothing to fall back to, so the normal "no data yet" icon shows.
     private func lastKnownLabel(whenFreshIsMissing freshLabel: MenuBarLabel?) -> MenuBarLabel? {
         guard freshLabel == nil, let previous = lastContent?.label else { return nil }
-        let providerHasSnapshot = monitor.enabledProviders.contains {
+        let providerHasSnapshot = monitor.lineup.contains {
             $0.id == settings.menuBarPercentageProviderId && $0.snapshot != nil
         }
         return providerHasSnapshot ? previous : nil
@@ -300,7 +300,7 @@ final class StatusItemLabelDriver {
     /// Status of the selected provider, considering the burn-rate setting.
     /// Mirrors the dropdown's status logic for the icon-only fallback.
     private var effectiveSelectedProviderStatus: QuotaStatus {
-        monitor.selectedProvider.flatMap { monitor.usage(of: $0) }?.overallStatus(under: settings.statusPolicy) ?? .healthy
+        monitor.selectedLogin.flatMap { monitor.usage(of: $0) }?.overallStatus(under: settings.statusPolicy) ?? .healthy
     }
 
     private func render(_ content: LabelContent) {
@@ -768,7 +768,7 @@ final class StatusItemLabelDriver {
     /// selected provider. Disabled providers are dropped (issue #67).
     private var backgroundRefreshProviderIds: [String]? {
         guard settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled else { return nil }
-        let enabledProviderIds = Set(monitor.enabledProviders.map(\.id))
+        let enabledProviderIds = Set(monitor.lineup.map(\.id))
         var seen = Set<String>()
         return ([monitor.selectedProviderId, settings.menuBarPercentageProviderId]
             + settings.menuBarAdditionalProviderIds)
