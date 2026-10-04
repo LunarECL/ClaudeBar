@@ -251,6 +251,48 @@ struct CommandFetcher: Fetching {
     static let system: MakeExecutor = { environment in PipeCLIExecutor(environment: environment) }
 }
 
+/// `script` — the person's own script, run with `/bin/sh` from its folder,
+/// its environment the definition's values and the secrets it names, read
+/// from the login's vault. Answers with what it printed; a non-zero exit is
+/// a fact, as for `command`.
+struct ScriptFetcher: Fetching {
+    let call: ScriptCall
+    let providerId: String
+    let secrets: (any SecretStore)?
+    let makeExecutor: CommandFetcher.MakeExecutor
+
+    func isReady() -> Bool {
+        FileManager.default.fileExists(atPath: call.path)
+    }
+
+    func fetch(with credential: Credential?) async throws -> Response {
+        var set = call.environment
+        for (variable, setting) in call.secrets {
+            if let value = secrets?.secret(setting, provider: providerId) { set[variable] = value }
+        }
+        let executor = makeExecutor(ProcessEnvironment(set: set))
+        let name = (call.run as NSString).lastPathComponent
+        guard isReady() else { throw CLIMissingError(cli: name) }
+        let result: CLIResult
+        do {
+            result = try await executor.execute(
+                binary: "/bin/sh", args: ["-c", call.path], input: nil, timeout: call.timeout,
+                workingDirectory: URL(fileURLWithPath: call.folder, isDirectory: true), autoResponses: [:]
+            )
+        } catch let error as UsageError {
+            throw error
+        } catch {
+            AppLog.probes.error("\(name) could not start")
+            throw CLILaunchError(cli: name)
+        }
+        guard result.exitCode == 0 else {
+            AppLog.probes.error("\(name) exited with \(result.exitCode)")
+            throw CLIExitError(cli: name, exitCode: result.exitCode)
+        }
+        return Response(text: result.output)
+    }
+}
+
 /// `cli` — drives a CLI in a terminal and answers with what the screen
 /// showed, drawn by a terminal emulator first when the session asks for it.
 struct CLIFetcher: Fetching {
