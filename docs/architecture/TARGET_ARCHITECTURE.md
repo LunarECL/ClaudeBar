@@ -1084,13 +1084,18 @@ CANONICAL §8: *"the same `Provider`, with script fetches"*. The person's
 
 ### 12.3 · Slices — the visible problem first, each green
 
+The lineup can only be `[Account]` once every member is one, so extensions
+become definitions before the Monitor changes type (corrected 2026-10-04: the
+first order put the Monitor first, which would have needed `AIProvider` to
+stay for extensions).
+
 | # | Slice | Fixes · pins |
 |---|---|---|
-| 1 | **Settings by product**: Providers rows and pages take a `Provider` (from `ProductTab`); the page is titled *Claude*, its toggle is `provider.isEnabled` (hides every login), its logins are the Accounts card | the visible problem · one row per product; the toggle hides every login and keeps their settings; extensions keep their own row |
-| 2 | `Monitor.providers: [Provider]`, `lineup: [Account]`; `AIProviderRepository` and `AIProviders` go | the cause, in the domain · every Monitor test on definitions over stubbed connections (`StubbedProvider`, shared) |
-| 3 | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
-| 4 | `Fetch.script` + the manifest → definition reader; extensions load as `Provider`s, their sections mapped as 12.2; `ExtensionProvider` goes | the last other conformer · golden tests on `docs/features/extensions/example-provider`; quotas and cost read the same |
-| 5 | Delete `AIProvider` and the test stubs (`StubClaudeProvider` …) | done · the build has no `AIProvider` |
+| 1 ✅ | **Settings by product**: Providers rows and pages take a `Provider` (from `ProductTab`); the page is titled *Claude*, its toggle is `provider.isEnabled` (hides every login), its logins are the Accounts card | the visible problem · one row per product; the toggle hides every login and keeps their settings; extensions keep their own row |
+| 2 | **Extensions as definitions**: `Fetch.script`; a definition's data sources can **answer together** (each section one, the usage their union, a failed one left out); the manifest → definition reader; sections mapped as 12.2; `ExtensionProvider` goes | every lineup member is an `Account` · golden tests on `docs/features/extensions/example-provider`: quotas and cost read the same; config fields as settings; a failing section left out |
+| 3 | `Monitor.providers: [Provider]`, `lineup: [Account]`; `AIProviderRepository` and `AIProviders` go; the test stubs become definitions over stubbed connections | the cause, in the domain · every Monitor test |
+| 4 | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
+| 5 | Delete `AIProvider` | done · the build has no `AIProvider` |
 
 #### Slice 1 in detail — Settings by product
 
