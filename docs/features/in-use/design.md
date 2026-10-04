@@ -26,7 +26,7 @@ In use is a **capability** ([CANONICAL §2.1](../../architecture/CANONICAL_MODEL
  NewSessions (Domain) ── lines not in the shell? ── waits ──▶ setUp · setUpByHand · cancel · turnOff
         │                                                    └── ShellLines (port) ← ShellSetup
         ▼
- provider.inUse: InUse (Providers) ── use(login) ──▶ LoginsInUse (port) → ~/.claudebar/in-use/<provider>
+ provider.inUse: InUse (Providers) ── use(login) ──▶ LoginsInUse (port) → ~/.claudebar/in-use/<command>
         ▲                                                                          │ read on every run
  QuotaMonitor.onRefreshed ─▶ newSessions.review ─▶ inUse.review()                 ▼
         (knows no In use)        └─▶ InUseAnnouncer (port) ← InUseNotifications   $ claude → CLAUDE_CONFIG_DIR=<folder>
@@ -40,7 +40,7 @@ No token is copied: each login keeps its own Keychain item and refresh token. No
 |---|---|---|
 | **in use** | the login new terminal sessions of a CLI start with | the *default* login (the plain one the CLI uses on its own), the *selected* chip, an *active* account (every login is still fetched) |
 | **new terminal sessions** | the next `claude` / `codex` run from a shell with the lines | running sessions, Claude Desktop, IDE extensions |
-| **the record** | `~/.claudebar/in-use/<provider>`: the folder, or empty for the plain login | settings.json (keeps no copy) |
+| **the record** | `~/.claudebar/in-use/<command>` — one per CLI (`claude`, `codex`): the folder, or empty for the plain login | settings.json (keeps no copy); a product's id |
 | **the shell lines** | the block between `# >>> claudebar in-use >>>` markers, or fish's own file | the user's own aliases and exports |
 | **worth switching** | the login in use is critical or out, and another has more left | *Switch when low* (acts, opt-in) |
 
@@ -84,7 +84,8 @@ Views never compare accounts, inspect folders, count logins or read quotas.
 | Law | Owner |
 |---|---|
 | The login in use is the plain login or a folder login of the same product; nothing recorded, or a folder no login has, is the plain login | `InUse` |
-| Only the folder is recorded, nowhere else | `LoginsInUse` / `DiskLoginsInUse` |
+| Only the folder is recorded, nowhere else, under the CLI's name | `LoginsInUse` / `DiskLoginsInUse`, keyed by `InUse.command.name` |
+| A CLI is wrapped once, however many products run it; two products on one CLI share its record, the last choice wins, and the other shows its plain login | `NewSessions.commands` (each once) · `ShellSetup` |
 | Removing the login in use goes back to the plain login | `InUse.forget`, told by `Provider.remove` |
 | A login worth switching to is told once per low | `InUse.review` |
 | *Switch when low* is off until turned on, moves only below its threshold to a ticked login with more left | `SwitchWhenLow` |

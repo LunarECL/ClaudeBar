@@ -104,7 +104,7 @@ public final class Provider {
             return left < right
         }.map(\.element)
         if let loginsInUse, let call = definition.accounts?.signIn, definition.accounts?.folder != nil {
-            inUse = InUse(provider: self, command: TerminalCommand(name: call.cli, variable: call.homeVariable, providerId: definition.id),
+            inUse = InUse(provider: self, command: TerminalCommand(name: call.cli, variable: call.homeVariable),
                           record: loginsInUse, switchWhenLow: SwitchWhenLow(providerId: definition.id, settings: settings))
         }
     }

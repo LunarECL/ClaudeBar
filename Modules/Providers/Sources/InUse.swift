@@ -6,7 +6,9 @@ import Quotas
 /// *In use* — which of a product's logins new terminal sessions start with.
 /// Only a product whose CLI can be started on a login's folder has one
 /// (`Provider.inUse`). The choice is recorded as that folder, through
-/// `LoginsInUse`, where the shell lines read it; running sessions keep theirs.
+/// `LoginsInUse`, under the CLI's name — the shell starts a CLI, not a
+/// product, so two products on one CLI share its record and the last choice
+/// wins. Running sessions keep theirs.
 @MainActor
 @Observable
 public final class InUse {
@@ -27,7 +29,7 @@ public final class InUse {
         self.switchWhenLow = switchWhenLow
         self.loginId = provider.defaultAccount.id
         // A record naming a folder no login has is the plain login.
-        if let folder = record.folder(for: provider.id),
+        if let folder = record.folder(for: command.name),
            let chosen = provider.accounts.first(where: { $0.folder?.url.path == folder.standardizedFileURL.path }) {
             loginId = chosen.id
         }
@@ -51,7 +53,7 @@ public final class InUse {
         guard logins.contains(where: { $0 === account }) else {
             throw UsageError.executionFailed("This login can't be used for new \(provider.name) sessions.")
         }
-        try record.use(account.isDefault ? nil : account.folder?.url, for: provider.id)
+        try record.use(account.isDefault ? nil : account.folder?.url, for: command.name)
         loginId = account.id
         AppLog.providers.info("\(provider.id): new sessions use \(account.isDefault ? "the plain login" : "an added login")")
     }
@@ -59,7 +61,7 @@ public final class InUse {
     /// The removed login was in use: new sessions go back to the plain login.
     func forget(_ account: Account) {
         guard loginId == account.id else { return }
-        try? record.use(nil, for: provider.id)
+        try? record.use(nil, for: command.name)
         loginId = provider.defaultAccount.id
     }
 
@@ -96,14 +98,13 @@ public final class InUse {
 /// The command new terminal sessions run, and the variable that starts it on
 /// a login's folder: `claude` with `CLAUDE_CONFIG_DIR`.
 public struct TerminalCommand: Sendable, Equatable {
+    /// The CLI — and the name its choice is recorded under.
     public let name: String
     public let variable: String
-    public let providerId: String
 
-    public init(name: String, variable: String, providerId: String) {
+    public init(name: String, variable: String) {
         self.name = name
         self.variable = variable
-        self.providerId = providerId
     }
 }
 

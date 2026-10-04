@@ -23,7 +23,7 @@ The first time you choose a login other than the plain one, ClaudeBar shows the 
 - **Add to ~/.zshrc**, **~/.bash_profile**, or a fish file of its own. ClaudeBar picks your login shell; you can choose another.
 - **Copy — I'll Add It**, to put them in yourself.
 
-The lines wrap `claude` and `codex` in small functions that read `~/.claudebar/in-use/<provider>` on every run. That file holds only the chosen login's folder, never a key. Tabs already open pick it up after `source ~/.zshrc`, or in a new tab.
+The lines wrap `claude` and `codex` in small functions that read `~/.claudebar/in-use/claude` (or `codex`) on every run — one record per CLI. That file holds only the chosen login's folder, never a key. Tabs already open pick it up after `source ~/.zshrc`, or in a new tab.
 
 **Turn it off:** **Settings → Accounts → Remove** next to *Shell set up*, or delete the block between `# >>> claudebar in-use >>>` and `# <<< claudebar in-use <<<`. Every CLI goes back to its own login.
 

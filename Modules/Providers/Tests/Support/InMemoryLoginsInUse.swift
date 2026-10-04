@@ -11,11 +11,11 @@ final class InMemoryLoginsInUse: LoginsInUse, @unchecked Sendable {
         folders = existing
     }
 
-    func folder(for providerId: String) -> URL? {
-        lock.withLock { folders[providerId] }
+    func folder(for command: String) -> URL? {
+        lock.withLock { folders[command] }
     }
 
-    func use(_ folder: URL?, for providerId: String) throws {
-        lock.withLock { folders[providerId] = folder?.standardizedFileURL }
+    func use(_ folder: URL?, for command: String) throws {
+        lock.withLock { folders[command] = folder?.standardizedFileURL }
     }
 }

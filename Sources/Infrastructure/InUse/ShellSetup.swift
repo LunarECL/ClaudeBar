@@ -14,8 +14,11 @@ public struct ShellSetup: ShellLines {
     public let commands: [TerminalCommand]
     public let home: URL
 
+    /// A CLI is wrapped once, however many products run it.
     public init(commands: [TerminalCommand], home: URL = FileManager.default.homeDirectoryForCurrentUser) {
-        self.commands = commands
+        self.commands = commands.reduce(into: []) { kept, command in
+            if !kept.contains(where: { $0.name == command.name }) { kept.append(command) }
+        }
         self.home = home
     }
 
@@ -37,7 +40,7 @@ public struct ShellSetup: ShellLines {
     public func lines(for shell: LoginShell) -> String {
         let existing = (try? String(contentsOf: file(for: shell), encoding: .utf8)) ?? ""
         let body = commands.map { command -> String in
-            let record = "$HOME/.claudebar/in-use/\(command.providerId)"
+            let record = "$HOME/.claudebar/in-use/\(command.name)"
             if shell == .fish {
                 return """
                 function \(command.name)

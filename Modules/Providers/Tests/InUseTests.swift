@@ -20,7 +20,7 @@ struct InUseTests {
 
         let inUse = try #require(codex.inUse)
         #expect(inUse.login === codex.defaultAccount)
-        #expect(inUse.command == TerminalCommand(name: "codex", variable: "CODEX_HOME", providerId: "codex"))
+        #expect(inUse.command == TerminalCommand(name: "codex", variable: "CODEX_HOME"))
     }
 
     @Test
@@ -66,6 +66,22 @@ struct InUseTests {
         #expect(work.isInUse)
         #expect(!codex.defaultAccount.isInUse)
         #expect(stub.loginsInUse.folder(for: "codex") == work.folder?.url)
+    }
+
+    @Test
+    func `the choice is recorded under the CLI's name, so two products on one CLI share it`() throws {
+        let (stub, codex, work) = try InUseFixture.twoLogins()
+        defer { stub.cleanUp() }
+        // A second product running the same CLI, on the same record.
+        let other = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
+
+        try work.useForNewSessions()
+        try other.defaultAccount.useForNewSessions()
+
+        #expect(stub.loginsInUse.folder(for: "codex") == nil)
+        let again = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
+        #expect(again.inUse?.login === again.defaultAccount)
+        #expect(codex.inUse?.command.name == "codex")
     }
 
     @Test

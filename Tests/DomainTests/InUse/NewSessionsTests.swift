@@ -166,8 +166,8 @@ struct NewSessionsTests {
     }
 
     @Test
-    func `the commands are the products' own`() {
-        let sessions = NewSessions(products: [codex()], shellLines: lines, shell: .zsh)
+    func `each CLI is named once, however many products run it`() {
+        let sessions = NewSessions(products: [codex(), codex()], shellLines: lines, shell: .zsh)
 
         #expect(sessions.commands == ["codex"])
     }

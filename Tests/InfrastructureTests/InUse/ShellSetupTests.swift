@@ -15,8 +15,10 @@ struct ShellSetupTests {
         home = FileManager.default.temporaryDirectory.appendingPathComponent("shell-setup-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
         setup = ShellSetup(commands: [
-            TerminalCommand(name: "claude", variable: "CLAUDE_CONFIG_DIR", providerId: "claude"),
-            TerminalCommand(name: "codex", variable: "CODEX_HOME", providerId: "codex"),
+            TerminalCommand(name: "claude", variable: "CLAUDE_CONFIG_DIR"),
+            TerminalCommand(name: "codex", variable: "CODEX_HOME"),
+            // A second product on the same CLI: wrapped once all the same.
+            TerminalCommand(name: "claude", variable: "CLAUDE_CONFIG_DIR"),
         ], home: home)
     }
 
@@ -35,6 +37,14 @@ struct ShellSetupTests {
         #expect(LoginShell.login("/opt/homebrew/bin/fish") == .fish)
         #expect(LoginShell.login("/bin/zsh") == .zsh)
         #expect(LoginShell.login(nil) == .zsh)
+    }
+
+    @Test
+    func `a CLI is wrapped once, however many products run it`() {
+        let lines = setup.lines(for: .zsh)
+
+        #expect(lines.components(separatedBy: "function claude {").count == 2)
+        #expect(lines.contains("# ClaudeBar → In use: new claude and codex sessions"))
     }
 
     // MARK: - Install and remove

@@ -84,8 +84,13 @@ public final class NewSessions {
         }
     }
 
-    /// The commands the lines wrap — `claude`, `codex`.
-    public var commands: [String] { products.compactMap { $0.inUse?.command.name } }
+    /// The CLIs the lines wrap — `claude`, `codex` — each once, however many
+    /// products run it.
+    public var commands: [String] {
+        products.compactMap { $0.inUse?.command.name }.reduce(into: []) { kept, name in
+            if !kept.contains(name) { kept.append(name) }
+        }
+    }
 
     /// The lines as the setup shows them, and the file they go in.
     public var lines: String { shellLines.lines(for: shell) }

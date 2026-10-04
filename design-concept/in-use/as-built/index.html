@@ -70,8 +70,8 @@ figcaption{font-size:12px;color:var(--muted);max-width:320px}
       <div style="display:flex;flex-direction:column;gap:12px">
         <div class="issue"><span class="tag fix">1 · fixed</span><b>Built as the approved mockup</b>
           IN USE badge in the chip, ⋯ with <i>Use for New Sessions</i>, a one-line caption, the low banner; Settings: a radio on each account row. (It was a system <code>Menu</code> with a lone chevron.)</div>
-        <div class="issue"><span class="tag bad">2 · Design</span><b>"claude, codex, or claude" — and <code>function claude</code> twice in the lines</b>
-          Two products run the same CLI (built-in Claude and a custom provider on <code>claude</code>). The record is keyed by <b>product</b> (<code>in-use/&lt;provider&gt;</code>), but the shell wraps a <b>command</b>: one CLI can only start on one login. Each product writes its own function, so the second overrides the first, and the choice made in one product silently does nothing.</div>
+        <div class="issue"><span class="tag fix">2 · fixed</span><b>The record belongs to the CLI</b>
+          <code>~/.claudebar/in-use/&lt;command&gt;</code>; a CLI is wrapped once however many products run it, and the setup names each once — "claude or codex". (It said "claude, codex, or claude" and wrote <code>function claude</code> twice.)</div>
         <div class="issue"><span class="tag bad">3 · UI</span><b>The setup card pushes the usage down</b>
           It sits above the cards at full height. Acceptable as a one-time step, but the lines box could be collapsed behind <i>Show the lines</i>.</div>
       </div>
