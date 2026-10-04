@@ -272,4 +272,48 @@ struct StatusItemWriteGateTests {
         #expect(recorder.contents == ["A", "B", "C"])
         #expect(recorder.times == [0.0, 1.0, 2.0])
     }
+
+    // MARK: - Reconcile (the render skip path)
+
+    @Test
+    func `reconcile points the armed flush at the newest render instead of a stale pending value`() {
+        // Given — the driver skipped a render because the screen already
+        // shows that content, but a flush is still armed carrying an older
+        // render's value
+        let clock = FakeClock()
+        let scheduler = FlushScheduler()
+        let recorder = WriteRecorder()
+        let gate = makeGate(clock: clock, scheduler: scheduler, recorder: recorder)
+        gate.submit("A")
+        clock.time = 0.5
+        gate.submit("B")
+
+        // When — the skip path reconciles with the newest render (identical
+        // to what is on screen)
+        gate.reconcile("A")
+
+        // Then — reconcile itself never writes and never reschedules; the
+        // armed flush now carries the reconciled content, so the older B can
+        // never be applied over the state the screen already shows
+        #expect(recorder.contents == ["A"])
+        #expect(scheduler.totalScheduled == 1)
+        clock.time = 1.0
+        scheduler.fireDue(at: clock.time)
+        #expect(recorder.contents == ["A", "A"])
+        #expect(recorder.times == [0.0, 1.0])
+    }
+
+    @Test
+    func `reconcile with nothing pending writes nothing and schedules nothing`() {
+        let clock = FakeClock()
+        let scheduler = FlushScheduler()
+        let recorder = WriteRecorder()
+        let gate = makeGate(clock: clock, scheduler: scheduler, recorder: recorder)
+        gate.submit("A")
+
+        gate.reconcile("A")
+
+        #expect(recorder.contents == ["A"])
+        #expect(scheduler.flushes.isEmpty)
+    }
 }

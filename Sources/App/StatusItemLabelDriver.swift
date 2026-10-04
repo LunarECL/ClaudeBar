@@ -311,6 +311,10 @@ final class StatusItemLabelDriver {
         // Skip when nothing changed and our image is still in place —
         // re-setting an identical image redraws the button and can flicker.
         if content == lastContent, let lastImage, statusItem?.button?.image === lastImage {
+            // The screen already shows this content, so a flush still armed
+            // from an earlier render is stale: point it at what is visible
+            // now instead of letting it publish an older value (issue #281).
+            writeGate?.reconcile(content)
             return
         }
         // Everything past this point is a write into the system's status-item

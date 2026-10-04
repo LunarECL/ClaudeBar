@@ -101,6 +101,16 @@ final class StatusItemWriteGate<Content: Equatable> {
         performWrite(pending, at: now())
     }
 
+    /// Replaces the pending content of the currently armed flush without
+    /// scheduling anything or writing. The driver calls this from the render
+    /// skip path: the screen already shows the newest render, so any flush
+    /// still armed from an earlier render would otherwise publish a value
+    /// older than what is visible. A no-op when nothing is pending.
+    func reconcile(_ content: Content) {
+        guard pending != nil else { return }
+        pending = content
+    }
+
     private func performWrite(_ content: Content, at currentNow: TimeInterval) {
         pending = nil
         lastWriteAt = currentNow
