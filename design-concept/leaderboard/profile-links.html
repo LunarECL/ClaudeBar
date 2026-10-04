@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profile Links — Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FFF8EC;--dot:#E9DCC4;--ink:#1E1B2E;--muted:#5E5873;--card:#fff;--lav:#EDE6FF;--mint:#9FE3B8;--pink:#FFB3C7;--sun:#FFD84D;--sky:#A9D8FF;--violet:#7C5CFF;--peach:#FFC9A8;--line:3px solid var(--ink);--shadow:4px 4px 0 var(--ink)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);background-image:radial-gradient(var(--dot) 1.4px,transparent 1.4px);background-size:18px 18px;color:var(--ink);font:500 15px/1.45 "Bricolage Grotesque",system-ui,sans-serif}
+.wrap{max-width:1320px;margin:0 auto;padding:36px 16px 64px;display:flex;flex-direction:column;gap:28px}
+header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:end}
+h1{margin:0;font-size:clamp(30px,5vw,44px);font-weight:800;letter-spacing:-.02em;line-height:1}
+.sub{margin:6px 0 0;color:var(--muted);max-width:720px}
+.tag{border:var(--line);border-radius:999px;padding:3px 12px;font-weight:800;font-size:13px;background:var(--sun);box-shadow:2px 2px 0 var(--ink)}
+.section-title{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+.row{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:10px;flex:1 1 380px;min-width:0;max-width:440px}
+.pop{background:var(--paper);background-image:radial-gradient(var(--dot) 1.2px,transparent 1.2px);background-size:14px 14px;border:var(--line);border-radius:22px;box-shadow:5px 5px 0 var(--ink);padding:14px;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--card);border:var(--line);border-radius:18px;box-shadow:var(--shadow);padding:14px;display:flex;flex-direction:column;gap:10px}
+.label{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted)}
+.hint.bad{color:#B4232C;font-weight:700}
+.hint.ok{color:#0E6B3A;font-weight:700}
+
+/* Board rows, as the popover draws them */
+ol.board{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+ol.board li{position:relative;display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;border:2px solid var(--ink);border-radius:8px;overflow:hidden;font-size:12px;font-weight:700}
+ol.board li .bar{position:absolute;inset:0 auto 0 0;z-index:0}
+ol.board li>*:not(.bar){position:relative;z-index:1}
+ol.board li.me{border-color:var(--violet);border-width:2.5px}
+.rank{width:20px;text-align:center;font-weight:800}
+.name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.you{font-size:9px;font-weight:800;color:#fff;background:var(--violet);border-radius:999px;padding:1px 6px}
+.tok{margin-left:auto;font-weight:800}
+a.link{display:inline-grid;place-items:center;width:18px;height:18px;border:1.5px solid var(--ink);border-radius:5px;background:#fff;color:var(--ink);flex:none}
+a.link:hover,a.link:focus-visible{background:var(--sun);outline:none}
+a.link svg{width:11px;height:11px}
+
+/* Picker */
+.seg{display:flex;border:var(--line);border-radius:999px;overflow:hidden;background:#fff;align-self:flex-start}
+.seg button{border:0;background:transparent;font:800 12px "Bricolage Grotesque",sans-serif;color:var(--ink);padding:6px 12px;cursor:pointer;min-height:34px;display:flex;align-items:center;gap:6px}
+.seg button+button{border-left:2px solid var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg button svg{width:12px;height:12px}
+.field{display:flex;align-items:center;border:var(--line);border-radius:12px;background:#fff;overflow:hidden}
+.field .prefix{padding:0 2px 0 10px;font:700 12px "JetBrains Mono",monospace;color:var(--muted);white-space:nowrap}
+.field input{flex:1;border:0;outline:0;padding:9px 10px 9px 0;font:700 13px "JetBrains Mono",monospace;background:transparent;min-width:0}
+.field:focus-within{box-shadow:0 0 0 3px var(--sky)}
+.field.off{opacity:.45}
+.preview{font:700 12px "JetBrains Mono",monospace}
+.preview a{color:var(--violet)}
+.btns{display:flex;gap:8px}
+.btn{border:var(--line);border-radius:999px;background:var(--violet);color:#fff;font:800 12px "Bricolage Grotesque",sans-serif;padding:7px 14px;box-shadow:2px 2px 0 var(--ink);cursor:pointer;min-height:36px}
+.btn.ghost{background:#fff;color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{border:2px solid var(--ink);border-radius:999px;background:#fff;font:700 12px "Bricolage Grotesque",sans-serif;padding:4px 10px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;min-height:32px}
+.pill[aria-pressed="true"]{background:var(--violet);color:#fff}
+.pill svg{width:12px;height:12px}
+
+/* Web board */
+.web{border:var(--line);border-radius:22px;box-shadow:6px 6px 0 var(--ink);overflow:hidden;background:var(--card)}
+.browser{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:var(--line);background:var(--lav)}
+.browser i{width:12px;height:12px;border-radius:50%;border:2px solid var(--ink);background:#fff}
+.browser .url{margin-left:8px;flex:1;border:2px solid var(--ink);border-radius:999px;padding:3px 12px;background:#fff;font:500 12px "JetBrains Mono",monospace}
+.web-body{padding:20px;background:var(--paper)}
+.tablebox{overflow-x:auto;border:var(--line);border-radius:16px;background:#fff;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:560px}
+th,td{padding:10px 14px;text-align:left;border-bottom:2px solid #EEE7DA;font-size:14px}
+th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+td.num,th.num{text-align:right;font-family:"JetBrains Mono",monospace}
+.who{display:flex;align-items:center;gap:8px}
+tr.me td{background:#F1ECFF}
+.tip{position:fixed;pointer-events:none;background:var(--paper);border:var(--line);border-radius:10px;box-shadow:3px 3px 0 var(--ink);padding:6px 10px;font-size:12px;opacity:0;transform:translate(-50%,calc(-100% - 10px));white-space:nowrap;z-index:5}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.rules .card h3{margin:0;font-size:15px}
+.rules .card p{margin:0;font-size:13.5px;color:#3a3550}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div>
+      <h1>Profile links</h1>
+      <p class="sub">Members can add one profile link (X, Instagram or GitHub) so people on the board can find them. Only a handle is stored; the link is always built from the platform's own address. Handles are not verified, and the board says so.</p>
+    </div>
+    <span class="tag">Sample data</span>
+  </header>
+
+  <section>
+    <p class="section-title">In the app · try it: pick a platform and type a handle</p>
+    <div class="row">
+      <div class="col">
+        <p class="label">Settings → Leaderboard → Profile link</p>
+        <div class="pop">
+          <div class="card">
+            <div><b>Profile link</b><p class="hint" style="margin:2px 0 0">Shown as an icon after your name on the board. Optional, not verified, removable any time.</p></div>
+            <div class="seg" role="group" aria-label="Platform" id="platforms"></div>
+            <label class="field" id="field"><span class="prefix" id="prefix">x.com/</span><input id="handle" autocomplete="off" spellcheck="false" placeholder="handle" aria-label="Handle" aria-describedby="handleHint"></label>
+            <p class="hint" id="handleHint"></p>
+            <p class="preview" id="preview"></p>
+            <div class="btns"><button class="btn" id="save" type="button">Save link</button><button class="btn ghost" id="remove" type="button">Remove</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <p class="label">Popover · the board</p>
+        <div class="pop">
+          <div class="card">
+            <p class="label" style="margin:0">The board · 6 members</p>
+            <ol class="board" id="popBoard"></ol>
+          </div>
+          <p class="hint">Hover an icon: "Linked by @… · not verified". Click opens the profile in the browser.</p>
+        </div>
+      </div>
+
+      <div class="col">
+        <p class="label">Join form · optional</p>
+        <div class="pop">
+          <div class="card">
+            <p class="label" style="margin:0">Profile link (optional)</p>
+            <div class="pills" id="joinPills"></div>
+            <p class="hint">Pick one to add a handle after joining, or skip: it's in Settings any time.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="section-title">Web board · claudebar.tddworks.com/leaderboard/</p>
+    <div class="web">
+      <div class="browser" aria-hidden="true"><i></i><i></i><i></i><span class="url">claudebar.tddworks.com/leaderboard/</span></div>
+      <div class="web-body">
+        <div class="tablebox">
+          <table>
+            <thead><tr><th>#</th><th>User</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th></tr></thead>
+            <tbody id="webRows"></tbody>
+          </table>
+        </div>
+        <p class="hint" style="margin-top:12px">Profile links are added by each member and aren't verified.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="rules">
+    <div class="card"><h3>Handles, not URLs</h3><p>Members type a handle; the link is built as <code>x.com/</code>, <code>instagram.com/</code> or <code>github.com/</code> + handle. Each platform's username rules are checked, so a link can never point anywhere else.</p></div>
+    <div class="card"><h3>Not verified, and said so</h3><p>Anyone could type anyone's handle. The icon's tooltip and the web board say links are added by members and not checked. Links open with <code>rel="nofollow ugc noopener"</code>.</p></div>
+    <div class="card"><h3>Removable, moderated</h3><p>Remove it in Settings any time; leaving deletes it. A suspended member's link is hidden, and the admin can clear any link.</p></div>
+  </section>
+</main>
+<div class="tip" id="tip"></div>
+
+<script>
+const ICONS = {
+  x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+  instagram: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none"/></svg>',
+  github: '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>',
+};
+// Each platform's own username rules; the link is always its own address + handle.
+const PLATFORMS = {
+  x: { name: "X", base: "https://x.com/", prefix: "x.com/", rule: /^[A-Za-z0-9_]{1,15}$/, help: "1–15 letters, numbers or _" },
+  instagram: { name: "Instagram", base: "https://instagram.com/", prefix: "instagram.com/", rule: /^(?!.*\.\.)(?!\.)(?!.*\.$)[A-Za-z0-9._]{1,30}$/, help: "1–30 letters, numbers, . or _" },
+  github: { name: "GitHub", base: "https://github.com/", prefix: "github.com/", rule: /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/, help: "1–39 letters, numbers or single -" },
+};
+const MEMBERS = [
+  { rank: 1, name: "nightowl", total: "10.1B", link: ["github", "nightowl"], mix: [["#F5B49A", .8], ["#A6E3D0", .2]] },
+  { rank: 2, name: "nhdphuong", total: "8.5B", link: ["x", "nhdphuong"], mix: [["#F5B49A", .6], ["#A6E3D0", .4]] },
+  { rank: 3, name: "boxcee", total: "7.6B", link: ["instagram", "boxcee.codes"], mix: [["#A6E3D0", .9], ["#F5B49A", .1]] },
+  { rank: 4, name: "itshan", total: "4.3B", me: true, link: null, mix: [["#F5B49A", 1]] },
+  { rank: 5, name: "quietcoder", total: "2.9B", link: null, mix: [["#F5B49A", 1]] },
+  { rank: 6, name: "late-night-dev", total: "1.2B", link: ["github", "late-night-dev"], mix: [["#A6E3D0", .7], ["#F5B49A", .3]] },
+];
+const state = { platform: "x", handle: "", saved: null };
+const me = MEMBERS.find((m) => m.me);
+const el = (tag, props = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(props)) k === "text" ? (n.textContent = v) : n.setAttribute(k, v); n.append(...kids); return n; };
+const tip = document.getElementById("tip");
+
+function linkIcon(member) {
+  if (!member.link) return null;
+  const [platform, handle] = member.link;
+  const p = PLATFORMS[platform];
+  const a = el("a", { class: "link", href: p.base + encodeURIComponent(handle), target: "_blank", rel: "nofollow ugc noopener",
+    "aria-label": `@${member.name} on ${p.name} (not verified)` });
+  a.innerHTML = ICONS[platform];                       // our own constant SVG, never member text
+  a.addEventListener("mouseenter", (e) => { tip.textContent = `${p.prefix}${handle} · linked by @${member.name} · not verified`; tip.style.left = e.clientX + "px"; tip.style.top = e.clientY + "px"; tip.style.opacity = 1; });
+  a.addEventListener("mouseleave", () => (tip.style.opacity = 0));
+  return a;
+}
+
+function renderBoards() {
+  me.link = state.saved;
+  const pop = document.getElementById("popBoard");
+  pop.replaceChildren(...MEMBERS.map((m) => {
+    const bar = el("span", { class: "bar" });
+    let x = 0; const total = parseFloat(m.total), lead = parseFloat(MEMBERS[0].total);
+    bar.style.cssText = `width:${(total / lead) * 100}%;background:linear-gradient(90deg,${m.mix.map(([c, s]) => { const a = x * 100; x += s; return `${c} ${a}% ${x * 100}%`; }).join(",")})`;
+    const li = el("li", { class: m.me ? "me" : "" }, bar, el("span", { class: "rank", text: String(m.rank) }), el("span", { class: "name", text: "@" + m.name }));
+    const icon = linkIcon(m); if (icon) li.append(icon);
+    if (m.me) li.append(el("span", { class: "you", text: "YOU" }));
+    li.append(el("span", { class: "tok", text: m.total }));
+    return li;
+  }));
+  const rows = document.getElementById("webRows");
+  rows.replaceChildren(...MEMBERS.map((m) => {
+    const who = el("span", { class: "who" }, el("strong", { text: "@" + m.name }));
+    const icon = linkIcon(m); if (icon) who.append(icon);
+    return el("tr", { class: m.me ? "me" : "" }, el("td", { class: "num", text: String(m.rank) }), el("td", {}, who),
+      el("td", { class: "num", text: "—" }), el("td", { class: "num", text: "—" }), el("td", { class: "num", text: "—" }), el("td", { class: "num", text: m.total }));
+  }));
+}
+
+function renderPicker() {
+  const seg = document.getElementById("platforms");
+  seg.replaceChildren(...Object.entries(PLATFORMS).map(([id, p]) => {
+    const b = el("button", { type: "button", "aria-pressed": String(state.platform === id) });
+    b.innerHTML = ICONS[id]; b.append(document.createTextNode(p.name));
+    b.addEventListener("click", () => { state.platform = id; renderPicker(); });
+    return b;
+  }));
+  const p = PLATFORMS[state.platform];
+  document.getElementById("prefix").textContent = p.prefix;
+  const hint = document.getElementById("handleHint"), preview = document.getElementById("preview");
+  const handle = state.handle.replace(/^@/, "");
+  const ok = p.rule.test(handle);
+  if (!handle) { hint.className = "hint"; hint.textContent = p.help + ". Your handle only, not a link."; }
+  else if (!ok) { hint.className = "hint bad"; hint.textContent = `That isn't a ${p.name} handle: ${p.help}.`; }
+  else { hint.className = "hint ok"; hint.textContent = "Looks right. Check it's yours before saving."; }
+  preview.replaceChildren(document.createTextNode("Links to "), ok ? el("a", { href: p.base + handle, target: "_blank", rel: "nofollow ugc noopener", text: p.prefix + handle }) : document.createTextNode(p.prefix + "…"));
+  document.getElementById("save").disabled = !ok;
+  document.getElementById("remove").disabled = !state.saved;
+  const pills = document.getElementById("joinPills");
+  pills.replaceChildren(...[["none", "None"], ...Object.entries(PLATFORMS).map(([id, q]) => [id, q.name])].map(([id, name]) => {
+    const b = el("button", { type: "button", class: "pill", "aria-pressed": String(id === "none" ? !state.saved : state.saved?.[0] === id) });
+    if (ICONS[id]) b.innerHTML = ICONS[id];
+    b.append(document.createTextNode(name));
+    b.addEventListener("click", () => { if (id === "none") { state.saved = null; } else { state.platform = id; document.getElementById("handle").focus(); } renderPicker(); renderBoards(); });
+    return b;
+  }));
+}
+
+document.getElementById("handle").addEventListener("input", (e) => { state.handle = e.target.value.trim(); renderPicker(); });
+document.getElementById("save").addEventListener("click", () => { state.saved = [state.platform, state.handle.replace(/^@/, "")]; renderPicker(); renderBoards(); });
+document.getElementById("remove").addEventListener("click", () => { state.saved = null; state.handle = ""; document.getElementById("handle").value = ""; renderPicker(); renderBoards(); });
+renderPicker(); renderBoards();
+</script>
+</body>
+</html>
