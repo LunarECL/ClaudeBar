@@ -32,9 +32,20 @@ public final class Account: AIProvider {
     /// before it was recorded.
     public let madeBy: AccountOrigin?
 
+    /// The login's own *Pause* — never the product's switch.
     public var isEnabled: Bool {
-        didSet { provider.settings.setEnabled(isEnabled, forProvider: id) }
+        didSet {
+            if isDefault {
+                provider.settings.setOn(isEnabled, Provider.plainLoginKey, forProvider: provider.id)
+            } else {
+                provider.settings.setEnabled(isEnabled, forProvider: id)
+            }
+        }
     }
+
+    /// In the lineup — pills, menu bar, refreshes, alerts: the login is on,
+    /// and so is its product.
+    public var isInLineup: Bool { isEnabled && provider.isEnabled }
 
     // MARK: - What we last saw
 
@@ -61,7 +72,9 @@ public final class Account: AIProvider {
         self.email = login.email
         self.values = values
         self.madeBy = madeBy
-        self.isEnabled = provider.settings.isEnabled(forProvider: login.id, defaultValue: provider.definition.enabledByDefault)
+        self.isEnabled = login.isDefault
+            ? provider.settings.isOn(Provider.plainLoginKey, forProvider: provider.definition.id) ?? true
+            : provider.settings.isEnabled(forProvider: login.id, defaultValue: provider.definition.enabledByDefault)
     }
 
     /// *NOT SET UP* — no usage yet, and the last refresh found no tool on

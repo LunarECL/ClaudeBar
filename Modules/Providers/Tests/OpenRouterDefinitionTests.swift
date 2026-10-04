@@ -53,7 +53,7 @@ struct OpenRouterDefinitionTests {
         let provider = try make()
         #expect(provider.id == "openrouter")
         #expect(provider.name == "OpenRouter")
-        #expect(!provider.defaultAccount.isEnabled)
+        #expect(!provider.defaultAccount.isInLineup)
         #expect(provider.definition.profile.links.dashboard == URL(string: "https://openrouter.ai/credits"))
         #expect(provider.definition.profile.links.status == URL(string: "https://status.openrouter.ai"))
         #expect(provider.definition.profile.look.icon == "OpenRouterIcon")

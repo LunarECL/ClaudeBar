@@ -37,7 +37,7 @@ struct VercelDefinitionTests {
         let provider = try make()
         #expect(provider.id == "vercel-gateway")
         #expect(provider.name == "Vercel Gateway")
-        #expect(!provider.defaultAccount.isEnabled)
+        #expect(!provider.defaultAccount.isInLineup)
         #expect(provider.definition.profile.links.dashboard == URL(string: "https://vercel.com/dashboard/ai-gateway"))
         #expect(provider.definition.accounts?.ways == [.form])
         #expect(provider.definition.keyDestinations == ["ai-gateway.vercel.sh"])

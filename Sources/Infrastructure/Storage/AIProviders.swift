@@ -21,7 +21,7 @@ public final class AIProviders: AIProviderRepository {
 
     /// Only enabled providers (computed from all providers' isEnabled state)
     public var enabled: [any AIProvider] {
-        all.filter { $0.isEnabled }
+        all.filter { $0.isInLineup }
     }
 
     // MARK: - Initialization

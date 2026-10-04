@@ -46,7 +46,7 @@ struct AlibabaExecutionTests {
     @Test func `definition keeps Alibaba's identity, off until turned on`() throws {
         let provider = try make()
         #expect(provider.name == "Alibaba")
-        #expect(!provider.defaultAccount.isEnabled)
+        #expect(!provider.defaultAccount.isInLineup)
         #expect(provider.defaultAccount.dashboardURL?.absoluteString == "https://modelstudio.console.alibabacloud.com/ap-southeast-1/?tab=coding-plan#/efm/detail")
     }
 

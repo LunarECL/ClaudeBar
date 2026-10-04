@@ -53,6 +53,9 @@ public protocol AIProvider: AnyObject, Sendable, Identifiable where ID == String
     /// Whether the provider is enabled (user can toggle this)
     var isEnabled: Bool { get set }
 
+    /// In the lineup — what the pills, menu bar, refreshes and alerts show.
+    var isInLineup: Bool { get }
+
     // MARK: - State (Observable)
 
     /// Whether the provider is currently syncing data
@@ -101,6 +104,9 @@ public protocol AIProvider: AnyObject, Sendable, Identifiable where ID == String
 // MARK: - Default Implementations
 
 public extension AIProvider {
+    /// Default: a provider with no product above it is in the lineup when it is on.
+    var isInLineup: Bool { isEnabled }
+
     /// Default: no status page
     var statusPageURL: URL? { nil }
 

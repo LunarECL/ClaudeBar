@@ -28,7 +28,7 @@ struct MistralDefinitionTests {
         let (provider, cleanUp) = try make(withLogs: true)
         defer { cleanUp() }
         #expect(provider.name == "Mistral")
-        #expect(!provider.defaultAccount.isEnabled)
+        #expect(!provider.defaultAccount.isInLineup)
         #expect(provider.defaultAccount.dashboardURL?.absoluteString == "https://console.mistral.ai")
     }
 

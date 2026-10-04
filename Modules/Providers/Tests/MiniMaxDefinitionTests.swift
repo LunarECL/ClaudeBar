@@ -135,7 +135,7 @@ struct MiniMaxDefinitionTests {
     @Test func `definition keeps identity and opt-in default`() throws {
         let provider = try make()
         #expect(provider.name == "MiniMax")
-        #expect(!provider.defaultAccount.isEnabled)
+        #expect(!provider.defaultAccount.isInLineup)
         #expect(provider.definition.keyDestinations == ["api.minimax.io", "api.minimaxi.com"])
         #expect(provider.definition.accounts?.ways == [.form])
     }

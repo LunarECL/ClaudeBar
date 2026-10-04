@@ -43,7 +43,7 @@ struct DeepSeekDefinitionTests {
         let provider = try make()
         #expect(provider.id == "deepseek")
         #expect(provider.name == "DeepSeek")
-        #expect(provider.defaultAccount.isEnabled == false)
+        #expect(provider.defaultAccount.isInLineup == false)
         #expect(provider.definition.profile.links.dashboard == URL(string: "https://platform.deepseek.com/usage"))
         #expect(provider.definition.profile.look.icon == "DeepSeekIcon")
         #expect(provider.definition.accounts?.ways == [.form])

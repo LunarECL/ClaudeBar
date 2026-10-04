@@ -42,6 +42,17 @@ public final class Provider {
     private let vault: (any SecretVault)?
     /// Where added logins' folders are made and deleted.
     private let folders: any LoginFolders
+    /// *The product's switch* — Claude on or off. Off hides every login (no
+    /// pill, menu-bar entry, refresh or alert) and keeps each login and its
+    /// own *Pause* (TARGET §12, slice 1).
+    public var isEnabled: Bool {
+        didSet { settings.setEnabled(isEnabled, forProvider: id) }
+    }
+
+    /// The plain login's own *Pause* — apart from the product's switch, which
+    /// keeps the key the plain login used to have.
+    static let plainLoginKey = "plainLoginEnabled"
+
     /// *In use* — which login new terminal sessions start with; `nil` when
     /// this product's CLI can't be started on a login's folder.
     public private(set) var inUse: InUse?
@@ -87,6 +98,7 @@ public final class Provider {
             self.running = definition
         }
         self.settings = settings
+        self.isEnabled = Self.productSwitch(definition, settings: settings, accounts: accounts)
         self.makeDataSource = makeDataSource
         self.guestPasses = guestPasses
         self.usageHistory = usageHistory
@@ -107,6 +119,28 @@ public final class Provider {
             inUse = InUse(provider: self, command: TerminalCommand(name: call.cli, variable: call.homeVariable),
                           record: loginsInUse, switchWhenLow: SwitchWhenLow(providerId: definition.id, settings: settings))
         }
+    }
+
+    /// The product's switch, read once from before it had its own: the old
+    /// `<id>.isEnabled` was the plain login's. Off while another login of it
+    /// was on meant *the plain login was paused* — kept as its pause, the
+    /// product on; otherwise it meant *the product was off*. Recorded once,
+    /// by the plain login's own setting.
+    private static func productSwitch(_ definition: ProviderDefinition, settings: any MultiAccountSettingsRepository,
+                                      accounts: [ProviderAccountConfig]) -> Bool {
+        let id = definition.id
+        let on = settings.isEnabled(forProvider: id, defaultValue: definition.enabledByDefault)
+        guard settings.isOn(plainLoginKey, forProvider: id) == nil else { return on }
+        let anotherOn = accounts.contains {
+            settings.isEnabled(forProvider: $0.toProviderAccount(providerId: id).id, defaultValue: definition.enabledByDefault)
+        }
+        if !on && anotherOn {
+            settings.setOn(false, plainLoginKey, forProvider: id)
+            settings.setEnabled(true, forProvider: id)
+            return true
+        }
+        settings.setOn(true, plainLoginKey, forProvider: id)
+        return on
     }
 
     /// A provider whose data sources ignore which login they run for — the
@@ -367,9 +401,10 @@ public final class Provider {
             for name in entry.secrets.keys { vault?.delete(name, provider: lineupId) }
             throw UsageError.executionFailed("This \(name) account can't be added.")
         }
-        // Supplying this login's key is an explicit opt-in, even when the
-        // product's unconfigured default login starts disabled.
+        // Supplying this login's key is an explicit opt-in — to the login, and
+        // to the product when it starts off (an opt-in provider).
         account.isEnabled = true
+        isEnabled = true
         return account
     }
 

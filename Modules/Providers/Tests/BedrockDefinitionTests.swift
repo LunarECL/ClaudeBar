@@ -46,7 +46,7 @@ struct BedrockDefinitionTests {
     @Test func `definition keeps Bedrock's identity, off until turned on`() throws {
         let provider = try make()
         #expect(provider.name == "AWS Bedrock")
-        #expect(!provider.defaultAccount.isEnabled)
+        #expect(!provider.defaultAccount.isInLineup)
         #expect(provider.defaultAccount.dashboardURL?.absoluteString == "https://console.aws.amazon.com/bedrock/home")
     }
 

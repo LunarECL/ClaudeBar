@@ -98,6 +98,17 @@ struct AccountFormTests {
     }
 
     @Test
+    func `adding an account with its key is an opt-in to the product too`() throws {
+        let openRouter = provider(try openRouter(), vault: MemoryVault(), network: network([:]))
+        openRouter.isEnabled = false
+
+        let work = try openRouter.addAccount(filling: ["apiKey": "sk-work"])
+
+        #expect(openRouter.isEnabled)
+        #expect(work.isInLineup)
+    }
+
+    @Test
     func `a key is kept in the vault, never in the saved account`() throws {
         let vault = MemoryVault()
         let settings = InMemoryProviderSettings()

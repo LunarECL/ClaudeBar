@@ -59,7 +59,7 @@ struct CopilotDefinitionTests {
     @Test func `definition keeps Copilot's identity, off until turned on`() throws {
         let provider = try make()
         #expect(provider.name == "Copilot")
-        #expect(!provider.defaultAccount.isEnabled)
+        #expect(!provider.defaultAccount.isInLineup)
         #expect(provider.defaultAccount.dashboardURL?.absoluteString == "https://github.com/settings/copilot/features")
     }
 
