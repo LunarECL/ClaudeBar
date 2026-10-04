@@ -276,10 +276,11 @@ struct MenuContentView: View {
 
     private var headerView: some View {
         HStack(spacing: 12) {
-            // Custom Provider Icon - shows AppLogo in overview mode, provider icon otherwise
+            // Custom Provider Icon - shows AppLogo in overview mode and on the Leaderboard
+            // tab (it isn't any one provider's), the provider icon otherwise.
             // Avoid animation on provider icon to prevent constraint update loops in MenuBarExtra
             ZStack {
-                if settings.overviewModeEnabled, let logo = NSImage(named: "AppLogo") {
+                if settings.overviewModeEnabled || showsLeaderboard, let logo = NSImage(named: "AppLogo") {
                     Image(nsImage: logo)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -324,8 +325,10 @@ struct MenuContentView: View {
 
             Spacer()
 
-            // Status Badge
-            statusBadge
+            // Status Badge: a provider's status, so not on the Leaderboard tab.
+            if !showsLeaderboard {
+                statusBadge
+            }
         }
         .opacity(animateIn ? 1 : 0)
         .offset(y: animateIn ? 0 : -10)
