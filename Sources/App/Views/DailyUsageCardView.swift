@@ -107,6 +107,8 @@ struct DailyUsageCardView: View {
     }
 
     private var subtitleText: String? {
+        // A day not begun reads as one, not as a count of zero.
+        if report.today.isEmpty { return "Not used yet today" }
         switch metric {
         case .cost:
             // Highlight cache savings as a discount line under the cost

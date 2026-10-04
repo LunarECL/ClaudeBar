@@ -6,14 +6,14 @@ description: Contributor design for showing another app's daily tokens, such as 
 
 User guide: [README.md](README.md) · Mockup: [design-concept/claude-desktop-tokens](../../../design-concept/claude-desktop-tokens/index.html)
 
-**Status: BUILT, slices 1–6 and 8; slice 7 is DESIGN.** Built on 2026-10-04 in
-place of [PR #446](https://github.com/tddworks/ClaudeBar/pull/446), which adds the
-same file as a third Claude data source; its fixtures are the tests here. Built:
+**Status: BUILT, slices 1–8.** Built on 2026-10-04 in place of
+[PR #446](https://github.com/tddworks/ClaudeBar/pull/446), which adds the same file
+as a third Claude data source; its fixtures are the tests here. Built:
 `UsageLog.At.formatted`, whole non-negative counts, `UsageLog.OtherApp` and
 `Definition.otherApps`, `UsageHistory.label` / `otherApps` / `usedOtherApps`,
-Claude's entry and patch line, and the popover card. Not built: the Today section
-when a provider has no snapshot (slice 7), so a user without Claude Code doesn't
-see the card yet.
+Claude's entry and patch line, the popover card, and *not set up*
+(`Account.needsSetup`, the definition's `setup`, `ProviderBadgeState.notSetUp`),
+which lets a user without Claude Code see the card.
 
 This document owns **an app's usage that sits beside a login's own logs**: how a
 definition declares it, which login shows it, and how its days are counted.
@@ -165,6 +165,7 @@ Asks to avoid:
 | A count is on the day its file names, in the user's time zone | `UsageLog.At`: a field read with a `format`, local unless `timeZone` says otherwise (§Rich types) |
 | A token count is a whole, non-negative number; anything else drops the record | `RecordShape.record(from:)` |
 | No card when the app has been used neither today nor yesterday (a missing file included) | `UsageHistory.read`: `report` is nil when both days are empty (*exists*) |
+| A login with no usage whose tool isn't on this Mac, or that never signed in, is *not set up*, not failing | `Account.needsSetup` |
 | A closed day is kept once and never read again | `DayLedger`, under a key apart from the login's (*exists*, new key) |
 
 ## Rich types: `UsageLog.At`, a field with a format
@@ -214,23 +215,27 @@ Each slice is test-first and green before the next.
 6. **The popover.** One tokens card per other app with a report, titled by its
    label, after the login's own Today cards and behind the same Daily Usage
    Cards switch. The 30-day chart stays the login's own.
-7. **Today without limits.** The Today section shows when the provider has no
-   snapshot because its data source failed. Without this, the #198 user, who has
-   no CLI, still sees only an error. See open question 1.
+7. **Not set up, and Today without limits.** A login with no usage whose last
+   refresh found no CLI (`cliNotFound`) or no sign-in (`authenticationRequired`)
+   is `Account.needsSetup`. The popover then shows the definition's `setup`
+   (title, text, a button to its `url`) instead of an error, the header badge
+   reads *NOT SET UP* instead of *UNAVAILABLE*, and the Today section follows,
+   with the Claude Desktop card. Any other failure is still an error.
 8. **Docs.** A row in [README.md](README.md)'s *Reads* table; the Claude README
    says Desktop's tokens appear under Today; one CHANGELOG line.
 
 ## 5 · Open questions
 
-1. **What the limits area says without Claude Code.** Today it shows "Claude CLI
-   not found" or "No OAuth credentials found". The mockup proposes "See your
-   session and weekly limits. ClaudeBar reads your plan's limits through Claude
-   Code" with a *Set up Claude Code* button. This belongs to the error
-   presentation, not this doc. Add Account's *Sign in with browser* runs
-   `claude auth login`, so it needs the CLI too and can't be the way in.
-2. **Today 0, yesterday not.** `DailyUsageCardView` would show "0". The mockup
-   says "Not used yet today". Decide whether that wording belongs to the card for
-   every provider, or nowhere.
+1. ~~**What the limits area says without Claude Code.**~~ The definition's
+   `setup`: "See your session and weekly limits. ClaudeBar reads your plan's
+   limits through Claude Code…", with a *Set up Claude Code* button to
+   claude.ai/code (slice 7). Settled by asking what the #198 user expects: to see
+   what can be read now, and to be told plainly what more takes. Add Account's
+   *Sign in with browser* runs `claude auth login`, so it needs the CLI too and
+   can't be the way in.
+2. ~~**Today 0, yesterday not.**~~ Every daily usage card says "Not used yet
+   today" under its 0 when today is empty: a day not begun reads as one, for any
+   provider.
 3. **Yesterday can be lost.** The file holds only today. A day is closed an hour
    after it ends; if Desktop is used before then, the file already holds the new
    day and yesterday reads 0. Accept this, or keep the last value read for a day

@@ -89,6 +89,35 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     /// *TODAY'S USAGE* — how to extract a login's usage history from its
     /// tool's own logs; `nil` when the provider offers none.
     public let usageHistory: UsageLog.Definition?
+    /// What it takes to see this provider's limits, said where an error
+    /// would otherwise be — `nil` when the error says enough.
+    public let setup: Setup?
+
+    /// *SET UP* — a title, what it takes, and where to start.
+    public struct Setup: Sendable, Equatable, Codable {
+        public let title: String
+        public let text: String
+        public let url: URL?
+        /// The button that opens `url` — *Set up Claude Code*.
+        public let button: String
+
+        public init(title: String, text: String, url: URL? = nil, button: String = "Set up") {
+            self.title = title
+            self.text = text
+            self.url = url
+            self.button = button
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(title: try container.decode(String.self, forKey: .title),
+                      text: try container.decode(String.self, forKey: .text),
+                      url: try container.decodeIfPresent(URL.self, forKey: .url),
+                      button: try container.decodeIfPresent(String.self, forKey: .button) ?? "Set up")
+        }
+
+        private enum CodingKeys: String, CodingKey { case title, text, url, button }
+    }
 
     /// What *Add Account*'s form asks for: the account-scope settings.
     public var accountSettings: [Setting] { settings.filter { $0.scope == .account } }
@@ -253,9 +282,11 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         defaultDataSource: String,
         accounts: Accounts? = nil,
         settings: [Setting] = [],
-        usageHistory: UsageLog.Definition? = nil
+        usageHistory: UsageLog.Definition? = nil,
+        setup: Setup? = nil
     ) {
         self.usageHistory = usageHistory
+        self.setup = setup
         self.profile = profile
         self.cli = cli
         self.enabledByDefault = enabledByDefault
@@ -290,7 +321,8 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             defaultDataSource: try container.decode(String.self, forKey: .defaultDataSource),
             accounts: accounts,
             settings: settings,
-            usageHistory: try container.decodeIfPresent(UsageLog.Definition.self, forKey: .usageHistory)
+            usageHistory: try container.decodeIfPresent(UsageLog.Definition.self, forKey: .usageHistory),
+            setup: try container.decodeIfPresent(Setup.self, forKey: .setup)
         )
         try validateSettings()
     }
@@ -305,10 +337,11 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         try container.encodeIfPresent(accounts, forKey: .accounts)
         if !settings.isEmpty { try container.encode(settings, forKey: .settings) }
         try container.encodeIfPresent(usageHistory, forKey: .usageHistory)
+        try container.encodeIfPresent(setup, forKey: .setup)
     }
 
     enum CodingKeys: String, CodingKey {
-        case profile, cli, enabledByDefault, dataSources, defaultDataSource, accounts, settings, usageHistory
+        case profile, cli, enabledByDefault, dataSources, defaultDataSource, accounts, settings, usageHistory, setup
     }
 
     /// Each setting's id is used once.

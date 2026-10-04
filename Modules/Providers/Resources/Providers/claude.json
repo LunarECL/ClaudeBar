@@ -343,6 +343,12 @@
       }
     }
   ],
+  "setup": {
+    "title": "See your session and weekly limits",
+    "text": "ClaudeBar reads your plan's limits through Claude Code. Install it and sign in once; Claude Desktop keeps working as it is.",
+    "url": "https://claude.ai/code",
+    "button": "Set up Claude Code"
+  },
   "usageHistory": {
     "records": {
       "files": "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",

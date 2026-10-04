@@ -14,6 +14,9 @@ public enum ProviderBadgeState: Equatable, Sendable {
     case syncing
     /// The last probe failed, so there are no numbers to show.
     case unavailable
+    /// Nothing to read with yet — no CLI on this Mac, or no sign-in (#198).
+    /// Waiting for the person, not failing.
+    case notSetUp
     /// No probe has produced data yet (first launch, provider just enabled).
     case awaitingData
     /// We have numbers, and this is what they say.
@@ -23,13 +26,16 @@ public enum ProviderBadgeState: Equatable, Sendable {
     ///   - isSyncing: whether a refresh is currently running.
     ///   - quotaStatus: status derived from the latest snapshot, nil when there is none.
     ///   - hasError: whether the last probe attempt failed.
-    public init(isSyncing: Bool, quotaStatus: QuotaStatus?, hasError: Bool) {
+    ///   - needsSetup: whether that failure is only that nothing is set up yet.
+    public init(isSyncing: Bool, quotaStatus: QuotaStatus?, hasError: Bool, needsSetup: Bool = false) {
         if isSyncing {
             self = .syncing
         } else if let quotaStatus {
             // Stale numbers still beat no numbers, so a snapshot wins over an
             // error from a later failed refresh.
             self = .quota(quotaStatus)
+        } else if needsSetup {
+            self = .notSetUp
         } else if hasError {
             self = .unavailable
         } else {

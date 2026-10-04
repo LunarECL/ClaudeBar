@@ -687,6 +687,7 @@ extension ProviderBadgeState {
         switch self {
         case .syncing: "Syncing..."
         case .unavailable: "UNAVAILABLE"
+        case .notSetUp: "NOT SET UP"
         case .awaitingData: "NO DATA"
         case .quota(let status): status.badgeText
         }
@@ -695,7 +696,7 @@ extension ProviderBadgeState {
     /// Pill accent color, resolved against the active theme.
     func badgeColor(_ theme: any AppThemeProvider) -> Color {
         switch self {
-        case .syncing, .awaitingData: theme.textTertiary
+        case .syncing, .awaitingData, .notSetUp: theme.textTertiary
         // Matches the warning triangle on the "Unavailable" card below it.
         case .unavailable: theme.statusWarning
         case .quota(let status): theme.statusColor(for: status)

@@ -22,6 +22,21 @@ struct ProviderBadgeStateTests {
     }
 
     @Test
+    func `a provider waiting to be set up is not set up, not unavailable`() {
+        let state = ProviderBadgeState(isSyncing: false, quotaStatus: nil, hasError: true, needsSetup: true)
+
+        #expect(state == .notSetUp)
+        #expect(!state.hasData)
+    }
+
+    @Test
+    func `stale numbers still win over a later setup failure`() {
+        let state = ProviderBadgeState(isSyncing: false, quotaStatus: .healthy, hasError: true, needsSetup: true)
+
+        #expect(state == .quota(.healthy))
+    }
+
+    @Test
     func `a snapshot reports its own quota status`() {
         let state = ProviderBadgeState(isSyncing: false, quotaStatus: .warning, hasError: false)
 

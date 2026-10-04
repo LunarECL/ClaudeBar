@@ -64,6 +64,20 @@ public final class Account: AIProvider {
         self.isEnabled = provider.settings.isEnabled(forProvider: login.id, defaultValue: provider.definition.enabledByDefault)
     }
 
+    /// *NOT SET UP* — no usage yet, and the last refresh found no tool on
+    /// this Mac or no sign-in to read with. Waiting for the person, not
+    /// failing: the definition's `setup` says what it takes (#198).
+    public var needsSetup: Bool {
+        guard snapshot == nil, let error = lastError as? UsageError else { return false }
+        switch error {
+        case .cliNotFound, .authenticationRequired: return true
+        default: return false
+        }
+    }
+
+    /// What setting this login's provider up takes, when its definition says.
+    public var setup: ProviderDefinition.Setup? { provider.definition.setup }
+
     /// QUOTA health — the worst quota in its usage. A failed fetch is not a
     /// status: it is `lastError`, and the last usage stays.
     public var status: QuotaStatus { snapshot?.overallStatus ?? .healthy }
