@@ -336,6 +336,7 @@ let project = Project(
                 .target(name: "ClaudeBar"),
                 .target(name: "Domain"),
                 .target(name: "Infrastructure"),
+                .external(name: "Sparkle"),
             ]
         ),
 

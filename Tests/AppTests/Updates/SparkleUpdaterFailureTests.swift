@@ -1,12 +1,15 @@
 import Testing
+import Sparkle
 @testable import ClaudeBar
 
 /// A failed update check or install must be visible as state, not silently
-/// look like "up to date". Sparkle's installer also terminates and watches
-/// only the first running app with our bundle ID, so a second ClaudeBar
-/// instance is a known risk for the install handshake — the update fails on
-/// the spot yet lands on the next launch when Sparkle completes the staged
-/// installation. These tests pin the state that makes both visible.
+/// look like "up to date" — but Sparkle's healthy outcomes must not read as
+/// failures either: it reports "no update found" and the user declining an
+/// install as NSError codes through the same abort callback. Sparkle's
+/// installer also terminates and watches only the first running app with our
+/// bundle ID, so a second ClaudeBar instance is a known risk for the install
+/// handshake — the update fails on the spot yet lands on the next launch
+/// when Sparkle completes the staged installation.
 @MainActor
 @Suite
 struct SparkleUpdaterFailureTests {
@@ -50,6 +53,34 @@ struct SparkleUpdaterFailureTests {
 
         #expect(updater.lastFailureMessage == nil)
         #expect(!updater.isUpdateAvailable)
+    }
+
+    @Test
+    func `no update found is a healthy outcome, not a failure`() {
+        let error = NSError(domain: SUSparkleErrorDomain, code: Int(SUError.noUpdateError.rawValue))
+
+        #expect(!SparkleUpdater.isUpdateFailure(error))
+    }
+
+    @Test
+    func `the user declining an install is not a failure`() {
+        let error = NSError(domain: SUSparkleErrorDomain, code: Int(SUError.installationCanceledError.rawValue))
+
+        #expect(!SparkleUpdater.isUpdateFailure(error))
+    }
+
+    @Test
+    func `a real Sparkle error is a failure`() {
+        let error = NSError(domain: SUSparkleErrorDomain, code: Int(SUError.installationError.rawValue))
+
+        #expect(SparkleUpdater.isUpdateFailure(error))
+    }
+
+    @Test
+    func `an error outside Sparkle's domain is a failure`() {
+        let error = NSError(domain: "com.example.other", code: 42)
+
+        #expect(SparkleUpdater.isUpdateFailure(error))
     }
 
     @Test

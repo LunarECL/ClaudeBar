@@ -19,18 +19,21 @@ private class SparkleUpdaterDelegate: NSObject, SPUUpdaterDelegate, @unchecked S
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
+        // Sparkle only ever routes its benign "no update found" sentinel
+        // (SUNoUpdateError) here; a check that genuinely failed arrives via
+        // `updater(_:didAbortWithError:)` instead. So this is the healthy
+        // outcome: clear any earlier failure with it.
         let wrapper = self.wrapper
         Task { @MainActor in
             wrapper?.clearUpdateAvailable()
-            // A failed check is not "up to date" — record it as a failure so
-            // the pane and the logs can tell the two apart.
-            wrapper?.recordFailure("Update check failed: \(error.localizedDescription)")
         }
     }
 
-    /// The update cycle was aborted (check, download or install failure that
-    /// Sparkle surfaced to the user driver).
+    /// The update cycle was aborted. Sparkle routes healthy outcomes through
+    /// here too — "no update found" and the user declining an install — so
+    /// only the real failures are recorded.
     func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
+        guard SparkleUpdater.isUpdateFailure(error) else { return }
         let wrapper = self.wrapper
         Task { @MainActor in
             wrapper?.recordFailure("Update aborted: \(error.localizedDescription)")
@@ -43,18 +46,6 @@ private class SparkleUpdaterDelegate: NSObject, SPUUpdaterDelegate, @unchecked S
             wrapper?.recordFailure(
                 "Update v\(item.displayVersionString) download failed: \(error.localizedDescription)"
             )
-        }
-    }
-
-    func updater(
-        _ updater: SPUUpdater,
-        didFinishUpdateCycleForUpdateCheck updateCheck: SPUUpdateCheck,
-        error: (any Error)?
-    ) {
-        guard let error else { return }
-        let wrapper = self.wrapper
-        Task { @MainActor in
-            wrapper?.recordFailure("Update cycle failed: \(error.localizedDescription)")
         }
     }
 
@@ -217,6 +208,18 @@ final class SparkleUpdater {
     func recordFailure(_ message: String) {
         AppLog.updates.error(message)
         lastFailureMessage = message
+    }
+
+    /// Whether an error the updater reports is a real failure. Sparkle
+    /// reports a healthy "no update found" (`SUNoUpdateError`) and the user
+    /// declining an install (`SUInstallationCanceledError`) as errors too —
+    /// `updater(_:didAbortWithError:)` receives both on every routine check —
+    /// and neither may show up as a failure.
+    static func isUpdateFailure(_ error: any Error) -> Bool {
+        let nsError = error as NSError
+        guard nsError.domain == SUSparkleErrorDomain else { return true }
+        return nsError.code != Int(SUError.noUpdateError.rawValue)
+            && nsError.code != Int(SUError.installationCanceledError.rawValue)
     }
 
     /// Sparkle's installer terminates and watches only the *first* running
