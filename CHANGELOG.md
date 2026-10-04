@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **Settings → Updates** now says which version is ready ("Version 0.5.4 is ready to install") and its button reads Install Update; the sidebar footer names the new version too, instead of only "update available". ([#PR](https://github.com/tddworks/ClaudeBar/pull/PR))
+- **Settings → Updates** now says which version is ready ("Version 0.5.4 is ready to install") and its button reads Install Update; the sidebar footer names the new version too, instead of only "update available". ([#473](https://github.com/tddworks/ClaudeBar/pull/473))
 
 ---
 
