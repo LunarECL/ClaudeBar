@@ -754,7 +754,9 @@ extension JSONSettingsRepository: LeaderboardSettingsRepository {
             username: username,
             sharing: store.read(key: "leaderboard.sharing") ?? [],
             visible: store.read(key: "leaderboard.visible") ?? true,
-            lastUpload: lastUpload.map(Date.init(timeIntervalSince1970:))
+            lastUpload: lastUpload.map(Date.init(timeIntervalSince1970:)),
+            sharesCountry: store.read(key: "leaderboard.sharesCountry") ?? false,
+            globeHintDismissed: store.read(key: "leaderboard.globeHintDismissed") ?? false
         )
     }
 
@@ -763,5 +765,7 @@ extension JSONSettingsRepository: LeaderboardSettingsRepository {
         store.write(value: record?.sharing, key: "leaderboard.sharing")
         store.write(value: record?.visible, key: "leaderboard.visible")
         store.write(value: record?.lastUpload?.timeIntervalSince1970, key: "leaderboard.lastUpload")
+        store.write(value: record?.sharesCountry, key: "leaderboard.sharesCountry")
+        store.write(value: record?.globeHintDismissed, key: "leaderboard.globeHintDismissed")
     }
 }

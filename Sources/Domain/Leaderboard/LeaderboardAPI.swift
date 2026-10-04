@@ -55,16 +55,77 @@ public struct Standing: Sendable, Equatable, Codable, Identifiable {
 }
 
 /// What the server holds about you: your standing in a view, whether you're
-/// shown, and every day you uploaded.
+/// shown, whether your country is on the globe, and every day you uploaded.
 public struct MemberSummary: Sendable, Equatable, Codable {
     public let standing: Standing?
     public let days: [DailyTokens]
     public let visible: Bool
+    public let sharesCountry: Bool
+    /// The country the server keeps for the globe, when you opted in.
+    public let country: String?
 
-    public init(standing: Standing?, days: [DailyTokens], visible: Bool) {
+    public init(standing: Standing?, days: [DailyTokens], visible: Bool, sharesCountry: Bool = false, country: String? = nil) {
         self.standing = standing
         self.days = days
         self.visible = visible
+        self.sharesCountry = sharesCountry
+        self.country = country
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case standing, days, visible, country
+        case sharesCountry = "shareCountry"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        standing = try container.decodeIfPresent(Standing.self, forKey: .standing)
+        days = try container.decode([DailyTokens].self, forKey: .days)
+        visible = try container.decode(Bool.self, forKey: .visible)
+        sharesCountry = try container.decodeIfPresent(Bool.self, forKey: .sharesCountry) ?? false
+        country = try container.decodeIfPresent(String.self, forKey: .country)
+    }
+}
+
+/// A change to your membership on the server; fields left `nil` stay as they are.
+public struct MemberChange: Sendable, Equatable, Encodable {
+    public let username: String?
+    public let visible: Bool?
+    public let sharesCountry: Bool?
+
+    public init(username: String? = nil, visible: Bool? = nil, sharesCountry: Bool? = nil) {
+        self.username = username
+        self.visible = visible
+        self.sharesCountry = sharesCountry
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case username, visible
+        case sharesCountry = "shareCountry"
+    }
+}
+
+/// *WHERE CLAUDEBAR IS USED* — opted-in members per country, only where at
+/// least three are; the rest are counted, never named.
+public struct GlobeSummary: Sendable, Equatable, Decodable {
+    public struct Country: Sendable, Equatable, Decodable {
+        public let country: String
+        public let members: Int
+        public let tokens: Int
+
+        public init(country: String, members: Int, tokens: Int) {
+            self.country = country
+            self.members = members
+            self.tokens = tokens
+        }
+    }
+
+    public let countries: [Country]
+    public let hiddenCountries: Int
+
+    public init(countries: [Country], hiddenCountries: Int) {
+        self.countries = countries
+        self.hiddenCountries = hiddenCountries
     }
 }
 
@@ -108,7 +169,8 @@ public protocol LeaderboardAPI: Sendable {
     func join(username: String, publicKey: String) async throws
     func upload(_ days: [DailyTokens], as credentials: MemberCredentials) async throws
     func me(in view: BoardView, as credentials: MemberCredentials) async throws -> MemberSummary
-    func update(username: String?, visible: Bool?, as credentials: MemberCredentials) async throws
+    func update(_ change: MemberChange, as credentials: MemberCredentials) async throws
     func leave(as credentials: MemberCredentials) async throws
     func board(in view: BoardView) async throws -> [Standing]
+    func globe(in view: BoardView) async throws -> GlobeSummary
 }

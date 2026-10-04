@@ -60,6 +60,14 @@ struct LeaderboardPane: View {
                     set: { visible in run { try await membership.setVisible(visible) } }
                 ))
             }
+            SettingsRowDivider()
+            SettingsRow(title: "Show my country on the globe",
+                        subtitle: "Your country, from where your requests come from, counted with others on the web board's globe. Never your city or IP; a country shows once three members are there. Turning this off forgets it at once.") {
+                SettingsSwitch(isOn: Binding(
+                    get: { membership.sharesCountry },
+                    set: { shares in run { try await membership.setSharesCountry(shares) } }
+                ))
+            }
         }
     }
 

@@ -37,7 +37,8 @@ struct LeaderboardStorageTests {
     @Test func `a membership is kept and read back`() {
         let (settings, _) = repository()
         let record = LeaderboardRecord(username: "tokenwhale", sharing: ["codex", "claude"], visible: false,
-                                       lastUpload: Date(timeIntervalSince1970: 1_791_080_000))
+                                       lastUpload: Date(timeIntervalSince1970: 1_791_080_000),
+                                       sharesCountry: true, globeHintDismissed: true)
 
         settings.saveLeaderboardRecord(record)
 

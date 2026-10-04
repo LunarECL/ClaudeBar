@@ -7,12 +7,17 @@ public struct LeaderboardRecord: Sendable, Equatable {
     public let sharing: [String]
     public let visible: Bool
     public let lastUpload: Date?
+    public let sharesCountry: Bool
+    public let globeHintDismissed: Bool
 
-    public init(username: String, sharing: [String], visible: Bool, lastUpload: Date?) {
+    public init(username: String, sharing: [String], visible: Bool, lastUpload: Date?,
+                sharesCountry: Bool = false, globeHintDismissed: Bool = false) {
         self.username = username
         self.sharing = sharing.sorted()
         self.visible = visible
         self.lastUpload = lastUpload
+        self.sharesCountry = sharesCountry
+        self.globeHintDismissed = globeHintDismissed
     }
 }
 

@@ -12,6 +12,7 @@ final class Leaderboard {
     let membership: LeaderboardMembership
     let uploader: LeaderboardUploader
     let boardPage = URL(string: "https://claudebar.tddworks.com/leaderboard")!
+    let globePage = URL(string: "https://claudebar.tddworks.com/leaderboard#globe-section")!
 
     @ObservationIgnored private let api: any LeaderboardAPI
     @ObservationIgnored private let logs: MonitorTokenLogs
@@ -42,8 +43,8 @@ final class Leaderboard {
 
     /// Joins, then sends the last thirty days in the background so the first
     /// rank shows without waiting an hour, and the tab switches at once.
-    func join(as username: Username, sharing: Set<String>) async throws {
-        try await membership.join(as: username, sharing: sharing)
+    func join(as username: Username, sharing: Set<String>, sharesCountry: Bool = false) async throws {
+        try await membership.join(as: username, sharing: sharing, sharesCountry: sharesCountry)
         Task { await uploader.uploadDue() }
     }
 
@@ -56,6 +57,10 @@ final class Leaderboard {
 
     func board(in view: BoardView) async throws -> [Standing] {
         try await api.board(in: view)
+    }
+
+    func globe() async throws -> GlobeSummary {
+        try await api.globe(in: BoardView(period: .thirtyDays))
     }
 }
 
