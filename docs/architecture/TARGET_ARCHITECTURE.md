@@ -1097,6 +1097,7 @@ stay for extensions).
 | 3 | `Monitor.providers: [Provider]`, `lineup: [Account]`; `AIProviderRepository` and `AIProviders` go; the test stubs become definitions over stubbed connections | the cause, in the domain · every Monitor test |
 | 4 | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
 | 5 | Delete `AIProvider` | done · the build has no `AIProvider` |
+| 6 | **`Provider` by role** (SRP): one product plays different roles in different contexts — refreshed in Monitoring, configured in Settings, a set of logins in Accounts, a terminal choice in In use (already `InUse`), a history in Usage History (already `UsageHistory`). Each role becomes its own type the product hands out, as `inUse` is; `Provider` keeps only the lifecycle (TARGET §1: it changes when the lifecycle changes). *Designed and confirmed when slice 5 is done* | `Provider` small again · each role's tests move with it |
 
 #### Slice 1 in detail — Settings by product
 

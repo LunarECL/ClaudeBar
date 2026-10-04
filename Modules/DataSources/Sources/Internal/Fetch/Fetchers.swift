@@ -266,7 +266,9 @@ struct ScriptFetcher: Fetching {
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        var set = call.environment
+        // A setting the person never set and that has no default still reads
+        // `{{setting.x}}`: it isn't passed, as extensions never passed one.
+        var set = call.environment.filter { !$0.value.contains("{{setting.") }
         for (variable, setting) in call.secrets {
             if let value = secrets?.secret(setting, provider: providerId) { set[variable] = value }
         }
