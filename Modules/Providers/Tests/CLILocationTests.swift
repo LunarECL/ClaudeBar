@@ -32,14 +32,14 @@ struct CLILocationTests {
         defer { stub.cleanUp() }
         let codex = try stub.makeProvider("codex", accounts: [login("work")], isExecutable: { _ in true })
 
-        try codex.setCLIPath(Self.path)
+        try codex.configuration.setCLIPath(Self.path)
 
         for account in codex.accounts {
             let clis = codex.dataSources(for: account).compactMap(cli)
             #expect(!clis.isEmpty)
             #expect(clis.allSatisfy { $0 == Self.path })
         }
-        #expect(codex.cliPath == Self.path)
+        #expect(codex.configuration.cliPath == Self.path)
         #expect(stub.settings.cliPath(forProvider: "codex") == Self.path)
     }
 
@@ -48,11 +48,11 @@ struct CLILocationTests {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         let codex = try stub.makeProvider("codex", isExecutable: { _ in true })
-        try codex.setCLIPath(Self.path)
+        try codex.configuration.setCLIPath(Self.path)
 
-        try codex.setCLIPath("  ")
+        try codex.configuration.setCLIPath("  ")
 
-        #expect(codex.cliPath == nil)
+        #expect(codex.configuration.cliPath == nil)
         #expect(codex.dataSources(for: codex.defaultAccount).compactMap(cli).allSatisfy { $0 == "codex" })
         #expect(stub.settings.cliPath(forProvider: "codex") == nil)
     }
@@ -63,9 +63,9 @@ struct CLILocationTests {
         defer { stub.cleanUp() }
         let codex = try stub.makeProvider("codex", isExecutable: { _ in false })
 
-        #expect(throws: UsageError.self) { try codex.setCLIPath("/Users/me/notes.txt") }
+        #expect(throws: UsageError.self) { try codex.configuration.setCLIPath("/Users/me/notes.txt") }
 
-        #expect(codex.cliPath == nil)
+        #expect(codex.configuration.cliPath == nil)
         #expect(codex.dataSources(for: codex.defaultAccount).compactMap(cli).allSatisfy { $0 == "codex" })
     }
 
@@ -73,7 +73,7 @@ struct CLILocationTests {
     func `a saved location is used after a relaunch`() throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
-        try stub.makeProvider("codex", isExecutable: { _ in true }).setCLIPath(Self.path)
+        try stub.makeProvider("codex", isExecutable: { _ in true }).configuration.setCLIPath(Self.path)
 
         let relaunched = try stub.makeProvider("codex")
 
@@ -85,7 +85,7 @@ struct CLILocationTests {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         let codex = try stub.makeProvider("codex", isExecutable: { _ in true })
-        try codex.setCLIPath(Self.path)
+        try codex.configuration.setCLIPath(Self.path)
         let ran = Ran()
         let process = MockSignInProcess()
         given(process).run(executable: .any, arguments: .any, environment: .any, directory: .any, timeout: .any)
@@ -94,7 +94,7 @@ struct CLILocationTests {
                 return 1
             }
 
-        _ = try? await codex.signIn(with: AccountSignIn(process: process, folders: stub.folders, locate: { $0 }))
+        _ = try? await codex.accounts.signIn(with: AccountSignIn(process: process, folders: stub.folders, locate: { $0 }))
 
         #expect(ran.executable == Self.path)
     }

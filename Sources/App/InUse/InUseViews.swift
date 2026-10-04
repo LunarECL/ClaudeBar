@@ -125,7 +125,7 @@ struct InUseSettingsSection: View {
             Text("The account marked IN USE above is the one `\(inUse.command.name)` starts with in your terminal. Sessions already running keep theirs; Claude Desktop and IDE extensions keep their own login.")
                 .font(.caption).foregroundStyle(theme.textSecondary)
 
-            if settingUp || sessions.isWaiting(in: inUse.login.provider) {
+            if settingUp || sessions.isWaiting(for: inUse.login) {
                 InUseSetupCard()
                     .onChange(of: sessions.isSetUp) { _, done in if done { settingUp = false } }
             } else {

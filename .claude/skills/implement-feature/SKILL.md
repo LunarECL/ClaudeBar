@@ -160,20 +160,19 @@ Views consume domain models directly from `QuotaMonitor`:
 
 ```swift
 // QuotaMonitor is the single source of truth
-public actor QuotaMonitor {
-    private let providers: AIProviders  // Hidden - use delegation methods
+@MainActor @Observable
+public final class QuotaMonitor {
+    // The providers you keep: add, delete, order, the derived lineup
+    public let providers: Providers
 
-    // Delegation methods (nonisolated for UI access)
-    public nonisolated var allProviders: [any AIProvider]
-    public nonisolated var enabledProviders: [any AIProvider]
-    public nonisolated func provider(for id: String) -> (any AIProvider)?
-    public nonisolated func addProvider(_ provider: any AIProvider)
-    public nonisolated func removeProvider(id: String)
+    public var logins: [Account]   // every login
+    public var lineup: [Account]   // the lineup
+    public func login(id: String) -> Account?
 
     // Selection state
-    public nonisolated var selectedProviderId: String
-    public nonisolated var selectedProvider: (any AIProvider)?
-    public nonisolated var selectedProviderStatus: QuotaStatus
+    public var selectedProviderId: String
+    public var selectedLogin: Account?
+    public var selectedProviderStatus: QuotaStatus
 }
 
 // Views consume domain directly - NO AppState layer
@@ -182,8 +181,8 @@ struct MenuContentView: View {
 
     var body: some View {
         // Use delegation methods, not monitor.providers.enabled
-        ForEach(monitor.enabledProviders, id: \.id) { provider in
-            ProviderPill(provider: provider)
+        ForEach(monitor.lineup, id: \.id) { login in
+            ProviderPill(provider: login)
         }
     }
 }
@@ -224,13 +223,15 @@ A bug in a migrated provider is fixed in its JSON, or generically in
 `DataSources`, never with vendor-named Swift. Modules never `import Domain`.
 
 **Key patterns:**
-- **Modules by context** — the domain at a module's root, its implementation in `Internal/`, one factory enum per module (`DataSources.make`, `Providers.make`)
+- **Modules by context** — the domain at a module's root, its implementation in `Internal/`, one factory enum per module (`DataSources.make`, `ProviderFactory.make`)
 - **Providers are data** — a feature a provider needs becomes a generic rule or worker, then a line of JSON
 - **Protocol-based DI** — `@Mockable` ports; Chicago-school tests assert on state
 - **No ViewModel layer** — views read `QuotaMonitor` and `Provider` directly
 - **Settings** — generic per-provider values (`dataSourceKind`, `isOn`) before a new sub-protocol
 
 ## TDD Workflow (Chicago School)
+
+Name each test `should <outcome> [when <situation>]`, in the person's words, never a method, type or mechanism verb → [Naming tests](references/tdd-patterns.md#naming-tests).
 
 We follow **Chicago school TDD** (state-based testing):
 - Test **state changes** and **return values**, not interactions
@@ -245,7 +246,7 @@ Test state and computed properties:
 ```swift
 @Suite
 struct FeatureModelTests {
-    @Test func `model computes status from state`() {
+    @Test func `should be normal when half is left`() {
         // Given - set up initial state
         let model = FeatureModel(value: 50)
 
@@ -253,7 +254,7 @@ struct FeatureModelTests {
         #expect(model.status == .normal)
     }
 
-    @Test func `model state changes correctly`() {
+    @Test func `should have 70 left and stay healthy after using 30 of 100`() {
         // Given
         var model = FeatureModel(value: 100)
 
@@ -274,7 +275,7 @@ Stub dependencies to return data, assert on resulting state:
 ```swift
 @Suite
 struct FeatureServiceTests {
-    @Test func `service returns parsed data on success`() async throws {
+    @Test func `should load three items when the service answers`() async throws {
         // Given - stub dependency to return data (not verify calls)
         let mockClient = MockNetworkClient()
         given(mockClient).fetch(any()).willReturn(validResponseData)

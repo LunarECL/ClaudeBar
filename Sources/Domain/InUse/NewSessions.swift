@@ -103,7 +103,12 @@ public final class NewSessions {
 
     /// Whether a choice for `product` waits for the setup.
     public func isWaiting(in product: Provider) -> Bool {
-        waiting?.provider === product
+        waiting?.providerId == product.id
+    }
+
+    /// Whether a choice for this login's product waits for the setup.
+    public func isWaiting(for login: Account) -> Bool {
+        waiting?.providerId == login.providerId
     }
 
     /// *Use for new sessions* — at once when the lines are there (or for the
@@ -127,7 +132,7 @@ public final class NewSessions {
 
     /// `claudebar://use` — the login a link names, by its product's id and its name.
     public func use(providerId: String, account name: String) -> LinkOutcome {
-        guard let product = product(providerId), let account = product.account(named: name), account.canBeInUse else {
+        guard let product = product(providerId), let account = product.accounts.named(name), product.inUse?.canBeInUse(account) == true else {
             return .unknown
         }
         use(account)
@@ -136,10 +141,10 @@ public final class NewSessions {
 
     /// After a login's refresh: *Switch when low* moves new sessions, or a
     /// login worth moving to is announced — once per low.
-    public func review(_ refreshed: any AIProvider) async {
-        guard let login = refreshed as? Account, let inUse = login.provider.inUse,
+    public func review(_ refreshed: Account) async {
+        guard let product = product(refreshed.providerId), let inUse = product.inUse,
               let notice = try? inUse.review() else { return }
-        await announcer?.announce(InUseAlert(notice, of: login.provider))
+        await announcer?.announce(InUseAlert(notice, of: product))
     }
 
     /// *Add to ~/.zshrc* — writes the lines, then makes the waiting choice.
@@ -181,7 +186,10 @@ public final class NewSessions {
 
     private func apply(_ account: Account) {
         do {
-            try account.useForNewSessions()
+            guard let inUse = product(account.providerId)?.inUse else {
+                throw UsageError.executionFailed("This login's product can't choose a login for new sessions.")
+            }
+            try inUse.use(account)
             problem = nil
         } catch {
             problem = error.localizedDescription

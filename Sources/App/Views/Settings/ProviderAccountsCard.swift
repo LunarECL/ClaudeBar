@@ -27,20 +27,20 @@ struct ProviderAccountsCard: View {
                     Text(text.count).font(.caption).foregroundStyle(theme.textSecondary)
                 }
                 Spacer()
-                if provider.hasSeveralAccounts {
+                if provider.accounts.hasSeveral {
                     StatusBadge(status: provider.status)
                 }
             }
 
             ForEach(Array(provider.accounts.enumerated()), id: \.element.id) { index, account in
-                AccountRow(account: account, index: index, text: text, monitor: monitor,
+                AccountRow(account: account, inUse: provider.inUse, index: index, text: text, monitor: monitor,
                            onRename: { newName = account.label.isEmpty ? (account.accountEmail ?? "") : account.label; renaming = account },
                            onRemove: { removing = account },
                            onReauth: { reauth(account) })
                     .draggable(account.id)
                     .dropDestination(for: String.self) { ids, _ in
                         guard let moved = provider.accounts.first(where: { $0.id == ids.first }) else { return false }
-                        provider.move(moved, to: index)
+                        provider.accounts.move(moved, to: index)
                         return true
                     }
             }
@@ -68,7 +68,7 @@ struct ProviderAccountsCard: View {
         }
         .alert("Rename Account", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
-            Button("Save") { if let renaming { provider.rename(renaming, to: newName) } }
+            Button("Save") { if let renaming { provider.accounts.rename(renaming, to: newName) } }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("A name for this account. Leave it empty to show its email.")
@@ -93,7 +93,8 @@ struct ProviderAccountsCard: View {
         }
         Task {
             do {
-                try await provider.signInAgain(account)
+                try await provider.accounts.signInAgain(account)
+                try await provider.refresh(account)
             } catch {
                 reauthMessage = error.localizedDescription
             }
@@ -101,18 +102,19 @@ struct ProviderAccountsCard: View {
     }
 
     private func remove(_ account: Account) {
-        provider.remove(account)
+        provider.accounts.remove(account)
         let settings = AppSettings.shared
         let remaining = settings.menuBarProviderIds.filter { $0 != account.id }
         settings.setMenuBarProviderIds(remaining.isEmpty ? [provider.id] : remaining)
         if monitor.selectedProviderId == account.id { monitor.selectedProviderId = provider.id }
-        monitor.removeProvider(id: account.id)
     }
 }
 
 /// One login: its avatar, name and email, its menu-bar pin, and its actions.
 private struct AccountRow: View {
     let account: Account
+    /// Its product's *In use* — the terminal's choice, asked about this login.
+    let inUse: InUse?
     let index: Int
     let text: AccountsCardText
     let monitor: QuotaMonitor
@@ -132,14 +134,14 @@ private struct AccountRow: View {
             Image(systemName: "line.3.horizontal")
                 .foregroundStyle(theme.textTertiary)
                 .help("Drag to reorder")
-            if account.canBeInUse {
+            if let inUse, inUse.canBeInUse(account) {
                 Button { newSessions.use(account) } label: {
-                    Image(systemName: account.isInUse ? "largecircle.fill.circle" : "circle")
-                        .foregroundStyle(account.isInUse ? theme.accentPrimary : theme.textTertiary)
+                    Image(systemName: inUse.isInUse(account) ? "largecircle.fill.circle" : "circle")
+                        .foregroundStyle(inUse.isInUse(account) ? theme.accentPrimary : theme.textTertiary)
                 }
                 .buttonStyle(.plain)
                 .help("Use for new terminal sessions")
-                .accessibilityLabel(account.isInUse ? "In use for new terminal sessions" : "Use for new terminal sessions")
+                .accessibilityLabel(inUse.isInUse(account) ? "In use for new terminal sessions" : "Use for new terminal sessions")
             }
             Text(String(account.displayName.prefix(1)).uppercased())
                 .font(.caption.bold())
@@ -162,7 +164,7 @@ private struct AccountRow: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(theme.textSecondary)
             }
-            if account.isInUse { InUseBadge() }
+            if inUse?.isInUse(account) == true { InUseBadge() }
             if text.needsReauth(account) {
                 Button("Re-auth", action: onReauth)
                     .controlSize(.small)

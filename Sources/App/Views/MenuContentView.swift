@@ -44,8 +44,8 @@ struct MenuContentView: View {
     }
 
     /// The currently selected provider
-    private var selectedProvider: (any AIProvider)? {
-        monitor.selectedProvider
+    private var selectedLogin: Account? {
+        monitor.selectedLogin
     }
 
     var body: some View {
@@ -427,8 +427,8 @@ struct MenuContentView: View {
     // MARK: - Provider Pills
 
     /// Only show enabled providers in the pills
-    private var enabledProviders: [any AIProvider] {
-        monitor.enabledProviders
+    private var enabledProviders: [Account] {
+        monitor.lineup
     }
 
     /// Room above the scrolled cards for an outlined theme's thick top
@@ -517,7 +517,7 @@ struct MenuContentView: View {
         if showsLeaderboard && !settings.overviewModeEnabled {
             LeaderboardPopoverView(leaderboard: leaderboard, monitor: monitor)
         } else if settings.overviewModeEnabled {
-            let providers = monitor.enabledProviders
+            let providers = monitor.lineup
             if providers.isEmpty {
                 emptyState
             } else {
@@ -525,30 +525,30 @@ struct MenuContentView: View {
             }
         } else if let tab = monitor.selectedTab, tab.accounts.count > 1 {
             accountsContent(tab)
-        } else if let provider = selectedProvider, let snapshot = monitor.usage(of: provider) {
+        } else if let provider = selectedLogin, let snapshot = monitor.usage(of: provider) {
             let report = RefreshReport.of(provider)
             VStack(spacing: 12) {
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
                     AccountCardView(
                         providerId: selectedProviderId, displayName: displayName, snapshot: snapshot,
-                        freshness: report?.freshness ?? "Updated \(snapshot.ageDescription)"
+                        freshness: report.freshness ?? "Updated \(snapshot.ageDescription)"
                     )
-                } else if let freshness = report?.freshness {
+                } else if let freshness = report.freshness {
                     freshnessLine(freshness)
                 }
-                if let failure = report?.failure {
+                if let failure = report.failure {
                     failureNotice(failure)
                 }
                 statsGrid(snapshot: snapshot)
-                    .opacity(report?.isLastSeen == true ? 0.55 : 1)
+                    .opacity(report.isLastSeen ? 0.55 : 1)
             }
             .opacity(animateIn ? 1 : 0)
             .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
-        } else if let account = selectedProvider as? Account, account.needsSetup {
+        } else if let account = selectedLogin, account.needsSetup {
             setupContent(account)
                 .opacity(animateIn ? 1 : 0)
                 .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
-        } else if selectedProvider?.isSyncing == true {
+        } else if selectedLogin?.isSyncing == true {
             loadingState
         } else {
             emptyState
@@ -561,13 +561,13 @@ struct MenuContentView: View {
     private func accountsContent(_ tab: ProductTab) -> some View {
         VStack(spacing: 12) {
             accountChips(tab)
-            if let product = tab.provider, let state = newSessions.state(of: product) {
+            if let state = newSessions.state(of: tab.provider) {
                 InUseStrip(state: state)
             }
             ForEach(tab.accounts.filter { !hiddenAccountIds.contains($0.id) }, id: \.id) { account in
                 providerSection(provider: account)
             }
-            if let worst = tab.provider?.worstAccount {
+            if let worst = tab.provider.accounts.worst {
                 worstAccountCallout(worst)
             }
         }
@@ -583,14 +583,13 @@ struct MenuContentView: View {
                     .foregroundStyle(theme.textTertiary)
                 ForEach(tab.accounts, id: \.id) { account in
                     let hidden = hiddenAccountIds.contains(account.id)
-                    let login = account as? Account
                     HStack(spacing: 4) {
                         Button {
                             if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
                         } label: {
                             HStack(spacing: 4) {
-                                if login?.isInUse == true { InUseBadge() }
-                                Text(settings.shown(account.name)).lineLimit(1)
+                                if tab.provider.inUse?.isInUse(account) == true { InUseBadge() }
+                                Text(settings.shown(tab.provider.lineupName(of: account))).lineLimit(1)
                                 Circle()
                                     .fill(account.lastError != nil ? theme.textTertiary
                                           : theme.statusColor(for: monitor.status(of: account) ?? .healthy))
@@ -598,24 +597,24 @@ struct MenuContentView: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        .help(hidden ? "Show \(settings.shown(account.name))" : "Hide \(settings.shown(account.name)) from this view")
+                        .help(hidden ? "Show \(settings.shown(tab.provider.lineupName(of: account)))" : "Hide \(settings.shown(tab.provider.lineupName(of: account))) from this view")
                         // One click switches: the other logins end in "Use".
-                        if let login, login.canBeInUse, !login.isInUse {
-                            Button { newSessions.use(login) } label: {
+                        if tab.provider.inUse?.canBeInUse(account) == true, tab.provider.inUse?.isInUse(account) != true {
+                            Button { newSessions.use(account) } label: {
                                 Text("Use")
                                     .font(.system(size: 10, weight: .bold, design: theme.fontDesign))
                                     .foregroundStyle(theme.accentPrimary)
                             }
                             .buttonStyle(.plain)
-                            .help("Use \(settings.shown(account.name)) for new terminal sessions")
-                            .accessibilityLabel("Use \(settings.shown(account.name)) for new terminal sessions")
+                            .help("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
+                            .accessibilityLabel("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
                         }
                     }
                     .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                     // The provider pills' shape and height. A leading IN USE badge sits
                     // concentric: the same gap on its left as above and below it.
                     .frame(height: InUseBadge.chipHeight(in: theme))
-                    .padding(.leading, login?.isInUse == true ? InUseBadge.gap(in: theme) : 10)
+                    .padding(.leading, tab.provider.inUse?.isInUse(account) == true ? InUseBadge.gap(in: theme) : 10)
                     .padding(.trailing, 10)
                     .background(RoundedRectangle(cornerRadius: theme.pillCornerRadius).fill(hidden ? Color.clear : theme.glassBackground))
                     // Stroked across the edge, as the provider pills and the cards are:
@@ -624,8 +623,8 @@ struct MenuContentView: View {
                     .overlay(RoundedRectangle(cornerRadius: theme.pillCornerRadius).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
                     .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
                     .contextMenu {
-                        if let login, login.canBeInUse {
-                            Button("Use for New Terminal Sessions") { newSessions.use(login) }.disabled(login.isInUse)
+                        if tab.provider.inUse?.canBeInUse(account) == true {
+                            Button("Use for New Terminal Sessions") { newSessions.use(account) }.disabled(tab.provider.inUse?.isInUse(account) == true)
                         }
                     }
                 }
@@ -656,7 +655,7 @@ struct MenuContentView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.statusColor(for: status).opacity(0.4), lineWidth: 1))
     }
 
-    private func overviewContent(providers: [any AIProvider]) -> some View {
+    private func overviewContent(providers: [Account]) -> some View {
         // Scrolling is owned by the shared middle-region ScrollView in
         // `body`; nesting another vertical ScrollView here would break
         // height negotiation and swallow gestures.
@@ -673,19 +672,19 @@ struct MenuContentView: View {
         .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
     }
 
-    private func providerSection(provider: any AIProvider) -> some View {
+    private func providerSection(provider: Account) -> some View {
         VStack(spacing: 8) {
             providerSectionHeader(provider: provider)
 
             if let snapshot = monitor.usage(of: provider) {
                 let report = RefreshReport.of(provider)
-                if let failure = report?.failure {
+                if let failure = report.failure {
                     failureNotice(failure)
                 }
                 statsGrid(snapshot: snapshot)
-                    .opacity(report?.isLastSeen == true ? 0.55 : 1)
-            } else if let account = provider as? Account, account.needsSetup {
-                setupContent(account)
+                    .opacity(report.isLastSeen ? 0.55 : 1)
+            } else if provider.needsSetup {
+                setupContent(provider)
             } else if provider.isSyncing {
                 LoadingSpinnerView()
             } else {
@@ -694,11 +693,11 @@ struct MenuContentView: View {
         }
     }
 
-    private func providerSectionHeader(provider: any AIProvider) -> some View {
+    private func providerSectionHeader(provider: Account) -> some View {
         HStack(spacing: 8) {
             ProviderIconView(providerId: provider.id, size: 20, showGlow: false)
 
-            Text(settings.shown(provider.name))
+            Text(settings.shown(monitor.lineupName(of: provider)))
                 .fixedSize(horizontal: false, vertical: true)
                 .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
@@ -751,7 +750,7 @@ struct MenuContentView: View {
         .padding(.vertical, 4)
     }
 
-    private func compactErrorState(provider: any AIProvider) -> some View {
+    private func compactErrorState(provider: Account) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 12))
@@ -918,7 +917,7 @@ struct MenuContentView: View {
                 CostStatCard(costUsage: costUsage, budget: budget, delay: Double(snapshot.quotas.count) * 0.08)
             }
 
-            todaySection(account: monitor.provider(for: snapshot.providerId) as? Account,
+            todaySection(account: monitor.login(id: snapshot.providerId),
                          fallback: snapshot.dailyUsageReport, after: snapshot.quotas.count)
 
             // Show extension metrics cards (from extension probes)
@@ -994,7 +993,7 @@ struct MenuContentView: View {
     }
 
     private func setupCard(_ account: Account) -> some View {
-        let setup = account.setupNotice
+        let setup = monitor.setupNotice(of: account)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: "gauge.with.dots.needle.0percent")
@@ -1037,15 +1036,15 @@ struct MenuContentView: View {
             }
 
             // A provider that is data names the step that failed first.
-            let failure = selectedProvider.flatMap { RefreshReport.of($0)?.failure }
-            Text(failure?.headline ?? "\(selectedProvider?.name ?? selectedProviderId) Unavailable")
+            let failure = selectedLogin.flatMap { RefreshReport.of($0).failure }
+            Text(failure?.headline ?? "\(selectedLogin.map(monitor.lineupName(of:)) ?? selectedProviderId) Unavailable")
                 .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
 
             // Show actual error message if available, otherwise generic message
             Text(failure?.headline != nil
-                 ? "\(selectedProvider?.name ?? selectedProviderId) Unavailable · \(failure?.detail ?? "")"
-                 : selectedProvider?.lastError?.localizedDescription ?? "Install CLI or check configuration")
+                 ? "\(selectedLogin.map(monitor.lineupName(of:)) ?? selectedProviderId) Unavailable · \(failure?.detail ?? "")"
+                 : selectedLogin?.lastError?.localizedDescription ?? "Install CLI or check configuration")
                 .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textTertiary)
                 .multilineTextAlignment(.center)
@@ -1066,7 +1065,7 @@ struct MenuContentView: View {
                 label: "Dashboard",
                 gradient: theme.accentGradient
             ) {
-                if let url = selectedProvider?.dashboardURL {
+                if let url = selectedLogin.flatMap(monitor.dashboardURL(of:)) {
                     NSWorkspace.shared.open(url)
                 }
             }
@@ -1075,8 +1074,8 @@ struct MenuContentView: View {
 
             // Refresh Button
             let isCurrentlyRefreshing = settings.overviewModeEnabled
-                ? monitor.enabledProviders.contains { $0.isSyncing }
-                : selectedProvider?.isSyncing == true
+                ? monitor.lineup.contains { $0.isSyncing }
+                : selectedLogin?.isSyncing == true
             WrappedActionButton(
                 icon: isCurrentlyRefreshing ? "arrow.trianglehead.2.counterclockwise.rotate.90" : "arrow.clockwise",
                 label: isCurrentlyRefreshing ? "Syncing" : "Refresh",
@@ -1100,7 +1099,7 @@ struct MenuContentView: View {
             Spacer()
 
             // Share Button (Claude only) - icon only
-            if let guestPasses, guestPasses.isOffered(for: selectedProvider?.snapshot) {
+            if let guestPasses, guestPasses.isOffered(for: selectedLogin?.snapshot) {
                 let isFetchingPasses = guestPasses.isFetching
                 Button {
                     Task { await fetchAndShowPasses() }
@@ -1195,18 +1194,19 @@ struct MenuContentView: View {
             // it here on the main actor (this closure inherits the caller's
             // isolation). Each child task then awaits `refresh(_:)`, whose heavy
             // probe work still suspends off-main, keeping the refreshes concurrent.
-            for provider in monitor.enabledProviders where !provider.isSyncing {
+            for provider in monitor.lineup where !provider.isSyncing {
+                guard let product = monitor.product(of: provider) else { continue }
                 group.addTask {
                     do {
-                        try await provider.refresh(kind)
+                        try await product.refresh(provider, kind)
                     } catch {
                         // Provider stores error in lastError
                     }
                 }
             }
         }
-        for provider in monitor.enabledProviders {
-            await (provider as? Account)?.usageHistory?.read()
+        for provider in monitor.lineup {
+            await provider.usageHistory?.read()
         }
     }
 
@@ -1216,20 +1216,21 @@ struct MenuContentView: View {
     private func refresh(providerId: String, kind: RefreshKind = .interactive) async {
         // A tab of logins refreshes every login it shows.
         let members = monitor.tabs.first { $0.contains(providerId) }?.accounts
-            ?? monitor.provider(for: providerId).map { [$0] } ?? []
+            ?? monitor.login(id: providerId).map { [$0] } ?? []
         // Provider stores error in lastError; isSyncing prevents duplicates.
-        let refreshes = members.filter { !$0.isSyncing }.map { provider in
-            Task { _ = try? await provider.refresh(kind) }
+        let refreshes: [Task<Void, Never>] = members.filter { !$0.isSyncing }.compactMap { login in
+            guard let product = monitor.product(of: login) else { return nil }
+            return Task { _ = try? await product.refresh(login, kind) }
         }
         // Today's usage is read with the popover open, never in the background.
-        let history = members.compactMap { ($0 as? Account)?.usageHistory }.map { history in Task { await history.read() } }
+        let history = members.compactMap(\.usageHistory).map { history in Task { await history.read() } }
         for refresh in refreshes { await refresh.value }
         for read in history { await read.value }
     }
 
     /// The selected provider's guest passes, when it has any to offer.
     private var guestPasses: GuestPasses? {
-        (selectedProvider as? Account)?.guestPasses
+        selectedLogin?.guestPasses
     }
 
     /// Fetch guest passes and show the share view

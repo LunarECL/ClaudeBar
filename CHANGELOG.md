@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Breaking:** extensions' `dailyUsage`, `metricsRow` and `statusBanner` sections are no longer read; their quotas, cost and health check still show. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/extensions/README.md) ([#471](https://github.com/tddworks/ClaudeBar/pull/471))
+
 ### Changed
+- **Settings → Providers, one row per provider:** with two Claude accounts, Claude is one row showing each account's usage, its page is titled Claude, and its switch turns the whole provider on or off. Each account keeps its own Pause, and your current setup carries over. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/multi-account/README.md) ([#471](https://github.com/tddworks/ClaudeBar/pull/471))
 - A provider whose CLI isn't installed, or that you never signed in to, now reads Not set up instead of Unavailable, and shows any daily usage it can still read. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/daily-usage/README.md) ([#198](https://github.com/tddworks/ClaudeBar/issues/198))
+- Extensions now show like any provider: their settings sit on the provider's page in Settings and their secret fields move to the Keychain. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/extensions/README.md) ([#471](https://github.com/tddworks/ClaudeBar/pull/471))
 
 ### Fixed
 - **Leaderboard:** your upload stays hourly after your Mac sleeps, instead of falling hours behind, and Refresh now uploads it too. ([#468](https://github.com/tddworks/ClaudeBar/pull/468))

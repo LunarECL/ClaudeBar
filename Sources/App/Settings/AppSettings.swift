@@ -515,11 +515,6 @@ public final class AppSettings {
     public var deepseek: DeepSeekSettingsRepository { repository }
     public var hook: HookSettingsRepository { repository }
     public var notify: NotifySettingsRepository { repository }
-
-    /// Extension config repository for dynamic extension provider settings.
-    public let extensionConfig: any ExtensionConfigRepository = JSONExtensionConfigRepository(
-        settingsStore: .shared
-    )
 }
 
 // MARK: - Notification Names

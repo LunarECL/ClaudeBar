@@ -56,6 +56,7 @@ UI changes come with a mockup in `design-concept/<feature>/` first, and, once bu
 
 - Write the failing test first. Swift Testing (`@Suite`, `@Test`, `#expect`) with Mockable (`given(mock).method().willReturn(…)`).
 - **Chicago school**: assert on resulting state and return values; stub dependencies, don't `verify()` calls.
+- **Name a test for the behaviour it guards**: `` `should <outcome> [when <situation>]` `` in the person's words, never a method, type or mechanism verb. Rename an old test when you change its file; don't sweep → [Naming tests](.claude/skills/implement-feature/references/tdd-patterns.md#naming-tests).
 - Protocols that cross a boundary are `@Mockable` so tests never touch a real CLI, network or Keychain.
 
 ## Logging

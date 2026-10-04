@@ -22,11 +22,11 @@ struct NotSetUpTests {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         cliNotFound(claude)
-        let account = try claude.provider()
+        let provider = try claude.provider()
 
-        _ = try? await account.refresh()
+        _ = try? await provider.refreshPlain()
 
-        #expect(account.needsSetup)
+        #expect(provider.defaultAccount.needsSetup)
     }
 
     @Test
@@ -34,11 +34,11 @@ struct NotSetUpTests {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         cliNotFound(claude)
-        let account = try claude.provider(settings: InMemoryProviderSettings(dataSourceKinds: ["claude": "api"]))
+        let provider = try claude.provider(settings: InMemoryProviderSettings(dataSourceKinds: ["claude": "api"]))
 
-        _ = try? await account.refresh()
+        _ = try? await provider.refreshPlain()
 
-        #expect(account.needsSetup)
+        #expect(provider.defaultAccount.needsSetup)
     }
 
     @Test
@@ -48,24 +48,24 @@ struct NotSetUpTests {
         given(claude.cli).locate(.any).willReturn("/usr/local/bin/claude")
         given(claude.cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
             .willThrow(UsageError.executionFailed("claude is not running"))
-        let account = try claude.provider()
+        let provider = try claude.provider()
 
-        _ = try? await account.refresh()
+        _ = try? await provider.refreshPlain()
 
-        #expect(account.lastError != nil)
-        #expect(!account.needsSetup)
+        #expect(provider.defaultAccount.lastError != nil)
+        #expect(!provider.defaultAccount.needsSetup)
     }
 
     @Test
     func `a login that has never refreshed is not yet waiting for setup`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        #expect(try !claude.provider().needsSetup)
+        #expect(try !claude.provider().defaultAccount.needsSetup)
     }
 
     @Test
     func `claude says what setting it up takes and where`() throws {
-        let setup = try #require(try Providers.builtIn("claude").setup)
+        let setup = try #require(try ProviderFactory.builtIn("claude").setup)
         #expect(setup.title == "See your session and weekly limits")
         #expect(setup.text.contains("Claude Code"))
         #expect(setup.url == URL(string: "https://claude.ai/code"))
@@ -79,7 +79,7 @@ struct NotSetUpTests {
         #expect(setup == ProviderDefinition.Setup(title: "Install Acme", text: "Acme reads your limits through its CLI.",
                                                   url: URL(string: "https://acme.dev/cli")))
         #expect(setup.button == "Set up")
-        #expect(try Providers.builtIn("grok").setup == nil)
+        #expect(try ProviderFactory.builtIn("grok").setup == nil)
     }
 
     @Test
@@ -87,17 +87,17 @@ struct NotSetUpTests {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         cliNotFound(claude)
-        let account = try claude.provider()
-        _ = try? await account.refresh()
+        let provider = try claude.provider()
+        _ = try? await provider.refreshPlain()
 
-        #expect(account.setupNotice.title == "See your session and weekly limits")
-        #expect(account.setupNotice.button == "Set up Claude Code")
+        #expect(provider.setupNotice(of: provider.defaultAccount).title == "See your session and weekly limits")
+        #expect(provider.setupNotice(of: provider.defaultAccount).button == "Set up Claude Code")
     }
 
     @Test
     func `without a setup in the definition, the notice names the provider and says what failed`() throws {
         let definition = try ProviderDefinition(
-            profile: Providers.builtIn("claude").profile, dataSources: Providers.builtIn("claude").dataSources,
+            profile: ProviderFactory.builtIn("claude").profile, dataSources: ProviderFactory.builtIn("claude").dataSources,
             defaultDataSource: "cli")
         let notice = ProviderDefinition.Setup.fallback(for: definition.profile.name, error: UsageError.cliNotFound("acme"))
 
@@ -111,7 +111,7 @@ struct NotSetUpTests {
     func `a login with no usage history reads no usage`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        let account = try claude.provider()
-        #expect(!account.readsUsage)
+        let provider = try claude.provider()
+        #expect(!provider.defaultAccount.readsUsage)
     }
 }

@@ -100,7 +100,7 @@ Examples:
 **Test approach**: State-based domain tests
 
 ```swift
-@Test func `model provides convenient access to lowest quota`() {
+@Test func `should point at the quota with the least left`() {
     // Given
     let snapshot = UsageSnapshot(quotas: [quota1, quota2, quota3])
 
@@ -142,13 +142,15 @@ Examples:
 
 ## TDD Pattern (Chicago School)
 
+Name each test `should <outcome> [when <situation>]`, in the person's words, never a method, type or mechanism verb → [Naming tests](../implement-feature/references/tdd-patterns.md#naming-tests).
+
 ### Write Test for Improved Behavior
 
 ```swift
 @Suite
 struct {Component}Tests {
 
-    @Test func `{describes improved behavior}`() {
+    @Test func `should {improved outcome} [when {situation}]`() {
         // Given - standard setup
         let component = Component(...)
 

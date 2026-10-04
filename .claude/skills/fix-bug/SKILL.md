@@ -96,6 +96,8 @@ Check if the bug violates domain invariants that should be maintained:
 
 ### Chicago School TDD
 
+Name each test `should <outcome> [when <situation>]`, in the person's words, never a method, type or mechanism verb → [Naming tests](../implement-feature/references/tdd-patterns.md#naming-tests).
+
 We follow **Chicago School TDD** (state-based testing):
 - Test **state changes** and **return values**, not interactions
 - Focus on the "what" (observable outcomes), not the "how" (method calls)
@@ -111,7 +113,7 @@ Test the CORRECT behavior, not the bug:
 @Suite
 struct {Component}Tests {
 
-    @Test func `{describes correct behavior}`() async throws {
+    @Test func `should {correct outcome} when {the situation that showed the bug}`() async throws {
         // Given - the response that triggers the bug, captured from the real CLI/API
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }

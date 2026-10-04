@@ -30,7 +30,7 @@ struct NewSessionsTests {
         let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: temp.appendingPathComponent("settings.json")))
         let work = ProviderAccountConfig(accountId: "work", label: "work",
                                          probeConfig: ["codexHome": "/Users/you/.codex-work", "chatgptAccountId": "work"])
-        return try! Providers.make("codex", settings: settings, accounts: [work],
+        return try! ProviderFactory.make("codex", settings: settings, accounts: [work],
                                    loginsInUse: DiskLoginsInUse(root: temp.appendingPathComponent("in-use")))
     }
 
@@ -42,7 +42,7 @@ struct NewSessionsTests {
 
         sessions.use(codex.accounts[1])
 
-        #expect(codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) == true)
         #expect(sessions.waiting == nil)
     }
 
@@ -53,7 +53,7 @@ struct NewSessionsTests {
 
         sessions.use(codex.accounts[1])
 
-        #expect(!codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) != true)
         #expect(sessions.isWaiting(in: codex))
     }
 
@@ -67,7 +67,7 @@ struct NewSessionsTests {
 
         #expect(sessions.isSetUp)
         #expect(lines.installed == [.bash])
-        #expect(codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) == true)
         #expect(sessions.waiting == nil)
     }
 
@@ -80,7 +80,7 @@ struct NewSessionsTests {
         let copied = sessions.setUpByHand()
 
         #expect(copied == "# lines for zsh")
-        #expect(codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) == true)
     }
 
     @Test
@@ -91,7 +91,7 @@ struct NewSessionsTests {
 
         sessions.cancel()
 
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
         #expect(sessions.waiting == nil)
     }
 
@@ -105,7 +105,7 @@ struct NewSessionsTests {
 
         sessions.use(codex.defaultAccount)
 
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
         #expect(sessions.waiting == nil)
     }
 
@@ -120,7 +120,7 @@ struct NewSessionsTests {
 
         #expect(!sessions.isSetUp)
         #expect(lines.installed.isEmpty)
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
     }
 
     @Test
@@ -158,7 +158,7 @@ struct NewSessionsTests {
     @Test
     func `a product with one login shows nothing`() throws {
         let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: temp.appendingPathComponent("one.json")))
-        let alone = try Providers.make("codex", settings: settings,
+        let alone = try ProviderFactory.make("codex", settings: settings,
                                        loginsInUse: DiskLoginsInUse(root: temp.appendingPathComponent("in-use")))
         let sessions = NewSessions(products: [alone], shellLines: lines, shell: .zsh)
 
@@ -181,7 +181,7 @@ struct NewSessionsTests {
         let sessions = NewSessions(products: [codex], shellLines: lines, shell: .zsh)
 
         #expect(sessions.use(providerId: "codex", account: "work") == .used)
-        #expect(codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) == true)
     }
 
     @Test
@@ -199,7 +199,7 @@ struct NewSessionsTests {
 
         #expect(sessions.use(providerId: "gemini", account: "work") == .unknown)
         #expect(sessions.use(providerId: "codex", account: "someone") == .unknown)
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
     }
 
     // MARK: - The alert a notice becomes
@@ -221,7 +221,7 @@ struct NewSessionsTests {
     @Test
     func `only products whose new sessions can be chosen are listed`() throws {
         let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: temp.appendingPathComponent("s.json")))
-        let gemini = try Providers.make("gemini", settings: settings)
+        let gemini = try ProviderFactory.make("gemini", settings: settings)
         let codex = codex()
 
         let sessions = NewSessions(products: [gemini, codex], shellLines: lines, shell: .zsh)

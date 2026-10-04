@@ -119,7 +119,7 @@ struct ProviderTests {
         let acme = acme(network, logins: ["work"])
         let work = acme.accounts[1]
 
-        let usage = try await work.refresh()
+        let usage = try await acme.refresh(work)
 
         #expect(usage.providerId == "acme.work")
         #expect(work.snapshot?.sessionQuota?.percentRemaining == 70)
@@ -132,11 +132,11 @@ struct ProviderTests {
         let network = AcmeNetwork()
         network.answer(Self.backup, used: 30)
         let acme = acme(network)
-        acme.use("backup")
-        try await acme.defaultAccount.refresh()
+        acme.configuration.use("backup")
+        try await acme.refreshPlain()
         network.fail(Self.backup)
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain() }
 
         #expect(acme.defaultAccount.snapshot?.sessionQuota?.percentRemaining == 70)
         #expect(acme.defaultAccount.lastError != nil)
@@ -150,8 +150,8 @@ struct ProviderTests {
         network.fail(Self.backup)
         let acme = acme(network, logins: ["home", "work"])
 
-        try await acme.accounts[1].refresh()
-        await #expect(throws: (any Error).self) { try await acme.accounts[2].refresh() }
+        try await acme.refresh(acme.accounts[1])
+        await #expect(throws: (any Error).self) { try await acme.refresh(acme.accounts[2]) }
 
         #expect(acme.accounts[1].snapshot?.sessionQuota?.percentRemaining == 90)
         #expect(acme.accounts[1].lastError == nil)
@@ -165,8 +165,8 @@ struct ProviderTests {
         network.held = true
         let acme = acme(network)
 
-        async let first = acme.defaultAccount.refresh()
-        async let second = acme.defaultAccount.refresh()
+        async let first = acme.refreshPlain()
+        async let second = acme.refreshPlain()
         try await Task.sleep(for: .milliseconds(50))
         network.release()
         _ = try await (first, second)
@@ -183,7 +183,7 @@ struct ProviderTests {
         network.answer(Self.backup, used: 40)
         let acme = acme(network)
 
-        let usage = try await acme.defaultAccount.refresh()
+        let usage = try await acme.refreshPlain()
 
         #expect(usage.sessionQuota?.percentRemaining == 60)
         #expect(acme.defaultAccount.answeredBy == "backup")
@@ -196,7 +196,7 @@ struct ProviderTests {
         network.fail(Self.backup, status: 500)
         let acme = acme(network)
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain() }
 
         #expect((acme.defaultAccount.lastError as? UsageError)?.tag == "authenticationRequired")
     }
@@ -207,9 +207,9 @@ struct ProviderTests {
         network.fail(Self.api)
         network.answer(Self.backup, used: 40)
         let acme = acme(network)
-        acme.setFallbackEnabled(false, from: "api")
+        acme.configuration.setFallbackEnabled(false, from: "api")
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain() }
 
         #expect(network.requests(to: Self.backup) == 0)
     }
@@ -221,7 +221,7 @@ struct ProviderTests {
         network.answer(Self.backup, used: 40)
         let acme = acme(network)
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain() }
 
         #expect(network.requests(to: Self.backup) == 0)
     }
@@ -234,7 +234,7 @@ struct ProviderTests {
         patch["api"] = try JSONDecoder().decode(JSONValue.self, from: Data("null".utf8))
         let acme = acme(network, definition: Self.acme(patch: patch), logins: ["work"])
 
-        let usage = try await acme.accounts[1].refresh()
+        let usage = try await acme.refresh(acme.accounts[1])
 
         #expect(usage.sessionQuota?.percentRemaining == 75)
         #expect(acme.accounts[1].answeredBy == "backup")
@@ -248,10 +248,10 @@ struct ProviderTests {
         let settings = InMemoryProviderSettings()
         let acme = acme(AcmeNetwork(), settings: settings)
 
-        #expect(acme.use("backup"))
-        #expect(acme.use("tty") == false)
+        #expect(acme.configuration.use("backup"))
+        #expect(acme.configuration.use("tty") == false)
 
-        #expect(acme.activeKind == "backup")
+        #expect(acme.configuration.activeKind == "backup")
         #expect(settings.dataSourceKind(forProvider: "acme") == "backup")
     }
 
@@ -260,7 +260,7 @@ struct ProviderTests {
         let acme = acme(AcmeNetwork())
 
         #expect(acme.backgroundRefreshFloor == .seconds(600))
-        acme.use("backup")
+        acme.configuration.use("backup")
         #expect(acme.backgroundRefreshFloor == nil)
     }
 
@@ -272,11 +272,11 @@ struct ProviderTests {
         network.answer(Self.api, used: 30)
         let acme = acme(network, definition: Self.acme(verifyBeforeBackground: true))
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh(.background) }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain(.background) }
         #expect(network.requests(to: Self.api) == 0)
 
-        try await acme.defaultAccount.refresh(.interactive)
-        try await acme.defaultAccount.refresh(.background)
+        try await acme.refreshPlain(.interactive)
+        try await acme.refreshPlain(.background)
         #expect(network.requests(to: Self.api) == 1)
     }
 
@@ -289,10 +289,10 @@ struct ProviderTests {
         network.answer(Self.api, login: "low", used: 90)
         network.answer(Self.api, login: "high", used: 10)
         let acme = acme(network, logins: ["low", "high"])
-        for account in acme.accounts { try await account.refresh() }
+        for account in acme.accounts { try await acme.refresh(account) }
 
         #expect(acme.status == .critical)
-        #expect(acme.bestAccount?.accountId == "high")
+        #expect(acme.accounts.best?.accountId == "high")
 
         acme.accounts[1].isEnabled = false
         #expect(acme.status == .healthy)
@@ -305,11 +305,11 @@ struct ProviderTests {
         network.answer(Self.api, login: "low", used: 90)
         let acme = acme(network, logins: ["low"])
 
-        #expect(acme.worstAccount == nil)
-        for account in acme.accounts { try await account.refresh() }
+        #expect(acme.accounts.worst == nil)
+        for account in acme.accounts { try await acme.refresh(account) }
 
-        #expect(acme.worstAccount?.accountId == "low")
+        #expect(acme.accounts.worst?.accountId == "low")
         acme.accounts[1].isEnabled = false
-        #expect(acme.worstAccount == nil)
+        #expect(acme.accounts.worst == nil)
     }
 }
