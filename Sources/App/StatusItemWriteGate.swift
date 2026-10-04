@@ -1,3 +1,4 @@
+import Dispatch
 import Foundation
 import Infrastructure
 
@@ -23,11 +24,25 @@ import Infrastructure
 /// advances within about a second of the true minute boundary.
 ///
 /// Time and scheduling are injected so tests can drive the clock manually;
-/// production uses the wall clock and a one-shot main-runloop timer.
+/// production uses a monotonic clock (`StatusItemClock.monotonicNow`) and a
+/// one-shot main-runloop timer.
 ///
 /// Tests: `Tests/AppTests/StatusItem/StatusItemWriteGateTests.swift`. They
 /// verify the update-rate reduction, not the Apple-side abort, which cannot
 /// be reproduced in a unit test.
+
+/// Time sources for the status-item write gate.
+enum StatusItemClock {
+    /// Production time source: the process's monotonic uptime. Unlike the
+    /// wall clock it never jumps — a user or time zone change cannot make a
+    /// submit interval come out negative (flooding writes) or huge (deferring
+    /// the trailing flush for ages). The countdown's visible value still
+    /// reads the wall clock, in the driver, where the label is drawn.
+    static func monotonicNow() -> TimeInterval {
+        Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000
+    }
+}
+
 @MainActor
 final class StatusItemWriteGate<Content: Equatable> {
     /// Reads the current time, in seconds, on whatever scale `now` provides.
@@ -64,7 +79,7 @@ final class StatusItemWriteGate<Content: Equatable> {
     init(
         minimumInterval: TimeInterval,
         rateWindow: TimeInterval = 60,
-        now: @escaping Now = { Date().timeIntervalSinceReferenceDate },
+        now: @escaping Now = StatusItemClock.monotonicNow,
         schedule: @escaping Scheduler = StatusItemWriteGate.scheduleOnMainRunLoop,
         write: @escaping @MainActor (Content) -> Void
     ) {

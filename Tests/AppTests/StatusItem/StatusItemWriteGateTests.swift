@@ -354,4 +354,24 @@ struct StatusItemWriteGateTests {
         #expect(recorder.contents == ["A", "C", "D"])
         #expect(recorder.times == [0.0, 1.0, 2.0])
     }
+
+    // MARK: - Production clock
+
+    @Test
+    func `the production clock is monotonic`() {
+        // The interval math only needs a clock that never goes backwards.
+        // A wall-clock jump (user or NTP correction) would make a submit
+        // interval come out negative — every render writing at once — or
+        // huge — the trailing flush deferred for hours. The production
+        // default therefore reads the monotonic uptime; here we verify the
+        // contract that matters and that is observable without changing the
+        // system clock: repeated reads never decrease and never go negative.
+        var previous = StatusItemClock.monotonicNow()
+        #expect(previous >= 0)
+        for _ in 0..<100 {
+            let current = StatusItemClock.monotonicNow()
+            #expect(current >= previous)
+            previous = current
+        }
+    }
 }
