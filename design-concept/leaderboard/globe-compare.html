@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Globe Styles Compared</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FFF8EC;--ink:#1E1B2E;--muted:#5E5873}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:500 15px/1.45 "Bricolage Grotesque",system-ui,sans-serif}
+.wrap{max-width:1900px;margin:0 auto;padding:24px 16px 40px}
+h1{margin:0 0 4px;font-size:30px;font-weight:800}
+p{margin:0 0 18px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+figure{margin:0;display:flex;flex-direction:column;gap:8px}
+figcaption{font-weight:800;font-size:16px}
+figcaption span{font-weight:500;color:var(--muted)}
+iframe{width:100%;height:760px;border:3px solid var(--ink);border-radius:14px;background:#fff}
+a{color:#7C5CFF}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Globe: Pop dots or pixel blocks?</h1>
+  <p>Same sample data, same rules: country only, opt-in, at least 3 members per country. Drag either globe; hover a marker. Open each on its own: <a href="globe.html">Pop</a> · <a href="globe-pixel.html">Pixel</a>.</p>
+  <div class="grid">
+    <figure><figcaption>A · Pop <span>— dotted land, candy spikes, matches the web board and the app's Pop theme</span></figcaption><iframe src="globe.html" title="Pop globe"></iframe></figure>
+    <figure><figcaption>B · Pixel <span>— a third of the resolution scaled up crisp, land as blocks, stacked-block towers</span></figcaption><iframe src="globe-pixel.html" title="Pixel globe"></iframe></figure>
+  </div>
+</main>
+</body>
+</html>

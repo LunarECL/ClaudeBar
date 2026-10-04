@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaudeBar Globe — Pixel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FFF8EC;--ink:#1E1B2E;--muted:#5E5873;--card:#fff;--sun:#FFD84D;--sky:#A9D8FF;--pink:#FFB3C7;--mint:#9FE3B8;--violet:#7C5CFF;--px:4px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);background-image:linear-gradient(#EFE3CC 2px,transparent 2px),linear-gradient(90deg,#EFE3CC 2px,transparent 2px);background-size:24px 24px;color:var(--ink);font:500 16px/1.4 "Pixelify Sans",ui-monospace,monospace}
+.wrap{max-width:1320px;margin:0 auto;padding:32px 16px 56px;display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:end}
+h1{margin:0;font:400 clamp(18px,3.2vw,30px)/1.3 "Press Start 2P",monospace}
+.sub{margin:8px 0 0;color:var(--muted);max-width:660px}
+.tag{border:var(--px) solid var(--ink);padding:4px 10px;background:var(--sun);font:400 11px "Press Start 2P",monospace;box-shadow:var(--px) var(--px) 0 var(--ink)}
+.board{display:flex;flex-wrap:wrap;gap:22px}
+.globe-card{flex:999 1 560px;min-width:0;position:relative;border:var(--px) solid var(--ink);box-shadow:8px 8px 0 var(--ink);background:#17141F;min-height:520px;overflow:hidden}
+#globe{position:absolute;inset:0}
+#globe canvas{display:block;image-rendering:pixelated;cursor:grab}
+.head{position:absolute;left:14px;top:14px;right:14px;display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;pointer-events:none}
+.head h2{margin:0;color:var(--paper);font:400 13px "Press Start 2P",monospace}
+.seg{pointer-events:auto;display:flex;border:3px solid var(--paper)}
+.seg button{border:0;background:transparent;color:var(--paper);font:400 10px "Press Start 2P",monospace;padding:8px 10px;cursor:pointer;min-height:36px}
+.seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink)}
+.legend{position:absolute;left:14px;bottom:12px;right:14px;display:flex;flex-wrap:wrap;gap:8px;color:#D9D2EE;font-size:14px;pointer-events:none}
+.legend .chip{border:2px solid rgba(255,248,236,.6);padding:1px 8px;color:var(--paper)}
+.tip{position:absolute;pointer-events:none;background:var(--paper);border:var(--px) solid var(--ink);box-shadow:var(--px) var(--px) 0 var(--ink);padding:8px 10px;font-size:15px;transform:translate(-50%,calc(-100% - 14px));white-space:nowrap;opacity:0}
+.tip b{font:400 10px "Press Start 2P",monospace;display:block;margin-bottom:4px}
+.loading{position:absolute;inset:0;display:grid;place-items:center;color:#D9D2EE;font:400 11px "Press Start 2P",monospace}
+.side{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--card);border:var(--px) solid var(--ink);box-shadow:6px 6px 0 var(--ink);padding:12px}
+.label{font:400 9px "Press Start 2P",monospace;color:var(--muted)}
+.big{font:400 30px/1.2 "Press Start 2P",monospace;margin-top:8px;color:var(--violet);text-shadow:3px 3px 0 var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ol{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+li{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:5px 8px;border:3px solid var(--ink);position:relative;overflow:hidden;font-size:15px}
+li .fill{position:absolute;inset:0 auto 0 0;background:repeating-linear-gradient(90deg,var(--sky) 0 8px,#C9E6FF 8px 12px);z-index:0}
+li>*:not(.fill){position:relative;z-index:1}
+li .num{font:400 10px "Press Start 2P",monospace}
+.note{font-size:15px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div>
+      <h1>CLAUDEBAR AROUND THE WORLD</h1>
+      <p class="sub">The same globe in a pixel style: rendered at a third of the resolution and scaled up crisp, land as blocks, markers as stacked blocks.</p>
+    </div>
+    <span class="tag">SAMPLE DATA</span>
+  </header>
+
+  <div class="board">
+    <div class="globe-card" aria-label="Globe of ClaudeBar members by country, pixel style">
+      <div id="globe"></div>
+      <div class="loading" id="loading">LOADING…</div>
+      <div class="head">
+        <h2>WHERE CLAUDEBAR IS USED</h2>
+        <div class="seg" role="group" aria-label="Size markers by">
+          <button type="button" data-metric="members" aria-pressed="true">MEMBERS</button>
+          <button type="button" data-metric="tokens" aria-pressed="false">TOKENS</button>
+        </div>
+      </div>
+      <div class="legend"><span class="chip">Country only</span><span class="chip">Opt-in</span><span class="chip">≥ 3 per country</span><span>Drag to turn · hover a tower</span></div>
+      <div class="tip" id="tip"></div>
+    </div>
+    <div class="side">
+      <div class="stats">
+        <div class="card"><div class="label">COUNTRIES</div><div class="big" id="countryCount">0</div></div>
+        <div class="card"><div class="label">MEMBERS</div><div class="big" id="memberCount">0</div></div>
+      </div>
+      <div class="card"><div class="label" id="listTitle">TOP COUNTRIES · MEMBERS</div><ol id="countryList"></ol></div>
+      <p class="note"><b id="hiddenCount">0</b> countries with fewer than 3 opted-in members aren't shown.</p>
+    </div>
+  </div>
+</main>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "topojson-client": "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm",
+  "d3-geo": "https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/+esm"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { feature } from "topojson-client";
+import { geoCentroid, geoEquirectangular, geoPath } from "d3-geo";
+
+// Same sample data as globe.html.
+const SAMPLE = {
+  "United States of America": [48, 61.2e9], "China": [31, 38.0e9], "Japan": [14, 21.4e9], "Germany": [17, 18.9e9],
+  "United Kingdom": [12, 14.1e9], "India": [11, 9.8e9], "Canada": [8, 9.1e9], "France": [7, 7.7e9],
+  "Brazil": [5, 4.4e9], "Netherlands": [5, 6.2e9], "Australia": [4, 3.9e9], "South Korea": [6, 8.3e9],
+  "Singapore": [3, 4.0e9], "Sweden": [3, 2.6e9], "Spain": [2, 1.1e9], "Poland": [2, 0.9e9], "Kenya": [1, 0.3e9], "Mexico": [2, 0.7e9],
+};
+const THRESHOLD = 3;
+const CANDY = [0xFFD84D, 0xFFB3C7, 0xA9D8FF, 0x9FE3B8, 0xC9B8FF, 0xFFC98A];
+const R = 1, PIXEL = 1 / 3, BLOCK = 0.042;
+let metric = "members";
+const fmt = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + "B" : String(n);
+const short = (n) => n === "United States of America" ? "United States" : n;
+const el = (tag, props = {}, ...kids) => { const n = document.createElement(tag); Object.entries(props).forEach(([k, v]) => k === "text" ? (n.textContent = v) : k === "style" ? (n.style.cssText = v) : n.setAttribute(k, v)); kids.forEach((k) => n.append(k)); return n; };
+function toVec(lon, lat, r = R) {
+  const phi = (90 - lat) * Math.PI / 180, theta = (lon + 180) * Math.PI / 180;
+  return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
+}
+
+const host = document.getElementById("globe");
+// No antialiasing and a third of the pixels, scaled up with image-rendering: pixelated.
+const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+renderer.setPixelRatio(PIXEL);
+host.append(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+camera.position.set(0, 0.6, 3.4);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.enablePan = false; controls.minDistance = 2; controls.maxDistance = 5;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.6;
+
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.04, 48, 48), new THREE.MeshBasicMaterial({ color: 0x1E1B2E, side: THREE.BackSide })));
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(R, 48, 48), new THREE.MeshBasicMaterial({ color: 0xA9D8FF })));
+
+const towers = new THREE.Group();
+scene.add(towers);
+let countries = [];
+const up = new THREE.Vector3(0, 1, 0);
+
+async function load() {
+  const world = await (await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")).json();
+  const geo = feature(world, world.objects.countries);
+  const land = feature(world, world.objects.land);
+  const W = 720, H = 360;
+  const canvas = Object.assign(document.createElement("canvas"), { width: W, height: H });
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.beginPath(); geoPath(geoEquirectangular().scale(W / (2 * Math.PI)).translate([W / 2, H / 2]), ctx)(land); ctx.fill();
+  const px = ctx.getImageData(0, 0, W, H).data;
+  const isLand = (lon, lat) => px[(Math.min(H - 1, Math.floor((90 - lat) / 180 * H)) * W + Math.min(W - 1, Math.floor((lon + 180) / 360 * W))) * 4 + 3] > 0;
+
+  // Land as blocks: one instanced box per 2.6° cell, standing on the surface.
+  const cells = [];
+  const step = 2.6;
+  for (let lat = -84; lat <= 84; lat += step) {
+    const lonStep = step / Math.max(0.25, Math.cos(lat * Math.PI / 180));
+    for (let lon = -180; lon < 180; lon += lonStep) if (isLand(lon, lat)) cells.push([lon, lat]);
+  }
+  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(BLOCK, BLOCK * 0.6, BLOCK), new THREE.MeshBasicMaterial({ color: 0x9FE3B8 }), cells.length);
+  const edges = new THREE.InstancedMesh(new THREE.BoxGeometry(BLOCK * 1.25, BLOCK * 0.62, BLOCK * 1.25), new THREE.MeshBasicMaterial({ color: 0x1E1B2E }), cells.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1);
+  cells.forEach(([lon, lat], i) => {
+    const p = toVec(lon, lat, R + BLOCK * 0.3);
+    q.setFromUnitVectors(up, p.clone().normalize());
+    blocks.setMatrixAt(i, m.compose(p.clone().multiplyScalar(1.002), q, s));
+    edges.setMatrixAt(i, m.compose(p, q, s));
+  });
+  scene.add(edges, blocks);
+
+  countries = geo.features.map((f) => ({ name: f.properties.name, centre: geoCentroid(f) }))
+    .filter((c) => SAMPLE[c.name]).map((c) => ({ ...c, members: SAMPLE[c.name][0], tokens: SAMPLE[c.name][1] }));
+  document.getElementById("loading").remove();
+  draw();
+}
+
+function draw() {
+  towers.clear();
+  const shown = countries.filter((c) => c.members >= THRESHOLD).sort((a, b) => b[metric] - a[metric]);
+  const max = Math.max(...shown.map((c) => c[metric]));
+  const cube = new THREE.BoxGeometry(0.05, 0.05, 0.05), edge = new THREE.BoxGeometry(0.066, 0.066, 0.066);
+  shown.forEach((c, i) => {
+    const n = 1 + Math.round(6 * (c[metric] / max)); // blocks stacked
+    const g = new THREE.Group();
+    for (let k = 0; k < n; k++) {
+      const y = 0.03 + k * 0.052;
+      const b = new THREE.Mesh(cube, new THREE.MeshBasicMaterial({ color: k === n - 1 ? 0xFFF8EC : CANDY[i % CANDY.length] }));
+      // Back faces only: the outline shows around the block, never over it.
+      const e = new THREE.Mesh(edge, new THREE.MeshBasicMaterial({ color: 0x1E1B2E, side: THREE.BackSide }));
+      b.position.y = y; e.position.y = y; g.add(e, b);
+    }
+    const base = toVec(c.centre[0], c.centre[1], R + 0.02);
+    g.position.copy(base);
+    g.quaternion.setFromUnitVectors(up, base.clone().normalize());
+    g.userData = c;
+    towers.add(g);
+  });
+  document.getElementById("countryCount").textContent = String(shown.length);
+  document.getElementById("memberCount").textContent = String(shown.reduce((a, c) => a + c.members, 0));
+  document.getElementById("hiddenCount").textContent = String(countries.length - shown.length);
+  document.getElementById("listTitle").textContent = `TOP COUNTRIES · ${metric.toUpperCase()}`;
+  document.getElementById("countryList").replaceChildren(...shown.slice(0, 8).map((c) => el("li", {},
+    el("span", { class: "fill", style: `width:${(c[metric] / max) * 100}%` }),
+    el("span", { text: short(c.name) }),
+    el("span", { class: "num", text: metric === "members" ? `${c.members}` : fmt(c.tokens) }))));
+}
+
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+  metric = b.dataset.metric;
+  document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  draw();
+}));
+
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), tip = document.getElementById("tip");
+renderer.domElement.addEventListener("pointermove", (e) => {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(towers.children, true)[0];
+  if (hit) {
+    let g = hit.object; while (g.parent !== towers) g = g.parent;
+    const c = g.userData;
+    tip.replaceChildren(el("b", { text: short(c.name).toUpperCase() }), document.createTextNode(`${c.members} members · ${fmt(c.tokens)} tokens`));
+    tip.style.left = `${e.clientX - r.left}px`; tip.style.top = `${e.clientY - r.top}px`; tip.style.opacity = "1";
+    controls.autoRotate = false;
+  } else { tip.style.opacity = "0"; controls.autoRotate = true; }
+});
+renderer.domElement.addEventListener("pointerleave", () => { tip.style.opacity = "0"; controls.autoRotate = true; });
+
+function resize() {
+  const w = host.clientWidth, h = host.clientHeight;
+  renderer.setSize(w, h, false); renderer.domElement.style.width = w + "px"; renderer.domElement.style.height = h + "px";
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(host); resize();
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+load().catch(() => { document.getElementById("loading").textContent = "OFFLINE?"; });
+</script>
+</body>
+</html>
