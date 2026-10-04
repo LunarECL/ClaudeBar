@@ -154,6 +154,11 @@ final class StatusItemLabelDriver {
             minimumInterval: Self.minimumWriteInterval,
             write: { [weak self] content in self?.applyToButton(content) }
         )
+        // The new button has never seen a tooltip: forget what the previous
+        // one had, so the first write assigns tooltip and accessibility to
+        // it instead of skipping as "unchanged" (issue #281 review).
+        hasAppliedTooltip = false
+        lastTooltip = nil
 
         let sync = ObservationRenderSync(
             read: { [self] in currentLabelContent() },
