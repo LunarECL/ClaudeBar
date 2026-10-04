@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
----
-
-## [0.5.1] - 2026-10-04
+### Added
+- Leaderboard: join with a username from the new Leaderboard tab, share daily token totals from Claude, Codex or Mistral, and see your rank today, this week or this month. Only token counts leave your Mac; leaving deletes them. ([#459](https://github.com/tddworks/ClaudeBar/pull/459))
+- Codex daily usage: today's and the last 30 days' Codex tokens now show beside Claude's, read from Codex's session logs. ([#459](https://github.com/tddworks/ClaudeBar/pull/459))
 
 ### Fixed
 - Codex in API mode no longer shows a made-up "$1000 of $1000" API cost when your ChatGPT account has no Codex credits; the card now appears only when you have credits. ([#444](https://github.com/tddworks/ClaudeBar/issues/444))
@@ -1227,8 +1227,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.1...HEAD
-[0.5.1]: https://github.com/tddworks/ClaudeBar/compare/v0.5.0...v0.5.1
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/tddworks/ClaudeBar/compare/v0.4.95...v0.5.0
 [0.4.95]: https://github.com/tddworks/ClaudeBar/compare/v0.4.94...v0.4.95
 [0.4.94]: https://github.com/tddworks/ClaudeBar/compare/v0.4.93...v0.4.94
