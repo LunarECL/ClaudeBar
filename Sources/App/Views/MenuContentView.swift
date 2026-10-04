@@ -350,25 +350,10 @@ struct MenuContentView: View {
         }
     }
 
-    /// Status of the selected tab — the worst of its logins that have
-    /// usage — nil when none has a snapshot.
-    private var selectedProviderStatus: QuotaStatus? {
-        let members = monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? []
-        return members.compactMap { monitor.usage(of: $0)?.overallStatus(under: settings.statusPolicy) }.max()
-    }
-
-    /// What the header pill says. A provider that failed to probe reads as
-    /// "UNAVAILABLE" rather than borrowing a green "HEALTHY" it has no data
-    /// for (#259).
-    private var selectedProviderBadge: ProviderBadgeState {
-        ProviderBadgeState(of: monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? [],
-                           quotaStatus: selectedProviderStatus)
-    }
-
-    /// Whether the selected provider is currently syncing
-    private var isSelectedProviderSyncing: Bool {
-        (monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? []).contains { $0.isSyncing }
-    }
+    /// What the header pill says — the monitor's word for the selected tab.
+    /// A provider that failed to probe reads as "UNAVAILABLE" rather than
+    /// borrowing a green "HEALTHY" it has no data for (#259).
+    private var selectedProviderBadge: ProviderBadgeState { monitor.selectedBadge }
 
     private var statusBadge: some View {
         let statusColor = selectedProviderBadge.badgeColor(theme)
@@ -380,7 +365,7 @@ struct MenuContentView: View {
         }
         // Nothing to say about limits it can't read while its usage shows
         // below: hidden, not removed, so the header keeps its height.
-        return headerPill(text: statusText, color: statusColor, fill: fill, pulsing: isSelectedProviderSyncing)
+        return headerPill(text: statusText, color: statusColor, fill: fill, pulsing: selectedProviderBadge == .syncing)
             .opacity(selectedProviderBadge.showsBadge ? 1 : 0)
     }
 
@@ -608,7 +593,7 @@ struct MenuContentView: View {
                                 Text(settings.shown(account.name)).lineLimit(1)
                                 Circle()
                                     .fill(account.lastError != nil ? theme.textTertiary
-                                          : theme.statusColor(for: monitor.usage(of: account)?.overallStatus(under: settings.statusPolicy) ?? .healthy))
+                                          : theme.statusColor(for: monitor.status(of: account) ?? .healthy))
                                     .frame(width: 6, height: 6)
                             }
                         }
@@ -655,7 +640,7 @@ struct MenuContentView: View {
 
     /// "Work is at 18% Session — causing Warning": the aggregate names its cause.
     private func worstAccountCallout(_ worst: Account) -> some View {
-        let status = monitor.usage(of: worst)?.overallStatus(under: settings.statusPolicy) ?? worst.status
+        let status = monitor.status(of: worst) ?? worst.status
         let lowest = monitor.usage(of: worst)?.lowestQuota
         let detail = lowest.map { " is at \(Int($0.percentRemaining))% \($0.quotaType.displayName)" } ?? ""
         return HStack(spacing: 8) {
@@ -720,9 +705,11 @@ struct MenuContentView: View {
 
             Spacer()
 
-            let status = monitor.usage(of: provider)?.overallStatus(under: settings.statusPolicy) ?? .healthy
-            Text(provider.isSyncing ? "Syncing..." : status.badgeText)
-                .badge(theme.statusColor(for: status))
+            // The same word the header uses: no "HEALTHY" without data (#259).
+            let badge = ProviderBadgeState(of: [provider], quotaStatus: monitor.status(of: provider))
+            Text(badge.badgeText)
+                .badge(badge.badgeColor(theme))
+                .opacity(badge.showsBadge ? 1 : 0)
         }
         .padding(.horizontal, 4)
     }

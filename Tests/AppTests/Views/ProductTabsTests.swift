@@ -74,5 +74,6 @@ struct ProductTabsTests {
         #expect(monitor.selectedProviderId == codex.accounts[0].id)
         monitor.selectedProviderId = "codex.side"
         #expect(monitor.selectedTab?.id == "codex")
+        #expect(monitor.selectedLogins.map(\.id) == codex.accounts.map(\.id))
     }
 }

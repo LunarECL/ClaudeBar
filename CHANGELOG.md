@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - A provider whose CLI isn't installed, or that you never signed in to, now reads Not set up instead of Unavailable, and shows any daily usage it can still read. ([#198](https://github.com/tddworks/ClaudeBar/issues/198))
 
+### Fixed
+- In overview mode, and with several accounts, a provider with no usage no longer reads Healthy: it says Unavailable, Not set up or Syncing, like the header does. ([#259](https://github.com/tddworks/ClaudeBar/issues/259))
+
 ---
 
 ## [0.5.3] - 2026-10-04
