@@ -157,6 +157,11 @@ private struct AccountRow: View {
                 }
             }
             Spacer(minLength: 8)
+            if let left = account.percentLeft {
+                Text("\(Int(left))% left")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(theme.textSecondary)
+            }
             if account.isInUse { InUseBadge() }
             if text.needsReauth(account) {
                 Button("Re-auth", action: onReauth)

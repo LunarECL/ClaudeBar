@@ -130,7 +130,7 @@ struct InUseSettingsSection: View {
                     .onChange(of: sessions.isSetUp) { _, done in if done { settingUp = false } }
             } else {
                 HStack(spacing: 6) {
-                    Image(systemName: sessions.isSetUp ? "checkmark.circle.fill" : "circle.dashed")
+                    Image(systemName: sessions.isSetUp ? "checkmark.circle.fill" : "exclamationmark.triangle")
                         .foregroundStyle(sessions.isSetUp ? theme.statusHealthy : theme.textTertiary)
                     Text(sessions.isSetUp ? "Shell set up in \(sessions.file.abbreviatingHome)" : "Shell not set up yet")
                         .font(.caption).foregroundStyle(theme.textSecondary)
@@ -143,14 +143,17 @@ struct InUseSettingsSection: View {
                 }
             }
 
-            Toggle(isOn: $policy.isOn) {
+            HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Switch when low").foregroundStyle(theme.textPrimary)
                     Text("New sessions move to the ticked login with the most left, and ClaudeBar tells you each time.")
                         .font(.caption).foregroundStyle(theme.textSecondary)
                 }
+                Spacer(minLength: 0)
+                Toggle("Switch when low", isOn: $policy.isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
             }
-            .toggleStyle(.switch)
 
             if policy.isOn {
                 HStack {
