@@ -75,7 +75,7 @@ UI changes come with a mockup in `design-concept/<feature>/` first, and, once bu
 
 ## Changes that touch docs
 
-- User-visible change → one line under `## [Unreleased]` in `CHANGELOG.md`: the effect in the user's words, ≤300 chars, absolute issue/PR link (it's shown in Sparkle's update dialog).
+- User-visible change → one line under `## [Unreleased]` in `CHANGELOG.md`, under its one heading (`Removed` → `Changed` → `Fixed` → `Added`): the effect in the user's words, ≤300 chars, absolute issue/PR link, and `→ [docs](…)` on `Added`/`Changed` (it's shown in Sparkle's update dialog).
 - Provider behaviour or probe research → that provider's `docs/providers/<id>/README.md` (users) or `design.md` (contributors).
 - Which file for which change: [update rules](docs/documentation-design/README.md#update-rules). Run `python3 scripts/gen-docs.py && python3 scripts/check-docs.py --strict` before pushing.
 
