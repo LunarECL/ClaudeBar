@@ -24,9 +24,9 @@ struct ProductTabsTests {
 
     private func lineup() throws -> (claude: Provider, codex: Provider, all: [Account]) {
         let settings = settings()
-        let claude = try ProviderFactory.make("claude", settings: settings)
-        let codex = try ProviderFactory.make("codex", settings: settings, accounts: [login("work"), login("side")])
-        return (claude, codex, claude.accounts + codex.accounts)
+        let claude = keep(try ProviderFactory.make("claude", settings: settings))
+        let codex = keep(try ProviderFactory.make("codex", settings: settings, accounts: [login("work"), login("side")]))
+        return (claude, codex, Array(claude.accounts) + Array(codex.accounts))
     }
 
     @Test
@@ -43,7 +43,7 @@ struct ProductTabsTests {
     @Test
     func `a tab keeps the person's order and leaves out paused logins`() throws {
         let (_, codex, _) = try lineup()
-        codex.move(codex.accounts[2], to: 0)
+        codex.accounts.move(codex.accounts[2], to: 0)
         codex.accounts[1].isEnabled = false
         let shown = (codex.accounts.filter(\.isEnabled) as [Account])
 

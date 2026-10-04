@@ -57,7 +57,7 @@ struct ClaudeProviderTests {
         #expect(provider.dashboardURL == URL(string: "https://claude.ai/new#settings/usage"))
         #expect(provider.statusPageURL == URL(string: "https://status.anthropic.com"))
         #expect(provider.isEnabled)
-        #expect(provider.provider.activeKind == "cli")
+        #expect(provider.provider.configuration.activeKind == "cli")
         #expect(provider.snapshot == nil)
         #expect(provider.lastError == nil)
     }

@@ -2,7 +2,7 @@ import DataSources
 import Quotas
 import Foundation
 import Mockable
-import Providers
+@testable import Providers
 import Testing
 
 /// Codex's added accounts (#326) and its passive background (#216), all from
@@ -144,7 +144,7 @@ struct CodexAccountsTests {
         let account = try stub.make("codex", account: config("a", folder: folder, accountId: "work"))
 
         let viaRPC = try await account.refresh()
-        account.provider.use("api")
+        account.provider.configuration.use("api")
         let viaAPI = try await account.refresh()
 
         #expect(viaRPC.accountEmail == "signed-in@example.com")
@@ -177,8 +177,8 @@ struct CodexAccountsTests {
         let b = try writeLogin(in: stub.home, "account b", email: "b@example.com", accountId: "account-b")
         let codex = try stub.makeProvider("codex")
 
-        let first = try codex.addAccount(signedInAt: a)
-        let second = try codex.addAccount(signedInAt: b)
+        let first = try codex.accounts.add(signedInAt: a)
+        let second = try codex.accounts.add(signedInAt: b)
 
         #expect(first.email == "a@example.com")
         #expect(second.email == "b@example.com")
@@ -195,10 +195,10 @@ struct CodexAccountsTests {
         let a = try writeLogin(in: stub.home, "a", email: "same@example.com", accountId: "same")
         let b = try writeLogin(in: stub.home, "b", email: "same@example.com", accountId: "same")
         let codex = try stub.makeProvider("codex")
-        try codex.addAccount(signedInAt: a)
+        try codex.accounts.add(signedInAt: a)
 
         #expect(throws: UsageError.executionFailed("This Codex account is already listed.")) {
-            try codex.addAccount(signedInAt: b)
+            try codex.accounts.add(signedInAt: b)
         }
     }
 
@@ -210,8 +210,8 @@ struct CodexAccountsTests {
         let b = try writeLogin(in: stub.home, "b", email: "same@example.com", accountId: "workspace-b")
         let codex = try stub.makeProvider("codex")
 
-        let first = try codex.addAccount(signedInAt: a)
-        let second = try codex.addAccount(signedInAt: b)
+        let first = try codex.accounts.add(signedInAt: a)
+        let second = try codex.accounts.add(signedInAt: b)
 
         #expect(first.values["chatgptAccountId"] != second.values["chatgptAccountId"])
     }
@@ -223,7 +223,7 @@ struct CodexAccountsTests {
         let codex = try stub.makeProvider("codex")
 
         #expect(throws: UsageError.executionFailed("No ChatGPT account found in this folder. Sign in with Codex using file credential storage, then choose the folder again.")) {
-            try codex.addAccount(signedInAt: stub.home.appendingPathComponent("missing"))
+            try codex.accounts.add(signedInAt: stub.home.appendingPathComponent("missing"))
         }
         #expect(codex.accounts.count == 1)
     }
@@ -237,7 +237,7 @@ struct CodexAccountsTests {
         let codex = try stub.makeProvider("codex")
 
         #expect(throws: UsageError.executionFailed("This Codex account is already listed.")) {
-            try codex.addAccount(signedInAt: copy)
+            try codex.accounts.add(signedInAt: copy)
         }
     }
 
@@ -248,8 +248,8 @@ struct CodexAccountsTests {
         let a = try writeLogin(in: stub.home, "a", email: "a@example.com", accountId: "a")
         let b = try writeLogin(in: stub.home, "b", email: "b@example.com", accountId: "b")
         let before = try stub.makeProvider("codex")
-        try before.addAccount(signedInAt: a)
-        try before.addAccount(signedInAt: b)
+        try before.accounts.add(signedInAt: a)
+        try before.accounts.add(signedInAt: b)
 
         let codex = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
         let added = Array(codex.accounts.dropFirst())
@@ -289,9 +289,9 @@ struct CodexAccountsTests {
         let folder = try writeLogin(in: stub.home, "work", email: "work@example.com", accountId: "work")
         let codex = try stub.makeProvider("codex", accounts: [config("a", folder: folder, accountId: "work")])
 
-        codex.use("api")
+        codex.configuration.use("api")
 
-        #expect(codex.activeKind == "api")
+        #expect(codex.configuration.activeKind == "api")
         #expect(stub.settings.dataSourceKind(forProvider: "codex") == "api")
     }
 
@@ -301,7 +301,7 @@ struct CodexAccountsTests {
         defer { stub.cleanUp() }
         let codex = try stub.makeProvider("codex")
 
-        let added = codex.add(ProviderAccountConfig(accountId: "a", label: "", probeConfig: ["codexHome": "/tmp/x"]))
+        let added = codex.accounts.add(ProviderAccountConfig(accountId: "a", label: "", probeConfig: ["codexHome": "/tmp/x"]))
 
         #expect(added == nil)
         #expect(codex.accounts.count == 1)
@@ -315,10 +315,10 @@ struct CodexAccountsTests {
         let codex = try stub.makeProvider("codex")
         let work = config("a", folder: folder, accountId: "work")
 
-        let first = try #require(codex.add(work))
-        let again = codex.add(work)
-        codex.remove(codex.defaultAccount)
-        codex.remove(first)
+        let first = try #require(codex.accounts.add(work))
+        let again = codex.accounts.add(work)
+        codex.accounts.remove(codex.defaultAccount)
+        codex.accounts.remove(first)
 
         #expect(again == nil)
         #expect(codex.accounts.map(\.id) == ["codex"])
@@ -344,7 +344,7 @@ struct CodexAccountsTests {
         #expect(me.status == .critical)
         #expect(work.status == .healthy)
         #expect(codex.status == .critical)
-        #expect(codex.bestAccount === work)
+        #expect(codex.accounts.best === work)
 
         me.isEnabled = false
 

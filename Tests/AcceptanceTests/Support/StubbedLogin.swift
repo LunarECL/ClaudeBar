@@ -26,7 +26,7 @@ func stubbedLogin(_ id: String, name: String? = nil, probe: any UsageProbe,
                          environment: { $0 == "STUB_READY" && available ? "ready" : nil },
                          homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
     })
-    return provider.defaultAccount
+    return keep(provider).defaultAccount
 }
 
 /// The providers a test keeps — each login's product, once, in order.

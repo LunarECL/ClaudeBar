@@ -47,11 +47,11 @@ struct AddProviderSpec {
 
             let saved = try #require(catalog.custom().first)
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
-            let openRouter = Provider(definition: saved, settings: settings, makeDataSource: {
+            let openRouter = keep(Provider(definition: saved, settings: settings, makeDataSource: {
                 DataSources.make($0, providerId: saved.id, cliExecutor: MockCLIExecutor(), network: network,
                                  makeTransport: { _, _, _, _ in MockRPCTransport() }, secrets: vault,
                                  environment: { _ in nil }, homeDirectory: folder, now: { Date() })
-            }).defaultAccount
+            })).defaultAccount
             let monitor = QuotaMonitor(providers: kept([openRouter]), clock: ClaudeConfigSpec.TestClock())
             await monitor.refresh(providerId: openRouter.id)
 

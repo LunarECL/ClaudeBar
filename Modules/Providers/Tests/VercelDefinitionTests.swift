@@ -46,7 +46,7 @@ struct VercelDefinitionTests {
     @Test(arguments: ["95.50", "0", "1245.67", "-1.25", "0.123456789"])
     func `the balance is exact money with no invented ceiling`(_ amount: String) async throws {
         for value in [amount, "\"\(amount)\""] {
-            let usage = try await make(body: "{\"balance\":\(value)}").defaultAccount.refresh()
+            let usage = try await keep(make(body: "{\"balance\":\(value)}")).defaultAccount.refresh()
             let quota = try #require(usage.quotas.first)
             #expect(quota.quotaType == .modelSpecific("AI Gateway Credits"))
             #expect(quota.left == .money(Money(Decimal(string: amount)!, currency: "USD"), of: nil))
@@ -57,23 +57,23 @@ struct VercelDefinitionTests {
 
     @Test(arguments: ["not JSON", "{}", #"{"balance":"abc"}"#, #"{"balance":"0x10"}"#, #"{"balance":null}"#, #"{"balance":true}"#])
     func `an invalid or absent balance fails mapping`(_ body: String) async throws {
-        let account = try make(body: body).defaultAccount
+        let account = try keep(make(body: body)).defaultAccount
         await #expect(throws: UsageError.self) { try await account.refresh() }
         #expect(account.lastFailedStep == .mapping)
     }
 
     @Test(arguments: [401, 403]) func `rejected keys need authentication`(_ status: Int) async throws {
-        await #expect(throws: UsageError.authenticationRequired) { try await make(status: status).defaultAccount.refresh() }
+        await #expect(throws: UsageError.authenticationRequired) { try await keep(make(status: status)).defaultAccount.refresh() }
     }
 
     @Test(arguments: [429, 500]) func `HTTP errors stay fetch errors`(_ status: Int) async throws {
-        let account = try make(status: status).defaultAccount
+        let account = try keep(make(status: status)).defaultAccount
         await #expect(throws: UsageError.self) { try await account.refresh() }
         #expect(account.lastFailedStep == .fetch)
     }
 
     @Test func `a missing key is not configured`() async throws {
-        let account = try make(vault: MemoryVault()).defaultAccount
+        let account = try keep(make(vault: MemoryVault())).defaultAccount
         #expect(await account.isAvailable() == false)
         await #expect(throws: UsageError.authenticationRequired) { try await account.refresh() }
     }
@@ -83,7 +83,7 @@ struct VercelDefinitionTests {
         let settings = InMemoryProviderSettings()
         let provider = try make(environment: ["AI_GATEWAY_API_KEY": "environment"], vault: vault, settings: settings,
                                 replies: ["Bearer environment": #"{"balance":40}"#, "Bearer work": #"{"balance":"7.50"}"#])
-        let work = try provider.addAccount(filling: ["apiKey": "work"])
+        let work = try provider.accounts.add(filling: ["apiKey": "work"])
         #expect(work.isEnabled)
         #expect(try await provider.defaultAccount.refresh().quotas.first?.dollarRemaining == 40)
         #expect(try await work.refresh().quotas.first?.dollarRemaining == Decimal(string: "7.50"))

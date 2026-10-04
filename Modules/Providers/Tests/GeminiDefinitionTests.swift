@@ -135,7 +135,7 @@ struct GeminiDefinitionTests {
 
     @Test func `an added account is a signed-in Gemini home of its own`() async throws {
         let (provider, _) = try make()
-        #expect(provider.accountForm.map(\.id) == ["home"])
+        #expect(provider.accounts.form.map(\.id) == ["home"])
         let definition = try ProviderFactory.builtIn("gemini")
         let source = try #require(try definition.dataSources(forAccount: ["home": "/Users/me/gemini-work"]).first)
         guard case .refreshing(.jsonFile(let file), .cli(let call))? = source.credential else {

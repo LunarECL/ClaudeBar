@@ -50,7 +50,8 @@ struct StubbedProvider {
         let network = self.network
         let home = self.home
         let definition = try ProviderFactory.builtIn(id)
-        return Provider(
+        // Kept for the test: a login never outlives its provider.
+        return keep(Provider(
             definition: definition,
             settings: settings,
             accounts: accounts,
@@ -72,7 +73,7 @@ struct StubbedProvider {
             folders: folders,
             loginsInUse: loginsInUse,
             isExecutable: isExecutable
-        )
+        ))
     }
 
     /// The default login, or — with `account` — that added one.

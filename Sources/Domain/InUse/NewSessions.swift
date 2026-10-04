@@ -127,7 +127,7 @@ public final class NewSessions {
 
     /// `claudebar://use` — the login a link names, by its product's id and its name.
     public func use(providerId: String, account name: String) -> LinkOutcome {
-        guard let product = product(providerId), let account = product.account(named: name), account.canBeInUse else {
+        guard let product = product(providerId), let account = product.accounts.named(name), account.canBeInUse else {
             return .unknown
         }
         use(account)

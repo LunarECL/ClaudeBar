@@ -30,7 +30,7 @@ struct AmpDefinitionTests {
                 secrets: vault.scoped(to: login), environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)
     }
-    private func parse(_ output: String) async throws -> UsageSnapshot { try await make(output).defaultAccount.refresh() }
+    private func parse(_ output: String) async throws -> UsageSnapshot { try await keep(make(output)).defaultAccount.refresh() }
 
     // MARK: - Sample Data
 
@@ -221,19 +221,19 @@ struct AmpDefinitionTests {
         }
     }
     @Test func `missing binary keeps the legacy error`() async throws {
-        let account = try make(Self.sampleOutput, located: false).defaultAccount
+        let account = try keep(make(Self.sampleOutput, located: false)).defaultAccount
         #expect(!(await account.isAvailable()))
         await #expect(throws: UsageError.cliNotFound("AmpCode")) { try await account.refresh() }
     }
     @Test func `nonzero exit cannot become usage`() async throws {
         await #expect(throws: UsageError.executionFailed("`amp` exited with code 1")) {
-            try await make(Self.sampleOutput, exitCode: 1).defaultAccount.refresh()
+            try await keep(make(Self.sampleOutput, exitCode: 1)).defaultAccount.refresh()
         }
     }
     @Test func `added account cannot use a default CLI login without its own key`() async throws {
         let vault = MemoryVault()
         let provider = try make(Self.sampleOutput, vault: vault)
-        let work = try provider.addAccount(filling: ["apiKey": "work-key"])
+        let work = try provider.accounts.add(filling: ["apiKey": "work-key"])
         #expect(work.isEnabled)
         #expect(try await work.refresh().quotas.count == 2)
         vault.secrets["\(work.id).apiKey"] = nil
@@ -243,7 +243,7 @@ struct AmpDefinitionTests {
 
     @Test func `a failure while running is reported as it happened`() async throws {
         await #expect(throws: UsageError.executionFailed("timeout")) {
-            try await make(Self.sampleOutput, executionError: .executionFailed("timeout")).defaultAccount.refresh()
+            try await keep(make(Self.sampleOutput, executionError: .executionFailed("timeout"))).defaultAccount.refresh()
         }
     }
 

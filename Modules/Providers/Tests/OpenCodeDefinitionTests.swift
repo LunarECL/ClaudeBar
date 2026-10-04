@@ -51,25 +51,25 @@ struct OpenCodeDefinitionTests {
     }
     @Test(arguments:[("rolling","\"12.5\"",87.5),("weekly","130",0.0),("monthly","-4",100.0)])
     func `partial numeric and string windows are clamped`(_ fixture:(String,String,Double)) async throws {
-        let qs = try await make(body:"{\"usage\":{\"\(fixture.0)\":{\"percent\":\(fixture.1)}}}").defaultAccount.refresh().quotas
+        let qs = try await keep(make(body:"{\"usage\":{\"\(fixture.0)\":{\"percent\":\(fixture.1)}}}")).defaultAccount.refresh().quotas
         #expect(qs.count == 1)
         #expect(qs[0].percentRemaining == fixture.2)
     }
     @Test(arguments:["<html>","{}",#"{"usage":{}}"#])
     func `malformed or empty API responses remain failures`(_ body:String) async throws {
-        await #expect(throws:UsageError.self) { try await make(body:body).defaultAccount.refresh() }
+        await #expect(throws:UsageError.self) { try await keep(make(body:body)).defaultAccount.refresh() }
     }
     @Test func `401 does not fall back to the local account`() async throws {
-        await #expect(throws:UsageError.sessionExpired(hint:"Run `opencode auth login` and pick OpenCode Zen to refresh your API key.")) { try await make(status:401).defaultAccount.refresh() }
+        await #expect(throws:UsageError.sessionExpired(hint:"Run `opencode auth login` and pick OpenCode Zen to refresh your API key.")) { try await keep(make(status:401)).defaultAccount.refresh() }
     }
     @Test func `403 preserves subscription required`() async throws {
-        await #expect(throws:UsageError.subscriptionRequired) { try await make(status:403).defaultAccount.refresh() }
+        await #expect(throws:UsageError.subscriptionRequired) { try await keep(make(status:403)).defaultAccount.refresh() }
     }
     @Test func `500 does not fall back`() async throws {
-        await #expect(throws:UsageError.executionFailed("HTTP error: 500")) { try await make(status:500).defaultAccount.refresh() }
+        await #expect(throws:UsageError.executionFailed("HTTP error: 500")) { try await keep(make(status:500)).defaultAccount.refresh() }
     }
     @Test func `a 429 is a rate limit and does not fall back`() async throws {
-        await #expect { try await make(status:429).defaultAccount.refresh() } throws: { ($0 as? UsageError)?.tag == "rateLimited" }
+        await #expect { try await keep(make(status:429)).defaultAccount.refresh() } throws: { ($0 as? UsageError)?.tag == "rateLimited" }
     }
     @Test func `with no key, the local database gives money of each cap`() async throws {
         let p = try make(key:nil)
@@ -86,7 +86,7 @@ struct OpenCodeDefinitionTests {
     }
     @Test func `with no spend yet, every cap is whole and the month states no window`() async throws {
         let row = #"[{"now_ms":1775044800000,"five_hour_cost":0,"five_hour_oldest_ms":null,"weekly_cost":0,"week_end_ms":1775433600000,"monthly_cost":0,"month_start_ms":null,"month_end_ms":null}]"#
-        let qs = try await make(key:nil,local:row).defaultAccount.refresh().quotas
+        let qs = try await keep(make(key:nil,local:row)).defaultAccount.refresh().quotas
         #expect(qs.map(\.percentLeft) == [100,100,100])
         #expect(qs[0].resetsAt == Self.now.addingTimeInterval(18000))
         #expect(qs[2].resetsAt == nil)
@@ -94,14 +94,14 @@ struct OpenCodeDefinitionTests {
     }
     @Test(arguments:[-5.0,6.0,20.0]) func `money left never goes below zero`(_ cost:Double) async throws {
         let row = "[{\"now_ms\":1775044800000,\"five_hour_cost\":\(cost),\"weekly_cost\":0,\"week_end_ms\":1775433600000,\"monthly_cost\":0}]"
-        let qs = try await make(key:nil,local:row).defaultAccount.refresh().quotas
+        let qs = try await keep(make(key:nil,local:row)).defaultAccount.refresh().quotas
         #expect(qs[0].dollarRemaining == Decimal(string: String(format: "%.2f", max(0, 12 - cost))))
     }
     @Test(arguments:["not JSON","[]",#"[{}]"#]) func `malformed local rows fail`(_ local:String) async throws {
-        await #expect(throws:UsageError.self) { try await make(key:nil,local:local).defaultAccount.refresh() }
+        await #expect(throws:UsageError.self) { try await keep(make(key:nil,local:local)).defaultAccount.refresh() }
     }
     @Test func `a nonzero database exit is never healthy usage`() async throws {
-        await #expect(throws:UsageError.executionFailed("`opencode` exited with code 1")) { try await make(key:nil,exit:1).defaultAccount.refresh() }
+        await #expect(throws:UsageError.executionFailed("`opencode` exited with code 1")) { try await keep(make(key:nil,exit:1)).defaultAccount.refresh() }
     }
     @Test func `missing key and CLI remain unavailable`() async throws {
         let p = try make(key:nil,available:false)
@@ -187,7 +187,7 @@ struct OpenCodeDefinitionTests {
     @Test func `added key account never falls back to the default local database`() async throws {
         let vault = MemoryVault()
         let p = try make(vault:vault)
-        let work = try p.addAccount(filling:["apiKey":"work"])
+        let work = try p.accounts.add(filling:["apiKey":"work"])
         #expect(p.dataSources(for:work).map(\.kind) == ["api"])
         #expect(try await work.refresh().quotas.map(\.percentRemaining) == [99,83,0])
         vault.secrets["\(work.id).apiKey"] = nil

@@ -35,7 +35,7 @@ struct CodexConfigSpec {
         transport: MockRPCTransport = MockRPCTransport()
     ) throws -> Account {
         let definition = try ProviderFactory.builtIn("codex")
-        return Provider(
+        return keep(Provider(
             definition: definition,
             settings: settings,
             makeDataSource: {
@@ -50,7 +50,7 @@ struct CodexConfigSpec {
                     now: { Date() }
                 )
             }
-        ).defaultAccount
+        )).defaultAccount
     }
 
     private static func makeHome() throws -> URL {
@@ -101,15 +101,15 @@ struct CodexConfigSpec {
             let codex = try CodexConfigSpec.makeCodex(settings: settings, home: home, network: network, transport: transport)
 
             // Default is RPC mode
-            #expect(codex.provider.activeKind == "rpc")
+            #expect(codex.provider.configuration.activeKind == "rpc")
 
             // When — user switches to API mode
-            codex.provider.use("api")
+            codex.provider.configuration.use("api")
             let monitor = QuotaMonitor(providers: kept([codex]), clock: CodexConfigSpec.TestClock())
             await monitor.refresh(providerId: "codex")
 
             // Then — the API's answer (45% left) is shown, not RPC's (80%)
-            #expect(codex.provider.activeKind == "api")
+            #expect(codex.provider.configuration.activeKind == "api")
             #expect(codex.snapshot?.quotas.first?.percentRemaining == 45)
         }
 
@@ -127,7 +127,7 @@ struct CodexConfigSpec {
 
             // Then — persisted, and the provider follows it
             #expect(settings.codexProbeMode() == .api)
-            #expect(codex.provider.activeKind == "api")
+            #expect(codex.provider.configuration.activeKind == "api")
         }
     }
 
@@ -150,7 +150,7 @@ struct CodexConfigSpec {
                 HTTPURLResponse(url: URL(string: "https://chatgpt.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             ))
             let codex = try CodexConfigSpec.makeCodex(settings: settings, home: home, network: network)
-            codex.provider.use("api")
+            codex.provider.configuration.use("api")
             try await codex.refresh()
 
             // When — the key is gone and Codex refreshes

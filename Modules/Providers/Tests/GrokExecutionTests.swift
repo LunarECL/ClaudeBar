@@ -13,7 +13,7 @@ struct GrokExecutionTests {
         let provider=Provider(definition:try ProviderFactory.builtIn("grok"),settings:InMemoryProviderSettings(),makeDataSource:{source,_ in
             DataSources.make(source,providerId:"grok",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,environment:{_ in nil},homeDirectory:home,now:{Date()})
         })
-        return provider.defaultAccount
+        return keep(provider).defaultAccount
     }
     private func saved(_ key:String,in home:URL) throws -> String? {
         let data=try Data(contentsOf:home.appendingPathComponent(".grok/auth.json"))
@@ -303,9 +303,9 @@ struct GrokExecutionTests {
         }
         let provider=factory()
         #expect(provider.defaultAccount.displayName == "Grok")
-        #expect(throws:UsageError.self) { try provider.addAccount(filling:["directory":"relative/path"]) }
-        let account=try provider.addAccount(filling:["directory":work.appendingPathComponent(".grok").path])
-        provider.rename(account,to:"Work")
+        #expect(throws:UsageError.self) { try provider.accounts.add(filling:["directory":"relative/path"]) }
+        let account=try provider.accounts.add(filling:["directory":work.appendingPathComponent(".grok").path])
+        provider.accounts.rename(account,to:"Work")
         #expect((try await provider.defaultAccount.refresh()).quotas[0].percentRemaining == 90)
         #expect((try await account.refresh()).quotas[0].percentRemaining == 40)
         let restored=factory(), restoredWork=try #require(restored.accounts.first {$0.id == account.id})
@@ -314,7 +314,7 @@ struct GrokExecutionTests {
         try FileManager.default.removeItem(at:work.appendingPathComponent(".grok/auth.json"))
         await #expect(throws:UsageError.authenticationRequired) { try await restoredWork.refresh() }
         #expect((try await restored.defaultAccount.refresh()).quotas[0].percentRemaining == 90)
-        restored.remove(restoredWork)
+        restored.accounts.remove(restoredWork)
         #expect(FileManager.default.fileExists(atPath:work.path))
         #expect(settings.accounts(forProvider:"grok").isEmpty)
     }

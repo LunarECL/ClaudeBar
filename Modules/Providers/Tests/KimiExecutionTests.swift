@@ -66,7 +66,7 @@ struct KimiExecutionTests {
 
     @Test func `the CLI is the default and types /usage once the screen settles`() async throws {
         let seen = Seen()
-        let quotas = try await make(seen: seen).defaultAccount.refresh().quotas
+        let quotas = try await keep(make(seen: seen)).defaultAccount.refresh().quotas
         #expect(quotas.map(\.quotaType) == [.weekly, .session])
         #expect(quotas.map(\.percentRemaining) == [10, 88])
         let call = try #require(seen.calls.first)
@@ -78,7 +78,7 @@ struct KimiExecutionTests {
 
     @Test func `the old card's API choice is read`() async throws {
         let seen = Seen()
-        _ = try await make(mode: "api", cookies: ["kimi.com": "browser"], seen: seen).defaultAccount.refresh()
+        _ = try await keep(make(mode: "api", cookies: ["kimi.com": "browser"], seen: seen)).defaultAccount.refresh()
         #expect(seen.host == "www.kimi.com")
         #expect(seen.cookie == "kimi-auth=browser")
     }
@@ -86,7 +86,7 @@ struct KimiExecutionTests {
     // MARK: - API
 
     @Test func `the API reads the plan and its 5-hour limit`() async throws {
-        let snapshot = try await make(mode: "api", cookies: ["kimi.com": "browser"]).defaultAccount.refresh()
+        let snapshot = try await keep(make(mode: "api", cookies: ["kimi.com": "browser"])).defaultAccount.refresh()
         let weekly = try #require(snapshot.quota(for: .weekly))
         #expect(weekly.window?.length == 604800)
         #expect(weekly.resetText == "214/2048 requests")
@@ -108,40 +108,40 @@ struct KimiExecutionTests {
 
     @Test func `KIMI_AUTH_TOKEN comes before the browser`() async throws {
         let seen = Seen()
-        _ = try await make(mode: "api", cookies: ["kimi.com": "browser"], environment: ["KIMI_AUTH_TOKEN": "env"], seen: seen).defaultAccount.refresh()
+        _ = try await keep(make(mode: "api", cookies: ["kimi.com": "browser"], environment: ["KIMI_AUTH_TOKEN": "env"], seen: seen)).defaultAccount.refresh()
         #expect(seen.cookie == "kimi-auth=env")
     }
 
     @Test func `no session anywhere is not ready`() async throws {
-        let account = make(mode: "api").defaultAccount
+        let account = keep(make(mode: "api")).defaultAccount
         #expect(await account.isAvailable() == false)
     }
 
     @Test(arguments: [401, 403]) func `a refused session needs signing in again`(_ code: Int) async throws {
         await #expect(throws: UsageError.authenticationRequired) {
-            try await make(mode: "api", status: code, cookies: ["kimi.com": "browser"]).defaultAccount.refresh()
+            try await keep(make(mode: "api", status: code, cookies: ["kimi.com": "browser"])).defaultAccount.refresh()
         }
     }
 
     @Test func `China is the dashboard with no region saved`() {
-        #expect(make().defaultAccount.dashboardURL?.absoluteString == "https://www.kimi.com/code/console")
+        #expect(keep(make()).defaultAccount.dashboardURL?.absoluteString == "https://www.kimi.com/code/console")
     }
 
     // MARK: - Added accounts
 
     @Test func `on the API an added account asks for a session token and a region`() throws {
-        #expect(make(mode: "api").accountForm.map(\.id) == ["token", "region"])
+        #expect(keep(make(mode: "api")).accounts.form.map(\.id) == ["token", "region"])
     }
 
     @Test func `on the CLI an added account asks for a signed-in folder and a region`() throws {
-        #expect(make().accountForm.map(\.id) == ["home", "region"])
+        #expect(keep(make()).accounts.form.map(\.id) == ["home", "region"])
     }
 
     @Test func `an added API account uses its own token and region, never the browser`() async throws {
         let seen = Seen()
         let vault = MemoryVault()
         let provider = make(mode: "api", vault: vault, cookies: ["kimi.com": "browser"], environment: ["KIMI_AUTH_TOKEN": "env"], seen: seen)
-        let work = try provider.addAccount(filling: ["token": "work", "region": "international"])
+        let work = try provider.accounts.add(filling: ["token": "work", "region": "international"])
         _ = try await work.refresh()
         #expect(seen.cookie == "kimi-auth=work")
         #expect(seen.host == "www.kimi.ai")
@@ -152,7 +152,7 @@ struct KimiExecutionTests {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        let work = try make(seen: seen).addAccount(filling: ["home": folder.path])
+        let work = try keep(make(seen: seen)).accounts.add(filling: ["home": folder.path])
         _ = try await work.refresh()
         let call = try #require(seen.calls.last)
         #expect(call.environment.set["KIMI_SHARE_DIR"] == folder.path)

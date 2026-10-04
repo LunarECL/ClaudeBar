@@ -35,8 +35,8 @@ struct CodexDefinitionTests {
         let api = try StubbedProvider(dataSourceKind: "api", providerId: "codex")
         defer { rpc.cleanUp(); api.cleanUp() }
 
-        #expect(try rpc.make("codex").provider.activeKind == "rpc")
-        #expect(try api.make("codex").provider.activeKind == "api")
+        #expect(try rpc.make("codex").provider.configuration.activeKind == "rpc")
+        #expect(try api.make("codex").provider.configuration.activeKind == "api")
     }
 
     // MARK: - RPC

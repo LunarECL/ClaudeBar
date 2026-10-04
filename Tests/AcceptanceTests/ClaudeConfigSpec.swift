@@ -57,7 +57,7 @@ struct ClaudeConfigSpec {
             let home = self.home
             let cli = self.cli
             let network = self.network
-            return Provider(
+            return keep(Provider(
                 definition: definition,
                 settings: settings,
                 makeDataSource: {
@@ -73,7 +73,7 @@ struct ClaudeConfigSpec {
                         now: { Date() }
                     )
                 }
-            ).defaultAccount
+            )).defaultAccount
         }
 
         func cliAnswers(_ screen: String) {
@@ -126,7 +126,7 @@ struct ClaudeConfigSpec {
             world.apiAnswers(ClaudeConfigSpec.apiUsage)
             try world.loggedIn()
             let claude = try world.claude()
-            #expect(claude.provider.activeKind == "cli")
+            #expect(claude.provider.configuration.activeKind == "cli")
 
             // When — the Claude card saves API mode
             world.settings.setClaudeProbeMode(.api)
@@ -134,7 +134,7 @@ struct ClaudeConfigSpec {
             await monitor.refresh(providerId: "claude")
 
             // Then — the API's answer is shown
-            #expect(claude.provider.activeKind == "api")
+            #expect(claude.provider.configuration.activeKind == "api")
             #expect(claude.snapshot?.quotas.first?.percentRemaining == 45)
         }
 

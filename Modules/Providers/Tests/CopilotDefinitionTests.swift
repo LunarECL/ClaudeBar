@@ -67,7 +67,7 @@ struct CopilotDefinitionTests {
 
     @Test func `billing sums this month's Copilot requests against the limit`() async throws {
         let seen = Seen()
-        let snapshot = try await make(seen: seen).defaultAccount.refresh()
+        let snapshot = try await keep(make(seen: seen)).defaultAccount.refresh()
         let quota = try #require(snapshot.quotas.first)
         #expect(snapshot.quotas.count == 1)
         #expect(quota.quotaType == .timeLimit("Monthly"))
@@ -79,13 +79,13 @@ struct CopilotDefinitionTests {
     }
 
     @Test func `the billing month is the calendar month GitHub names, in UTC`() async throws {
-        let quota = try #require(try await make().defaultAccount.refresh().quotas.first)
+        let quota = try #require(try await keep(make()).defaultAccount.refresh().quotas.first)
         #expect(quota.resetsAt == Date(timeIntervalSince1970: 1767225600)) // 2026-01-01T00:00Z
         #expect(quota.window?.length == TimeInterval(31 * 86400))
     }
 
     @Test func `the person's monthly limit is used`() async throws {
-        let quota = try #require(try await make(limit: "300").defaultAccount.refresh().quotas.first)
+        let quota = try #require(try await keep(make(limit: "300")).defaultAccount.refresh().quotas.first)
         #expect(quota.resetText == "15/300 AI credits")
         #expect(quota.percentRemaining == 95)
     }
@@ -95,57 +95,57 @@ struct CopilotDefinitionTests {
     }
 
     @Test func `no Copilot items is nothing used yet`() async throws {
-        let quota = try #require(try await make(body: Self.billing("[]")).defaultAccount.refresh().quotas.first)
+        let quota = try #require(try await keep(make(body: Self.billing("[]"))).defaultAccount.refresh().quotas.first)
         #expect(quota.percentRemaining == 100)
         #expect(quota.resetText == "0/50 AI credits")
     }
 
     @Test(arguments: [("20", 60.0, "20/50 AI credits (manual)"), ("40%", 60.0, "20/50 AI credits (manual)")])
     func `an organization seat shows the usage the person entered`(_ manual: String, _ left: Double, _ text: String) async throws {
-        let quota = try #require(try await make(body: Self.billing("[]"), manual: manual).defaultAccount.refresh().quotas.first)
+        let quota = try #require(try await keep(make(body: Self.billing("[]"), manual: manual)).defaultAccount.refresh().quotas.first)
         #expect(quota.percentRemaining == left)
         #expect(quota.resetText == text)
     }
 
     @Test func `over the limit shows how far over`() async throws {
-        let quota = try #require(try await make(body: Self.billing("[]"), manual: "198%").defaultAccount.refresh().quotas.first)
+        let quota = try #require(try await keep(make(body: Self.billing("[]"), manual: "198%")).defaultAccount.refresh().quotas.first)
         #expect(quota.percentRemaining == -98)
     }
 
     @Test func `GitHub's own numbers win over an entered usage`() async throws {
-        let quota = try #require(try await make(manual: "40").defaultAccount.refresh().quotas.first)
+        let quota = try #require(try await keep(make(manual: "40")).defaultAccount.refresh().quotas.first)
         #expect(quota.resetText == "15/50 AI credits")
     }
 
     @Test func `billing without a username hands over to the Copilot API`() async throws {
         let seen = Seen()
-        _ = try await make(username: nil, seen: seen).defaultAccount.refresh()
+        _ = try await keep(make(username: nil, seen: seen)).defaultAccount.refresh()
         #expect(seen.url == "https://api.github.com/copilot_internal/user")
     }
 
     @Test func `nothing anywhere is not ready`() async throws {
-        #expect(await (try make(username: nil, vault: MemoryVault())).defaultAccount.isAvailable() == false)
+        #expect(await keep(try make(username: nil, vault: MemoryVault())).defaultAccount.isAvailable() == false)
     }
 
     @Test func `the token is read from the environment variable the person named`() async throws {
         let seen = Seen()
-        _ = try await make(envVar: "MY_GH", vault: MemoryVault(), environment: ["MY_GH": "env"], seen: seen).defaultAccount.refresh()
+        _ = try await keep(make(envVar: "MY_GH", vault: MemoryVault(), environment: ["MY_GH": "env"], seen: seen)).defaultAccount.refresh()
         #expect(seen.authorization == "Bearer env")
     }
 
     @Test func `COPILOT_TOKEN is read when no variable is named`() async throws {
         let seen = Seen()
-        _ = try await make(vault: MemoryVault(), environment: ["COPILOT_TOKEN": "env"], seen: seen).defaultAccount.refresh()
+        _ = try await keep(make(vault: MemoryVault(), environment: ["COPILOT_TOKEN": "env"], seen: seen)).defaultAccount.refresh()
         #expect(seen.authorization == "Bearer env")
     }
 
     @Test func `a refused token needs a new one`() async throws {
-        await #expect(throws: UsageError.authenticationRequired) { try await make(status: 401).defaultAccount.refresh() }
+        await #expect(throws: UsageError.authenticationRequired) { try await keep(make(status: 401)).defaultAccount.refresh() }
     }
 
     @Test func `a token without billing access says what it lacks`() async throws {
         await #expect(throws: UsageError.executionFailed("Forbidden - ensure the token has 'Plan: read' permission")) {
-            try await make(status: 403).defaultAccount.refresh()
+            try await keep(make(status: 403)).defaultAccount.refresh()
         }
     }
 
@@ -153,7 +153,7 @@ struct CopilotDefinitionTests {
 
     @Test func `the old card's Copilot API choice is read`() async throws {
         let seen = Seen()
-        let snapshot = try await make(mode: "copilotAPI", seen: seen).defaultAccount.refresh()
+        let snapshot = try await keep(make(mode: "copilotAPI", seen: seen)).defaultAccount.refresh()
         #expect(seen.url == "https://api.github.com/copilot_internal/user")
         let quota = try #require(snapshot.quotas.first)
         #expect(quota.percentRemaining == 99.3)
@@ -166,7 +166,7 @@ struct CopilotDefinitionTests {
     }
 
     @Test func `the Copilot API needs no username`() async throws {
-        #expect(try await make(mode: "copilotAPI", username: nil).defaultAccount.refresh().quotas.count == 1)
+        #expect(try await keep(make(mode: "copilotAPI", username: nil)).defaultAccount.refresh().quotas.count == 1)
     }
 
     @Test(arguments: [
@@ -174,28 +174,28 @@ struct CopilotDefinitionTests {
         #"{"copilot_plan":"free","quota_snapshots":{"chat":{"entitlement":50}}}"#,
     ])
     func `unlimited or no AI-credits quota shows the plan, never a made-up 100%`(_ body: String) async throws {
-        let account = try make(mode: "copilotAPI", body: body).defaultAccount
+        let account = try keep(make(mode: "copilotAPI", body: body)).defaultAccount
         let snapshot = try? await account.refresh()
         #expect(snapshot?.quotas.isEmpty ?? true)
     }
 
     @Test func `with no token saved, the GitHub CLI's login reads the Copilot API`() async throws {
         let seen = Seen()
-        let snapshot = try await make(mode: "copilotAPI", vault: MemoryVault(), ghLogin: "gho_cli", seen: seen).defaultAccount.refresh()
+        let snapshot = try await keep(make(mode: "copilotAPI", vault: MemoryVault(), ghLogin: "gho_cli", seen: seen)).defaultAccount.refresh()
         #expect(seen.authorization == "Bearer gho_cli")
         #expect(snapshot.quotas.first?.resetText == "2/300 AI credits")
     }
 
     @Test func `the Copilot API names the login it read`() async throws {
         let body = #"{"login":"octocat","copilot_plan":"individual","quota_snapshots":{"premium_interactions":{"entitlement":1500,"remaining":1487,"percent_remaining":99.1}}}"#
-        let snapshot = try await make(mode: "copilotAPI", body: body).defaultAccount.refresh()
+        let snapshot = try await keep(make(mode: "copilotAPI", body: body)).defaultAccount.refresh()
         #expect(snapshot.accountEmail == "octocat")
         #expect(snapshot.accountTier == .custom("individual"))
     }
 
     @Test func `billing with no key hands over to the Copilot API and the GitHub CLI's login`() async throws {
         let seen = Seen()
-        let snapshot = try await make(vault: MemoryVault(), ghLogin: "gho_cli", seen: seen).defaultAccount.refresh()
+        let snapshot = try await keep(make(vault: MemoryVault(), ghLogin: "gho_cli", seen: seen)).defaultAccount.refresh()
         #expect(seen.url == "https://api.github.com/copilot_internal/user")
         #expect(snapshot.quotas.first?.resetText == "2/300 AI credits")
     }
@@ -203,17 +203,17 @@ struct CopilotDefinitionTests {
     // MARK: - Accounts
 
     @Test func `on billing an added account asks for its token, username and limit`() throws {
-        #expect(try make().accountForm.map(\.id) == ["token", "username", "monthlyLimit"])
+        #expect(try keep(make()).accounts.form.map(\.id) == ["token", "username", "monthlyLimit"])
     }
 
     @Test func `on the Copilot API an added account asks only for its token`() throws {
-        #expect(try make(mode: "copilotAPI").accountForm.map(\.id) == ["token"])
+        #expect(try keep(make(mode: "copilotAPI")).accounts.form.map(\.id) == ["token"])
     }
 
     @Test func `an added account uses its own token and username, never the environment`() async throws {
         let seen = Seen()
         let provider = try make(vault: MemoryVault(), environment: ["COPILOT_TOKEN": "env"], seen: seen)
-        let work = try provider.addAccount(filling: ["token": "work", "username": "hubot", "monthlyLimit": "300"])
+        let work = try provider.accounts.add(filling: ["token": "work", "username": "hubot", "monthlyLimit": "300"])
         let quota = try #require(try await work.refresh().quotas.first)
         #expect(seen.authorization == "Bearer work")
         #expect(seen.url == "https://api.github.com/users/hubot/settings/billing/premium_request/usage")

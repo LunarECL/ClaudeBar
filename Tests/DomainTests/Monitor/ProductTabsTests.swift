@@ -16,7 +16,7 @@ struct ProductTabsTests {
         let work = ProviderAccountConfig(accountId: "work", label: "work", probeConfig: ["codexHome": "/tmp/work", "chatgptAccountId": "work"])
         let codex = try ProviderFactory.make("codex", settings: settings, accounts: [work])
         let claude = try ProviderFactory.make("claude", settings: settings)
-        return (QuotaMonitor(providers: kept(codex.accounts + claude.accounts)), codex, claude)
+        return (QuotaMonitor(providers: kept(Array(codex.accounts) + Array(claude.accounts))), codex, claude)
     }
 
     @Test
@@ -65,7 +65,7 @@ struct ProductTabsTests {
     @Test
     func `a row names each login only when the product has several`() throws {
         let (monitor, codex, claude) = try monitor()
-        codex.rename(codex.defaultAccount, to: "personal")
+        codex.accounts.rename(codex.defaultAccount, to: "personal")
 
         #expect(monitor.productTabs[0].loginName(codex.defaultAccount) == "personal")
         #expect(monitor.productTabs[0].loginName(codex.accounts[1]) == "work")

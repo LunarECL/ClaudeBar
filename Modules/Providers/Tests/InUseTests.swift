@@ -113,7 +113,7 @@ struct InUseTests {
         defer { stub.cleanUp() }
         try work.useForNewSessions()
 
-        codex.remove(work)
+        codex.accounts.remove(work)
 
         #expect(codex.inUse?.login === codex.defaultAccount)
         #expect(stub.loginsInUse.folder(for: "codex") == nil)
@@ -147,10 +147,10 @@ struct InUseTests {
         let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
 
-        #expect(codex.account(named: "Work") === work)
-        #expect(codex.account(named: work.id) === work)
-        #expect(codex.account(named: "default") === codex.defaultAccount)
-        #expect(codex.account(named: "someone") == nil)
+        #expect(codex.accounts.named("Work") === work)
+        #expect(codex.accounts.named(work.id) === work)
+        #expect(codex.accounts.named("default") === codex.defaultAccount)
+        #expect(codex.accounts.named("someone") == nil)
     }
 
     // MARK: - Worth switching

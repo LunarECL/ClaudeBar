@@ -132,7 +132,7 @@ struct ProviderTests {
         let network = AcmeNetwork()
         network.answer(Self.backup, used: 30)
         let acme = acme(network)
-        acme.use("backup")
+        acme.configuration.use("backup")
         try await acme.defaultAccount.refresh()
         network.fail(Self.backup)
 
@@ -207,7 +207,7 @@ struct ProviderTests {
         network.fail(Self.api)
         network.answer(Self.backup, used: 40)
         let acme = acme(network)
-        acme.setFallbackEnabled(false, from: "api")
+        acme.configuration.setFallbackEnabled(false, from: "api")
 
         await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
 
@@ -248,10 +248,10 @@ struct ProviderTests {
         let settings = InMemoryProviderSettings()
         let acme = acme(AcmeNetwork(), settings: settings)
 
-        #expect(acme.use("backup"))
-        #expect(acme.use("tty") == false)
+        #expect(acme.configuration.use("backup"))
+        #expect(acme.configuration.use("tty") == false)
 
-        #expect(acme.activeKind == "backup")
+        #expect(acme.configuration.activeKind == "backup")
         #expect(settings.dataSourceKind(forProvider: "acme") == "backup")
     }
 
@@ -260,7 +260,7 @@ struct ProviderTests {
         let acme = acme(AcmeNetwork())
 
         #expect(acme.backgroundRefreshFloor == .seconds(600))
-        acme.use("backup")
+        acme.configuration.use("backup")
         #expect(acme.backgroundRefreshFloor == nil)
     }
 
@@ -292,7 +292,7 @@ struct ProviderTests {
         for account in acme.accounts { try await account.refresh() }
 
         #expect(acme.status == .critical)
-        #expect(acme.bestAccount?.accountId == "high")
+        #expect(acme.accounts.best?.accountId == "high")
 
         acme.accounts[1].isEnabled = false
         #expect(acme.status == .healthy)
@@ -305,11 +305,11 @@ struct ProviderTests {
         network.answer(Self.api, login: "low", used: 90)
         let acme = acme(network, logins: ["low"])
 
-        #expect(acme.worstAccount == nil)
+        #expect(acme.accounts.worst == nil)
         for account in acme.accounts { try await account.refresh() }
 
-        #expect(acme.worstAccount?.accountId == "low")
+        #expect(acme.accounts.worst?.accountId == "low")
         acme.accounts[1].isEnabled = false
-        #expect(acme.worstAccount == nil)
+        #expect(acme.accounts.worst == nil)
     }
 }

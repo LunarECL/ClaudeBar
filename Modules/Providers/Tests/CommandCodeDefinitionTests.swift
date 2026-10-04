@@ -54,7 +54,7 @@ struct CommandCodeDefinitionTests {
     }
     private func parse(_ json: String, accountEmail: String? = nil) async throws -> UsageSnapshot {
         let user = try JSONSerialization.data(withJSONObject:["user":["userName":accountEmail ?? ""],"org":["id":42]])
-        return try await make(json,whoami:String(decoding:user,as:UTF8.self)).defaultAccount.refresh()
+        return try await keep(make(json,whoami:String(decoding:user,as:UTF8.self))).defaultAccount.refresh()
     }
 
     @Test
@@ -261,7 +261,7 @@ struct CommandCodeDefinitionTests {
     @Test func `account key is isolated from the default environment`() async throws {
         let vault = MemoryVault(["commandcode.apiKey":"personal"])
         let provider = try make(vault:vault,environment:["COMMAND_CODE_API_KEY":"personal"])
-        let work = try provider.addAccount(filling:["apiKey":"work"])
+        let work = try provider.accounts.add(filling:["apiKey":"work"])
         #expect(work.isEnabled)
         #expect(try await work.refresh().accountEmail == "alice")
         vault.secrets["\(work.id).apiKey"] = nil
@@ -269,7 +269,7 @@ struct CommandCodeDefinitionTests {
     }
     @Test(arguments:[401,403]) func `rejected keys preserve the login hint`(_ status:Int) async throws {
         await #expect(throws:UsageError.sessionExpired(hint:"Run `cmd login` or set COMMAND_CODE_API_KEY.")) {
-            try await make(status:status).defaultAccount.refresh()
+            try await keep(make(status:status)).defaultAccount.refresh()
         }
     }
     @Test func `saved CLI credentials remain readable`() async throws {
@@ -278,12 +278,12 @@ struct CommandCodeDefinitionTests {
         let dir = home.appendingPathComponent(".commandcode")
         try FileManager.default.createDirectory(at:dir,withIntermediateDirectories:true)
         try Data(#"{"apiKey":"file"}"#.utf8).write(to:dir.appendingPathComponent("auth.json"))
-        #expect(try await make(vault:MemoryVault(),home:home).defaultAccount.refresh().quotas.count == 3)
+        #expect(try await keep(make(vault:MemoryVault(),home:home)).defaultAccount.refresh().quotas.count == 3)
     }
 
     @Test(arguments:["{}",#"{"data":{"user":{"name":"Alice"},"org":{"id":"team & org"}}}"#])
     func `missing organization and wrapped organization queries remain valid`(_ whoami:String) async throws {
-        #expect(try await make(whoami:whoami).defaultAccount.refresh().quotas.count == 3)
+        #expect(try await keep(make(whoami:whoami)).defaultAccount.refresh().quotas.count == 3)
     }
 
     @Test(arguments: [
@@ -309,7 +309,7 @@ struct CommandCodeDefinitionTests {
     }
 
     @Test func `definition preserves identity and initial state`() throws {
-        let provider = try make().defaultAccount
+        let provider = try keep(make()).defaultAccount
         #expect(provider.id == "commandcode")
         #expect(provider.lineupName == "Command Code")
         #expect(provider.cliCommand == "cmd")
@@ -325,29 +325,29 @@ struct CommandCodeDefinitionTests {
         let error: UsageError = [401,403].contains(status)
             ? .sessionExpired(hint: "Run `cmd login` or set COMMAND_CODE_API_KEY.")
             : .executionFailed("HTTP error: \(status)")
-        let account = try make(creditsStatus: status).defaultAccount
+        let account = try keep(make(creditsStatus: status)).defaultAccount
         await #expect(throws: error) { try await account.refresh() }
         #expect(account.snapshot == nil)
         #expect(account.lastError as? UsageError == error)
     }
     @Test func `a rate limit on credits is remembered, not reported as an HTTP error`() async throws {
-        let account = try make(creditsStatus: 429).defaultAccount
+        let account = try keep(make(creditsStatus: 429)).defaultAccount
         await #expect { try await account.refresh() } throws: { ($0 as? UsageError)?.tag == "rateLimited" }
         #expect(account.snapshot == nil)
     }
 
     @Test func `network failure cannot become a successful snapshot`() async throws {
-        let account = try make(networkFailure: true).defaultAccount
+        let account = try keep(make(networkFailure: true)).defaultAccount
         await #expect(throws: UsageError.self) { try await account.refresh() }
         #expect(account.snapshot == nil)
     }
     @Test(arguments: ["[]", "not JSON"])
     func `both responses must be JSON objects`(_ body: String) async throws {
         await #expect(throws: UsageError.parseFailed("Failed to parse Command Code response as JSON")) {
-            try await make(body).defaultAccount.refresh()
+            try await keep(make(body)).defaultAccount.refresh()
         }
         await #expect(throws: UsageError.parseFailed("Failed to parse Command Code response as JSON")) {
-            try await make(whoami: body).defaultAccount.refresh()
+            try await keep(make(whoami: body)).defaultAccount.refresh()
         }
     }
 

@@ -58,7 +58,7 @@ struct AntigravityDefinitionTests {
         #expect(provider.name == "Antigravity")
         #expect(provider.defaultAccount.isEnabled)
         #expect(provider.defaultAccount.dashboardURL == nil)
-        #expect(provider.accountForm.isEmpty)
+        #expect(provider.accounts.form.isEmpty)
     }
 
     // MARK: - The running app
@@ -77,7 +77,7 @@ struct AntigravityDefinitionTests {
     }
 
     @Test func `an older app answers user status: a quota per model, its plan and email`() async throws {
-        let snapshot = try await make(answers: ["GetUserStatus": (200, Self.userStatus)]).defaultAccount.refresh()
+        let snapshot = try await keep(make(answers: ["GetUserStatus": (200, Self.userStatus)])).defaultAccount.refresh()
         #expect(snapshot.quotas.map(\.quotaType) == [.modelSpecific("Claude Sonnet"), .modelSpecific("Gemini Pro")])
         #expect(snapshot.quotas.map(\.percentRemaining) == [75, 50])
         #expect(snapshot.quotas[1].resetsAt == Date(timeIntervalSince1970: 1735689600))
@@ -110,10 +110,10 @@ struct AntigravityDefinitionTests {
     }
 
     @Test func `neither running nor signed in is not available`() async throws {
-        #expect(await (try make(running: false)).defaultAccount.isAvailable() == false)
+        #expect(await keep(try make(running: false)).defaultAccount.isAvailable() == false)
     }
 
     @Test func `running is available without a saved login`() async throws {
-        #expect(await (try make()).defaultAccount.isAvailable())
+        #expect(await keep(try make()).defaultAccount.isAvailable())
     }
 }

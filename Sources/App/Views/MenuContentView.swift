@@ -567,7 +567,7 @@ struct MenuContentView: View {
             ForEach(tab.accounts.filter { !hiddenAccountIds.contains($0.id) }, id: \.id) { account in
                 providerSection(provider: account)
             }
-            if let worst = tab.provider.worstAccount {
+            if let worst = tab.provider.accounts.worst {
                 worstAccountCallout(worst)
             }
         }

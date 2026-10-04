@@ -139,7 +139,7 @@ struct ClaudeAccountsTests {
         let work = try claude.writeLogin(in: "work", email: "work@example.com")
         let provider = try claude.provider(settings: settings).provider
 
-        let added = try provider.addAccount(signedInAt: work)
+        let added = try provider.accounts.add(signedInAt: work)
 
         let folder = try #require(added.values["configDirectory"])
         let hash = SHA256.hash(data: Data(folder.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -156,10 +156,10 @@ struct ClaudeAccountsTests {
         let work = try claude.writeLogin(in: "work", email: "work@example.com")
         let again = try claude.writeLogin(in: "work-again", email: "work@example.com")
         let provider = try claude.provider().provider
-        try provider.addAccount(signedInAt: work)
+        try provider.accounts.add(signedInAt: work)
 
-        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: work) }
-        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: again) }
+        #expect(throws: UsageError.self) { try provider.accounts.add(signedInAt: work) }
+        #expect(throws: UsageError.self) { try provider.accounts.add(signedInAt: again) }
         #expect(provider.accounts.count == 2)
     }
 
@@ -171,7 +171,7 @@ struct ClaudeAccountsTests {
         try FileManager.default.removeItem(at: folder.appendingPathComponent(".credentials.json"))
         let provider = try claude.provider().provider
 
-        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: folder) }
+        #expect(throws: UsageError.self) { try provider.accounts.add(signedInAt: folder) }
     }
 
     @Test
@@ -182,6 +182,6 @@ struct ClaudeAccountsTests {
         let copy = try claude.writeLogin(in: "copy", email: "me@example.com")
         let provider = try claude.provider().provider
 
-        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: copy) }
+        #expect(throws: UsageError.self) { try provider.accounts.add(signedInAt: copy) }
     }
 }

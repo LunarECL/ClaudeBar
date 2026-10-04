@@ -52,7 +52,7 @@ struct DeepSeekDefinitionTests {
     @Test
     func `the first balance keeps its currency exact money and paid granted details`() async throws {
         let body = #"{"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"110.123456789","granted_balance":"10","topped_up_balance":"100"},{"currency":"USD","total_balance":"40"}]}"#
-        let usage = try await make(body: body).defaultAccount.refresh()
+        let usage = try await keep(make(body: body)).defaultAccount.refresh()
         let quota = try #require(usage.quotas.first)
         #expect(usage.quotas.count == 1)
         #expect(quota.quotaType == .modelSpecific("Balance"))
@@ -65,7 +65,7 @@ struct DeepSeekDefinitionTests {
     @Test
     func `optional breakdown fields can be missing or invalid`() async throws {
         let body = #"{"balance_infos":[{"currency":"USD","total_balance":"40","granted_balance":"bad","topped_up_balance":"30"}]}"#
-        let usage = try await make(body: body).defaultAccount.refresh()
+        let usage = try await keep(make(body: body)).defaultAccount.refresh()
         #expect(usage.quotas.first?.resetText == "Paid: $30.00")
     }
 
@@ -75,7 +75,7 @@ struct DeepSeekDefinitionTests {
         let replies = ["Bearer environment": #"{"balance_infos":[{"currency":"USD","total_balance":"40"}]}"#,
                        "Bearer work": #"{"balance_infos":[{"currency":"CNY","total_balance":"7"}]}"#]
         let provider = try make(vault: vault, environment: ["DEEPSEEK_API_KEY": "environment"], balancesByKey: replies)
-        let work = try provider.addAccount(filling: ["apiKey": "work"])
+        let work = try provider.accounts.add(filling: ["apiKey": "work"])
         #expect(work.isEnabled)
         let personalUsage = try await provider.defaultAccount.refresh()
         let workUsage = try await work.refresh()
@@ -92,7 +92,7 @@ struct DeepSeekDefinitionTests {
 
     @Test
     func `an unsigned default account is unavailable`() async throws {
-        let account = try make(vault: MemoryVault()).defaultAccount
+        let account = try keep(make(vault: MemoryVault())).defaultAccount
         #expect(await account.isAvailable() == false)
         await #expect(throws: UsageError.authenticationRequired) { try await account.refresh() }
     }
@@ -100,40 +100,40 @@ struct DeepSeekDefinitionTests {
     @Test(arguments: ["0", "-1.25"])
     func `zero and negative balances are depleted without inventing a cap`(_ amount: String) async throws {
         let body = #"{"balance_infos":[{"currency":"USD","total_balance":"\#(amount)"}]}"#
-        let usage = try await make(body: body).defaultAccount.refresh()
+        let usage = try await keep(make(body: body)).defaultAccount.refresh()
         #expect(usage.quotas.first?.status == .depleted)
         #expect(usage.quotas.first?.percentLeft == nil)
     }
 
     @Test(arguments: [429, 500])
     func `HTTP failures remain fetch failures`(_ status: Int) async throws {
-        let account = try make(status: status).defaultAccount
+        let account = try keep(make(status: status)).defaultAccount
         await #expect(throws: UsageError.self) { try await account.refresh() }
         #expect(account.lastFailedStep == .fetch)
     }
 
     @Test(arguments: [401, 403])
     func `rejected keys fail authentication`(_ status: Int) async throws {
-        let account = try make(status: status).defaultAccount
+        let account = try keep(make(status: status)).defaultAccount
         await #expect(throws: UsageError.authenticationRequired) { try await account.refresh() }
     }
 
     @Test
     func `an empty balance list has no data`() async throws {
-        let account = try make(body: #"{"balance_infos":[]}"#).defaultAccount
+        let account = try keep(make(body: #"{"balance_infos":[]}"#)).defaultAccount
         await #expect(throws: UsageError.noData) { try await account.refresh() }
     }
 
     @Test(arguments: ["not JSON", #"{"balance_infos":[{"currency":"USD","total_balance":"bad"}]}"#])
     func `malformed balances fail at mapping`(_ body: String) async throws {
-        let account = try make(body: body).defaultAccount
+        let account = try keep(make(body: body)).defaultAccount
         await #expect(throws: UsageError.self) { try await account.refresh() }
         #expect(account.lastFailedStep == .mapping)
     }
 
     @Test
     func `unusable funds are an explicit failure rather than a healthy balance`() async throws {
-        let account = try make(body: #"{"is_available":false,"balance_infos":[{"currency":"USD","total_balance":"5"}]}"#).defaultAccount
+        let account = try keep(make(body: #"{"is_available":false,"balance_infos":[{"currency":"USD","total_balance":"5"}]}"#)).defaultAccount
         await #expect(throws: UsageError.executionFailed("DeepSeek reports that this balance is unavailable for API calls.")) { try await account.refresh() }
     }
 
@@ -142,7 +142,7 @@ struct DeepSeekDefinitionTests {
         let vault = MemoryVault(["deepseek.apiKey": "personal"])
         let settings = InMemoryProviderSettings()
         let provider = try make(vault: vault, environment: ["DEEPSEEK_API_KEY": "environment-default"], settings: settings)
-        let work = try provider.addAccount(filling: ["apiKey": "work"])
+        let work = try provider.accounts.add(filling: ["apiKey": "work"])
         #expect(settings.accounts(forProvider: "deepseek").first?.probeConfig["apiKey"] == nil)
         #expect(vault.secrets["\(work.id).apiKey"] == "work")
         let reloaded = try make(vault: vault, settings: settings)
@@ -150,7 +150,7 @@ struct DeepSeekDefinitionTests {
         let usage = try await reloaded.accounts[1].refresh()
         #expect(usage.providerId == work.id)
         reloaded.accounts[1].isEnabled = false
-        #expect(try make(vault: vault, settings: settings).accounts[1].isEnabled == false)
+        #expect(try keep(make(vault: vault, settings: settings)).accounts[1].isEnabled == false)
         vault.secrets["\(work.id).apiKey"] = nil
         await #expect(throws: UsageError.authenticationRequired) { try await work.refresh() }
         #expect(work.lastFailedStep == .lookup)

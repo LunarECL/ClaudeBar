@@ -61,11 +61,11 @@ struct FallbackSettingTests {
         let settings = InMemoryProviderSettings()
         let provider = try claude.provider(settings: settings).provider
 
-        #expect(provider.isFallbackEnabled(from: "api"))
+        #expect(provider.configuration.isFallbackEnabled(from: "api"))
 
-        provider.setFallbackEnabled(false, from: "api")
+        provider.configuration.setFallbackEnabled(false, from: "api")
 
-        #expect(provider.isFallbackEnabled(from: "api") == false)
+        #expect(provider.configuration.isFallbackEnabled(from: "api") == false)
         #expect(settings.isOn("cliFallbackEnabled", forProvider: "claude") == false)
     }
 
@@ -75,8 +75,8 @@ struct FallbackSettingTests {
         defer { claude.cleanUp() }
         let provider = try claude.provider().provider
 
-        provider.setFallbackEnabled(false, from: "cli")
+        provider.configuration.setFallbackEnabled(false, from: "cli")
 
-        #expect(provider.isFallbackEnabled(from: "cli"))
+        #expect(provider.configuration.isFallbackEnabled(from: "cli"))
     }
 }

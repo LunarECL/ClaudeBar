@@ -44,13 +44,13 @@ struct ClaudeHarness {
         guestPasses: GuestPasses? = nil
     ) throws -> Account {
         let definition = try ProviderFactory.builtIn("claude")
-        return Provider(
+        return keep(Provider(
             definition: definition,
             settings: settings,
             accounts: accounts,
             makeDataSource: make,
             guestPasses: guestPasses
-        ).defaultAccount
+        )).defaultAccount
     }
 
     private func make(_ source: DataSourceDefinition) -> DataSource {

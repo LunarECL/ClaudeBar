@@ -1034,8 +1034,8 @@ switching, once per low) → `InUseAnnouncer`. *A link* —
 
 ## 12 · Retiring `AIProvider`
 
-> **Status: BUILT** (2026-10-04), slices 1–5; slice 6 is designed when
-> asked. The build has no `AIProvider`.
+> **Status: BUILT** (2026-10-04), slices 1–6. The build has no `AIProvider`,
+> and `Provider` keeps only the lifecycle.
 
 **The problem.** Someone with two Claude logins opens Settings → Providers and
 finds *personal* and *work* listed as two providers. The page is titled
@@ -1097,7 +1097,7 @@ stay for extensions).
 | 3 ✅ | **`Providers`** (CRUD of the providers you keep, their order and the derived `lineup: [Account]`), held by the Monitor; `AIProviderRepository` and `AIProviders` go; the test stubs become definitions over stubbed connections | the cause, in the domain · every Monitor test |
 | 4 ✅ | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
 | 5 ✅ | Delete `AIProvider` | done · the build has no `AIProvider` |
-| 6 | **`Provider` by role** (SRP): one product plays different roles in different contexts — refreshed in Monitoring, configured in Settings, a set of logins in Accounts, a terminal choice in In use (already `InUse`), a history in Usage History (already `UsageHistory`). Each role becomes its own type the product hands out, as `inUse` is; `Provider` keeps only the lifecycle (TARGET §1: it changes when the lifecycle changes). *Designed and confirmed when slice 5 is done* | `Provider` small again · each role's tests move with it |
+| 6 ✅ | **`Provider` by role** (SRP): one product plays different roles in different contexts — refreshed in Monitoring, configured in Settings, a set of logins in Accounts, a terminal choice in In use (already `InUse`), a history in Usage History (already `UsageHistory`). Each role becomes its own type the product hands out, as `inUse` is; `Provider` keeps only the lifecycle (TARGET §1: it changes when the lifecycle changes). designed in *Slice 6 in detail* | `Provider` small again · each role's tests move with it |
 
 #### Slice 1 in detail — Settings by product
 
@@ -1172,6 +1172,72 @@ the vault and the settings, never the Monitor). `AIProviderRepository` and
 `selectedProviderId` keeps its name and value (a lineup id): the status export
 file and `claudebar://` links carry it. Nothing on screen changes; mock-data screenshots
 of the pills, menu bar, Settings → Providers and the overview confirm it.
+
+#### Slice 6 in detail — `Provider` by role
+
+> **Status: BUILT** (2026-10-04, second take, confirmed the same day). The first take —
+> roles as stateless views holding their provider — was **circular**:
+> `Configuration` held `Provider`, `Provider` handed out `Configuration`, and
+> each "role" reached into the provider's state (`settings`, `vault`,
+> `running`, `bind`). That moved code, not responsibility: `Provider` still
+> owned everything. 6a (`Accounts` as a view) shipped that way and is redone here.
+
+**The problem.** `Provider` changes for three reasons: the lifecycle
+(refresh, fallback), the Accounts card (add, sign in, rename, order), and the
+provider's Settings page (data source, setting values, CLI location). One
+product plays a different role in each context — a student at school, a son
+or daughter at home — and each role decides different things.
+
+**The rule: dependencies point one way — down.** Each role *owns* what it
+decides and knows nothing above it; the lifecycle composes them.
+
+```text
+Provider  ◆  THE LIFECYCLE — refresh(login), isAvailable, the switch, status
+│            depends on ↓ both; neither knows it
+├── accounts: Accounts  ◆           THE ACCOUNTS CARD — owns the logins and their order
+│   │                               (saved), adding (form · folder · sign in), remove,
+│   │                               rename, move; each added login's usage history
+│   └── depends on ↓ Configuration  (the form, and the definition a new login runs)
+└── configuration: Configuration ◆  THE SETTINGS PAGE — owns DATA SOURCE (which one,
+                                    fallback on/off), the settings form's values, CLI
+                                    location; answers `definitionAsRun(for: login)` and
+                                    `revision`, which grows on every change. Knows no one
+```
+
+| Question | Answer |
+|---|---|
+| How does a changed setting reach the fetch, with no arrow up? | **pulled, not pushed**: `Configuration.revision` grows on each change; the provider remakes a login's data sources when the revision it made them at is older. No callback, no back-reference |
+| A new or removed login? | the provider makes a login's data sources when first asked (`bound[login]` empty) and drops those of a login `accounts` no longer has |
+| Adding a folder must read who is signed in there — a live data source | `Accounts` gets the same `makeDataSource` the provider gets, injected; it never asks the provider |
+| Test Connection | the lifecycle's (it fetches): `provider.testConnection(login)` |
+| `Account` → `Provider` | `unowned` — a child never outlives its parent (answered below) |
+
+| Law | Owner |
+|---|---|
+| a role never depends on the lifecycle, nor on a role above it: `Provider → Accounts → Configuration`, never back | each role |
+| the provider owns its children — its roles and its logins — and they end with it; a login's reference back is `unowned` | `Provider` |
+| a login's data sources are made in one place, from `configuration.definitionAsRun(for:)` at its current revision | `Provider` |
+| the default login is first and can't be removed; an added login's folder or values are checked before it is kept; the order is yours, saved | `Accounts` |
+| a setting is saved where its definition says (vault for a secret); a CLI location must be a program; the data source is one choice for every login; any change grows `revision` | `Configuration` |
+
+**Built** — `Configuration` and `Accounts` are owning classes in
+`Modules/Providers`; `Provider` composes them and makes data sources at the
+configuration's revision. Test Connection and `hasKey` are the lifecycle's
+(`provider.testConnection`, `provider.hasKey`). Tests that hold only a login
+keep its provider (`keep(_:)` in each test target), as the app's `Providers`
+does — `unowned` turns a dropped provider into a crash, which is the point.
+
+~~**Open.** Should a login stop pointing at its product (`Account.provider`)?~~
+**Answered (2026-10-04): `unowned` — composition.** The provider owns its
+children: when it is destroyed, so are they. A login's reference to its
+product is therefore non-owning and never outlives it (`unowned`, not `weak`,
+which would say a login can outlive its product). It breaks the retain cycle
+— a deleted custom provider and its logins were never freed — and keeps
+`account.provider` non-optional. The law it puts on the rest: deleting a
+product removes its logins from every surface (the lineup is derived from
+`Providers`, so nothing keeps one). `Configuration` and `Accounts` hold no
+reference up at all. Not chosen: a reference by id with every call told to
+the root (the type cycle goes too, but most views change).
 
 ### 12.4 · Decided
 

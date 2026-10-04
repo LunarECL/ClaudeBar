@@ -27,7 +27,7 @@ struct ProviderAccountsCard: View {
                     Text(text.count).font(.caption).foregroundStyle(theme.textSecondary)
                 }
                 Spacer()
-                if provider.hasSeveralAccounts {
+                if provider.accounts.hasSeveral {
                     StatusBadge(status: provider.status)
                 }
             }
@@ -40,7 +40,7 @@ struct ProviderAccountsCard: View {
                     .draggable(account.id)
                     .dropDestination(for: String.self) { ids, _ in
                         guard let moved = provider.accounts.first(where: { $0.id == ids.first }) else { return false }
-                        provider.move(moved, to: index)
+                        provider.accounts.move(moved, to: index)
                         return true
                     }
             }
@@ -68,7 +68,7 @@ struct ProviderAccountsCard: View {
         }
         .alert("Rename Account", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
-            Button("Save") { if let renaming { provider.rename(renaming, to: newName) } }
+            Button("Save") { if let renaming { provider.accounts.rename(renaming, to: newName) } }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("A name for this account. Leave it empty to show its email.")
@@ -93,7 +93,7 @@ struct ProviderAccountsCard: View {
         }
         Task {
             do {
-                try await provider.signInAgain(account)
+                try await provider.accounts.signInAgain(account)
             } catch {
                 reauthMessage = error.localizedDescription
             }
@@ -101,7 +101,7 @@ struct ProviderAccountsCard: View {
     }
 
     private func remove(_ account: Account) {
-        provider.remove(account)
+        provider.accounts.remove(account)
         let settings = AppSettings.shared
         let remaining = settings.menuBarProviderIds.filter { $0 != account.id }
         settings.setMenuBarProviderIds(remaining.isEmpty ? [provider.id] : remaining)

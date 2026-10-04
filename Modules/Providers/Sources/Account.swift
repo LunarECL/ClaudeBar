@@ -12,9 +12,10 @@ import Observation
 @MainActor
 @Observable
 public final class Account: Identifiable {
-    /// The product this login belongs to. Held strongly: the app keeps
-    /// accounts, and an account needs its provider to fetch.
-    public let provider: Provider
+    /// The product this login belongs to. The provider owns its logins and
+    /// they end with it, so this points back without owning: `unowned`, never
+    /// outliving it (TARGET §12, slice 6).
+    public unowned let provider: Provider
     /// `codex` for the default login, `codex.<account>` for an added one —
     /// the ids every saved setting and menu-bar pin is keyed by.
     public let id: String
@@ -145,12 +146,12 @@ public final class Account: Identifiable {
     /// *The name the lineup prints* — on a pill, the menu bar, an alert: the
     /// product's while this is the only login to tell apart, else the
     /// login's own (TARGET §12.1). Pages never re-decide it.
-    public var lineupName: String { provider.hasSeveralAccounts ? displayName : provider.name }
+    public var lineupName: String { provider.accounts.hasSeveral ? displayName : provider.name }
 
     public var cliCommand: String { provider.definition.cli ?? "" }
     /// The dashboard for the plan the last usage reported (#328).
     public var dashboardURL: URL? {
-        provider.definition.profile.links.dashboard(for: snapshot?.accountTier, settings: provider.settingFills(for: self))
+        provider.definition.profile.links.dashboard(for: snapshot?.accountTier, settings: provider.configuration.settingFills(ownValues: isDefault ? [:] : values))
     }
     public var statusPageURL: URL? { provider.definition.profile.links.status }
     public var backgroundRefreshFloor: Duration? { provider.backgroundRefreshFloor }
@@ -159,7 +160,7 @@ public final class Account: Identifiable {
     /// What this login used, day by day, from its own logs — `nil` when the
     /// provider offers no usage history, or doesn't say where an added
     /// login's logs are.
-    public var usageHistory: UsageHistory? { provider.usageHistory(for: self) }
+    public var usageHistory: UsageHistory? { provider.accounts.history(for: self) }
 
     public func isAvailable() async -> Bool {
         await provider.isAvailable(self)
@@ -216,5 +217,19 @@ public final class Account: Identifiable {
            tag == "authenticationRequired" || tag == "sessionExpired" {
             snapshot = nil
         }
+    }
+}
+
+// MARK: - A login on the Settings page
+
+public extension Configuration {
+    /// What a setting holds for this login.
+    func value(of setting: Setting, for account: Account) -> String? {
+        value(of: setting, ownValues: account.isDefault ? [:] : account.values)
+    }
+
+    /// Whether a value of this setting is saved for this login.
+    func hasSaved(_ setting: Setting, for account: Account) -> Bool {
+        hasSaved(setting, login: account.id, ownValues: account.isDefault ? nil : account.values)
     }
 }
