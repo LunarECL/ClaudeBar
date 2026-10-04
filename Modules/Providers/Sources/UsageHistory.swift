@@ -20,14 +20,34 @@ public final class UsageHistory {
     /// Whether a day's cost means anything; without it only tokens do.
     public var knowsCost: Bool { log.knowsCost }
 
+    /// The app this history counts, when it isn't the login's own tool —
+    /// *Claude Desktop* beside Claude Code's logs.
+    public let label: String?
+    /// Other apps on this Mac that use the same plan, each its own history:
+    /// shown under its own name, never added to this one's days.
+    public let otherApps: [UsageHistory]
+
     private let log: UsageLog
     private let ledger: DayLedger?
 
     /// - Parameter ledger: where closed days are kept; without one every
     ///   read goes to the logs.
-    public init(log: UsageLog, ledger: DayLedger? = nil) {
+    public init(log: UsageLog, ledger: DayLedger? = nil, label: String? = nil, otherApps: [UsageHistory] = []) {
         self.log = log
         self.ledger = ledger
+        self.label = label
+        self.otherApps = otherApps
+    }
+
+    /// A login's history as its definition says, with one history per other
+    /// app — each its own log and, under `ledger("<login>/<label>")`, its own
+    /// kept days.
+    public convenience init(_ definition: UsageLog.Definition, login: String,
+                            log makeLog: (UsageLog.Definition) -> UsageLog,
+                            ledger: (String) -> DayLedger? = { _ in nil }) {
+        self.init(log: makeLog(definition), ledger: ledger(login), otherApps: (definition.otherApps ?? []).map { app in
+            UsageHistory(log: makeLog(app.definition), ledger: ledger("\(login)/\(app.label)"), label: app.label)
+        })
     }
 
     /// One day per date of `range`, every date present. Closed days come
@@ -60,6 +80,7 @@ public final class UsageHistory {
     /// then the last thirty days, for the chart — closed days from the
     /// ledger. Days with nothing are kept as none.
     public func read() async {
+        for app in otherApps { await app.read() }
         let days = await days(in: .last(2, endingOn: log.currentTime, calendar: log.calendar))
         guard days.count == 2 else { return }
         let report = DailyUsageReport(today: days[1], previous: days[0])

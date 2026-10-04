@@ -366,7 +366,18 @@
         "url": ["$.env.ANTHROPIC_BASE_URL", ["$.providers[*].base_url", "$.providers[*].env.ANTHROPIC_BASE_URL"]]
       }
     },
-    "sessionGap": 1800
+    "sessionGap": 1800,
+    "otherApps": [
+      {
+        "label": "Claude Desktop",
+        "records": {
+          "files": "~/Library/Application Support/Claude/buddy-tokens.json",
+          "format": "json",
+          "at": { "field": "$.tokens-today.date", "format": "yyyy-MM-dd" },
+          "tokens": { "total": "$.tokens-today.tokens" }
+        }
+      }
+    ]
   },
   "accounts": {
     "signIn": {
@@ -391,7 +402,8 @@
     "patch": {
       "usageHistory": {
         "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" },
-        "freeWhen": { "localEndpoint": { "file": "{{account.configDirectory}}/.claude.json" } }
+        "freeWhen": { "localEndpoint": { "file": "{{account.configDirectory}}/.claude.json" } },
+        "otherApps": null
       },
       "cli": {
         "fetch": {

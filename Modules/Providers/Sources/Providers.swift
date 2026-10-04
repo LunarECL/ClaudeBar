@@ -97,8 +97,9 @@ public enum Providers {
     @MainActor
     private static func history(_ definition: UsageLog.Definition, login: String,
                                 environment: @escaping @Sendable (String) -> String?) -> UsageHistory {
-        UsageHistory(log: DataSources.makeUsageLog(definition, scripts: builtInScripts, environment: environment),
-                     ledger: DayLedger(store: FileLedgerStore(), key: login))
+        UsageHistory(definition, login: login,
+                     log: { DataSources.makeUsageLog($0, scripts: builtInScripts, environment: environment) },
+                     ledger: { DayLedger(store: FileLedgerStore(), key: $0) })
     }
 
     /// A built-in provider by id — `Providers.make("codex", settings:)`.
