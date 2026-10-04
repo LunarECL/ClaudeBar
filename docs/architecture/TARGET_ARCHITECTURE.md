@@ -1040,7 +1040,7 @@ switching, once per low) → `InUseAnnouncer`. *A link* —
 **The problem.** Someone with two Claude logins opens Settings → Providers and
 finds *personal* and *work* listed as two providers. The page is titled
 *personal*, and its *Enabled* toggle pauses that one login while it looks like
-it turns Claude off (#352). The cause is in the code: one protocol stands for a
+it turns Claude off. The cause is in the code: one protocol stands for a
 product **or** a login, so every screen guesses which it holds. Extensions work,
 and are moved only because they are the last other thing on that protocol.
 
@@ -1058,10 +1058,10 @@ it holds, and casts to find out.
 |---|---|---|
 | `QuotaMonitor` · `AIProviderRepository` (`all`, `enabled`, `provider(id:)`) | the products, and the lineup of their logins | `Monitor.providers: [Provider]`; `lineup: [Account]` derived (enabled logins of enabled products) |
 | pills, menu-bar entries, Touch Bar, notch, alerts, `onRefreshed` | **a login** | `Account` |
-| Settings → Providers rows and pages | **a product** | `Provider` — one row per product; its logins in the Accounts card (#352) |
+| Settings → Providers rows and pages | **a product** | `Provider` — one row per product; its logins in the Accounts card |
 | `ProductTab` (`provider: Provider?` from its first account) | a product | `Provider` itself |
 | `Account.name` (product or login, by count) | two things | `account.displayName` for the login; `provider.name` for the product; the page decides which to print |
-| `isEnabled` on `AIProvider` | a login's pause *and* a product's toggle | `account.isEnabled` (pause) · `provider.isEnabled` (hide every login — CANONICAL §8, #352) |
+| `isEnabled` on `AIProvider` | a login's pause *and* a product's toggle | `account.isEnabled` (pause) · `provider.isEnabled` (hide every login — CANONICAL §8, ) |
 | `RefreshKind`, `refresh(kind)`, `backgroundRefreshFloor` | the lifecycle | `Provider` (already there) |
 
 ### 12.2 · Extensions become definitions
@@ -1086,7 +1086,7 @@ CANONICAL §8: *"the same `Provider`, with script fetches"*. The person's
 
 | # | Slice | Fixes · pins |
 |---|---|---|
-| 1 | **Settings by product (#352)**: Providers rows and pages take a `Provider` (from `ProductTab`); the page is titled *Claude*, its toggle is `provider.isEnabled` (hides every login), its logins are the Accounts card | the visible problem · one row per product; the toggle hides every login and keeps their settings; extensions keep their own row |
+| 1 | **Settings by product**: Providers rows and pages take a `Provider` (from `ProductTab`); the page is titled *Claude*, its toggle is `provider.isEnabled` (hides every login), its logins are the Accounts card | the visible problem · one row per product; the toggle hides every login and keeps their settings; extensions keep their own row |
 | 2 | `Monitor.providers: [Provider]`, `lineup: [Account]`; `AIProviderRepository` and `AIProviders` go | the cause, in the domain · every Monitor test on definitions over stubbed connections (`StubbedProvider`, shared) |
 | 3 | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
 | 4 | `Fetch.script` + the manifest → definition reader; extensions load as `Provider`s, their sections mapped as 12.2; `ExtensionProvider` goes | the last other conformer · golden tests on `docs/features/extensions/example-provider`; quotas and cost read the same |
