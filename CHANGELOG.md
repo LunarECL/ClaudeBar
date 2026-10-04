@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.3] - 2026-10-04
+
 ### Added
 - Leaderboard profile links: add your X, Instagram or GitHub handle when you join or in Settings → Leaderboard, and it shows as an icon after your name on the board that opens your profile. Handles aren't verified, and the board says so. ([#462](https://github.com/tddworks/ClaudeBar/pull/462))
 - Leaderboard globe: opt in to put your country on the web board's globe of where ClaudeBar is used. Only your country is kept, never your city or IP; it shows once three members there opt in. An eye hides it in the popover, and Turn off removes it. ([#460](https://github.com/tddworks/ClaudeBar/pull/460))
@@ -1238,7 +1242,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/tddworks/ClaudeBar/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/tddworks/ClaudeBar/compare/v0.5.0...v0.5.2
 [0.5.0]: https://github.com/tddworks/ClaudeBar/compare/v0.4.95...v0.5.0
 [0.4.95]: https://github.com/tddworks/ClaudeBar/compare/v0.4.94...v0.4.95
