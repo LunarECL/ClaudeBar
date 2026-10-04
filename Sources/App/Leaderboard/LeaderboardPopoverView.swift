@@ -341,20 +341,23 @@ struct LeaderboardStandingsView: View {
                 CardLabel(text: (["YOUR RANK", period.label] + [provider.map { leaderboardProviderName($0, in: monitor) }].compactMap { $0 })
                     .joined(separator: " · ").uppercased())
                 Spacer()
-                if mine?.visible == false {
-                    Label("Hidden", systemImage: "eye.slash")
-                        .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
-                        .foregroundStyle(theme.textTertiary)
-                }
             }
             HStack(alignment: .center, spacing: 12) {
                 OutlinedNumber(text: mine?.standing.map { "#\($0.rank)" } ?? "–", size: 42, color: theme.accentPrimary)
                     .accessibilityLabel(mine?.standing.map { "Rank \($0.rank)" } ?? "Not ranked yet")
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(membership.username?.description ?? "")
-                        .font(.system(size: 15, weight: .bold, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(membership.username?.description ?? "")
+                            .font(.system(size: 15, weight: .bold, design: theme.fontDesign))
+                            .foregroundStyle(theme.textPrimary)
+                            .lineLimit(1)
+                        // An eye in the popover is always a toggle: this one shows or hides
+                        // you on the web board, like Settings' "Show me on the web board".
+                        PrivacyEyeBadge(isHidden: Binding(
+                            get: { !membership.isVisible },
+                            set: { hidden in Task { try? await membership.setVisible(!hidden) } }
+                        ), what: "you on the web board")
+                    }
                     Text("\(Self.tokens(mine?.standing?.total ?? 0)) tokens")
                         .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
                         .foregroundStyle(theme.textSecondary)
