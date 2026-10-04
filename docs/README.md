@@ -26,6 +26,7 @@ Start with the [README](../README.md). Something broken? See [troubleshooting](t
 | [mistral](providers/mistral/README.md) | Show today's and yesterday's Mistral Vibe cost and token totals, read from Vibe's local session logs. No API key needed. Use when setting up Mistral or when its card is empty. |
 | [omp](providers/omp/README.md) | Track the rate-limit windows of every account Oh My Pi (omp) is signed into, such as Claude, Codex and Z.ai, via `omp usage --json`. Use when setting up Oh My Pi or when an account shows "No usage reported". |
 | [opencode-go](providers/opencode-go/README.md) | Track OpenCode Go rolling 5-hour, weekly and monthly usage from the opencode.ai usage API, or from the local opencode database when no API key is set. Use when setting up OpenCode Go or when its numbers differ from the dashboard. |
+| [openrouter](providers/openrouter/README.md) | Track your OpenRouter credit balance (total credits minus usage, in USD) with an OpenRouter API key. Use when setting up OpenRouter or when its key is rejected. |
 | [vercel-gateway](providers/vercel-gateway/README.md) | Show your Vercel AI Gateway credit balance in dollars, using an AI Gateway API key stored in the Keychain or an environment variable. Use when setting up Vercel Gateway or when the connection test fails. |
 | [zai](providers/zai/README.md) | Track the Z.ai / Zhipu GLM Coding Plan 5-hour, weekly and MCP quotas, from a saved key or Claude Code's settings. Use when setting up Z.ai or when it shows "Key needed". |
 
