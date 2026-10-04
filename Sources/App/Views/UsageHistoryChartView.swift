@@ -42,8 +42,12 @@ struct UsageHistoryChartView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             HStack(spacing: 4) {
-                ForEach(Measure.allCases) { choice in
-                    chip(choice)
+                if theme.isOutlined {
+                    InkSegmentedPicker(title: "Measure", options: Measure.allCases, selection: $measure, label: \.rawValue)
+                } else {
+                    ForEach(Measure.allCases) { choice in
+                        chip(choice)
+                    }
                 }
                 Spacer(minLength: 0)
                 legend
