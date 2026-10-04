@@ -14,7 +14,7 @@ struct PriceCatalogTests {
         }
     }
 
-    @Test func `should give a model's exact input and output prices per million tokens, with its name and vendor`() async {
+    @Test func `should give exact price texts per million tokens, and none for an unknown model`() async {
         let catalog = SDKPriceCatalog(pricing: Prices(models: [
             "anthropic.claude-sonnet-4": BedrockModel(id: "anthropic.claude-sonnet-4", displayName: "Claude Sonnet 4", vendor: "Anthropic",
                                                       inputPricePer1M: Decimal(string: "3.00")!, outputPricePer1M: 15),
