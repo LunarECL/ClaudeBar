@@ -36,7 +36,7 @@ paths, field names, client ids, CLI arguments — is data.
                                                                ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ ProviderCatalog      reads files → [ProviderDefinition]                  │
-│ Providers.make(_:)   definition → Provider, each data source made live   │
+│ ProviderFactory.make(_:)   definition → Provider, each data source made live   │
 │                      by DataSources.make(_:settings:vault:cloudWatch:)   │
 └──────────────────────────────────┬───────────────────────────────────────┘
                                    ▼
@@ -282,7 +282,7 @@ slice 7 (`Usage`), and gains `source: kind` — *via RPC* — in slice 1.
 ### 4.2 · Flows
 
 **Launch.** `ProviderCatalog` reads the definitions (bundled, then
-`~/.claudebar/providers/`, then extensions) → `Providers.make` builds one
+`~/.claudebar/providers/`, then extensions) → `ProviderFactory.make` builds one
 `Provider` each, its data sources made live by `DataSources.make` →
 `QuotaMonitor` receives them. A file that fails to decode — an unknown tag
 included, since the sums are closed — is logged by file name and left out;
@@ -1093,8 +1093,8 @@ stay for extensions).
 | # | Slice | Fixes · pins |
 |---|---|---|
 | 1 ✅ | **Settings by product**: Providers rows and pages take a `Provider` (from `ProductTab`); the page is titled *Claude*, its toggle is `provider.isEnabled` (hides every login), its logins are the Accounts card | the visible problem · one row per product; the toggle hides every login and keeps their settings; extensions keep their own row |
-| 2 | **Extensions as definitions**: `Fetch.script`; a definition's data sources can **answer together** (each section one, the usage their union, a failed one left out); the manifest → definition reader; sections mapped as 12.2; `ExtensionProvider` goes | every lineup member is an `Account` · golden tests on `docs/features/extensions/example-provider`: quotas and cost read the same; config fields as settings; a failing section left out |
-| 3 | `Monitor.providers: [Provider]`, `lineup: [Account]`; `AIProviderRepository` and `AIProviders` go; the test stubs become definitions over stubbed connections | the cause, in the domain · every Monitor test |
+| 2 ✅ | **Extensions as definitions**: `Fetch.script`; a definition's data sources can **answer together** (each section one, the usage their union, a failed one left out); the manifest → definition reader; sections mapped as 12.2; `ExtensionProvider` goes | every lineup member is an `Account` · golden tests on `docs/features/extensions/example-provider`: quotas and cost read the same; config fields as settings; a failing section left out |
+| 3 ✅ | **`Providers`** (CRUD of the providers you keep, their order and the derived `lineup: [Account]`), held by the Monitor; `AIProviderRepository` and `AIProviders` go; the test stubs become definitions over stubbed connections | the cause, in the domain · every Monitor test |
 | 4 | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
 | 5 | Delete `AIProvider` | done · the build has no `AIProvider` |
 | 6 | **`Provider` by role** (SRP): one product plays different roles in different contexts — refreshed in Monitoring, configured in Settings, a set of logins in Accounts, a terminal choice in In use (already `InUse`), a history in Usage History (already `UsageHistory`). Each role becomes its own type the product hands out, as `inUse` is; `Provider` keeps only the lifecycle (TARGET §1: it changes when the lifecycle changes). *Designed and confirmed when slice 5 is done* | `Provider` small again · each role's tests move with it |
@@ -1110,6 +1110,48 @@ Mockup: `design-concept/settings-by-product/index.html`.
 | `Provider.isEnabled` | **its own setting**: off hides every login — no pill, no menu-bar entry, no refresh, no alert — and keeps every login and its settings. The lineup is the enabled logins **of enabled products** |
 | `Account.isEnabled` | the login's own *Pause*, its own setting — never the product's. A product whose logins are all paused reads as disabled (CANONICAL §5) |
 | upgrade | today `providers.<id>.isEnabled` is the plain login's switch. Read once: **off while another login of it is on** meant *the plain login was paused* — kept as its pause, the product on; **otherwise** it meant *the product was off* — kept as the product's switch. Nobody's setup changes |
+
+#### Slice 3 in detail — `Providers`: the providers you keep
+
+> **Status: BUILT** (2026-10-04, confirmed the same day). `Providers` in
+> `Modules/Providers`; the module's factory is `ProviderFactory` (it was
+> `Providers`). The Monitor's members still take and return `Account` under
+> their old names (`allProviders`, `enabledProviders`); slice 4 renames them
+> with the views.
+
+The Monitor does two jobs today: it **watches** (refresh, alerts, selection,
+status) and it **keeps the person's providers** (add a custom one, delete it,
+order the pane, look one up). They change for different reasons, so the
+keeping becomes its own aggregate in the Providers context, the one the
+Settings → Providers pane shows, and the Monitor holds it.
+
+```text
+Monitor  ◆                      watches: refresh, alerts, selection, status, onRefreshed
+└── providers: Providers  ◆     the providers you keep — the Providers pane
+    ├── all: [Provider]         in the pane's order (persisted; a product's logins move together)
+    ├── lineup → [Account]      DERIVED — enabled logins of enabled products, in that order
+    └── Provider  ◆             the product (unchanged); its logins are its own business
+```
+
+| Tell it | It does |
+|---|---|
+| `providers.add(definition)` | **Create** — a custom provider (Add Provider, Import): saves the definition to the catalog, registers it, makes it live, appends it |
+| `providers.all` · `provider(id:)` · `login(id:)` · `lineup` | **Read** |
+| `providers.move(id, by:)` | **Update** the order — persisted; ids no longer kept are dropped |
+| `providers.remove(id)` | **Delete** — a custom provider: its definition file, its vault keys, its registration. A built-in is never deleted (turn it off instead) |
+
+| Law | Owner |
+|---|---|
+| one provider per id; adding an id already kept is refused | `Providers` |
+| the order is the pane's, saved; a product's logins stay together; unknown ids are dropped | `Providers` |
+| a built-in provider can't be deleted, only turned off | `Providers` |
+| the lineup is derived — enabled logins of enabled products, in the order — never stored | `Providers` |
+| adding or removing a **login** is the product's (`provider.addAccount` / `remove`), never the collection's or the Monitor's | `Provider` |
+| the Monitor never adds, deletes or orders a provider; it reads `providers` and watches | `Monitor` |
+
+It lives in `Modules/Providers` (the Providers context; it needs the catalog,
+the vault and the settings, never the Monitor). `AIProviderRepository` and
+`AIProviders` are what it replaces.
 
 ### 12.4 · Decided
 

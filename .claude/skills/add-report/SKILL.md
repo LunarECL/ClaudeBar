@@ -351,7 +351,7 @@ if let report = (provider as? Account)?.{name}?.report {
 
 ### 3d. Register in ClaudeBarApp
 
-A capability the definition declares is built by `Providers.make` — as
+A capability the definition declares is built by `ProviderFactory.make` — as
 `usageHistory` is from a definition's `usageHistory` block — so the App
 passes nothing. Only a capability not yet expressible as data is handed in:
 

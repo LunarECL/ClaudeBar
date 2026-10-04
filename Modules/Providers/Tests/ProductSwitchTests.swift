@@ -13,7 +13,7 @@ struct ProductSwitchTests {
     }
 
     private func codex(_ settings: InMemoryProviderSettings) throws -> Provider {
-        try Providers.make("codex", settings: settings, accounts: settings.accounts(forProvider: "codex"))
+        try ProviderFactory.make("codex", settings: settings, accounts: settings.accounts(forProvider: "codex"))
     }
 
     private func twoLogins() -> InMemoryProviderSettings {

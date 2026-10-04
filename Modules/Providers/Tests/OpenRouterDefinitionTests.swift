@@ -13,7 +13,7 @@ struct OpenRouterDefinitionTests {
     private func make(body: String = #"{"data":{"total_credits":"10.00","total_usage":"3.50"}}"#, status: Int = 200,
                       environment: [String: String] = [:], vault: MemoryVault = MemoryVault(["openrouter.apiKey": "personal"]),
                       settings: InMemoryProviderSettings = InMemoryProviderSettings(), replies: [String: String]? = nil) throws -> Provider {
-        let definition = try Providers.builtIn("openrouter")
+        let definition = try ProviderFactory.builtIn("openrouter")
         let network = MockNetworkClient()
         given(network).request(.any).willProduce { @Sendable request in
             guard request.url?.absoluteString == "https://openrouter.ai/api/v1/credits", request.timeoutInterval == 30,
@@ -29,7 +29,7 @@ struct OpenRouterDefinitionTests {
         return Provider(definition: definition, settings: settings, accounts: settings.accounts(forProvider: definition.id),
                         makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: network,
-                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: Providers.builtInScripts,
+                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
                              secrets: vault.scoped(to: login),
                              environment: { environment[$0] }, homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)

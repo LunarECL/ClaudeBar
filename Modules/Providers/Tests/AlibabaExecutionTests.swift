@@ -34,11 +34,11 @@ struct AlibabaExecutionTests {
         let settings = InMemoryProviderSettings()
         settings.setValue(region, "region", forProvider: "alibaba")
         if let mode { settings.setDataSourceKind(mode, forProvider: "alibaba") }
-        let definition = try Providers.builtIn("alibaba")
+        let definition = try ProviderFactory.builtIn("alibaba")
         return Provider(definition: definition, settings: settings, accounts: settings.accounts(forProvider: "alibaba"), makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, makeCLIExecutor: { _ in MockCLIExecutor() }, makeCommandExecutor: { _ in MockCLIExecutor() },
                              network: network, makeTransport: { _, _, _, _ in MockRPCTransport() }, security: { _ in (1, "") },
-                             scripts: Providers.builtInScripts, secrets: vault.scoped(to: login), browserCookies: cookies,
+                             scripts: ProviderFactory.builtInScripts, secrets: vault.scoped(to: login), browserCookies: cookies,
                              environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)
     }

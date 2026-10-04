@@ -160,20 +160,19 @@ Views consume domain models directly from `QuotaMonitor`:
 
 ```swift
 // QuotaMonitor is the single source of truth
-public actor QuotaMonitor {
-    private let providers: AIProviders  // Hidden - use delegation methods
+@MainActor @Observable
+public final class QuotaMonitor {
+    // The providers you keep: add, delete, order, the derived lineup
+    public let providers: Providers
 
-    // Delegation methods (nonisolated for UI access)
-    public nonisolated var allProviders: [any AIProvider]
-    public nonisolated var enabledProviders: [any AIProvider]
-    public nonisolated func provider(for id: String) -> (any AIProvider)?
-    public nonisolated func addProvider(_ provider: any AIProvider)
-    public nonisolated func removeProvider(id: String)
+    public var allProviders: [Account]       // every login
+    public var enabledProviders: [Account]   // the lineup
+    public func provider(for id: String) -> Account?
 
     // Selection state
-    public nonisolated var selectedProviderId: String
-    public nonisolated var selectedProvider: (any AIProvider)?
-    public nonisolated var selectedProviderStatus: QuotaStatus
+    public var selectedProviderId: String
+    public var selectedProvider: Account?
+    public var selectedProviderStatus: QuotaStatus
 }
 
 // Views consume domain directly - NO AppState layer
@@ -224,7 +223,7 @@ A bug in a migrated provider is fixed in its JSON, or generically in
 `DataSources`, never with vendor-named Swift. Modules never `import Domain`.
 
 **Key patterns:**
-- **Modules by context** — the domain at a module's root, its implementation in `Internal/`, one factory enum per module (`DataSources.make`, `Providers.make`)
+- **Modules by context** — the domain at a module's root, its implementation in `Internal/`, one factory enum per module (`DataSources.make`, `ProviderFactory.make`)
 - **Providers are data** — a feature a provider needs becomes a generic rule or worker, then a line of JSON
 - **Protocol-based DI** — `@Mockable` ports; Chicago-school tests assert on state
 - **No ViewModel layer** — views read `QuotaMonitor` and `Provider` directly

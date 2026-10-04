@@ -483,6 +483,7 @@ public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {
     case missingAccountValue(String, String)
     case duplicateProvider(String)
     case duplicateSetting(String, String)
+    case notDeletable(String)
 
     public var errorDescription: String? {
         switch self {
@@ -493,6 +494,7 @@ public enum DefinitionError: Error, Sendable, Equatable, LocalizedError {
         case .missingAccountValue(let id, let name): "A '\(id)' account has no saved '\(name)'"
         case .duplicateProvider(let id): "A provider named '\(id)' already exists"
         case .duplicateSetting(let id, let setting): "Provider '\(id)' lists setting '\(setting)' twice"
+        case .notDeletable(let id): "Provider '\(id)' isn't one you made; turn it off instead"
         }
     }
 }

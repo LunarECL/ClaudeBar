@@ -34,10 +34,10 @@ struct ZaiExecutionTests {
         let settings = InMemoryProviderSettings()
         settings.setValue(platform, "platform", forProvider: "zai")
         settings.setValue(envVar, "glmAuthEnvVar", forProvider: "zai")
-        let definition = try Providers.builtIn("zai")
+        let definition = try ProviderFactory.builtIn("zai")
         return Provider(definition: definition, settings: settings, makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: network,
-                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: Providers.builtInScripts,
+                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
                              secrets: vault.scoped(to: login), environment: { environment[$0] },
                              homeDirectory: home, now: { Date() })
         }, vault: vault)

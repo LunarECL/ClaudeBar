@@ -39,15 +39,15 @@ struct ActionBarSpec {
         }
 
         @Test
-        func `Claude dashboard URL is Anthropic billing`() {
-            let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
-            #expect(claude.dashboardURL?.absoluteString == "https://console.anthropic.com/settings/billing")
+        func `Claude dashboard URL is its usage settings`() throws {
+            let claude = try ProviderFactory.builtIn("claude")
+            #expect(claude.profile.links.dashboard?.absoluteString == "https://claude.ai/new#settings/usage")
         }
 
         @Test
-        func `Codex dashboard URL is OpenAI usage`() {
-            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: Self.makeSettings())
-            #expect(codex.dashboardURL?.absoluteString == "https://platform.openai.com/usage")
+        func `Codex dashboard URL is OpenAI usage`() throws {
+            let codex = try ProviderFactory.builtIn("codex")
+            #expect(codex.profile.links.dashboard?.absoluteString == "https://platform.openai.com/usage")
         }
 
         @Test
@@ -55,14 +55,14 @@ struct ActionBarSpec {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let copilot = try Providers.make("copilot", settings: settings).defaultAccount
+            let copilot = try ProviderFactory.make("copilot", settings: settings).defaultAccount
             #expect(copilot.dashboardURL?.absoluteString == "https://github.com/settings/copilot/features")
         }
 
         @Test
         func `Antigravity has no dashboard URL`() throws {
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
-            let antigravity = try Providers.make("antigravity", settings: settings).defaultAccount
+            let antigravity = try ProviderFactory.make("antigravity", settings: settings).defaultAccount
             #expect(antigravity.dashboardURL == nil)
         }
 
@@ -71,7 +71,7 @@ struct ActionBarSpec {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let bedrock = try Providers.make("bedrock", settings: settings).defaultAccount
+            let bedrock = try ProviderFactory.make("bedrock", settings: settings).defaultAccount
             #expect(bedrock.dashboardURL?.absoluteString == "https://console.aws.amazon.com/bedrock/home")
         }
 
@@ -80,7 +80,7 @@ struct ActionBarSpec {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let zai = try Providers.make("zai", settings: settings).defaultAccount
+            let zai = try ProviderFactory.make("zai", settings: settings).defaultAccount
             #expect(zai.dashboardURL?.absoluteString == "https://z.ai/subscribe")
         }
     }
@@ -98,8 +98,8 @@ struct ActionBarSpec {
         @Test
         func `Claude offers guest passes only when it has a pass probe`() throws {
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
-            let withoutPasses = try Providers.make("claude", settings: settings).defaultAccount
-            let withPasses = try Providers.make("claude", settings: settings, guestPasses: GuestPasses(source: MockGuestPassSource())).defaultAccount
+            let withoutPasses = try ProviderFactory.make("claude", settings: settings).defaultAccount
+            let withPasses = try ProviderFactory.make("claude", settings: settings, guestPasses: GuestPasses(source: MockGuestPassSource())).defaultAccount
 
             #expect(withoutPasses.guestPasses == nil)
             #expect(withPasses.guestPasses != nil)

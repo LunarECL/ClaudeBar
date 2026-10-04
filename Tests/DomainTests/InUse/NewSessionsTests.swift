@@ -30,7 +30,7 @@ struct NewSessionsTests {
         let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: temp.appendingPathComponent("settings.json")))
         let work = ProviderAccountConfig(accountId: "work", label: "work",
                                          probeConfig: ["codexHome": "/Users/you/.codex-work", "chatgptAccountId": "work"])
-        return try! Providers.make("codex", settings: settings, accounts: [work],
+        return try! ProviderFactory.make("codex", settings: settings, accounts: [work],
                                    loginsInUse: DiskLoginsInUse(root: temp.appendingPathComponent("in-use")))
     }
 
@@ -158,7 +158,7 @@ struct NewSessionsTests {
     @Test
     func `a product with one login shows nothing`() throws {
         let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: temp.appendingPathComponent("one.json")))
-        let alone = try Providers.make("codex", settings: settings,
+        let alone = try ProviderFactory.make("codex", settings: settings,
                                        loginsInUse: DiskLoginsInUse(root: temp.appendingPathComponent("in-use")))
         let sessions = NewSessions(products: [alone], shellLines: lines, shell: .zsh)
 
@@ -221,7 +221,7 @@ struct NewSessionsTests {
     @Test
     func `only products whose new sessions can be chosen are listed`() throws {
         let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: temp.appendingPathComponent("s.json")))
-        let gemini = try Providers.make("gemini", settings: settings)
+        let gemini = try ProviderFactory.make("gemini", settings: settings)
         let codex = codex()
 
         let sessions = NewSessions(products: [gemini, codex], shellLines: lines, shell: .zsh)

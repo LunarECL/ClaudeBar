@@ -107,7 +107,7 @@ struct SignInAccountsTests {
     @Test
     func `adding a login saves it`() throws {
         let settings = InMemoryProviderSettings()
-        let codex = try Providers.make("codex", settings: settings)
+        let codex = try ProviderFactory.make("codex", settings: settings)
         let work = ProviderAccountConfig(accountId: "a", label: "", email: "w@example.com",
                                          probeConfig: ["codexHome": "/tmp/a", "chatgptAccountId": "a"])
 
@@ -189,13 +189,13 @@ struct SignInAccountsTests {
 
     @Test
     func `codex and claude offer sign-in first, then choosing a folder`() throws {
-        #expect(try Providers.builtIn("codex").accounts?.ways == [.signIn, .folder])
-        #expect(try Providers.builtIn("claude").accounts?.ways == [.signIn, .folder])
+        #expect(try ProviderFactory.builtIn("codex").accounts?.ways == [.signIn, .folder])
+        #expect(try ProviderFactory.builtIn("claude").accounts?.ways == [.signIn, .folder])
     }
 
     @Test
     func `claude signs in with its own config folder and no inherited keys`() throws {
-        let signIn = try #require(try Providers.builtIn("claude").accounts?.signIn)
+        let signIn = try #require(try ProviderFactory.builtIn("claude").accounts?.signIn)
 
         #expect(signIn.args == ["auth", "login", "--claudeai"])
         #expect(signIn.homeVariable == "CLAUDE_CONFIG_DIR")

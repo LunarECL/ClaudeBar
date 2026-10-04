@@ -341,9 +341,9 @@ struct ObservationRenderSyncTests {
             quotas: [UsageQuota(percentRemaining: 64, quotaType: .session, providerId: "claude")],
             capturedAt: Date()
         ))
-        let provider = StubClaudeProvider(probe: probe, settingsRepository: settings)
+        let provider = stubbedLogin("claude", probe: probe, settings: settings)
         let monitor = QuotaMonitor(
-            providers: AIProviders(providers: [provider]),
+            providers: kept([provider]),
             clock: NoOpClock()
         )
 

@@ -75,27 +75,3 @@ public extension MultiAccountProvider {
         return sorted.first?.0
     }
 }
-
-// MARK: - AIProviderRepository Extension
-
-public extension AIProviderRepository {
-    /// Returns all providers that support multiple accounts
-    var multiAccountProviders: [any MultiAccountProvider] {
-        all.compactMap { $0 as? (any MultiAccountProvider) }
-    }
-
-    /// Finds a multi-account provider by its ID
-    func multiAccountProvider(id: String) -> (any MultiAccountProvider)? {
-        provider(id: id) as? (any MultiAccountProvider)
-    }
-
-    /// Total number of accounts across all multi-account providers
-    var totalAccountCount: Int {
-        all.reduce(0) { count, provider in
-            if let multi = provider as? (any MultiAccountProvider) {
-                return count + multi.accounts.count
-            }
-            return count + 1 // Single-account providers count as 1
-        }
-    }
-}

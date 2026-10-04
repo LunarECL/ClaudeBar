@@ -38,7 +38,7 @@ struct AntigravityDefinitionTests {
             guard let answer = answers.first(where: { path.hasSuffix($0.key) })?.value else { return (Data(), StubbedProvider.response(404)) }
             return (Data(answer.1.utf8), StubbedProvider.response(answer.0))
         }
-        let definition = try Providers.builtIn("antigravity")
+        let definition = try ProviderFactory.builtIn("antigravity")
         return Provider(definition: definition, settings: InMemoryProviderSettings(), makeDataSource: { source, _ in
             DataSources.make(source, providerId: definition.id, makeCLIExecutor: { _ in commands }, makeCommandExecutor: { _ in commands },
                              network: network, localNetwork: network,
@@ -48,7 +48,7 @@ struct AntigravityDefinitionTests {
                                  guard let keychain, arguments.contains("gemini"), arguments.contains("antigravity") else { return (44, "") }
                                  return (0, "go-keyring-base64:" + Data(keychain.utf8).base64EncodedString())
                              },
-                             scripts: Providers.builtInScripts, secrets: nil, browserCookies: SystemBrowserCookies(),
+                             scripts: ProviderFactory.builtInScripts, secrets: nil, browserCookies: SystemBrowserCookies(),
                              environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         })
     }

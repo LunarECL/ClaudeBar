@@ -52,11 +52,11 @@ struct KimiExecutionTests {
         let settings = InMemoryProviderSettings()
         settings.setValue(region, "region", forProvider: "kimi")
         if let mode { settings.setDataSourceKind(mode, forProvider: "kimi") }
-        let definition = try! Providers.builtIn("kimi")
+        let definition = try! ProviderFactory.builtIn("kimi")
         return Provider(definition: definition, settings: settings, accounts: settings.accounts(forProvider: "kimi"), makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, makeCLIExecutor: { @Sendable call in seen.calls.append(call); return cli },
                              makeCommandExecutor: { _ in cli }, network: network, makeTransport: { _, _, _, _ in MockRPCTransport() },
-                             security: { _ in (1, "") }, scripts: Providers.builtInScripts, secrets: vault.scoped(to: login),
+                             security: { _ in (1, "") }, scripts: ProviderFactory.builtInScripts, secrets: vault.scoped(to: login),
                              browserCookies: browser, environment: { environment[$0] },
                              homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)
@@ -165,7 +165,7 @@ struct KimiExecutionTests {
 @Suite
 struct SourceScopedAccountTests {
     private func definition() throws -> ProviderDefinition {
-        try Providers.builtIn("kimi")
+        try ProviderFactory.builtIn("kimi")
     }
 
     @Test func `a login without a folder runs no CLI, only the API`() throws {

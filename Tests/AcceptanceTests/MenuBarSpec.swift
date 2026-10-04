@@ -60,10 +60,10 @@ struct MenuBarSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
+            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claude, codex]),
                 clock: TestClock()
             )
 
@@ -95,12 +95,12 @@ struct MenuBarSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
+            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claude, codex]),
                 clock: TestClock()
             )
 
@@ -123,9 +123,9 @@ struct MenuBarSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: probe, settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 
@@ -140,9 +140,9 @@ struct MenuBarSpec {
         func `no snapshots defaults to healthy`() {
             // Given — fresh monitor, no refresh yet
             let settings = MenuBarSpec.makeSettings()
-            let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: MockUsageProbe(), settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 

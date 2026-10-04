@@ -17,7 +17,7 @@ struct CodexDefinitionTests {
 
     @Test
     func `codex json keeps the definition laws`() throws {
-        let codex = try Providers.builtIn("codex")
+        let codex = try ProviderFactory.builtIn("codex")
 
         #expect(codex.id == "codex")
         #expect(codex.profile.name == "Codex")

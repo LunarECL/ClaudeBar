@@ -36,7 +36,7 @@ struct InUseTests {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
 
-        let codex = try Providers.make("codex", settings: stub.settings)
+        let codex = try ProviderFactory.make("codex", settings: stub.settings)
 
         #expect(codex.inUse == nil)
         #expect(throws: (any Error).self) { try codex.defaultAccount.useForNewSessions() }

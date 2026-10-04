@@ -15,7 +15,7 @@ struct OpenCodeDefinitionTests {
     static let localRow = #"[{"now_ms":1775044800000,"five_hour_cost":2.5,"five_hour_oldest_ms":1775037600000,"weekly_cost":7.5,"week_end_ms":1775433600000,"monthly_cost":15,"month_start_ms":1773502200000,"month_end_ms":1776177000000}]"#
     private func make(body: String = usage, status: Int = 200, key: String? = "personal", local: String = Self.localRow, exit: Int32 = 0, clock: Date = now, home: URL = FileManager.default.temporaryDirectory, env: [String:String]? = nil, available: Bool = true, vault: MemoryVault = MemoryVault()) throws -> Provider {
         let now = clock
-        let def = try Providers.builtIn("opencode-go")
+        let def = try ProviderFactory.builtIn("opencode-go")
         let net = MockNetworkClient()
         given(net).request(.any).willProduce { @Sendable request in
             #expect(request.url?.absoluteString == "https://opencode.ai/zen/go/v1/usage")
@@ -34,7 +34,7 @@ struct OpenCodeDefinitionTests {
             return CLIResult(output: local, exitCode: exit)
         }
         return Provider(definition:def,settings:InMemoryProviderSettings(),makeDataSource:{source,login in
-            DataSources.make(source,providerId:def.id,cliExecutor:cli,network:net,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:Providers.builtInScripts,secrets:vault.scoped(to:login),environment:{ name in env.map { $0[name] } ?? (name == "OPENCODE_API_KEY" ? key : nil) },homeDirectory:home,now:{now})
+            DataSources.make(source,providerId:def.id,cliExecutor:cli,network:net,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,secrets:vault.scoped(to:login),environment:{ name in env.map { $0[name] } ?? (name == "OPENCODE_API_KEY" ? key : nil) },homeDirectory:home,now:{now})
         },vault:vault)
     }
     @Test func `server fixture retains quotas resets and durations`() async throws {
@@ -113,7 +113,7 @@ struct OpenCodeDefinitionTests {
 
     /// The definition's query against a fixture database, as of `now` (UTC).
     private func query(_ messages: [(at: String, cost: Double, provider: String)], now: String) throws -> [String: Any] {
-        let definition = try Providers.builtIn("opencode-go")
+        let definition = try ProviderFactory.builtIn("opencode-go")
         guard case .command(let call) = try #require(definition.dataSource("local")).fetch else {
             Issue.record("Expected a command"); return [:]
         }

@@ -248,7 +248,7 @@ ClaudeBarApp.init (composition root)
   │ ProviderCatalog → [ProviderDefinition]          bundled · ~/.claudebar/providers · (extensions, slice 5)
   │ settings.accounts(forProvider: id) → [ProviderAccountConfig]
   ▼
-Providers.make(definition, settings, vault)
+ProviderFactory.make(definition, settings, vault)
   │
   ├─ default account:  definition.dataSources ──map──▶ DataSources.make(_, secrets: vault.scoped(to: "<id>"))
   │
@@ -460,7 +460,7 @@ provider.remove(account)
 
 // Composition root
 let vault = ProviderVault()
-Providers.make(definition, settings: settings, vault: vault)   // binds every saved account
+ProviderFactory.make(definition, settings: settings, vault: vault)   // binds every saved account
 
 // Page
 Text(account.displayName)

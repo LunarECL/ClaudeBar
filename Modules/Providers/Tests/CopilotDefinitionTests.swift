@@ -41,7 +41,7 @@ struct CopilotDefinitionTests {
         settings.setValue(limit, "monthlyLimit", forProvider: "copilot")
         settings.setValue(manual, "manualUsage", forProvider: "copilot")
         settings.setValue(envVar, "authEnvVar", forProvider: "copilot")
-        let definition = try Providers.builtIn("copilot")
+        let definition = try ProviderFactory.builtIn("copilot")
         return Provider(definition: definition, settings: settings, accounts: settings.accounts(forProvider: "copilot"), makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: network,
                              makeTransport: { _, _, _, _ in MockRPCTransport() },
@@ -50,7 +50,7 @@ struct CopilotDefinitionTests {
                                  guard arguments.contains("gh:github.com"), let ghLogin else { return (44, "") }
                                  return (0, "go-keyring-base64:" + Data(ghLogin.utf8).base64EncodedString())
                              },
-                             scripts: Providers.builtInScripts,
+                             scripts: ProviderFactory.builtInScripts,
                              secrets: vault.scoped(to: login), environment: { environment[$0] },
                              homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)

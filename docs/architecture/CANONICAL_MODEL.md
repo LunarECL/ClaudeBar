@@ -78,7 +78,8 @@ connect · Couldn't find the numbers*, *via API*. Those are the words below.
 
 ```text
 Monitor  ◆                                  THE ROOT — what the menu bar is watching. One per app
-├── providers: [Provider]                   the Providers pane's order
+├── providers: Providers  ◆                THE PROVIDERS YOU KEEP — the Providers pane: add a custom
+│                                           one, delete it, their order (TARGET §12, slice 3)
 ├── lineup → [Account]                      DERIVED — the enabled accounts of the enabled providers,
 │                                           in that order: the pills, the menu bar, the notifications
 ├── selection: Provider.ID                  which provider the popover opens on; it shows every enabled
@@ -410,6 +411,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a choice waits for the shell lines, and the plain login never waits; turning off removes the lines and puts every CLI back on its plain login | `NewSessions` |
 | *Switch when low* is off until turned on, moves only below its threshold, only to a ticked login with more left, and never touches a running session; a login worth switching to is told once per low | `SwitchWhenLow` · `InUse.review` |
 | the Monitor knows nothing that follows a refresh: In use, and anything after it, observes through `onRefreshed` | `QuotaMonitor` |
+| one provider per id; the order is the pane's, saved, a provider's logins together; only a provider you made can be deleted — a built-in is turned off. The Monitor never adds, deletes or orders one | `Providers` |
 | a disabled account is paused, not forgotten; a provider whose accounts are all disabled reads as disabled | `Account.isEnabled` |
 | a failed refresh keeps the last usage and records the error beside it — what we saw is never erased by failing to look again | `Account.sync` |
 | at most one refresh per account is in flight | `Provider` |

@@ -61,7 +61,7 @@ struct QuotaDisplaySpec {
             try world.account(email: "user@example.com", organization: "Acme Corp")
             let claude = try world.claude()
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 
@@ -112,7 +112,7 @@ struct QuotaDisplaySpec {
 
             let claude = try world.claude()
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 
@@ -145,7 +145,7 @@ struct QuotaDisplaySpec {
 
             let claude = try world.claude()
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 
@@ -205,16 +205,15 @@ struct QuotaDisplaySpec {
         func `unavailable provider has no snapshot after refresh`() async {
             // Given — CLI not found
             let probe = MockUsageProbe()
-            given(probe).isAvailable().willReturn(false)
 
             let settings = MockProviderSettingsRepository()
             given(settings).isEnabled(forProvider: .any, defaultValue: .any).willReturn(true)
             given(settings).isEnabled(forProvider: .any).willReturn(true)
             given(settings).setEnabled(.any, forProvider: .any).willReturn()
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: probe, settings: settings, available: false)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 
@@ -237,9 +236,9 @@ struct QuotaDisplaySpec {
             given(settings).isEnabled(forProvider: .any).willReturn(true)
             given(settings).setEnabled(.any, forProvider: .any).willReturn()
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: probe, settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 

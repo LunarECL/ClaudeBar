@@ -15,7 +15,7 @@ import Testing
 struct ClaudeCLIDefinitionTests {
 
     private func call(_ kind: String) throws -> CLICall {
-        try call(kind, in: Providers.builtIn("claude"))
+        try call(kind, in: ProviderFactory.builtIn("claude"))
     }
 
     private func call(_ kind: String, in definition: ProviderDefinition) throws -> CLICall {
@@ -430,7 +430,7 @@ struct ClaudeCLIDefinitionTests {
 
     @Test
     func `a configured binary runs in every claude command, with everything else untouched`() throws {
-        let definition = try Providers.builtIn("claude").runningCLI("/opt/tools/bin/claude-work")
+        let definition = try ProviderFactory.builtIn("claude").runningCLI("/opt/tools/bin/claude-work")
 
         #expect(try call("cli", in: definition).cli == "/opt/tools/bin/claude-work")
         #expect(try call("cliCost", in: definition).cli == "/opt/tools/bin/claude-work")
@@ -445,7 +445,7 @@ struct ClaudeCLIDefinitionTests {
 
     @Test
     func `the api data source never runs the binary`() throws {
-        let definition = try Providers.builtIn("claude").runningCLI("/opt/tools/bin/claude-work")
+        let definition = try ProviderFactory.builtIn("claude").runningCLI("/opt/tools/bin/claude-work")
         guard case .http(let request)? = definition.dataSource("api")?.fetch else {
             Issue.record("api is not an HTTP data source")
             throw UsageError.noData
@@ -455,7 +455,7 @@ struct ClaudeCLIDefinitionTests {
 
     @Test
     func `codex's rpc, terminal and sign-in all run the configured binary`() throws {
-        let definition = try Providers.builtIn("codex").runningCLI("/opt/tools/bin/codex-work")
+        let definition = try ProviderFactory.builtIn("codex").runningCLI("/opt/tools/bin/codex-work")
 
         guard case .jsonRpc(let rpc)? = definition.dataSource("rpc")?.fetch,
               case .cli(let tty)? = definition.dataSource("tty")?.fetch else {
@@ -465,19 +465,19 @@ struct ClaudeCLIDefinitionTests {
         #expect(rpc.cli == "/opt/tools/bin/codex-work")
         #expect(tty.cli == "/opt/tools/bin/codex-work")
         #expect(definition.accounts?.signIn?.cli == "/opt/tools/bin/codex-work")
-        #expect(definition.accounts?.signIn?.args == (try Providers.builtIn("codex")).accounts?.signIn?.args)
+        #expect(definition.accounts?.signIn?.args == (try ProviderFactory.builtIn("codex")).accounts?.signIn?.args)
     }
 
     @Test
     func `claude's sign-in runs the configured binary`() throws {
-        let definition = try Providers.builtIn("claude").runningCLI("/opt/tools/bin/claude-work")
+        let definition = try ProviderFactory.builtIn("claude").runningCLI("/opt/tools/bin/claude-work")
 
         #expect(definition.accounts?.signIn?.cli == "/opt/tools/bin/claude-work")
     }
 
     @Test
     func `an empty, blank or unchanged name is a no-op`() throws {
-        let claude = try Providers.builtIn("claude")
+        let claude = try ProviderFactory.builtIn("claude")
         #expect(try claude.runningCLI("") == claude)
         #expect(try claude.runningCLI("   \n ") == claude)
         #expect(try claude.runningCLI("claude") == claude)

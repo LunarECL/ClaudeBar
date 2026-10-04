@@ -38,8 +38,8 @@ struct ThemesSpec {
         func `each provider has unique id and display name`() {
             // Given — all providers
             let settings = Self.makeSettings()
-            let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: MockUsageProbe(), settings: settings)
+            let codex = stubbedLogin("codex", probe: MockUsageProbe(), settings: settings)
 
             // Then — unique identities for theme mapping
             #expect(claude.id == "claude")

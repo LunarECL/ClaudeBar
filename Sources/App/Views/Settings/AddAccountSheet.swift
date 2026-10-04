@@ -109,7 +109,7 @@ struct AddAccountSheet: View {
             }
             HStack {
                 if case .failed = fetch {
-                    Button("Remove") { provider.remove(account); monitor.removeProvider(id: account.id); dismiss() }
+                    Button("Remove") { provider.remove(account); dismiss() }
                     Spacer()
                     Button("Retry") { verify(account) }
                     // Only a login ClaudeBar knows the owner of may stay unchecked.
@@ -203,7 +203,6 @@ struct AddAccountSheet: View {
     }
 
     private func added(_ account: Account) {
-        monitor.addProvider(account)
         verify(account)
     }
 

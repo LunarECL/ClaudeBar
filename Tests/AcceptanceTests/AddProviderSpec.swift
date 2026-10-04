@@ -52,7 +52,7 @@ struct AddProviderSpec {
                                  makeTransport: { _, _, _, _ in MockRPCTransport() }, secrets: vault,
                                  environment: { _ in nil }, homeDirectory: folder, now: { Date() })
             }).defaultAccount
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [openRouter]), clock: ClaudeConfigSpec.TestClock())
+            let monitor = QuotaMonitor(providers: kept([openRouter]), clock: ClaudeConfigSpec.TestClock())
             await monitor.refresh(providerId: openRouter.id)
 
             // Then — "OpenRouter" appears with $12.40 of $50.00, no reset and no percentage of a window

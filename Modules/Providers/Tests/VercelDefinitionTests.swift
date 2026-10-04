@@ -12,7 +12,7 @@ struct VercelDefinitionTests {
     private func make(body: String = #"{"balance":95.50,"total_used":4.50}"#, status: Int = 200,
                       environment: [String: String] = [:], vault: MemoryVault = MemoryVault(["vercel-gateway.apiKey": "personal"]),
                       settings: InMemoryProviderSettings = InMemoryProviderSettings(), replies: [String: String]? = nil) throws -> Provider {
-        let definition = try Providers.builtIn("vercel-gateway")
+        let definition = try ProviderFactory.builtIn("vercel-gateway")
         let network = MockNetworkClient()
         given(network).request(.any).willProduce { @Sendable request in
             guard request.url?.absoluteString == "https://ai-gateway.vercel.sh/v1/credits", request.timeoutInterval == 30,

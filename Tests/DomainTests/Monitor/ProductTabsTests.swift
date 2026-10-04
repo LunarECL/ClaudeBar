@@ -14,10 +14,9 @@ struct ProductTabsTests {
     private func monitor() throws -> (QuotaMonitor, codex: Provider, claude: Provider) {
         let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: temp.appendingPathComponent("settings.json")))
         let work = ProviderAccountConfig(accountId: "work", label: "work", probeConfig: ["codexHome": "/tmp/work", "chatgptAccountId": "work"])
-        let codex = try Providers.make("codex", settings: settings, accounts: [work])
-        let claude = try Providers.make("claude", settings: settings)
-        let lineup: [any AIProvider] = codex.accounts + claude.accounts
-        return (QuotaMonitor(providers: AIProviders(providers: lineup)), codex, claude)
+        let codex = try ProviderFactory.make("codex", settings: settings, accounts: [work])
+        let claude = try ProviderFactory.make("claude", settings: settings)
+        return (QuotaMonitor(providers: kept(codex.accounts + claude.accounts)), codex, claude)
     }
 
     @Test
@@ -56,7 +55,7 @@ struct ProductTabsTests {
     func `moving a product moves its logins together`() throws {
         let (monitor, _, _) = try monitor()
 
-        monitor.moveProduct(id: "claude", by: -1)
+        monitor.providers.move("claude", by: -1)
 
         #expect(monitor.productTabs.map(\.id) == ["claude", "codex"])
         #expect(monitor.allProviders.map(\.id).prefix(1) == ["claude"])

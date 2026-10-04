@@ -65,7 +65,7 @@ struct NotSetUpTests {
 
     @Test
     func `claude says what setting it up takes and where`() throws {
-        let setup = try #require(try Providers.builtIn("claude").setup)
+        let setup = try #require(try ProviderFactory.builtIn("claude").setup)
         #expect(setup.title == "See your session and weekly limits")
         #expect(setup.text.contains("Claude Code"))
         #expect(setup.url == URL(string: "https://claude.ai/code"))
@@ -79,7 +79,7 @@ struct NotSetUpTests {
         #expect(setup == ProviderDefinition.Setup(title: "Install Acme", text: "Acme reads your limits through its CLI.",
                                                   url: URL(string: "https://acme.dev/cli")))
         #expect(setup.button == "Set up")
-        #expect(try Providers.builtIn("grok").setup == nil)
+        #expect(try ProviderFactory.builtIn("grok").setup == nil)
     }
 
     @Test
@@ -97,7 +97,7 @@ struct NotSetUpTests {
     @Test
     func `without a setup in the definition, the notice names the provider and says what failed`() throws {
         let definition = try ProviderDefinition(
-            profile: Providers.builtIn("claude").profile, dataSources: Providers.builtIn("claude").dataSources,
+            profile: ProviderFactory.builtIn("claude").profile, dataSources: ProviderFactory.builtIn("claude").dataSources,
             defaultDataSource: "cli")
         let notice = ProviderDefinition.Setup.fallback(for: definition.profile.name, error: UsageError.cliNotFound("acme"))
 

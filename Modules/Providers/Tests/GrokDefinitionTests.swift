@@ -24,8 +24,8 @@ struct GrokDefinitionTests {
             #expect(request.value(forHTTPHeaderField:"Authorization") == "Bearer fixture-token")
             return (data,HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:nil,headerFields:nil)!)
         }
-        let provider=Provider(definition:try Providers.builtIn("grok"),settings:InMemoryProviderSettings(),makeDataSource:{source,_ in
-            DataSources.make(source,providerId:"grok",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:Providers.builtInScripts,environment:{_ in nil},homeDirectory:root,now:{Date()})
+        let provider=Provider(definition:try ProviderFactory.builtIn("grok"),settings:InMemoryProviderSettings(),makeDataSource:{source,_ in
+            DataSources.make(source,providerId:"grok",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,environment:{_ in nil},homeDirectory:root,now:{Date()})
         })
         return try await provider.defaultAccount.refresh()
     }

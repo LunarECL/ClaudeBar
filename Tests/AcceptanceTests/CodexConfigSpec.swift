@@ -34,7 +34,7 @@ struct CodexConfigSpec {
         network: MockNetworkClient = MockNetworkClient(),
         transport: MockRPCTransport = MockRPCTransport()
     ) throws -> Account {
-        let definition = try Providers.builtIn("codex")
+        let definition = try ProviderFactory.builtIn("codex")
         return Provider(
             definition: definition,
             settings: settings,
@@ -105,7 +105,7 @@ struct CodexConfigSpec {
 
             // When — user switches to API mode
             codex.provider.use("api")
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [codex]), clock: CodexConfigSpec.TestClock())
+            let monitor = QuotaMonitor(providers: kept([codex]), clock: CodexConfigSpec.TestClock())
             await monitor.refresh(providerId: "codex")
 
             // Then — the API's answer (45% left) is shown, not RPC's (80%)

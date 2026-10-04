@@ -26,7 +26,7 @@ struct TogetherTests {
          "defaultDataSource":"quotas"}
         """
         let definition = try ProviderDefinition.parse(Data(json.utf8), origin: .extension)
-        return Providers.make(definition, settings: InMemoryProviderSettings())
+        return ProviderFactory.make(definition, settings: InMemoryProviderSettings())
     }
 
     @Test

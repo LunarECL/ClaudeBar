@@ -79,7 +79,7 @@ struct ExtensionDefinitionTests {
     @Test
     func `the example extension reads the same quotas as before`() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
-        let provider = Providers.make(try read(try example()), settings: InMemoryProviderSettings())
+        let provider = ProviderFactory.make(try read(try example()), settings: InMemoryProviderSettings())
 
         let usage = try await provider.defaultAccount.refresh()
 

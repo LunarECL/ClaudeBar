@@ -17,7 +17,7 @@ An extension is a definition of origin *Extension* ([TARGET_ARCHITECTURE §12](.
    - `dailyUsage`, `metricsRow`, `statusBanner` → skipped and logged.
    - config fields → provider-scope settings (`number` a text with a number pattern, `toggle` an On/Off choice).
 3. `ExtensionSettingsUpgrade` (Infrastructure) moves what was saved before, once: values from `extensions.<id>.<field>`, secrets from UserDefaults into the vault.
-4. `Providers.make` builds it like any custom provider; its logins join the lineup.
+4. `ProviderFactory.make` builds it like any custom provider; its logins join the lineup.
 
 With `together`, every section runs on each refresh; the usage is their union in the manifest's order, a failed one is left out and shows as fetch health, and the refresh fails only when all do.
 

@@ -106,7 +106,6 @@ struct ProviderAccountsCard: View {
         let remaining = settings.menuBarProviderIds.filter { $0 != account.id }
         settings.setMenuBarProviderIds(remaining.isEmpty ? [provider.id] : remaining)
         if monitor.selectedProviderId == account.id { monitor.selectedProviderId = provider.id }
-        monitor.removeProvider(id: account.id)
     }
 }
 

@@ -15,10 +15,10 @@ struct MistralDefinitionTests {
             try FileManager.default.createDirectory(at: home.appendingPathComponent(".vibe/logs/session/session_20260103_101500_abc"),
                                                     withIntermediateDirectories: true)
         }
-        let definition = try Providers.builtIn("mistral")
+        let definition = try ProviderFactory.builtIn("mistral")
         let provider = Provider(definition: definition, settings: InMemoryProviderSettings(), makeDataSource: { source, _ in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: MockNetworkClient(),
-                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: Providers.builtInScripts,
+                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
                              environment: { _ in nil }, homeDirectory: home, now: { Date() })
         })
         return (provider, { try? FileManager.default.removeItem(at: home) })

@@ -26,7 +26,7 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
                                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ DOMAIN — QuotaMonitor (@Observable, single source of truth)          │
-│  AIProviders: the lineup (each login is an AIProvider)               │
+│  holds Providers: the providers you keep, their order, the lineup    │
 │  UsageHistory, SessionMonitor, Notify!, extension providers          │
 └──────────────────────────────┬──────────────────────────────────────┘
                                ▼
@@ -90,13 +90,13 @@ public struct UsageQuota: Sendable, Equatable {
 
 ```swift
 // QuotaMonitor is the single source of truth
-public actor QuotaMonitor {
-    private let providers: AIProviders  // Hidden - use delegation methods
+@MainActor @Observable
+public final class QuotaMonitor {
+    public let providers: Providers        // the providers you keep: add, delete, order, lineup
 
-    // Delegation methods (nonisolated for UI access)
-    public nonisolated var allProviders: [any AIProvider]
-    public nonisolated var enabledProviders: [any AIProvider]
-    public nonisolated func provider(for id: String) -> (any AIProvider)?
+    public var allProviders: [Account]     // every login
+    public var enabledProviders: [Account] // the lineup
+    public func provider(for id: String) -> Account?
 }
 ```
 
@@ -117,7 +117,7 @@ Everything outside the process is a `@Mockable` port, so tests never touch a rea
 @Mockable public protocol PriceCatalog: Sendable { … }       // DataSources, implemented in AWSClients
 
 // Production wiring (ClaudeBarApp):
-Providers.make("bedrock", settings: settingsRepository,
+ProviderFactory.make("bedrock", settings: settingsRepository,
                cloudWatch: AWSClients.makeCloudWatch(), priceCatalog: AWSClients.makePriceCatalog())
 // Tests: DataSources.make(source, providerId:, cliExecutor: MockCLIExecutor(), network: MockNetworkClient(), …)
 ```
@@ -205,7 +205,7 @@ didSet → settingsRepository.setEnabled(false, forProvider: id)
 JSON settings file persists the change
         │
         ▼
-AIProviders.enabled recomputes (filters by isEnabled)
+Providers.lineup recomputes (enabled logins of enabled providers)
         │
         ▼
 SwiftUI observes change → provider hidden from menu

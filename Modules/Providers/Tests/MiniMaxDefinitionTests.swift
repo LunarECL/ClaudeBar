@@ -110,7 +110,7 @@ struct MiniMaxDefinitionTests {
     private func make(body: String = sampleSuccessResponse, status: Int = 200, region: String? = "china",
                       authEnvVar: String? = nil, vault: MemoryVault = MemoryVault(["minimax.apiKey": "personal"]),
                       environment: [String: String] = [:]) throws -> Provider {
-        let definition = try Providers.builtIn("minimax")
+        let definition = try ProviderFactory.builtIn("minimax")
         let network = MockNetworkClient()
         given(network).request(.any).willProduce { @Sendable request in
             let international = request.value(forHTTPHeaderField: "Authorization") == "Bearer work" || region == "international"
@@ -126,7 +126,7 @@ struct MiniMaxDefinitionTests {
         settings.setValue(authEnvVar, "authEnvVar", forProvider: "minimax")
         return Provider(definition: definition, settings: settings, makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: network,
-                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: Providers.builtInScripts,
+                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
                              secrets: vault.scoped(to: login), environment: { environment[$0] },
                              homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)

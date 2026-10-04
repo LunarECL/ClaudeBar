@@ -24,8 +24,8 @@ struct ProductTabsTests {
 
     private func lineup() throws -> (claude: Provider, codex: Provider, all: [any AIProvider]) {
         let settings = settings()
-        let claude = try Providers.make("claude", settings: settings)
-        let codex = try Providers.make("codex", settings: settings, accounts: [login("work"), login("side")])
+        let claude = try ProviderFactory.make("claude", settings: settings)
+        let codex = try ProviderFactory.make("codex", settings: settings, accounts: [login("work"), login("side")])
         return (claude, codex, claude.accounts + codex.accounts)
     }
 
@@ -65,8 +65,9 @@ struct ProductTabsTests {
 
     @Test
     func `the monitor selects by tab position and knows the selected tab`() throws {
-        let (_, codex, all) = try lineup()
-        let monitor = QuotaMonitor(providers: AIProviders(providers: all), clock: SystemClock())
+        let (claude, codex, _) = try lineup()
+        let monitor = QuotaMonitor(providers: Providers([claude, codex], make: { _ in fatalError("no providers added") }),
+                                   clock: SystemClock())
 
         monitor.selectProvider(atPosition: 2)
 

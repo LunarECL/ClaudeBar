@@ -13,7 +13,7 @@ struct DeepSeekDefinitionTests {
     private func make(body: String? = nil, status: Int = 200, vault: MemoryVault = MemoryVault(["deepseek.apiKey": "personal"]),
                       environment: [String: String] = [:], settings: InMemoryProviderSettings = InMemoryProviderSettings(),
                       balancesByKey: [String: String]? = nil) throws -> Provider {
-        let definition = try Providers.builtIn("deepseek")
+        let definition = try ProviderFactory.builtIn("deepseek")
         let network = MockNetworkClient()
         let body = body ?? balance
         given(network).request(.any).willProduce { @Sendable request in
@@ -32,7 +32,7 @@ struct DeepSeekDefinitionTests {
         return Provider(definition: definition, settings: settings, accounts: settings.accounts(forProvider: definition.id),
                         makeDataSource: { source, account in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: network,
-                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: Providers.builtInScripts,
+                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
                              secrets: vault.scoped(to: account), environment: { environment[$0] },
                              homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)

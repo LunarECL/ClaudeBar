@@ -29,7 +29,7 @@ struct CommandCodeDefinitionTests {
     private func make(_ json: String = sampleResponse, whoami: String = #"{"user":{"userName":"alice"},"org":{"id":42}}"#,
                       status: Int = 200, creditsStatus: Int? = nil, networkFailure: Bool = false, acceptedTokens: [String] = ["personal", "work", "file"], vault: MemoryVault = MemoryVault(["commandcode.apiKey":"personal"]),
                       environment: [String:String] = [:], home: URL = FileManager.default.temporaryDirectory) throws -> Provider {
-        let definition = try Providers.builtIn("commandcode")
+        let definition = try ProviderFactory.builtIn("commandcode")
         let first = (try? JSONSerialization.jsonObject(with:Data(whoami.utf8))) as? [String:Any] ?? [:]
         let payload = first["data"] as? [String:Any] ?? first
         let expectedOrg = ((payload["org"] as? [String:Any])?["id"]).map { String(describing:$0) }
@@ -48,7 +48,7 @@ struct CommandCodeDefinitionTests {
         }
         return Provider(definition:definition,settings:InMemoryProviderSettings(),makeDataSource:{source,login in
             DataSources.make(source,providerId:definition.id,cliExecutor:MockCLIExecutor(),network:network,
-                makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:Providers.builtInScripts,secrets:vault.scoped(to:login),
+                makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,secrets:vault.scoped(to:login),
                 environment:{environment[$0]},homeDirectory:home,now:{Date()})
         },vault:vault)
     }

@@ -55,7 +55,7 @@ struct ClaudeDashboardTests {
     func `dashboard opens claude.ai usage settings for other plans and before the first refresh`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        let definition = try Providers.builtIn("claude")
+        let definition = try ProviderFactory.builtIn("claude")
 
         #expect(try claude.provider().dashboardURL == Self.subscriptionUsageURL)
         #expect(definition.profile.links.dashboard(for: .custom("Enterprise")) == Self.subscriptionUsageURL)

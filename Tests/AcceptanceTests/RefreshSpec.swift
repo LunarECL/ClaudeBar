@@ -51,9 +51,9 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: probe, settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 
@@ -84,10 +84,10 @@ struct RefreshSpec {
             given(codexProbe).isAvailable().willReturn(true)
             given(codexProbe).probe().willThrow(UsageError.timeout)
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
+            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claude, codex]),
                 clock: TestClock()
             )
 
@@ -123,9 +123,9 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: probe, settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 
@@ -156,9 +156,9 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: probe, settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 
@@ -238,9 +238,9 @@ struct RefreshSpec {
                 quotas: [UsageQuota(percentRemaining: 42, quotaType: .session, providerId: "claude")],
                 capturedAt: Date()
             ))
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: probe, settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claude]),
                 clock: TestClock()
             )
 
@@ -269,9 +269,9 @@ struct RefreshSpec {
             given(apiProbe).isAvailable().willReturn(true)
             given(apiProbe).probe().willReturn(snapshot)
             _ = cliProbe
-            let claude = StubClaudeProvider(probe: apiProbe, settingsRepository: settings, backgroundRefreshFloor: .seconds(900))
+            let claude = stubbedLogin("claude", probe: apiProbe, settings: settings, backgroundRefreshFloor: .seconds(900))
             let clock = RecordingClock()
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: clock)
+            let monitor = QuotaMonitor(providers: kept([claude]), clock: clock)
 
             // When — background sync runs one tick.
             let stream = monitor.startMonitoring(interval: .seconds(60), providerIds: ["claude"])
@@ -298,12 +298,14 @@ struct RefreshSpec {
                     capturedAt: Date()
                 ),
             ])
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings, backgroundRefreshFloor: .seconds(900))
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: TestClock())
+            // No cache here: Claude's API keeps its usage 15 min, and that is
+            // the data source's own law (ClaudeAPITests), not the Monitor's.
+            let claude = stubbedLogin("claude", probe: probe, settings: settings)
+            let monitor = QuotaMonitor(providers: kept([claude]), clock: TestClock())
 
             // When/Then — two back-to-back user-initiated refreshes both update the
-            // snapshot. The 15-min floor governs only the background loop, never the
-            // interactive path (#204), so neither call is gated.
+            // snapshot. The Monitor's floor governs only the background loop, never
+            // the interactive path (#204), so neither call is gated.
             await monitor.refresh(providerId: "claude")
             #expect(claude.snapshot?.quotas.first?.percentRemaining == 80)
             await monitor.refresh(providerId: "claude")

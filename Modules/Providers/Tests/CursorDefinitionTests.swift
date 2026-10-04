@@ -17,7 +17,7 @@ struct CursorDefinitionTests {
         func get() -> String? { lock.lock(); defer {lock.unlock()}; return value }
     }
     private func make(_ data:Data, token:String, capture:CookieCapture = CookieCapture()) throws -> Account {
-        let definition=try Providers.builtIn("cursor"), vault=MemoryVault(), network=MockNetworkClient()
+        let definition=try ProviderFactory.builtIn("cursor"), vault=MemoryVault(), network=MockNetworkClient()
         given(network).request(.any).willProduce { @Sendable request in
             #expect(request.url?.absoluteString == "https://cursor.com/api/usage-summary")
             #expect(request.httpMethod == "GET" && request.timeoutInterval == 15)
@@ -25,7 +25,7 @@ struct CursorDefinitionTests {
             return (data,HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:nil,headerFields:nil)!)
         }
         let provider=Provider(definition:definition,settings:InMemoryProviderSettings(),makeDataSource:{ source,login in
-            DataSources.make(source,providerId:"cursor",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:Providers.builtInScripts,secrets:vault.scoped(to:login),environment:{_ in nil},homeDirectory:FileManager.default.temporaryDirectory,now:{Date()})
+            DataSources.make(source,providerId:"cursor",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,secrets:vault.scoped(to:login),environment:{_ in nil},homeDirectory:FileManager.default.temporaryDirectory,now:{Date()})
         },vault:vault)
         return try provider.addAccount(filling:["accessToken":token])
     }
@@ -975,10 +975,10 @@ struct CursorDefinitionTests {
             let data=Data("{\"individualUsage\":{\"plan\":{\"enabled\":true,\"limit\":100,\"used\":\(100-remaining)}}}".utf8)
             return (data,HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:nil,headerFields:nil)!)
         }
-        let definition=try Providers.builtIn("cursor")
+        let definition=try ProviderFactory.builtIn("cursor")
         let make: @MainActor () -> Provider = {
             Provider(definition:definition,settings:settings,accounts:settings.accounts(forProvider:"cursor"),makeDataSource:{source,login in
-                DataSources.make(source,providerId:"cursor",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:Providers.builtInScripts,secrets:vault.scoped(to:login),environment:{_ in personal},homeDirectory:root,now:{Date()})
+                DataSources.make(source,providerId:"cursor",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,secrets:vault.scoped(to:login),environment:{_ in personal},homeDirectory:root,now:{Date()})
             },vault:vault)
         }
         let first=make()
@@ -1007,8 +1007,8 @@ struct CursorDefinitionTests {
         given(network).request(.any).willProduce { @Sendable request in
             (Data("{}".utf8),HTTPURLResponse(url:request.url!,statusCode:fixture.0,httpVersion:nil,headerFields:nil)!)
         }
-        let provider=Provider(definition:try Providers.builtIn("cursor"),settings:InMemoryProviderSettings(),makeDataSource:{source,login in
-            DataSources.make(source,providerId:"cursor",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:Providers.builtInScripts,secrets:vault.scoped(to:login),environment:{_ in nil},homeDirectory:FileManager.default.temporaryDirectory,now:{Date()})
+        let provider=Provider(definition:try ProviderFactory.builtIn("cursor"),settings:InMemoryProviderSettings(),makeDataSource:{source,login in
+            DataSources.make(source,providerId:"cursor",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,secrets:vault.scoped(to:login),environment:{_ in nil},homeDirectory:FileManager.default.temporaryDirectory,now:{Date()})
         },vault:vault)
         let account=try provider.addAccount(filling:["accessToken":token("test")])
         await #expect(throws:fixture.1) {try await account.refresh()}
@@ -1019,9 +1019,9 @@ struct CursorDefinitionTests {
         given(network).request(.any).willProduce { @Sendable request in
             (Data("{}".utf8), HTTPURLResponse(url: request.url!, statusCode: 429, httpVersion: nil, headerFields: nil)!)
         }
-        let provider = Provider(definition: try Providers.builtIn("cursor"), settings: InMemoryProviderSettings(), makeDataSource: { source, login in
+        let provider = Provider(definition: try ProviderFactory.builtIn("cursor"), settings: InMemoryProviderSettings(), makeDataSource: { source, login in
             DataSources.make(source, providerId: "cursor", cliExecutor: MockCLIExecutor(), network: network, makeTransport: { _, _, _, _ in MockRPCTransport() },
-                             scripts: Providers.builtInScripts, secrets: vault.scoped(to: login), environment: { _ in nil },
+                             scripts: ProviderFactory.builtInScripts, secrets: vault.scoped(to: login), environment: { _ in nil },
                              homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)
         let account = try provider.addAccount(filling: ["accessToken": token("test")])
@@ -1030,9 +1030,9 @@ struct CursorDefinitionTests {
 
     @Test func `without the Cursor app's database the default login needs signing in, with Cursor's own hint`() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let provider = Provider(definition: try Providers.builtIn("cursor"), settings: InMemoryProviderSettings(), makeDataSource: { source, login in
+        let provider = Provider(definition: try ProviderFactory.builtIn("cursor"), settings: InMemoryProviderSettings(), makeDataSource: { source, login in
             DataSources.make(source, providerId: "cursor", cliExecutor: MockCLIExecutor(), network: MockNetworkClient(), makeTransport: { _, _, _, _ in MockRPCTransport() },
-                             scripts: Providers.builtInScripts, environment: { _ in nil }, homeDirectory: root, now: { Date() })
+                             scripts: ProviderFactory.builtInScripts, environment: { _ in nil }, homeDirectory: root, now: { Date() })
         })
         #expect(await provider.defaultAccount.isAvailable() == false)
         await #expect(throws: UsageError.authenticationRequired) { try await provider.defaultAccount.refresh() }

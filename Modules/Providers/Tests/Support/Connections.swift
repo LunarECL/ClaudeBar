@@ -49,7 +49,7 @@ struct StubbedProvider {
         let cli = self.cli
         let network = self.network
         let home = self.home
-        let definition = try Providers.builtIn(id)
+        let definition = try ProviderFactory.builtIn(id)
         return Provider(
             definition: definition,
             settings: settings,

@@ -10,8 +10,8 @@ import Quotas
 struct GrokExecutionTests {
 
     private func make(home:URL,network:any NetworkClient = MockNetworkClient()) throws -> Account {
-        let provider=Provider(definition:try Providers.builtIn("grok"),settings:InMemoryProviderSettings(),makeDataSource:{source,_ in
-            DataSources.make(source,providerId:"grok",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:Providers.builtInScripts,environment:{_ in nil},homeDirectory:home,now:{Date()})
+        let provider=Provider(definition:try ProviderFactory.builtIn("grok"),settings:InMemoryProviderSettings(),makeDataSource:{source,_ in
+            DataSources.make(source,providerId:"grok",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,environment:{_ in nil},homeDirectory:home,now:{Date()})
         })
         return provider.defaultAccount
     }
@@ -295,10 +295,10 @@ struct GrokExecutionTests {
             let used=token == "Bearer personal-token" ? 10 : 60
             return (Data("{\"creditUsagePercent\":\(used)}".utf8),self.httpResponse(200))
         }
-        let definition=try Providers.builtIn("grok"), settings=InMemoryProviderSettings()
+        let definition=try ProviderFactory.builtIn("grok"), settings=InMemoryProviderSettings()
         let factory: @MainActor () -> Provider = {
             Provider(definition:definition,settings:settings,accounts:settings.accounts(forProvider:"grok"),makeDataSource:{source,_ in
-                DataSources.make(source,providerId:"grok",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:Providers.builtInScripts,environment:{_ in nil},homeDirectory:personal,now:{Date()})
+                DataSources.make(source,providerId:"grok",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,environment:{_ in nil},homeDirectory:personal,now:{Date()})
             })
         }
         let provider=factory()

@@ -55,12 +55,12 @@ struct ProviderEnableDisableSpec {
             let codexProbe = MockUsageProbe()
             // No setup — Codex should never be called
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
+            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claude, codex]),
                 clock: TestClock()
             )
 
@@ -93,10 +93,10 @@ struct ProviderEnableDisableSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
+            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claude, codex]),
                 clock: TestClock()
             )
 
@@ -125,12 +125,12 @@ struct ProviderEnableDisableSpec {
         func `enabling Codex does not change Claude selection`() {
             // Given — Claude selected, Codex disabled
             let settings = ProviderEnableDisableSpec.makeSettings()
-            let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let claude = stubbedLogin("claude", probe: MockUsageProbe(), settings: settings)
+            let codex = stubbedLogin("codex", probe: MockUsageProbe(), settings: settings)
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claude, codex]),
                 clock: TestClock()
             )
             #expect(monitor.selectedProviderId == "claude")

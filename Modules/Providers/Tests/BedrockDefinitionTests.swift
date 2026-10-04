@@ -34,10 +34,10 @@ struct BedrockDefinitionTests {
         settings.setValue(regions, "regions", forProvider: "bedrock")
         settings.setValue(profile, "awsProfile", forProvider: "bedrock")
         settings.setValue(budget, "dailyBudget", forProvider: "bedrock")
-        let definition = try Providers.builtIn("bedrock")
+        let definition = try ProviderFactory.builtIn("bedrock")
         return Provider(definition: definition, settings: settings, makeDataSource: { source, _ in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: MockNetworkClient(),
-                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: Providers.builtInScripts,
+                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
                              environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory,
                              cloudWatch: client, priceCatalog: catalog, now: { Date() })
         })

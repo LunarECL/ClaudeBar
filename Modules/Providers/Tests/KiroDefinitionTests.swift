@@ -10,7 +10,7 @@ import Quotas
 @MainActor @Suite("Kiro definition")
 struct KiroDefinitionTests {
     private func make(_ output: String, located: Bool = true, workHome: String? = nil, now: Date = Date()) throws -> Provider {
-        let definition = try Providers.builtIn("kiro")
+        let definition = try ProviderFactory.builtIn("kiro")
         let cli = MockCLIExecutor()
         given(cli).locate(.any).willReturn(located ? "/usr/local/bin/kiro-cli" : nil)
         given(cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
@@ -36,7 +36,7 @@ struct KiroDefinitionTests {
                 }
                 return cli
             }, network: MockNetworkClient(),
-                makeTransport: { _,_,_,_ in MockRPCTransport() }, security: { _ in (1, "") }, scripts: Providers.builtInScripts, secrets: nil,
+                makeTransport: { _,_,_,_ in MockRPCTransport() }, security: { _ in (1, "") }, scripts: ProviderFactory.builtInScripts, secrets: nil,
                 browserCookies: SystemBrowserCookies(), environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory, now: { now })
         }, paths: DiskPaths())
     }

@@ -74,7 +74,7 @@ struct ClaudeAccountsTests {
 
     @Test
     func `the cli for an added login runs in its folder without the default login's keys`() throws {
-        let sources = try Providers.builtIn("claude").dataSources(forAccount: [
+        let sources = try ProviderFactory.builtIn("claude").dataSources(forAccount: [
             "configDirectory": "/Users/me/claude-work", "loginEmail": "work@example.com", "credentialService": "svc",
         ])
 
@@ -92,7 +92,7 @@ struct ClaudeAccountsTests {
 
     @Test
     func `folder trust is granted in the added login's own config`() throws {
-        let sources = try Providers.builtIn("claude").dataSources(forAccount: [
+        let sources = try ProviderFactory.builtIn("claude").dataSources(forAccount: [
             "configDirectory": "/Users/me/claude-work", "loginEmail": "work@example.com", "credentialService": "svc",
         ])
         let cli = try #require(sources.first { $0.kind == "cli" })
@@ -105,7 +105,7 @@ struct ClaudeAccountsTests {
 
     @Test
     func `the default login is untouched by the accounts block`() throws {
-        let definition = try Providers.builtIn("claude")
+        let definition = try ProviderFactory.builtIn("claude")
         let cli = try #require(definition.dataSource("cli"))
 
         #expect(cli.identity == nil)

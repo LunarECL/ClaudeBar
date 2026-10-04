@@ -53,7 +53,7 @@ struct ClaudeConfigSpec {
 
         @MainActor
         func claude() throws -> Account {
-            let definition = try Providers.builtIn("claude")
+            let definition = try ProviderFactory.builtIn("claude")
             let home = self.home
             let cli = self.cli
             let network = self.network
@@ -67,7 +67,7 @@ struct ClaudeConfigSpec {
                         cliExecutor: cli,
                         network: network,
                         makeTransport: { _, _, _, _ in MockRPCTransport() },
-                        scripts: Providers.builtInScripts,
+                        scripts: ProviderFactory.builtInScripts,
                         environment: { _ in nil },
                         homeDirectory: home,
                         now: { Date() }
@@ -130,7 +130,7 @@ struct ClaudeConfigSpec {
 
             // When — the Claude card saves API mode
             world.settings.setClaudeProbeMode(.api)
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: ClaudeConfigSpec.TestClock())
+            let monitor = QuotaMonitor(providers: kept([claude]), clock: ClaudeConfigSpec.TestClock())
             await monitor.refresh(providerId: "claude")
 
             // Then — the API's answer is shown
@@ -156,7 +156,7 @@ struct ClaudeConfigSpec {
             world.cliAnswers(ClaudeConfigSpec.usageScreen)
             world.settings.setClaudeProbeMode(.api)
             let claude = try world.claude()
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: ClaudeConfigSpec.TestClock())
+            let monitor = QuotaMonitor(providers: kept([claude]), clock: ClaudeConfigSpec.TestClock())
 
             // When
             await monitor.refresh(providerId: "claude")
@@ -189,7 +189,7 @@ struct ClaudeConfigSpec {
             world.apiAnswers(ClaudeConfigSpec.apiUsage)
             try world.loggedIn()
             let claude = try world.claude()
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: ClaudeConfigSpec.TestClock())
+            let monitor = QuotaMonitor(providers: kept([claude]), clock: ClaudeConfigSpec.TestClock())
 
             // When
             await monitor.refresh(providerId: "claude")
@@ -235,7 +235,7 @@ struct ClaudeConfigSpec {
             world.apiAnswers("", status: 401)
             try world.loggedIn()
             let claude = try world.claude()
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: ClaudeConfigSpec.TestClock())
+            let monitor = QuotaMonitor(providers: kept([claude]), clock: ClaudeConfigSpec.TestClock())
 
             // When
             await monitor.refresh(providerId: "claude")

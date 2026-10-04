@@ -12,7 +12,7 @@ import Quotas
 struct AmpDefinitionTests {
 
     private func make(_ output: String, exitCode: Int32 = 0, executionError: UsageError? = nil, located: Bool = true, vault: MemoryVault = MemoryVault()) throws -> Provider {
-        let definition = try Providers.builtIn("ampcode")
+        let definition = try ProviderFactory.builtIn("ampcode")
         let cli = MockCLIExecutor()
         given(cli).locate(.any).willReturn(located ? "/usr/local/bin/amp" : nil)
         given(cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
@@ -26,7 +26,7 @@ struct AmpDefinitionTests {
             }
         return Provider(definition: definition, settings: InMemoryProviderSettings(), makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, cliExecutor: cli, network: MockNetworkClient(),
-                makeTransport: { _,_,_,_ in MockRPCTransport() }, scripts: Providers.builtInScripts,
+                makeTransport: { _,_,_,_ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
                 secrets: vault.scoped(to: login), environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         }, vault: vault)
     }

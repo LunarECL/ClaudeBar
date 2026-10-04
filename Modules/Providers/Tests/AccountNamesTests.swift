@@ -15,7 +15,7 @@ struct AccountNamesTests {
     }
 
     private func codex(_ settings: InMemoryProviderSettings, _ logins: [ProviderAccountConfig] = []) throws -> Provider {
-        try Providers.make("codex", settings: settings, accounts: logins)
+        try ProviderFactory.make("codex", settings: settings, accounts: logins)
     }
 
     // MARK: - Display name

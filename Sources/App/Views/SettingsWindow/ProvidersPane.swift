@@ -201,7 +201,7 @@ private struct ProviderListRow: View {
     private func moveButton(symbol: String, offset: Int, enabled: Bool, label: String) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
-                monitor.moveProduct(id: tab.id, by: offset)
+                monitor.providers.move(tab.id, by: offset)
                 onMove()
             }
         } label: {

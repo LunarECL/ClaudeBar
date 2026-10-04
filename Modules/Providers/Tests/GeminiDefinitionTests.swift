@@ -45,11 +45,11 @@ struct GeminiDefinitionTests {
                 try? Data(#"{"access_token":"fresh","refresh_token":"r"}"#.utf8).write(to: file)
                 return CLIResult(output: "")
             }
-        let definition = try Providers.builtIn("gemini")
+        let definition = try ProviderFactory.builtIn("gemini")
         let provider = Provider(definition: definition, settings: InMemoryProviderSettings(), makeDataSource: { source, _ in
             DataSources.make(source, providerId: definition.id, makeCLIExecutor: { @Sendable call in seen.runs.append(call); return cli },
                              makeCommandExecutor: { _ in cli }, network: network, makeTransport: { _, _, _, _ in MockRPCTransport() },
-                             security: { _ in (1, "") }, scripts: Providers.builtInScripts, secrets: nil, browserCookies: SystemBrowserCookies(),
+                             security: { _ in (1, "") }, scripts: ProviderFactory.builtInScripts, secrets: nil, browserCookies: SystemBrowserCookies(),
                              environment: { _ in nil }, homeDirectory: home, now: { Date(timeIntervalSince1970: 1778420000) })
         })
         return (provider, home)
@@ -136,7 +136,7 @@ struct GeminiDefinitionTests {
     @Test func `an added account is a signed-in Gemini home of its own`() async throws {
         let (provider, _) = try make()
         #expect(provider.accountForm.map(\.id) == ["home"])
-        let definition = try Providers.builtIn("gemini")
+        let definition = try ProviderFactory.builtIn("gemini")
         let source = try #require(try definition.dataSources(forAccount: ["home": "/Users/me/gemini-work"]).first)
         guard case .refreshing(.jsonFile(let file), .cli(let call))? = source.credential else {
             Issue.record("Expected Gemini's login file renewed by its CLI"); return

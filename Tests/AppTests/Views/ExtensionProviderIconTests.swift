@@ -15,7 +15,7 @@ struct ExtensionProviderIconTests {
         {"id":"\(id)","name":"Icon","version":"1"\(iconField),
          "sections":[{"id":"quotas","type":"quotaGrid","probe":{"command":"./probe.sh"}}]}
         """.utf8), folder: FileManager.default.temporaryDirectory)
-        Providers.register(custom: definition)
+        ProviderFactory.register(custom: definition)
     }
 
     @Test
