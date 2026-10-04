@@ -27,6 +27,12 @@ no Swift for a vendor**: no `XxxProvider`, no `XxxUsageProbe`, no
 > local server (`antigravity.json`), cloud metrics priced into money (`bedrock.json`).
 > Their tests are in `Modules/Providers/Tests/`.
 
+**The docs are the source of truth** ([AGENTS.md](../../../AGENTS.md#design-docs-are-the-source-of-truth)).
+A provider that fits the definition language needs no design change. One that needs the
+language to grow — a new case and worker, a new capability (CANONICAL §2.1), a new setting
+kind — is a design change: write it into TARGET_ARCHITECTURE / CANONICAL_MODEL first and ask
+the user to confirm before writing code.
+
 ## The pieces
 
 | Piece | Where | You touch it when |

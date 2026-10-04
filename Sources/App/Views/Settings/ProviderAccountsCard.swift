@@ -132,6 +132,15 @@ private struct AccountRow: View {
             Image(systemName: "line.3.horizontal")
                 .foregroundStyle(theme.textTertiary)
                 .help("Drag to reorder")
+            if account.canBeInUse {
+                Button { newSessions.use(account) } label: {
+                    Image(systemName: account.isInUse ? "largecircle.fill.circle" : "circle")
+                        .foregroundStyle(account.isInUse ? theme.accentPrimary : theme.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .help("Use for new terminal sessions")
+                .accessibilityLabel(account.isInUse ? "In use for new terminal sessions" : "Use for new terminal sessions")
+            }
             Text(String(account.displayName.prefix(1)).uppercased())
                 .font(.caption.bold())
                 .foregroundStyle(.white)
@@ -141,11 +150,6 @@ private struct AccountRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.displayName)
                     .foregroundStyle(account.isEnabled ? theme.textPrimary : theme.textTertiary)
-                if account.isInUse {
-                    Label("In use for new terminal sessions", systemImage: "terminal.fill")
-                        .font(.caption2.bold())
-                        .foregroundStyle(theme.accentPrimary)
-                }
                 if let email = account.accountEmail, email != account.displayName {
                     Text(email).font(.caption).foregroundStyle(theme.textSecondary).textSelection(.enabled)
                 } else if account.isDefault {
@@ -153,6 +157,7 @@ private struct AccountRow: View {
                 }
             }
             Spacer(minLength: 8)
+            if account.isInUse { InUseBadge() }
             if text.needsReauth(account) {
                 Button("Re-auth", action: onReauth)
                     .controlSize(.small)
@@ -165,11 +170,6 @@ private struct AccountRow: View {
             .foregroundStyle(isPinned ? theme.accentPrimary : theme.textTertiary)
             .help(isPinned ? "Shown in the menu bar" : "Show in the menu bar")
             Menu {
-                if account.canBeInUse {
-                    Button("Use for New Terminal Sessions") { newSessions.use(account) }
-                        .disabled(account.isInUse)
-                    Divider()
-                }
                 Button("Rename…", action: onRename)
                 Button(account.isEnabled ? "Pause" : "Resume") { account.isEnabled.toggle() }
                 if !account.isDefault {

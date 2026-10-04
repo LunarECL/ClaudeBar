@@ -52,6 +52,12 @@ A new report is a capability the `Provider` holds and a view reads, as
 > **Reference implementation:** See `references/daily-usage-pattern.md` for the complete
 > DailyUsage feature as a working example of this pattern.
 
+> **Check the design first** — the docs are the source of truth ([AGENTS.md](../../../AGENTS.md#design-docs-are-the-source-of-truth)).
+> Usage history is now data ([TARGET_ARCHITECTURE §10](../../../docs/architecture/TARGET_ARCHITECTURE.md#10--usage-history-as-data)):
+> a report is a range of `account.usageHistory.days(in:)` read by the page, not a
+> `XxxAnalyzer` or a field on the snapshot. Where this skill's steps below disagree with §10,
+> §10 wins; confirm the design with the user before coding.
+
 ## Workflow
 
 ```

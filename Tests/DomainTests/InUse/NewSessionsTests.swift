@@ -139,11 +139,11 @@ struct NewSessionsTests {
     // MARK: - What the strip shows
 
     @Test
-    func `the strip shows the login in use among the logins to choose from`() {
+    func `the strip shows the login in use`() {
         let codex = codex()
         let sessions = NewSessions(products: [codex], shellLines: lines, shell: .zsh)
 
-        #expect(sessions.state(of: codex) == .using(codex.defaultAccount, among: codex.accounts))
+        #expect(sessions.state(of: codex) == .using(codex.defaultAccount))
     }
 
     @Test

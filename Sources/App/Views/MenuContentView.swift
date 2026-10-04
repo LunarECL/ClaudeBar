@@ -595,39 +595,39 @@ struct MenuContentView: View {
                 ForEach(tab.accounts, id: \.id) { account in
                     let hidden = hiddenAccountIds.contains(account.id)
                     let login = account as? Account
-                    Button {
-                        if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
-                    } label: {
-                        HStack(spacing: 4) {
-                            if login?.isInUse == true {
-                                Image(systemName: "terminal.fill")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(theme.accentPrimary)
-                                    .accessibilityLabel("In use for new terminal sessions")
+                    HStack(spacing: 4) {
+                        Button {
+                            if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
+                        } label: {
+                            HStack(spacing: 4) {
+                                if login?.isInUse == true { InUseBadge() }
+                                Text(settings.shown(account.name)).lineLimit(1)
+                                Circle()
+                                    .fill(account.lastError != nil ? theme.textTertiary
+                                          : theme.statusColor(for: monitor.usage(of: account)?.overallStatus(under: settings.statusPolicy) ?? .healthy))
+                                    .frame(width: 6, height: 6)
                             }
-                            Text(settings.shown(account.name)).lineLimit(1)
-                            Circle()
-                                .fill(account.lastError != nil ? theme.textTertiary
-                                      : theme.statusColor(for: monitor.usage(of: account)?.overallStatus(under: settings.statusPolicy) ?? .healthy))
-                                .frame(width: 6, height: 6)
                         }
-                        .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(hidden ? Color.clear : theme.glassBackground))
-                        .overlay(Capsule().stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
-                        .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(hidden ? "Show \(settings.shown(account.name))" : "Hide \(settings.shown(account.name)) from this view")
-                    .contextMenu {
+                        .buttonStyle(.plain)
+                        .help(hidden ? "Show \(settings.shown(account.name))" : "Hide \(settings.shown(account.name)) from this view")
                         if let login, login.canBeInUse {
-                            Button(login.isInUse ? "In Use for New Terminal Sessions" : "Use for New Terminal Sessions") {
-                                newSessions.use(login)
+                            Menu {
+                                Button("Use for New Sessions") { newSessions.use(login) }.disabled(login.isInUse)
+                            } label: {
+                                Image(systemName: "ellipsis").font(.system(size: 10, weight: .bold))
                             }
-                            .disabled(login.isInUse)
+                            .menuStyle(.borderlessButton)
+                            .menuIndicator(.hidden)
+                            .fixedSize()
+                            .accessibilityLabel("\(settings.shown(account.name)) actions")
                         }
                     }
+                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(hidden ? Color.clear : theme.glassBackground))
+                    .overlay(Capsule().stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
+                    .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
                 }
             }
         }

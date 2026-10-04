@@ -30,7 +30,8 @@ struct ClaudeBarApp: App {
         guestPasses: GuestPasses? = nil,
         usageHistory: UsageHistory? = nil,
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
-        loginsInUse: (any LoginsInUse)? = nil
+        // Every product gets the record; `inUse` exists only where its definition declares it.
+        loginsInUse: (any LoginsInUse)? = DiskLoginsInUse()
     ) -> Provider {
         do {
             return try Providers.make(id, settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses,
@@ -116,18 +117,11 @@ struct ClaudeBarApp: App {
             // Guest passes run the same Claude CLI, at its CLI location (#210).
             guestPasses: GuestPasses(source: ClaudeGuestPassSource(
                 claudeBinary: { settingsRepository.cliPath(forProvider: "claude") ?? "claude" }
-            )),
-            // *In use*: which login new `claude` sessions start with.
-            loginsInUse: DiskLoginsInUse()
+            ))
         )
         // Codex is data: Modules/Providers/Resources/Providers/codex.json — the
         // product once, with the logins added beside the default one (#326).
-        let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"),
-                                 loginsInUse: DiskLoginsInUse())
-        let newSessions = NewSessions(products: [claude, codex],
-                                      shellLines: ShellSetup(commands: [claude, codex].compactMap { $0.inUse?.command }),
-                                      announcer: InUseNotifications())
-        self.newSessions = newSessions
+        let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
 
         let vault = ProviderVault()
         // These are data: their keys, regions and environment variables are
@@ -224,10 +218,20 @@ struct ClaudeBarApp: App {
         for definition in ProviderCatalog().custom() {
             Providers.register(custom: definition)
             let custom = Providers.make(definition, settings: settingsRepository,
-                                        accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault)
+                                        accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault,
+                                        loginsInUse: DiskLoginsInUse())
             for account in custom.accounts { repository.add(account) }
         }
         AppLog.providers.info("Created \(repository.all.count) providers")
+
+        // *In use*: every product whose definition declares it — chosen by the
+        // definition, never by a provider's name (CANONICAL §2.1).
+        let products = repository.all.compactMap { ($0 as? Account)?.provider }
+            .reduce(into: [Provider]()) { kept, product in if !kept.contains(where: { $0 === product }) { kept.append(product) } }
+        let newSessions = NewSessions(products: products,
+                                      shellLines: ShellSetup(commands: products.compactMap { $0.inUse?.command }),
+                                      announcer: InUseNotifications())
+        self.newSessions = newSessions
 
         // Initialize the domain service with quota alerter
         // QuotaMonitor automatically validates selected provider on init

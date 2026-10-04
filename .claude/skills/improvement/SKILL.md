@@ -26,6 +26,15 @@ Make improvements to existing functionality using TDD and rich domain design.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
+│  0. CHECK THE DESIGN (docs are the source of truth)          │
+├─────────────────────────────────────────────────────────────┤
+│  • Read CANONICAL_MODEL, TARGET_ARCHITECTURE, design.md      │
+│  • Does the improvement change a law, an owner, a word?      │
+│  • If so: write it into the docs, ask the user to confirm    │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼ (design confirmed, or unchanged)
+┌─────────────────────────────────────────────────────────────┐
 │  1. UNDERSTAND CURRENT STATE                                 │
 ├─────────────────────────────────────────────────────────────┤
 │  • Read existing code                                        │
@@ -51,6 +60,14 @@ Make improvements to existing functionality using TDD and rich domain design.
 │  • All existing tests still pass                             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## Phase 0: Check the design
+
+The design docs are the source of truth ([AGENTS.md](../../../AGENTS.md#design-docs-are-the-source-of-truth)).
+Read [CANONICAL_MODEL.md](../../../docs/architecture/CANONICAL_MODEL.md), [TARGET_ARCHITECTURE.md](../../../docs/architecture/TARGET_ARCHITECTURE.md) and the
+feature's `design.md`. An improvement that only makes the code match the docs needs no
+approval. One that changes a law, its owner, a word the screen prints, or adds a piece is a
+design change: write it into the docs and ask the user to confirm before coding.
 
 ## Types of Improvements
 

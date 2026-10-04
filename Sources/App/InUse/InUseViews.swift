@@ -19,8 +19,8 @@ struct InUseStrip: View {
                 InUseSetupCard()
             case let .worthSwitching(from, to):
                 suggestion(from: from, to: to)
-            case let .using(login, among):
-                line(login, among: among)
+            case let .using(login):
+                line(login)
             }
             if let problem = sessions.problem {
                 Text(problem)
@@ -30,36 +30,14 @@ struct InUseStrip: View {
         }
     }
 
-    /// "New terminal sessions use personal ▾" — the menu that changes it.
-    private func line(_ login: Account, among logins: [Account]) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "terminal")
-            Text("New terminal sessions use")
-            Menu {
-                ForEach(logins, id: \.id) { choice in
-                    Button { sessions.use(choice) } label: {
-                        if choice.isInUse {
-                            Label(settings.shown(choice.displayName), systemImage: "checkmark")
-                        } else {
-                            Text(settings.shown(choice.displayName))
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 2) {
-                    Text(settings.shown(login.displayName)).fontWeight(.bold)
-                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
-                }
-                .foregroundStyle(theme.textPrimary)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            Spacer(minLength: 0)
-        }
-        .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-        .foregroundStyle(theme.textTertiary)
-        .help("Claude Desktop and IDE extensions keep their own login. Sessions already running keep theirs.")
+    /// "New terminal sessions use personal · Desktop & IDE keep their own login".
+    private func line(_ login: Account) -> some View {
+        (Text(Image(systemName: "terminal")) + Text(" New terminal sessions use ")
+            + Text(settings.shown(login.displayName)).bold().foregroundColor(theme.textPrimary)
+            + Text(" · Desktop & IDE keep their own login"))
+            .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+            .foregroundStyle(theme.textTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func suggestion(from: Account, to: Account) -> some View {
@@ -70,7 +48,7 @@ struct InUseStrip: View {
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
-            InUseButton(title: "Use for New Sessions", prominent: true) { sessions.use(to) }
+            InUseButton(title: "Use \(settings.shown(to.displayName))", prominent: true) { sessions.use(to) }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 10).fill(theme.statusWarning.opacity(0.12)))
@@ -143,20 +121,8 @@ struct InUseSettingsSection: View {
         @Bindable var policy = inUse.switchWhenLow
         VStack(alignment: .leading, spacing: 10) {
             Divider()
-            HStack {
-                Image(systemName: "terminal").foregroundStyle(theme.textSecondary)
-                Text("New terminal sessions").font(.subheadline.bold()).foregroundStyle(theme.textPrimary)
-                Spacer()
-                Menu {
-                    ForEach(inUse.logins, id: \.id) { login in
-                        Button(settings.shown(login.displayName)) { sessions.use(login) }.disabled(login.isInUse)
-                    }
-                } label: {
-                    Text(settings.shown(inUse.login.displayName))
-                }
-                .fixedSize()
-            }
-            Text("Which login `\(inUse.command.name)` starts with in your terminal. Sessions already running keep theirs; Claude Desktop and IDE extensions keep their own login.")
+            Text("New terminal sessions").font(.subheadline.bold()).foregroundStyle(theme.textPrimary)
+            Text("The account marked IN USE above is the one `\(inUse.command.name)` starts with in your terminal. Sessions already running keep theirs; Claude Desktop and IDE extensions keep their own login.")
                 .font(.caption).foregroundStyle(theme.textSecondary)
 
             if settingUp || sessions.isWaiting(in: inUse.login.provider) {
@@ -205,6 +171,21 @@ struct InUseSettingsSection: View {
                 }
             }
         }
+    }
+}
+
+/// "IN USE" — on the chip and the Settings row of the login new sessions start with.
+struct InUseBadge: View {
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        Text("IN USE")
+            .font(.system(size: 8, weight: .heavy, design: theme.fontDesign))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1.5)
+            .foregroundStyle(theme.textPrimary)
+            .background(Capsule().fill(theme.statusWarning.opacity(0.35)))
+            .accessibilityLabel("In use for new terminal sessions")
     }
 }
 

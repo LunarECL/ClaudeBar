@@ -65,20 +65,20 @@ public final class NewSessions {
         guard let inUse = product.inUse, inUse.offersChoice else { return nil }
         if isWaiting(in: product) { return .waitingForSetup }
         if let better = inUse.worthSwitchingTo { return .worthSwitching(from: inUse.login, to: better) }
-        return .using(inUse.login, among: inUse.logins)
+        return .using(inUse.login)
     }
 
     public enum State: Equatable {
         case waitingForSetup
         case worthSwitching(from: Account, to: Account)
-        /// The login in use, and the logins to choose from.
-        case using(Account, among: [Account])
+        /// The login in use.
+        case using(Account)
 
         public static func == (lhs: State, rhs: State) -> Bool {
             switch (lhs, rhs) {
             case (.waitingForSetup, .waitingForSetup): true
             case let (.worthSwitching(a, b), .worthSwitching(c, d)): a === c && b === d
-            case let (.using(a, x), .using(b, y)): a === b && x.map(ObjectIdentifier.init) == y.map(ObjectIdentifier.init)
+            case let (.using(a), .using(b)): a === b
             default: false
             }
         }
