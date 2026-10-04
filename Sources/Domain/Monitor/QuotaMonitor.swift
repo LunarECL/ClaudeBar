@@ -185,12 +185,18 @@ public final class QuotaMonitor {
                 currentStatus: newStatus
             )
         }
-        // *In use*: new sessions move when the person asked, else a login
-        // worth moving to is told once.
-        if let login = provider as? Account, login.provider.canChooseInUse,
-           let notice = try? login.provider.reviewInUse() {
-            await alerter?.inUse(InUseAlert(notice, of: login.provider))
+        for observer in refreshObservers {
+            await observer(provider)
         }
+    }
+
+    /// What else reacts to a refreshed login — the Monitor's one extension
+    /// point, so a feature that follows refreshes never edits the Monitor.
+    @ObservationIgnored private var refreshObservers: [@MainActor (any AIProvider) async -> Void] = []
+
+    /// Runs `observer` after every successful refresh of a login.
+    public func onRefreshed(_ observer: @escaping @MainActor (any AIProvider) async -> Void) {
+        refreshObservers.append(observer)
     }
 
     /// Refreshes a single provider by its ID.

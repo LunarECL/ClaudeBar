@@ -42,12 +42,9 @@ public final class Provider {
     private let vault: (any SecretVault)?
     /// Where added logins' folders are made and deleted.
     private let folders: any LoginFolders
-    /// Where *In use* is recorded — `nil` where nothing may choose it.
-    private let loginsInUse: (any LoginsInUse)?
-    /// The login new terminal sessions start with, by lineup id.
-    private var inUseId: String
-    /// The suggestion already told — `<in use>><suggested>` — so a low is told once.
-    @ObservationIgnored private var told: String?
+    /// *In use* — which login new terminal sessions start with; `nil` when
+    /// this product's CLI can't be started on a login's folder.
+    public private(set) var inUse: InUse?
     /// What a path setting asks of this Mac.
     private let paths: any PathChecking
     /// Whether a path is a program the CLI location may point at.
@@ -77,10 +74,6 @@ public final class Provider {
         isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) {
         self.folders = folders
-        self.loginsInUse = loginsInUse
-        self.inUseId = definition.id
-        self.switchesWhenLow = settings.isOn(Self.switchKey, forProvider: definition.id) ?? false
-        self.switchBelow = settings.value(Self.belowKey, forProvider: definition.id).flatMap(Int.init) ?? 10
         self.paths = paths
         self.vault = vault
         self.isExecutable = isExecutable
@@ -110,10 +103,9 @@ public final class Provider {
                                  order.firstIndex(of: rhs.element.accountId) ?? order.count + rhs.offset)
             return left < right
         }.map(\.element)
-        // A record naming a folder no login has is the plain login.
-        if canChooseInUse, let folder = loginsInUse?.folder(for: definition.id),
-           let chosen = self.accounts.first(where: { $0.folder?.url.path == folder.standardizedFileURL.path }) {
-            inUseId = chosen.id
+        if let loginsInUse, let call = definition.accounts?.signIn, definition.accounts?.folder != nil {
+            inUse = InUse(provider: self, command: TerminalCommand(name: call.cli, variable: call.homeVariable, providerId: definition.id),
+                          record: loginsInUse, switchWhenLow: SwitchWhenLow(providerId: definition.id, settings: settings))
         }
     }
 
@@ -319,10 +311,7 @@ public final class Provider {
         for setting in definition.accountSettings {
             vault?.delete(setting.id, provider: account.id)
         }
-        if inUseId == account.id {
-            try? loginsInUse?.use(nil, for: id)
-            inUseId = defaultAccount.id
-        }
+        inUse?.forget(account)
         accounts.removeAll { $0.id == account.id }
         bound[account.id] = nil
         usageHistories[account.id] = nil
@@ -485,142 +474,12 @@ public final class Provider {
         return try await refresh(account, .interactive)
     }
 
-    // MARK: - In use — the login new terminal sessions start with
-
-    /// Whether the person can choose which login new `claude` / `codex`
-    /// sessions start with: the definition names the variable its CLI reads
-    /// its folder from, its added logins are folders, and there is a place to
-    /// record the choice.
-    public var canChooseInUse: Bool {
-        loginsInUse != nil && definition.accounts?.signIn != nil && definition.accounts?.folder != nil
-    }
-
-    /// *In use* — the login new terminal sessions start with; the plain
-    /// login until the person chooses another. Running sessions keep theirs.
-    public var inUse: Account {
-        accounts.first { $0.id == inUseId } ?? defaultAccount
-    }
-
-    /// *Use for new sessions* — records `account`'s folder (nothing for the
-    /// plain login) where the shell reads it. Only this provider's logins,
-    /// and only those that are a folder, can be in use.
-    public func use(_ account: Account) throws {
-        guard canChooseInUse, let loginsInUse else {
-            throw UsageError.executionFailed("\(name) can't choose a login for new sessions.")
-        }
-        guard loginsForNewSessions.contains(where: { $0 === account }) else {
-            throw UsageError.executionFailed("This login can't be used for new \(name) sessions.")
-        }
-        try loginsInUse.use(account.isDefault ? nil : account.folder?.url, for: id)
-        inUseId = account.id
-        AppLog.providers.info("\(id): new sessions use \(account.isDefault ? "the plain login" : "an added login")")
-    }
-
-    /// The logins new sessions can start with: the plain login and every
-    /// login that is a folder.
-    public var loginsForNewSessions: [Account] {
-        canChooseInUse ? accounts.filter { $0.isDefault || $0.folder != nil } : []
-    }
-
-    /// Whether there is a choice to offer: more than one login to start on.
-    public var offersInUse: Bool { loginsForNewSessions.count > 1 }
-
-    /// The command new terminal sessions run and the variable that points it
-    /// at a login's folder — `claude` and `CLAUDE_CONFIG_DIR`.
-    public var terminalCommand: TerminalCommand? {
-        guard canChooseInUse, let call = definition.accounts?.signIn else { return nil }
-        return TerminalCommand(name: call.cli, variable: call.homeVariable, providerId: id)
-    }
-
     /// The login a person or a link names: its id, its account id
     /// (`default` for the plain login), its name or its email — any case.
     public func account(named name: String) -> Account? {
         let wanted = name.lowercased()
         return accounts.first { $0.id.lowercased() == wanted || $0.accountId.lowercased() == wanted }
             ?? accounts.first { $0.displayName.lowercased() == wanted || $0.accountEmail?.lowercased() == wanted }
-    }
-
-    /// The login worth switching to: the one in use is low (critical or
-    /// out), and another enabled login has more left — the most.
-    public var suggestedLogin: Account? {
-        guard canChooseInUse, inUse.status >= .critical, let left = remaining(inUse) else { return nil }
-        return logins(withMoreThan: left, tickedOnly: false).first
-    }
-
-    /// What to tell the person after a refresh: that new sessions moved
-    /// (*Switch when low*), or — once per low — which login is worth moving
-    /// to. `nil` when there is nothing new.
-    public func reviewInUse() throws -> InUseNotice? {
-        let from = inUse
-        if let to = try switchIfLow() {
-            told = nil
-            return .switched(from: from, to: to)
-        }
-        guard let to = suggestedLogin else {
-            told = nil
-            return nil
-        }
-        let pair = "\(from.id)>\(to.id)"
-        guard told != pair else { return nil }
-        told = pair
-        return .worthSwitching(from: from, to: to)
-    }
-
-    // MARK: Switch when low — opt-in
-
-    private static let switchKey = "switchWhenLow"
-    private static let belowKey = "switchWhenLowBelow"
-    private static let skipKey = "switchWhenLowSkip"
-
-    /// *Switch when low* — off until the person turns it on.
-    public var switchesWhenLow: Bool {
-        didSet { settings.setOn(switchesWhenLow, Self.switchKey, forProvider: id) }
-    }
-
-    /// The percentage left below which new sessions move to another login.
-    public var switchBelow: Int {
-        didSet { settings.setValue(String(switchBelow), Self.belowKey, forProvider: id) }
-    }
-
-    /// Whether *Switch when low* may move new sessions to `account` — every
-    /// login until the person unticks it.
-    public func mayPick(_ account: Account) -> Bool {
-        !skipped.contains(account.accountId)
-    }
-
-    public func setMayPick(_ allowed: Bool, _ account: Account) {
-        var skip = skipped
-        if allowed { skip.remove(account.accountId) } else { skip.insert(account.accountId) }
-        settings.setValue(skip.isEmpty ? nil : skip.sorted().joined(separator: ","), Self.skipKey, forProvider: id)
-    }
-
-    /// When *Switch when low* is on and the login in use has less left than
-    /// `switchBelow`, new sessions move to the ticked login with the most
-    /// left. Returns that login, or `nil` when nothing moved.
-    @discardableResult
-    public func switchIfLow() throws -> Account? {
-        guard switchesWhenLow, canChooseInUse, let left = remaining(inUse), left < Double(switchBelow),
-              let next = logins(withMoreThan: left, tickedOnly: true).first else { return nil }
-        try use(next)
-        return next
-    }
-
-    private var skipped: Set<String> {
-        Set((settings.value(Self.skipKey, forProvider: id) ?? "").split(separator: ",").map(String.init))
-    }
-
-    private func remaining(_ account: Account) -> Double? {
-        account.snapshot?.lowestQuota?.percentRemaining
-    }
-
-    /// Other enabled logins that could be in use, with more left than
-    /// `left`, the most first.
-    private func logins(withMoreThan left: Double, tickedOnly: Bool) -> [Account] {
-        accounts
-            .filter { $0 !== inUse && $0.isEnabled && $0.canBeInUse && (!tickedOnly || mayPick($0)) }
-            .compactMap { account in remaining(account).flatMap { $0 > left ? (account, $0) : nil } }
-            .sorted { $0.1 > $1.1 }
-            .map(\.0)
     }
 
     /// More than one enabled login, so each needs telling apart by name.

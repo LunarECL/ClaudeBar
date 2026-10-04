@@ -17,16 +17,19 @@ User guide: [README.md](README.md). Mockup: `design-concept/in-use/index.html`.
 
 **New sessions of a CLI start on the login whose folder is recorded for it; ClaudeBar records it, the shell reads it, and nothing else moves.**
 
+In use is a **capability** ([CANONICAL §2.1](../../architecture/CANONICAL_MODEL.md#21--what-a-provider-owns-what-it-offers-and-what-it-isnt)): declared by `accounts.signIn`, reached as `provider.inUse` (`nil` when not declared), never a flag on `Provider`. Pieces and flows: [TARGET §11](../../architecture/TARGET_ARCHITECTURE.md#11--in-use-as-a-capability).
+
 ```
- popover / Settings / claudebar://use / notification button
-        │ tell
+ views · claudebar://use · notification button          (render and tell — decide nothing)
+        │ newSessions.use(login) / use(providerId:account:)
         ▼
- NewSessions.use(login) ── lines not in the shell? ── waits ──▶ setUp() · setUpByHand() · cancel()
-        │                                                       (ShellLines port → ShellSetup)
+ NewSessions (Domain) ── lines not in the shell? ── waits ──▶ setUp · setUpByHand · cancel · turnOff
+        │                                                    └── ShellLines (port) ← ShellSetup
         ▼
- Account.useForNewSessions() → Provider.use(_) → LoginsInUse.use(folder) → ~/.claudebar/in-use/<provider>
-                                                                                    │ read on every run
- $ claude  ── function in ~/.zshrc ──▶ CLAUDE_CONFIG_DIR=<folder> command claude ◀──┘
+ provider.inUse: InUse (Providers) ── use(login) ──▶ LoginsInUse (port) → ~/.claudebar/in-use/<provider>
+        ▲                                                                          │ read on every run
+ QuotaMonitor.onRefreshed ─▶ newSessions.review ─▶ inUse.review()                 ▼
+        (knows no In use)        └─▶ InUseAnnouncer (port) ← InUseNotifications   $ claude → CLAUDE_CONFIG_DIR=<folder>
 ```
 
 No token is copied: each login keeps its own Keychain item and refresh token. No traffic goes through ClaudeBar.
@@ -35,7 +38,7 @@ No token is copied: each login keeps its own Keychain item and refresh token. No
 
 | Term | Meaning | Not to be confused with |
 |---|---|---|
-| **in use** | the login new terminal sessions of a CLI start with | the *default* login (the plain one the CLI uses on its own), the *selected* chip |
+| **in use** | the login new terminal sessions of a CLI start with | the *default* login (the plain one the CLI uses on its own), the *selected* chip, an *active* account (every login is still fetched) |
 | **new terminal sessions** | the next `claude` / `codex` run from a shell with the lines | running sessions, Claude Desktop, IDE extensions |
 | **the record** | `~/.claudebar/in-use/<provider>`: the folder, or empty for the plain login | settings.json (keeps no copy) |
 | **the shell lines** | the block between `# >>> claudebar in-use >>>` markers, or fish's own file | the user's own aliases and exports |
@@ -44,49 +47,52 @@ No token is copied: each login keeps its own Keychain item and refresh token. No
 ## 2 · The aggregate
 
 ```
-NewSessions (Domain)                        the choice and the lines that make it count
-├── products: [Provider]                    only those that canChooseInUse
-├── shell: LoginShell, isSetUp              the login shell; whether its file has the lines
-├── waiting: Account?                       chosen before the lines existed
-└── ShellLines (port) ← ShellSetup (Infrastructure)
+Provider
+└── inUse: InUse?  ◆                  nil unless accounts.signIn names a folder variable and a record exists
+    ├── login: Account                the plain login until another is chosen
+    ├── logins: [Account]             the plain login + folder logins; offersChoice when > 1
+    ├── command: TerminalCommand ◇    accounts.signIn.cli + homeVariable
+    ├── use(_) · forget(_)            forget is told by Provider.remove
+    ├── worthSwitchingTo: Account?
+    ├── review() → InUseNotice?       switched, or worth switching — told once per low
+    └── switchWhenLow: SwitchWhenLow ◆   isOn · below · mayPick · next(from:among:)
+Account: isInUse · canBeInUse (only when there is a choice) · useForNewSessions() · percentLeft
 
-Provider (Modules/Providers)
-├── canChooseInUse                          definition names accounts.signIn + folder, and a record exists
-├── loginsForNewSessions / offersInUse      the plain login + folder logins; more than one
-├── terminalCommand                         signIn.cli + signIn.homeVariable
-├── inUse / use(_)                          via LoginsInUse (port) ← DiskLoginsInUse
-├── suggestedLogin                          worth switching
-├── switchesWhenLow, switchBelow, mayPick   opt-in; generic per-provider settings
-└── reviewInUse() → InUseNotice?            after a refresh: switched, or worth switching (once)
-
-Account
-└── isInUse · canBeInUse · useForNewSessions()
+NewSessions  ◆  (Domain)             products (those with inUse) · shell · isSetUp · waiting · problem
+├── state(of:) → .waitingForSetup | .worthSwitching(from, to) | .using(login, among:)
+├── use(_) · use(providerId:account:) → .used | .waitingForSetup | .unknown
+├── setUp() · setUpByHand() · cancel() · turnOff()
+├── review(_ refreshed)              registered on QuotaMonitor.onRefreshed
+├── ShellLines (port)  ← ShellSetup (Infrastructure)
+└── InUseAnnouncer (port) ← InUseNotifications (Infrastructure)
 ```
 
 ## 3 · The tells
 
 ```swift
-newSessions.use(login)                   // popover menu, chip, Settings, link, notification
-newSessions.setUp()                      // "Add to ~/.zshrc"
-if product.offersInUse { InUseStrip(provider: product) }
-if login.isInUse { terminal mark }
-let notice = try provider.reviewInUse()  // QuotaMonitor, after each refresh → InUseAlert
+if let state = newSessions.state(of: product) { InUseStrip(state: state) }   // the strip renders a state
+newSessions.use(login)                                                       // chip, menu, Settings, banner
+switch newSessions.use(providerId: id, account: name) { … }                 // claudebar://use
+monitor.onRefreshed { await newSessions.review($0) }                         // the composition root wires it
+if let inUse = provider.inUse, inUse.offersChoice { InUseSettingsSection(inUse: inUse) }
 ```
 
-Views never compare accounts, inspect folders or count logins.
+Views never compare accounts, inspect folders, count logins or read quotas.
 
 ## 4 · Invariants — each law, one owner
 
 | Law | Owner |
 |---|---|
-| The login in use is one of the provider's logins that is a folder, or the plain login; nothing recorded, or a folder no login has, is the plain login | `Provider.inUse` |
+| The login in use is the plain login or a folder login of the same product; nothing recorded, or a folder no login has, is the plain login | `InUse` |
 | Only the folder is recorded, nowhere else | `LoginsInUse` / `DiskLoginsInUse` |
-| Removing the login in use goes back to the plain login | `Provider.remove` |
+| Removing the login in use goes back to the plain login | `InUse.forget`, told by `Provider.remove` |
+| A login worth switching to is told once per low | `InUse.review` |
+| *Switch when low* is off until turned on, moves only below its threshold to a ticked login with more left | `SwitchWhenLow` |
 | A login chosen before the lines exist waits; the plain login never waits | `NewSessions.use` |
 | Turning off removes the lines and puts every CLI back on its plain login | `NewSessions.turnOff` |
+| What the strip shows | `NewSessions.state(of:)` |
 | The lines are written once, replace an alias for the CLI, and removing takes out nothing else | `ShellSetup` |
-| A login worth switching to is told once per low | `Provider.reviewInUse` |
-| *Switch when low* is off until turned on, moves only to ticked logins with more left, and never touches running sessions | `Provider.switchIfLow` |
+| What follows a refresh is never the Monitor's | `QuotaMonitor.onRefreshed` |
 | `claudebar://use` takes exactly `provider` and `account`, each once | `URLSchemeAction` |
 
 Changed by this feature: a folder ClaudeBar made by *Sign in with browser* was "ClaudeBar's, and nothing else uses it". Now the person's terminal may use it, through the record ([multiple accounts](../multi-account/design.md)).

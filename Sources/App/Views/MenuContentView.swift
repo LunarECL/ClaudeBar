@@ -572,8 +572,8 @@ struct MenuContentView: View {
     private func accountsContent(_ tab: ProductTab) -> some View {
         VStack(spacing: 12) {
             accountChips(tab)
-            if let product = tab.provider, product.offersInUse {
-                InUseStrip(provider: product)
+            if let product = tab.provider, let state = newSessions.state(of: product) {
+                InUseStrip(state: state)
             }
             ForEach(tab.accounts.filter { !hiddenAccountIds.contains($0.id) }, id: \.id) { account in
                 providerSection(provider: account)

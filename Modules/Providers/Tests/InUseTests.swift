@@ -11,289 +11,201 @@ import Testing
 @MainActor
 @Suite
 struct InUseTests {
-    // MARK: - Choosing
+    // MARK: - Offered, or not
 
     @Test
-    func `with nothing chosen, new sessions use the plain login`() throws {
-        let (stub, codex, _) = try twoLogins()
+    func `a product whose CLI starts on a login's folder offers In use, the plain login first in use`() throws {
+        let (stub, codex, _) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
 
-        #expect(codex.canChooseInUse)
-        #expect(codex.inUse === codex.defaultAccount)
+        let inUse = try #require(codex.inUse)
+        #expect(inUse.login === codex.defaultAccount)
+        #expect(inUse.command == TerminalCommand(name: "codex", variable: "CODEX_HOME", providerId: "codex"))
     }
 
     @Test
-    func `choosing a login makes it the one in use, and records only its folder`() throws {
-        let (stub, codex, work) = try twoLogins()
-        defer { stub.cleanUp() }
-
-        try codex.use(work)
-
-        #expect(codex.inUse === work)
-        #expect(stub.loginsInUse.folder(for: "codex") == work.folder?.url)
-    }
-
-    @Test
-    func `the login in use is still in use after a relaunch`() throws {
-        let (stub, codex, work) = try twoLogins()
-        defer { stub.cleanUp() }
-        try codex.use(work)
-
-        let again = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
-
-        #expect(again.inUse.accountId == work.accountId)
-    }
-
-    @Test
-    func `choosing the plain login clears the record`() throws {
-        let (stub, codex, work) = try twoLogins()
-        defer { stub.cleanUp() }
-        try codex.use(work)
-
-        try codex.use(codex.defaultAccount)
-
-        #expect(codex.inUse === codex.defaultAccount)
-        #expect(stub.loginsInUse.folder(for: "codex") == nil)
-    }
-
-    @Test
-    func `removing the login in use goes back to the plain login`() throws {
-        let (stub, codex, work) = try twoLogins()
-        defer { stub.cleanUp() }
-        try codex.use(work)
-
-        codex.remove(work)
-
-        #expect(codex.inUse === codex.defaultAccount)
-        #expect(stub.loginsInUse.folder(for: "codex") == nil)
-    }
-
-    @Test
-    func `a record naming a folder no login has is the plain login`() throws {
-        let (stub, _, _) = try twoLogins()
-        defer { stub.cleanUp() }
-        try stub.loginsInUse.use(URL(fileURLWithPath: "/tmp/gone"), for: "codex")
-
-        let codex = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
-
-        #expect(codex.inUse === codex.defaultAccount)
-    }
-
-    @Test
-    func `another provider's login can't be put in use`() throws {
-        let (stub, codex, _) = try twoLogins()
-        defer { stub.cleanUp() }
-        let claudeStub = try StubbedProvider(providerId: "claude")
-        defer { claudeStub.cleanUp() }
-        let claude = try claudeStub.makeProvider("claude")
-
-        #expect(throws: (any Error).self) { try codex.use(claude.defaultAccount) }
-        #expect(codex.inUse === codex.defaultAccount)
-    }
-
-    @Test
-    func `a provider whose CLI has no login folder can't choose`() throws {
+    func `a product whose CLI has no login folder has no In use`() throws {
         let stub = try StubbedProvider(providerId: "gemini")
         defer { stub.cleanUp() }
 
-        #expect(try stub.makeProvider("gemini").canChooseInUse == false)
+        #expect(try stub.makeProvider("gemini").inUse == nil)
     }
 
     @Test
-    func `without a place to record it, nothing can be chosen`() throws {
+    func `without a place to record the choice, there is no In use`() throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
+
         let codex = try Providers.make("codex", settings: stub.settings)
 
-        #expect(codex.canChooseInUse == false)
-        #expect(throws: (any Error).self) { try codex.use(codex.defaultAccount) }
+        #expect(codex.inUse == nil)
+        #expect(throws: (any Error).self) { try codex.defaultAccount.useForNewSessions() }
     }
 
     @Test
-    func `a login is found by its name, its id, or default for the plain login`() throws {
-        let (stub, codex, work) = try twoLogins()
+    func `the logins offered are the plain login and every folder login; one login is no choice`() throws {
+        let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
+        let alone = try StubbedProvider(providerId: "codex")
+        defer { alone.cleanUp() }
 
-        #expect(codex.account(named: "Work") === work)
-        #expect(codex.account(named: "work") === work)
-        #expect(codex.account(named: work.id) === work)
-        #expect(codex.account(named: "default") === codex.defaultAccount)
-        #expect(codex.account(named: "someone") == nil)
+        #expect(codex.inUse?.logins.map(\.id) == [codex.defaultAccount.id, work.id])
+        #expect(codex.inUse?.offersChoice == true)
+        #expect(try alone.makeProvider("codex").inUse?.offersChoice == false)
     }
 
-    // MARK: - What each login can do — the screens only ask these
+    // MARK: - Choosing
 
     @Test
-    func `the login in use says so, and every folder login can be put in use`() throws {
-        let (stub, codex, work) = try twoLogins()
+    func `choosing a login puts it in use, and records only its folder`() throws {
+        let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
 
         try work.useForNewSessions()
 
         #expect(work.isInUse)
         #expect(!codex.defaultAccount.isInUse)
-        #expect(work.canBeInUse && codex.defaultAccount.canBeInUse)
-        #expect(codex.loginsForNewSessions.map(\.id) == [codex.defaultAccount.id, work.id])
-        #expect(codex.offersInUse)
-    }
-
-    @Test
-    func `with one login there is nothing to choose between`() throws {
-        let stub = try StubbedProvider(providerId: "codex")
-        defer { stub.cleanUp() }
-        let codex = try stub.makeProvider("codex")
-
-        #expect(codex.canChooseInUse)
-        #expect(!codex.offersInUse)
-    }
-
-    @Test
-    func `a provider names the command and the variable its new sessions start with`() throws {
-        let (stub, codex, _) = try twoLogins()
-        defer { stub.cleanUp() }
-        let gemini = try StubbedProvider(providerId: "gemini")
-        defer { gemini.cleanUp() }
-
-        #expect(codex.terminalCommand == TerminalCommand(name: "codex", variable: "CODEX_HOME", providerId: "codex"))
-        #expect(try gemini.makeProvider("gemini").terminalCommand == nil)
-    }
-
-    // MARK: - Low: suggest, or switch when the person asked
-
-    @Test
-    func `when the login in use is low, the one with more left is suggested`() async throws {
-        let (stub, codex, work) = try twoLogins()
-        defer { stub.cleanUp() }
-        try await usage(stub, codex, me: 92, work: 15)
-
-        #expect(codex.suggestedLogin === work)
-    }
-
-    @Test
-    func `nothing is suggested while the login in use has room`() async throws {
-        let (stub, codex, _) = try twoLogins()
-        defer { stub.cleanUp() }
-        try await usage(stub, codex, me: 40, work: 10)
-
-        #expect(codex.suggestedLogin == nil)
-    }
-
-    @Test
-    func `nothing is suggested when no other login has more left`() async throws {
-        let (stub, codex, _) = try twoLogins()
-        defer { stub.cleanUp() }
-        try await usage(stub, codex, me: 92, work: 95)
-
-        #expect(codex.suggestedLogin == nil)
-    }
-
-    @Test
-    func `switch when low is off until the person turns it on`() async throws {
-        let (stub, codex, _) = try twoLogins()
-        defer { stub.cleanUp() }
-        try await usage(stub, codex, me: 95, work: 10)
-
-        #expect(codex.switchesWhenLow == false)
-        #expect(try codex.switchIfLow() == nil)
-        #expect(codex.inUse === codex.defaultAccount)
-    }
-
-    @Test
-    func `below the threshold, new sessions move to the ticked login with the most left`() async throws {
-        let (stub, codex, work) = try twoLogins()
-        defer { stub.cleanUp() }
-        codex.switchesWhenLow = true
-        codex.switchBelow = 10
-        try await usage(stub, codex, me: 95, work: 10)
-
-        let moved = try codex.switchIfLow()
-
-        #expect(moved === work)
-        #expect(codex.inUse === work)
         #expect(stub.loginsInUse.folder(for: "codex") == work.folder?.url)
     }
 
     @Test
-    func `above the threshold nothing moves`() async throws {
-        let (stub, codex, _) = try twoLogins()
+    func `the login in use is still in use after a relaunch`() throws {
+        let (stub, _, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
-        codex.switchesWhenLow = true
-        codex.switchBelow = 5
-        try await usage(stub, codex, me: 90, work: 10)
-
-        #expect(try codex.switchIfLow() == nil)
-        #expect(codex.inUse === codex.defaultAccount)
-    }
-
-    @Test
-    func `a login the person didn't tick is never switched to`() async throws {
-        let (stub, codex, work) = try twoLogins()
-        defer { stub.cleanUp() }
-        codex.switchesWhenLow = true
-        codex.setMayPick(false, work)
-        try await usage(stub, codex, me: 95, work: 10)
-
-        #expect(codex.mayPick(work) == false)
-        #expect(try codex.switchIfLow() == nil)
-    }
-
-    @Test
-    func `switch when low and its choices are kept`() throws {
-        let (stub, codex, work) = try twoLogins()
-        defer { stub.cleanUp() }
-        codex.switchesWhenLow = true
-        codex.switchBelow = 20
-        codex.setMayPick(false, work)
+        try work.useForNewSessions()
 
         let again = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
 
-        #expect(again.switchesWhenLow)
-        #expect(again.switchBelow == 20)
-        #expect(again.mayPick(again.accounts[1]) == false)
-        #expect(again.mayPick(again.defaultAccount))
+        #expect(again.inUse?.login.accountId == work.accountId)
     }
 
-    // MARK: - After each refresh: what is worth telling the person
+    @Test
+    func `choosing the plain login clears the record`() throws {
+        let (stub, codex, work) = try InUseFixture.twoLogins()
+        defer { stub.cleanUp() }
+        try work.useForNewSessions()
+
+        try codex.defaultAccount.useForNewSessions()
+
+        #expect(codex.defaultAccount.isInUse)
+        #expect(stub.loginsInUse.folder(for: "codex") == nil)
+    }
+
+    @Test
+    func `removing the login in use goes back to the plain login`() throws {
+        let (stub, codex, work) = try InUseFixture.twoLogins()
+        defer { stub.cleanUp() }
+        try work.useForNewSessions()
+
+        codex.remove(work)
+
+        #expect(codex.inUse?.login === codex.defaultAccount)
+        #expect(stub.loginsInUse.folder(for: "codex") == nil)
+    }
+
+    @Test
+    func `a record naming a folder no login has is the plain login`() throws {
+        let (stub, _, _) = try InUseFixture.twoLogins()
+        defer { stub.cleanUp() }
+        try stub.loginsInUse.use(URL(fileURLWithPath: "/tmp/gone"), for: "codex")
+
+        let codex = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
+
+        #expect(codex.defaultAccount.isInUse)
+    }
+
+    @Test
+    func `another product's login can't be put in use`() throws {
+        let (stub, codex, _) = try InUseFixture.twoLogins()
+        defer { stub.cleanUp() }
+        let claudeStub = try StubbedProvider(providerId: "claude")
+        defer { claudeStub.cleanUp() }
+        let claude = try claudeStub.makeProvider("claude")
+
+        #expect(throws: (any Error).self) { try codex.inUse?.use(claude.defaultAccount) }
+        #expect(codex.defaultAccount.isInUse)
+    }
+
+    @Test
+    func `a login is found by its name, its id, or default for the plain login`() throws {
+        let (stub, codex, work) = try InUseFixture.twoLogins()
+        defer { stub.cleanUp() }
+
+        #expect(codex.account(named: "Work") === work)
+        #expect(codex.account(named: work.id) === work)
+        #expect(codex.account(named: "default") === codex.defaultAccount)
+        #expect(codex.account(named: "someone") == nil)
+    }
+
+    // MARK: - Worth switching
+
+    @Test
+    func `when the login in use is low, the one with more left is worth switching to`() async throws {
+        let (stub, codex, work) = try InUseFixture.twoLogins()
+        defer { stub.cleanUp() }
+        try await InUseFixture.usage(stub, codex, me: 92, work: 15)
+
+        #expect(codex.inUse?.worthSwitchingTo === work)
+    }
+
+    @Test
+    func `nothing is worth switching to while the login in use has room, or no login has more`() async throws {
+        let (stub, codex, _) = try InUseFixture.twoLogins()
+        defer { stub.cleanUp() }
+
+        try await InUseFixture.usage(stub, codex, me: 40, work: 10)
+        #expect(codex.inUse?.worthSwitchingTo == nil)
+
+        try await InUseFixture.usage(stub, codex, me: 92, work: 95)
+        #expect(codex.inUse?.worthSwitchingTo == nil)
+    }
+
+    // MARK: - After each refresh: what is worth telling
 
     @Test
     func `a login worth switching to is told once, not on every refresh`() async throws {
-        let (stub, codex, work) = try twoLogins()
+        let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
-        try await usage(stub, codex, me: 92, work: 15)
+        try await InUseFixture.usage(stub, codex, me: 92, work: 15)
+        let inUse = try #require(codex.inUse)
 
-        #expect(try codex.reviewInUse() == .worthSwitching(from: codex.defaultAccount, to: work))
-        #expect(try codex.reviewInUse() == nil)
+        #expect(try inUse.review() == .worthSwitching(from: codex.defaultAccount, to: work))
+        #expect(try inUse.review() == nil)
     }
 
     @Test
     func `after the login in use recovers, the next low is told again`() async throws {
-        let (stub, codex, work) = try twoLogins()
+        let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
-        try await usage(stub, codex, me: 92, work: 15)
-        _ = try codex.reviewInUse()
+        let inUse = try #require(codex.inUse)
+        try await InUseFixture.usage(stub, codex, me: 92, work: 15)
+        _ = try inUse.review()
 
-        try await usage(stub, codex, me: 30, work: 15)
-        #expect(try codex.reviewInUse() == nil)
-        try await usage(stub, codex, me: 95, work: 15)
+        try await InUseFixture.usage(stub, codex, me: 30, work: 15)
+        #expect(try inUse.review() == nil)
+        try await InUseFixture.usage(stub, codex, me: 95, work: 15)
 
-        #expect(try codex.reviewInUse() == .worthSwitching(from: codex.defaultAccount, to: work))
+        #expect(try inUse.review() == .worthSwitching(from: codex.defaultAccount, to: work))
     }
 
     @Test
     func `with switch when low on, the switch is what is told`() async throws {
-        let (stub, codex, work) = try twoLogins()
+        let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
-        codex.switchesWhenLow = true
-        try await usage(stub, codex, me: 95, work: 15)
+        let inUse = try #require(codex.inUse)
+        inUse.switchWhenLow.isOn = true
+        try await InUseFixture.usage(stub, codex, me: 95, work: 15)
 
-        #expect(try codex.reviewInUse() == .switched(from: codex.defaultAccount, to: work))
-        #expect(codex.inUse === work)
+        #expect(try inUse.review() == .switched(from: codex.defaultAccount, to: work))
+        #expect(work.isInUse)
     }
+}
 
-    // MARK: - Helpers
-
-    /// Codex with the plain login *me* and an added folder login *work*.
-    private func twoLogins() throws -> (StubbedProvider, Provider, Account) {
+/// Codex with the plain login *me* and an added folder login *work*, and
+/// their usage on demand.
+@MainActor
+enum InUseFixture {
+    static func twoLogins() throws -> (StubbedProvider, Provider, Account) {
         let stub = try StubbedProvider(dataSourceKind: "api", providerId: "codex")
         try stub.writeCodexAuth(accountId: "me")
         let folder = stub.home.appendingPathComponent("work", isDirectory: true)
@@ -308,7 +220,7 @@ struct InUseTests {
     }
 
     /// Both logins refreshed with these percentages used.
-    private func usage(_ stub: StubbedProvider, _ codex: Provider, me: Int, work: Int) async throws {
+    static func usage(_ stub: StubbedProvider, _ codex: Provider, me: Int, work: Int) async throws {
         stub.network.reset([.given])
         for (id, used) in [("me", me), ("work", work)] {
             given(stub.network).request(.matching { @Sendable in $0.value(forHTTPHeaderField: "ChatGPT-Account-Id") == id })

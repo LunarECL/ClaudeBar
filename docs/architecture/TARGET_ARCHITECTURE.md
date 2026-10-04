@@ -292,7 +292,10 @@ the rest load.
 `activeDataSource.fetchUsage()` off the main actor: look up the key
 (refreshing it when the lookup says so), fetch, map. On failure the provider
 tries the active data source's `fallback` once. Success replaces `snapshot`
-and clears `lastError`; failure sets `lastError` and **keeps `snapshot`**.
+and clears `lastError`; failure sets `lastError` and **keeps `snapshot`**. After
+a success the Monitor tells its refresh observers (`onRefreshed`) — its one
+extension point, so a feature that follows refreshes (In use, §11) never edits
+the Monitor.
 
 **A 401.** `HTTPFetcher` reports the status; when the lookup is
 `refreshing(_, oauth2)` with `onStatus: [401]`, the data source refreshes once
@@ -979,3 +982,42 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | UH6 ✅ | **Per login**: `accounts.patch.usageHistory`; `account.usageHistory` on every login | an added Claude login shows its own usage history (visible) |
 | GP ✗ | ~~Guest passes as data~~ — dropped: Claude's alone (§10.6) | `ClaudeGuestPassSource` stays Swift, handed in by the App |
 | — | the words: `Day`, `DayLedger`; the typealiases go | with §8 slice 7 |
+
+## 11 · In use as a capability
+
+*Which login does my next terminal session start with?* is a question the
+monitor doesn't answer — every login is still fetched — so it is a
+**capability** (CANONICAL §2.1): declared in the definition, run by its own
+pieces, reached through a handle that is `nil` when not declared. Design and
+laws: [features/in-use/design.md](../features/in-use/design.md).
+
+**Declared as** `accounts.signIn` — the CLI and the variable that points it at
+a folder (`claude` + `CLAUDE_CONFIG_DIR`). No new JSON: a provider whose
+added logins are folders and whose sign-in names that variable has In use.
+
+| Piece | One job | Changes when |
+|---|---|---|
+| `InUse` (`Providers`) | which login new sessions start with: `login`, `logins`, `use`, `worthSwitchingTo`, `review()` | the rule for choosing changes |
+| `SwitchWhenLow` (`Providers`) | the opt-in policy: is it on, below what, which logins it may pick | the policy changes |
+| `LoginsInUse` (port, `Providers`) · `DiskLoginsInUse` | the record: one file per provider, the folder or empty | where the shell reads it changes |
+| `NewSessions` (`Domain`) | a choice waits for the shell lines; set up, by hand, cancel, turn off; the strip's state; `claudebar://use`; reviews each refresh | how a choice reaches the shell changes |
+| `ShellLines` (port, `Domain`) · `ShellSetup` (`Infrastructure`) | the lines per shell, between markers; an alias for the CLI replaced | a shell's syntax changes |
+| `InUseAnnouncer` (port, `Domain`) · `InUseNotifications` (`Infrastructure`) | tell the person: worth switching, or switched — one button, a `claudebar://use` link | the wording or the channel changes |
+| `QuotaMonitor.onRefreshed` | the Monitor's one extension point | never for In use |
+
+**Flows.** *Choose* — a view tells `newSessions.use(login)`; with the lines in
+the shell (or for the plain login) → `inUse.use(login)` → the record; else the
+choice waits and the strip shows the setup. *Set up* — `ShellSetup.install`,
+then the waiting choice. *After a refresh* — `onRefreshed` →
+`newSessions.review(login)` → `inUse.review()` (*Switch when low*, else worth
+switching, once per low) → `InUseAnnouncer`. *A link* —
+`newSessions.use(providerId:account:)` answers `.used`, `.waitingForSetup` or
+`.unknown`; the App only opens the popover for the second.
+
+| A contributor wants… | They change |
+|---|---|
+| In use for another CLI whose logins are folders | its definition's `accounts.signIn` (`homeVariable`) — nothing else |
+| another shell | one case in `LoginShell`, its lines in `ShellSetup`, a test that runs it |
+| another policy than *Switch when low* | a policy beside `SwitchWhenLow` that `InUse.review` asks |
+| In use for API-key providers | an env-variable record and lines — `InUse` and `NewSessions` unchanged |
+

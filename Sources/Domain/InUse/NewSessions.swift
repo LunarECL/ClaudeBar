@@ -34,8 +34,10 @@ public protocol ShellLines: Sendable {
 @MainActor
 @Observable
 public final class NewSessions {
+    /// The products whose new sessions can be chosen — those with `inUse`.
     public let products: [Provider]
     private let shellLines: any ShellLines
+    private let announcer: (any InUseAnnouncer)?
 
     /// The shell the lines are for — the login shell until the person picks another.
     public var shell: LoginShell {
@@ -48,12 +50,42 @@ public final class NewSessions {
     /// What went wrong last, in the person's words.
     public private(set) var problem: String?
 
-    public init(products: [Provider], shellLines: any ShellLines, shell: LoginShell = .login()) {
-        self.products = products.filter(\.canChooseInUse)
+    public init(products: [Provider], shellLines: any ShellLines, announcer: (any InUseAnnouncer)? = nil,
+                shell: LoginShell = .login()) {
+        self.products = products.filter { $0.inUse != nil }
         self.shellLines = shellLines
+        self.announcer = announcer
         self.shell = shell
         self.isSetUp = shellLines.isInstalled(shell)
     }
+
+    /// What a product's strip shows: the setup a choice waits for, the login
+    /// worth moving to, or the login in use. `nil` when there is no choice to offer.
+    public func state(of product: Provider) -> State? {
+        guard let inUse = product.inUse, inUse.offersChoice else { return nil }
+        if isWaiting(in: product) { return .waitingForSetup }
+        if let better = inUse.worthSwitchingTo { return .worthSwitching(from: inUse.login, to: better) }
+        return .using(inUse.login, among: inUse.logins)
+    }
+
+    public enum State: Equatable {
+        case waitingForSetup
+        case worthSwitching(from: Account, to: Account)
+        /// The login in use, and the logins to choose from.
+        case using(Account, among: [Account])
+
+        public static func == (lhs: State, rhs: State) -> Bool {
+            switch (lhs, rhs) {
+            case (.waitingForSetup, .waitingForSetup): true
+            case let (.worthSwitching(a, b), .worthSwitching(c, d)): a === c && b === d
+            case let (.using(a, x), .using(b, y)): a === b && x.map(ObjectIdentifier.init) == y.map(ObjectIdentifier.init)
+            default: false
+            }
+        }
+    }
+
+    /// The commands the lines wrap — `claude`, `codex`.
+    public var commands: [String] { products.compactMap { $0.inUse?.command.name } }
 
     /// The lines as the setup shows them, and the file they go in.
     public var lines: String { shellLines.lines(for: shell) }
@@ -78,6 +110,31 @@ public final class NewSessions {
             return
         }
         apply(account)
+    }
+
+    /// What `claudebar://use?provider=…&account=…` did.
+    public enum LinkOutcome: Equatable {
+        case used
+        case waitingForSetup
+        /// No such product, or no such login that new sessions can start on.
+        case unknown
+    }
+
+    /// `claudebar://use` — the login a link names, by its product's id and its name.
+    public func use(providerId: String, account name: String) -> LinkOutcome {
+        guard let product = product(providerId), let account = product.account(named: name), account.canBeInUse else {
+            return .unknown
+        }
+        use(account)
+        return isWaiting(in: product) ? .waitingForSetup : .used
+    }
+
+    /// After a login's refresh: *Switch when low* moves new sessions, or a
+    /// login worth moving to is announced — once per low.
+    public func review(_ refreshed: any AIProvider) async {
+        guard let login = refreshed as? Account, let inUse = login.provider.inUse,
+              let notice = try? inUse.review() else { return }
+        await announcer?.announce(InUseAlert(notice, of: login.provider))
     }
 
     /// *Add to ~/.zshrc* — writes the lines, then makes the waiting choice.
@@ -110,7 +167,7 @@ public final class NewSessions {
             try shellLines.remove(shell)
             isSetUp = false
             for product in products {
-                try? product.use(product.defaultAccount)
+                try? product.inUse?.use(product.defaultAccount)
             }
         } catch {
             problem = "ClaudeBar couldn't change \(file.path): \(error.localizedDescription)"

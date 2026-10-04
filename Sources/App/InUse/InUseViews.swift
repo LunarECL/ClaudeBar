@@ -3,24 +3,24 @@ import AppKit
 import Domain
 import Providers
 
-/// Under a product's account chips: which login new terminal sessions start
-/// with, as a menu to change it — or the login worth moving to — or, while a
-/// choice waits for the shell lines, the setup. The rules are the domain's
-/// (`NewSessions`, `Provider`, `Account`); this only shows them.
+/// Under a product's account chips: what `NewSessions.state(of:)` says —
+/// the setup a choice waits for, the login worth moving to, or the login in
+/// use as a menu to change it. It renders and tells; it decides nothing.
 struct InUseStrip: View {
-    let provider: Provider
+    let state: NewSessions.State
     @Environment(NewSessions.self) private var sessions
     @Environment(\.appTheme) private var theme
     private var settings: AppSettings { .shared }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if sessions.isWaiting(in: provider) {
+            switch state {
+            case .waitingForSetup:
                 InUseSetupCard()
-            } else if let better = provider.suggestedLogin {
-                suggestion(to: better)
-            } else {
-                line
+            case let .worthSwitching(from, to):
+                suggestion(from: from, to: to)
+            case let .using(login, among):
+                line(login, among: among)
             }
             if let problem = sessions.problem {
                 Text(problem)
@@ -31,23 +31,23 @@ struct InUseStrip: View {
     }
 
     /// "New terminal sessions use personal ▾" — the menu that changes it.
-    private var line: some View {
+    private func line(_ login: Account, among logins: [Account]) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "terminal")
             Text("New terminal sessions use")
             Menu {
-                ForEach(provider.loginsForNewSessions, id: \.id) { login in
-                    Button { sessions.use(login) } label: {
-                        if login.isInUse {
-                            Label(settings.shown(login.displayName), systemImage: "checkmark")
+                ForEach(logins, id: \.id) { choice in
+                    Button { sessions.use(choice) } label: {
+                        if choice.isInUse {
+                            Label(settings.shown(choice.displayName), systemImage: "checkmark")
                         } else {
-                            Text(settings.shown(login.displayName))
+                            Text(settings.shown(choice.displayName))
                         }
                     }
                 }
             } label: {
                 HStack(spacing: 2) {
-                    Text(settings.shown(provider.inUse.displayName)).fontWeight(.bold)
+                    Text(settings.shown(login.displayName)).fontWeight(.bold)
                     Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
                 }
                 .foregroundStyle(theme.textPrimary)
@@ -62,16 +62,15 @@ struct InUseStrip: View {
         .help("Claude Desktop and IDE extensions keep their own login. Sessions already running keep theirs.")
     }
 
-    private func suggestion(to better: Account) -> some View {
-        let left = better.snapshot?.lowestQuota.map { " has \(Int($0.percentRemaining))% left" } ?? " has more left"
-        return HStack(spacing: 8) {
+    private func suggestion(from: Account, to: Account) -> some View {
+        HStack(spacing: 8) {
             Image(systemName: "terminal.fill").foregroundStyle(theme.statusWarning)
-            Text("\(settings.shown(provider.inUse.displayName)) is low — \(settings.shown(better.displayName))\(left)")
+            Text("\(settings.shown(from.displayName)) is low — \(settings.shown(to.displayName)) has \(to.percentLeft.map { "\(Int($0))%" } ?? "more") left")
                 .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
-            InUseButton(title: "Use for New Sessions", prominent: true) { sessions.use(better) }
+            InUseButton(title: "Use for New Sessions", prominent: true) { sessions.use(to) }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 10).fill(theme.statusWarning.opacity(0.12)))
@@ -91,7 +90,7 @@ struct InUseSetupCard: View {
             Text("Let ClaudeBar choose the login?")
                 .font(.system(size: 13, weight: .bold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
-            Text("One time: ClaudeBar adds these lines to your shell. Each time you run \(sessions.products.compactMap(\.terminalCommand?.name).joined(separator: " or ")), they start on the login you chose here. Delete them to turn this off.")
+            Text("One time: ClaudeBar adds these lines to your shell. Each time you run \(sessions.commands.formatted(.list(type: .or))), they start on the login you chose here. Delete them to turn this off.")
                 .font(.system(size: 11, design: theme.fontDesign))
                 .foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -134,13 +133,14 @@ struct InUseSetupCard: View {
 /// Settings → Accounts: which login new terminal sessions use, the shell
 /// lines that make it work, and *Switch when low*.
 struct InUseSettingsSection: View {
-    @Bindable var provider: Provider
+    let inUse: InUse
     @Environment(NewSessions.self) private var sessions
     @Environment(\.appTheme) private var theme
     @State private var settingUp = false
     private var settings: AppSettings { .shared }
 
     var body: some View {
+        @Bindable var policy = inUse.switchWhenLow
         VStack(alignment: .leading, spacing: 10) {
             Divider()
             HStack {
@@ -148,25 +148,25 @@ struct InUseSettingsSection: View {
                 Text("New terminal sessions").font(.subheadline.bold()).foregroundStyle(theme.textPrimary)
                 Spacer()
                 Menu {
-                    ForEach(provider.loginsForNewSessions, id: \.id) { login in
+                    ForEach(inUse.logins, id: \.id) { login in
                         Button(settings.shown(login.displayName)) { sessions.use(login) }.disabled(login.isInUse)
                     }
                 } label: {
-                    Text(settings.shown(provider.inUse.displayName))
+                    Text(settings.shown(inUse.login.displayName))
                 }
                 .fixedSize()
             }
-            Text("Which login `\(provider.terminalCommand?.name ?? provider.id)` starts with in your terminal. Sessions already running keep theirs; Claude Desktop and IDE extensions keep their own login.")
+            Text("Which login `\(inUse.command.name)` starts with in your terminal. Sessions already running keep theirs; Claude Desktop and IDE extensions keep their own login.")
                 .font(.caption).foregroundStyle(theme.textSecondary)
 
-            if sessions.isWaiting(in: provider) || settingUp {
+            if settingUp || sessions.isWaiting(in: inUse.login.provider) {
                 InUseSetupCard()
                     .onChange(of: sessions.isSetUp) { _, done in if done { settingUp = false } }
             } else {
                 HStack(spacing: 6) {
                     Image(systemName: sessions.isSetUp ? "checkmark.circle.fill" : "circle.dashed")
                         .foregroundStyle(sessions.isSetUp ? theme.statusHealthy : theme.textTertiary)
-                    Text(sessions.isSetUp ? "LoginShell set up in \(sessions.file.abbreviatingHome)" : "LoginShell not set up yet")
+                    Text(sessions.isSetUp ? "Shell set up in \(sessions.file.abbreviatingHome)" : "Shell not set up yet")
                         .font(.caption).foregroundStyle(theme.textSecondary)
                     Spacer()
                     if sessions.isSetUp {
@@ -177,7 +177,7 @@ struct InUseSettingsSection: View {
                 }
             }
 
-            Toggle(isOn: $provider.switchesWhenLow) {
+            Toggle(isOn: $policy.isOn) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Switch when low").foregroundStyle(theme.textPrimary)
                     Text("New sessions move to the ticked login with the most left, and ClaudeBar tells you each time.")
@@ -186,19 +186,19 @@ struct InUseSettingsSection: View {
             }
             .toggleStyle(.switch)
 
-            if provider.switchesWhenLow {
+            if policy.isOn {
                 HStack {
                     Text("When the login in use drops below").font(.caption).foregroundStyle(theme.textSecondary)
-                    Picker("", selection: $provider.switchBelow) {
+                    Picker("", selection: $policy.below) {
                         ForEach([5, 10, 20, 30], id: \.self) { Text("\($0)%").tag($0) }
                     }
                     .labelsHidden()
                     .fixedSize()
                 }
-                ForEach(provider.loginsForNewSessions, id: \.id) { login in
+                ForEach(inUse.logins, id: \.id) { login in
                     Toggle(settings.shown(login.displayName), isOn: Binding(
-                        get: { provider.mayPick(login) },
-                        set: { provider.setMayPick($0, login) }
+                        get: { policy.mayPick(login) },
+                        set: { policy.setMayPick($0, login) }
                     ))
                     .toggleStyle(.checkbox)
                     .font(.caption)

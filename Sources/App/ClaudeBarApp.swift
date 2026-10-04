@@ -124,8 +124,10 @@ struct ClaudeBarApp: App {
         // product once, with the logins added beside the default one (#326).
         let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"),
                                  loginsInUse: DiskLoginsInUse())
-        self.newSessions = NewSessions(products: [claude, codex],
-                                       shellLines: ShellSetup(commands: [claude, codex].compactMap(\.terminalCommand)))
+        let newSessions = NewSessions(products: [claude, codex],
+                                      shellLines: ShellSetup(commands: [claude, codex].compactMap { $0.inUse?.command }),
+                                      announcer: InUseNotifications())
+        self.newSessions = newSessions
 
         let vault = ProviderVault()
         // These are data: their keys, regions and environment variables are
@@ -240,6 +242,8 @@ struct ClaudeBarApp: App {
             statusPolicy: { AppSettings.shared.statusPolicy }
         )
         self.monitor = monitor
+        // *In use* follows every refresh: Switch when low, or a login worth moving to.
+        monitor.onRefreshed { refreshed in await newSessions.review(refreshed) }
         AppLog.monitor.info("QuotaMonitor initialized")
 
         let sessionMonitor = SessionMonitor()
@@ -401,14 +405,14 @@ struct ClaudeBarApp: App {
             openWindow(id: "settings")
             NSApp.activate(ignoringOtherApps: true)
         case let .use(providerId, name):
-            guard let account = newSessions.product(providerId)?.account(named: name), account.canBeInUse else {
+            switch newSessions.use(providerId: providerId, account: name) {
+            case .used:
+                break
+            case .unknown:
                 AppLog.ui.info("claudebar://use names no login that can be used for new sessions")
-                return
-            }
-            newSessions.use(account)
-            // The shell lines aren't there yet: the popover shows the setup.
-            if newSessions.isWaiting(in: account.provider) {
-                monitor.selectedProviderId = account.provider.id
+            case .waitingForSetup:
+                // The shell lines aren't there yet: the popover shows the setup.
+                monitor.selectedProviderId = providerId
                 isMenuPresented = true
                 NSApp.activate(ignoringOtherApps: true)
             }

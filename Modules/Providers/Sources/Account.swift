@@ -74,16 +74,29 @@ public final class Account: AIProvider {
         return SignedInFolder(url: URL(fileURLWithPath: path), madeBy: madeBy ?? .folder)
     }
 
+    /// What its tightest quota has left, in percent — `nil` before a usage.
+    public var percentLeft: Double? { snapshot?.lowestQuota?.percentRemaining }
+
     // MARK: - In use
 
-    /// The login new terminal sessions of its provider start with.
-    public var isInUse: Bool { provider.canChooseInUse && provider.inUse === self }
+    /// The login new terminal sessions of its product start with, when its
+    /// product offers a choice of logins.
+    public var isInUse: Bool { canBeInUse && provider.inUse?.login === self }
 
-    /// Whether new terminal sessions can start on it: the plain login, or a folder.
-    public var canBeInUse: Bool { provider.loginsForNewSessions.contains { $0 === self } }
+    /// Whether it can be chosen for new terminal sessions: its product offers
+    /// a choice, and it is one of the logins offered.
+    public var canBeInUse: Bool {
+        guard let inUse = provider.inUse, inUse.offersChoice else { return false }
+        return inUse.logins.contains { $0 === self }
+    }
 
     /// *Use for new sessions*.
-    public func useForNewSessions() throws { try provider.use(self) }
+    public func useForNewSessions() throws {
+        guard let inUse = provider.inUse else {
+            throw UsageError.executionFailed("\(provider.name) can't choose a login for new sessions.")
+        }
+        try inUse.use(self)
+    }
 
     /// The email the data source reported, else the one it was added with.
     public var accountEmail: String? { snapshot?.accountEmail ?? email }

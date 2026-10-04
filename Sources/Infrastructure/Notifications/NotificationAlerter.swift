@@ -74,30 +74,6 @@ public final class NotificationAlerter: QuotaAlerter, @unchecked Sendable {
         }
     }
 
-    // MARK: - In use
-
-    /// The category of *In use* notifications; its button opens the alert's link.
-    public static let inUseCategory = "IN_USE"
-
-    public func inUse(_ alert: InUseAlert) async {
-        let left = { (value: Int?) in value.map { " is at \($0)%" } ?? " is low" }
-        let (title, body, button): (String, String, String) = switch alert.kind {
-        case .worthSwitching:
-            ("\(alert.providerName): \(alert.from)\(left(alert.fromLeft))",
-             "\(alert.to) has \(alert.toLeft.map { "\($0)%" } ?? "more") left. Start new terminal sessions on \(alert.to)?",
-             "Use for New Sessions")
-        case .switched:
-            ("New \(alert.providerName) sessions now use \(alert.to)",
-             "\(alert.from)\(left(alert.fromLeft)). Sessions already running keep their login.",
-             "Undo")
-        }
-        do {
-            try await alertSender.send(title: title, body: body, categoryIdentifier: Self.inUseCategory, button: button, link: alert.link)
-        } catch {
-            AppLog.notifications.error("Failed to send the In use alert: \(error.localizedDescription)")
-        }
-    }
-
     // MARK: - Helpers (internal for testability)
 
     func shouldAlert(for status: QuotaStatus) -> Bool {

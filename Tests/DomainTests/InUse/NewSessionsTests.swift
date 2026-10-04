@@ -136,6 +136,88 @@ struct NewSessionsTests {
         #expect(sessions.isWaiting(in: codex))
     }
 
+    // MARK: - What the strip shows
+
+    @Test
+    func `the strip shows the login in use among the logins to choose from`() {
+        let codex = codex()
+        let sessions = NewSessions(products: [codex], shellLines: lines, shell: .zsh)
+
+        #expect(sessions.state(of: codex) == .using(codex.defaultAccount, among: codex.accounts))
+    }
+
+    @Test
+    func `while a choice waits, the strip shows the setup`() {
+        let codex = codex()
+        let sessions = NewSessions(products: [codex], shellLines: lines, shell: .zsh)
+        sessions.use(codex.accounts[1])
+
+        #expect(sessions.state(of: codex) == .waitingForSetup)
+    }
+
+    @Test
+    func `a product with one login shows nothing`() throws {
+        let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: temp.appendingPathComponent("one.json")))
+        let alone = try Providers.make("codex", settings: settings,
+                                       loginsInUse: DiskLoginsInUse(root: temp.appendingPathComponent("in-use")))
+        let sessions = NewSessions(products: [alone], shellLines: lines, shell: .zsh)
+
+        #expect(sessions.state(of: alone) == nil)
+    }
+
+    @Test
+    func `the commands are the products' own`() {
+        let sessions = NewSessions(products: [codex()], shellLines: lines, shell: .zsh)
+
+        #expect(sessions.commands == ["codex"])
+    }
+
+    // MARK: - claudebar://use
+
+    @Test
+    func `a link names a login by its product and name`() {
+        lines.installed = [.zsh]
+        let codex = codex()
+        let sessions = NewSessions(products: [codex], shellLines: lines, shell: .zsh)
+
+        #expect(sessions.use(providerId: "codex", account: "work") == .used)
+        #expect(codex.accounts[1].isInUse)
+    }
+
+    @Test
+    func `a link before the setup waits for it`() {
+        let codex = codex()
+        let sessions = NewSessions(products: [codex], shellLines: lines, shell: .zsh)
+
+        #expect(sessions.use(providerId: "codex", account: "work") == .waitingForSetup)
+    }
+
+    @Test
+    func `a link to no such product or login does nothing`() {
+        let codex = codex()
+        let sessions = NewSessions(products: [codex], shellLines: lines, shell: .zsh)
+
+        #expect(sessions.use(providerId: "gemini", account: "work") == .unknown)
+        #expect(sessions.use(providerId: "codex", account: "someone") == .unknown)
+        #expect(codex.defaultAccount.isInUse)
+    }
+
+    // MARK: - The alert a notice becomes
+
+    @Test
+    func `a switch's alert links back to where sessions were; a suggestion's links on`() {
+        let codex = codex()
+        let (me, work) = (codex.defaultAccount, codex.accounts[1])
+
+        let switched = InUseAlert(.switched(from: me, to: work), of: codex)
+        let suggested = InUseAlert(.worthSwitching(from: me, to: work), of: codex)
+
+        #expect(switched.kind == .switched && switched.to == "work")
+        #expect(switched.link.absoluteString == "claudebar://use?provider=codex&account=default")
+        #expect(suggested.kind == .worthSwitching)
+        #expect(suggested.link.absoluteString == "claudebar://use?provider=codex&account=work")
+    }
+
     @Test
     func `only products whose new sessions can be chosen are listed`() throws {
         let settings = JSONSettingsRepository(store: JSONSettingsStore(fileURL: temp.appendingPathComponent("s.json")))

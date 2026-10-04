@@ -45,8 +45,8 @@ struct ProviderAccountsCard: View {
                     }
             }
 
-            if provider.offersInUse {
-                InUseSettingsSection(provider: provider)
+            if let inUse = provider.inUse, inUse.offersChoice {
+                InUseSettingsSection(inUse: inUse)
             }
 
             if !text.ways.isEmpty {
@@ -141,7 +141,7 @@ private struct AccountRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.displayName)
                     .foregroundStyle(account.isEnabled ? theme.textPrimary : theme.textTertiary)
-                if account.isInUse, account.provider.offersInUse {
+                if account.isInUse {
                     Label("In use for new terminal sessions", systemImage: "terminal.fill")
                         .font(.caption2.bold())
                         .foregroundStyle(theme.accentPrimary)
@@ -165,7 +165,7 @@ private struct AccountRow: View {
             .foregroundStyle(isPinned ? theme.accentPrimary : theme.textTertiary)
             .help(isPinned ? "Shown in the menu bar" : "Show in the menu bar")
             Menu {
-                if account.canBeInUse, account.provider.offersInUse {
+                if account.canBeInUse {
                     Button("Use for New Terminal Sessions") { newSessions.use(account) }
                         .disabled(account.isInUse)
                     Divider()

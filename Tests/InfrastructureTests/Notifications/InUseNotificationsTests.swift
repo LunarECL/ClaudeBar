@@ -7,7 +7,7 @@ import Domain
 /// *In use* news as a notification: what it says, and the one button that
 /// acts on it through `claudebar://use`.
 @Suite
-struct InUseAlertTests {
+struct InUseNotificationsTests {
     private final class Sent: @unchecked Sendable {
         var title = "", body = "", category = "", button = "", link: URL?
     }
@@ -19,7 +19,7 @@ struct InUseAlertTests {
             .willProduce { title, body, category, button, link in
                 sent.title = title; sent.body = body; sent.category = category; sent.button = button; sent.link = link
             }
-        await NotificationAlerter(alertSender: sender).inUse(alert)
+        await InUseNotifications(alertSender: sender).announce(alert)
         return sent
     }
 
@@ -36,7 +36,7 @@ struct InUseAlertTests {
         #expect(sent.body == "work has 81% left. Start new terminal sessions on work?")
         #expect(sent.button == "Use for New Sessions")
         #expect(sent.link?.absoluteString == "claudebar://use?provider=claude&account=work")
-        #expect(sent.category == NotificationAlerter.inUseCategory)
+        #expect(sent.category == InUseNotifications.category)
     }
 
     @Test
