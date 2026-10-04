@@ -1,10 +1,10 @@
-import Foundation
+import AppKit
 import Observation
 import Domain
 import Infrastructure
 
 /// The leaderboard as the app runs it: the membership, the uploader, and the
-/// hourly timer that keeps the server current. Views read `membership` and
+/// checks that keep the server current. Views read `membership` and
 /// `uploader` directly; this only wires them and reads the public board.
 @MainActor
 @Observable
@@ -17,6 +17,7 @@ final class Leaderboard {
     @ObservationIgnored private let api: any LeaderboardAPI
     @ObservationIgnored private let logs: MonitorTokenLogs
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
 
     init(monitor: QuotaMonitor,
          api: any LeaderboardAPI = LeaderboardHTTPClient(),
@@ -29,10 +30,18 @@ final class Leaderboard {
         uploader = LeaderboardUploader(membership: membership, logs: logs, api: api)
     }
 
-    /// Uploads once soon after launch, then every hour while joined.
+    /// Uploads once soon after launch, then asks every five minutes and on
+    /// wake; the uploader decides whether the hour has passed. A `Timer`'s
+    /// clock stops while the Mac sleeps, so it can't keep the hour itself.
     func start() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.uploader.uploadDue() }
+        }
+        if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
             Task { @MainActor in await self?.uploader.uploadDue() }
         }
         Task { @MainActor [weak self] in
@@ -45,7 +54,13 @@ final class Leaderboard {
     /// rank shows without waiting an hour, and the tab switches at once.
     func join(as username: Username, sharing: Set<String>, sharesCountry: Bool = false, link: ProfileLink? = nil) async throws {
         try await membership.join(as: username, sharing: sharing, sharesCountry: sharesCountry, link: link)
-        Task { await uploader.uploadDue() }
+        Task { await uploader.uploadNow() }
+    }
+
+    /// The popover's Refresh: uploads now, whatever tab is open. Nothing
+    /// happens when not joined.
+    func refresh() async {
+        await uploader.uploadNow()
     }
 
     /// Today's days for `providers`, exactly as an upload would send them —

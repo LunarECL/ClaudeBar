@@ -1087,6 +1087,7 @@ struct MenuContentView: View {
                 // CLI expects it to be picked up, so drop the cached lookups
                 // instead of waiting for their TTL to lapse.
                 BinaryLocator.invalidateCaches()
+                Task { await leaderboard.refresh() }
                 if settings.overviewModeEnabled {
                     Task { await refreshAllEnabled() }
                 } else {
