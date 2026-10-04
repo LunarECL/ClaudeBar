@@ -325,12 +325,13 @@ struct MenuContentView: View {
 
             Spacer()
 
-            // Status Badge: a provider's status, so not shown on the Leaderboard
-            // tab — but its space is kept, so the header doesn't jump on switching.
-            statusBadge
-                .opacity(showsLeaderboard ? 0 : 1)
-                .accessibilityHidden(showsLeaderboard)
-                .allowsHitTesting(!showsLeaderboard)
+            // Status Badge: the provider's status, or on the Leaderboard tab the
+            // leaderboard's own — same pill, so the header never changes height.
+            if showsLeaderboard {
+                leaderboardBadge
+            } else {
+                statusBadge
+            }
         }
         .opacity(animateIn ? 1 : 0)
         .offset(y: animateIn ? 0 : -10)
@@ -370,22 +371,39 @@ struct MenuContentView: View {
 
     private var statusBadge: some View {
         let statusColor = selectedProviderBadge.badgeColor(theme)
-
         // An outlined theme fills the badge with its status colour, inked —
         // syncing and waiting with a light "in progress" colour, never dark.
-        let outlined = theme.isOutlined
         let fill: Color = switch selectedProviderBadge {
         case .syncing, .awaitingData: theme.accentSecondary
         default: statusColor
         }
+        return headerPill(text: statusText, color: statusColor, fill: fill, pulsing: isSelectedProviderSyncing)
+    }
+
+    /// *NOT JOINED · RANKED · UPLOAD FAILED* — the Leaderboard tab's own pill.
+    private var leaderboardBadge: some View {
+        let membership = leaderboard.membership
+        let (text, color): (String, Color) = if !membership.isJoined {
+            ("NOT JOINED", theme.accentSecondary)
+        } else if leaderboard.uploader.lastError != nil {
+            ("UPLOAD FAILED", theme.statusWarning)
+        } else {
+            ("RANKED", theme.statusHealthy)
+        }
+        return headerPill(text: text, color: color, fill: color, pulsing: leaderboard.uploader.isUploading)
+    }
+
+    /// The header's pill, in the theme's way: a pulse dot and a word.
+    private func headerPill(text: String, color statusColor: Color, fill: Color, pulsing: Bool) -> some View {
+        let outlined = theme.isOutlined
         return HStack(spacing: 6) {
             // Animated pulse dot
             PulsingStatusDot(
                 color: outlined ? theme.textOnStatus : statusColor,
-                isSyncing: isSelectedProviderSyncing
+                isSyncing: pulsing
             )
 
-            Text(statusText)
+            Text(text)
                 .font(.system(size: 11, weight: outlined ? .heavy : .medium, design: theme.fontDesign))
                 .foregroundStyle(outlined ? theme.textOnStatus : theme.textPrimary)
         }
