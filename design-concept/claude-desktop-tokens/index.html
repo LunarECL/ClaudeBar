@@ -150,17 +150,38 @@ input[type=radio]{accent-color:var(--violet);width:16px;height:16px;margin-top:2
   </div>
 
   <div class="card">
-    <h3>What the engine learns</h3>
-    <p class="hint" style="margin:0">One general rule in <span class="mono">DataSources</span>: <span class="mono">usageHistory</span> can read a file that holds a single day's total. Claude's definition names the file. No Swift names Claude Desktop.</p>
-    <div class="code"><span class="c">// claude.json → usageHistory</span>
-"dailyTotals": [{
-  "label":  "Claude Desktop",
-  "file":   "~/Library/Application Support/Claude/buddy-tokens.json",
-  "date":   "$.tokens-today.date",
-  "tokens": "$.tokens-today.tokens"
-}]
-<span class="c">// date ≠ today (local) → "Not used yet today"; unreadable → no row; file missing → no row.
-// ClaudeBar saves each day's last value into ~/.claudebar/usage-history/ for "Vs yesterday".</span></div>
+    <h3>The JSON</h3>
+    <p class="hint" style="margin:0">It goes in Claude's existing <span class="mono">usageHistory</span>. Desktop's file reuses the reader <span class="mono">usageHistory</span> already has: <span class="mono">format: json</span> is one record per file, and <span class="mono">tokens.total</span> is for a log that keeps only the sum. Added logins drop it through the patch they already have, because the file belongs to the Mac, not a login. No <span class="mono">prices</span>, so the card shows tokens and no cost.</p>
+    <div class="code"><span class="c">// claude.json</span>
+"usageHistory": {
+  "records": { …Claude Code, unchanged… },
+  "prices": { "file": "claude-prices.json" },
+  "freeWhen": { … },
+  "sessionGap": 1800,
+  "otherApps": [{
+    "label": "Claude Desktop",
+    "records": {
+      "files":  "~/Library/Application Support/Claude/buddy-tokens.json",
+      "format": "json",
+      "at":     { "field": "$.tokens-today.date", "format": "yyyy-MM-dd" },
+      "tokens": { "total": "$.tokens-today.tokens" }
+    }
+  }]
+},
+"accounts": {
+  "patch": {
+    "usageHistory": {
+      "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" },
+      "freeWhen": { … },
+      <b>"otherApps": null</b>   <span class="c">// merge-patch null removes it: the Mac's app shows on the usual login only</span>
+    }
+  }
+}</div>
+    <p class="hint" style="margin:0">Two general rules in <span class="mono">DataSources</span>, neither of which names Claude:</p>
+    <div class="code"><span class="c">// 1. "at" can read a field with a format, like fromPath does. Local time unless "timeZone" says otherwise.
+//    "2026-05-28" is the user's day; ISO8601Instant alone can't read it, so today the record is dropped.
+// 2. An otherApps entry whose files aren't found shows no card. A file dated yesterday is just yesterday's
+//    record, so today reads 0 ("Not used yet today") with no special case.</span></div>
   </div>
 </div>
 
