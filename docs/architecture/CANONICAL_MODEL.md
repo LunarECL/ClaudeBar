@@ -117,6 +117,7 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │                       json(paths, each, used|left, resets) · text(patterns) ·
 │       │       │   │                       script(file) — JavaScript in JavaScriptCore, no I/O,
 │       │       │   │                       for a format no rule can say (a TUI screen)
+│       │       │   │                       · usage — ClaudeBar's own documented output (TARGET §12)
 │       │       │   └── fallback: kind?     the data source to try when this one fails — Codex's
 │       │       │                           RPC falls back to its terminal
 │       │       ├── fetchResponse(for: Account) → Response   "Test Connection" — looks up the key and fetches;

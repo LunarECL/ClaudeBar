@@ -1074,13 +1074,14 @@ CANONICAL §8: *"the same `Provider`, with script fetches"*. The person's
 |---|---|
 | `id`, `name`, `icon` | `profile` (`look.symbol`), origin `extension` |
 | `config` fields | provider-scope `settings` (a `secret` in the vault, as today) |
-| a section's `probe.command` | `Fetch.script(command, timeout)` — run from the extension's folder, settings as `CLAUDEBAR_<ID>` environment variables (the contract the docs promise) |
-| `quotaGrid` · `costUsage` output | `Mapping.json` over the documented keys — rules every definition can use |
-| several sections | one data source per section, run together; the usage is their union, and a failed section is left out (the extension's own law) |
-| `dailyUsage` | the login's **`usageHistory`**, its source a script instead of log files — the same days the *TODAY'S USAGE* and 30-day cards read for every provider |
+| a section's `probe.command` | **`Fetch.script`** — run with `/bin/sh` from the extension's folder, **every** setting as `CLAUDEBAR_<UPPER_SNAKE>` in the environment, secrets read from the vault (a command fetch reaches one key and runs only in the dedicated folder) |
+| `quotaGrid` · `costUsage` output | **`Mapping.usage`** — ClaudeBar's own documented output (`quotas[]` with `type` / `percentRemaining` / `resetsAt`, `costUsage`), which any script provider can print. `Mapping.json` can't take a quota's kind from a field |
+| several sections | one data source per section, and the definition says **`"together": true`**: every data source runs, the usage is their union in definition order, a failed one is left out, and the refresh fails only when all do (the extension's own law). Without it, one data source answers, with its fallback, as today |
+| `dailyUsage` | **retired** with a note — `usageHistory` reads raw records from log files, and this section prints ready-made totals. An extension that wants daily usage writes JSON-lines records a `usageHistory` `files` glob reads, as every provider does |
 | `metricsRow` | **`usage.cost`** and the comparison from `usageHistory` — the cost and daily cards every provider draws. A free-form metric ("Requests: 1,234") has no domain meaning and is **retired** |
 | `healthCheck` | **fetch health**: an `http` data source with no mapping; failing is `account.sync.lastError`, never a quota status (CANONICAL §5) |
-| `statusBanner` | **retired** — free text with no domain meaning; the provider's status page is `profile.links.status` |
+| `statusBanner` | **retired** — free text with no domain meaning (already decoded and dropped today); the provider's status page is `profile.links.status` |
+| `config` fields and their saved values | provider-scope `settings`; on upgrade, once, values move from `extensions.<id>.<field>` and secrets from UserDefaults into the vault (the Keychain). The id stays `ext-<id>`, so its switch and place in the order are kept |
 
 ### 12.3 · Slices — the visible problem first, each green
 
@@ -1113,4 +1114,6 @@ Mockup: `design-concept/settings-by-product/index.html`.
 
 - ~~**The product's switch.**~~ **Answered (2026-10-04): its own setting**, as CANONICAL §1 says (*"off hides every login"*); each login's *Pause* stays its own; the upgrade rule above keeps everyone's setup. Not chosen: a switch that pauses every login, which would also resume logins paused on purpose.
 - ~~**Settings rows lose a login's usage.**~~ **Answered:** the product row shows each login's usage, one meter per login.
-- ~~**Extension sections a definition can't say yet.**~~ **Answered (2026-10-04): they map into the account's own model** — daily usage → `usageHistory` (a script as its source), metrics → `usage.cost` + history, health check → fetch health. Free-form metrics and `statusBanner` have no domain meaning and are **retired**, announced in the release before they go; either can return as a general rule when an issue asks, problem-first. `Usage.extensionMetrics` and `dailyUsageReport` then leave the kernel (CANONICAL §8).
+- ~~**Daily usage from an extension's script.**~~ **Answered (2026-10-04): retired** — `usageHistory` reads raw records, the section prints totals; an extension writes records instead.
+- ~~**The engine additions.**~~ **Answered (2026-10-04):** `Fetch.script`, `Mapping.usage` and `"together": true`, each one case of a closed sum or one field (CANONICAL §2).
+- ~~**Extension sections a definition can't say yet.**~~ **Answered (2026-10-04): they map into the account's own model** — metrics → `usage.cost` + history, health check → fetch health. Free-form metrics and `statusBanner` have no domain meaning and are **retired**, announced in the release before they go; either can return as a general rule when an issue asks, problem-first. `Usage.extensionMetrics` and `dailyUsageReport` then leave the kernel (CANONICAL §8).
