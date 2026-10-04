@@ -316,4 +316,42 @@ struct StatusItemWriteGateTests {
         #expect(recorder.contents == ["A"])
         #expect(scheduler.flushes.isEmpty)
     }
+
+    // MARK: - Immediate writes retire the armed flush
+
+    @Test
+    func `an immediate write retires the pending flush schedule`() {
+        // Given — B is pending, with a flush armed for the 1.0 boundary
+        let clock = FakeClock()
+        let scheduler = FlushScheduler()
+        let recorder = WriteRecorder()
+        let gate = makeGate(clock: clock, scheduler: scheduler, recorder: recorder)
+        gate.submit("A")
+        clock.time = 0.5
+        gate.submit("B")
+
+        // When — a render lands exactly on the boundary and writes at once,
+        // the flush armed for the old window must be retired
+        clock.time = 1.0
+        gate.submit("C")
+        #expect(recorder.contents == ["A", "C"])
+
+        // And a render inside the fresh window defers again
+        clock.time = 1.25
+        gate.submit("D")
+
+        // Then — the retired schedule must not fire, and D waits for a fresh
+        // trailing edge, keeping actual writes at least one second apart.
+        // (Without retirement the stale schedule suppresses the new one and
+        // the old flush writes D at 1.5 — half a second after C.)
+        #expect(scheduler.totalScheduled == 2)
+        clock.time = 1.5
+        scheduler.fireDue(at: clock.time)
+        #expect(recorder.contents == ["A", "C"])
+
+        clock.time = 2.0
+        scheduler.fireDue(at: clock.time)
+        #expect(recorder.contents == ["A", "C", "D"])
+        #expect(recorder.times == [0.0, 1.0, 2.0])
+    }
 }

@@ -51,6 +51,9 @@ final class StatusItemWriteGate<Content: Equatable> {
     /// The latest content held back inside the current window.
     private var pending: Content?
     private var isFlushScheduled = false
+    /// Incremented whenever an armed flush schedule is retired, so a
+    /// late-firing schedule can recognize it is no longer the current one.
+    private var flushGeneration = 0
 
     // Rate counters for the debug log below. Counts only — content values
     // never enter the log (the file log has no privacy redaction).
@@ -83,11 +86,13 @@ final class StatusItemWriteGate<Content: Equatable> {
             windowCoalesced += 1
             guard !isFlushScheduled else { return }
             isFlushScheduled = true
+            let generation = flushGeneration
             schedule(minimumInterval - (currentNow - lastWriteAt)) { [weak self] in
-                self?.flushPending()
+                self?.flushPending(ifStillScheduled: generation)
             }
             return
         }
+        retireFlushSchedule()
         performWrite(content, at: currentNow)
     }
 
@@ -99,6 +104,24 @@ final class StatusItemWriteGate<Content: Equatable> {
         isFlushScheduled = false
         guard let pending else { return }
         performWrite(pending, at: now())
+    }
+
+    /// The scheduled callback's entry point: a no-op unless its schedule is
+    /// still the armed one. A schedule retired by an immediate write must not
+    /// write — its pending content and window are stale, and writing could
+    /// land inside the next write's interval (issue #281 review).
+    private func flushPending(ifStillScheduled generation: Int) {
+        guard generation == flushGeneration else { return }
+        flushPending()
+    }
+
+    /// Invalidates the armed flush schedule, if any. The underlying timer
+    /// cannot be cancelled from here (the scheduler returns no handle), so
+    /// retirement bumps the generation and lets the callback no-op itself.
+    private func retireFlushSchedule() {
+        guard isFlushScheduled else { return }
+        isFlushScheduled = false
+        flushGeneration += 1
     }
 
     /// Replaces the pending content of the currently armed flush without
