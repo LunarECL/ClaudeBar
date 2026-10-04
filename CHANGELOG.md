@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Codex in API mode no longer shows a made-up "$1000 of $1000" API cost when your ChatGPT account has no Codex credits; the card now appears only when you have credits. ([#444](https://github.com/tddworks/ClaudeBar/issues/444))
+
 ### Changed
 - Breaking: the CLI theme's menu bar icon is now an outline terminal that fills in while Claude Code works, in your quota's status colour. It replaces the two terminals shown side by side; nothing to change on your side. Applies with the readout off. ([#445](https://github.com/tddworks/ClaudeBar/pull/445))
 - The Pop theme's cards now match its design: outlined percentages with "left" beside them, striped bars on every card, the reset time in bold beside a pace sticker, a lavender extra-usage card with its budget, and a one-piece Cost / Tokens / Cache picker. ([#452](https://github.com/tddworks/ClaudeBar/pull/452))

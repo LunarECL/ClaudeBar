@@ -282,7 +282,11 @@
             }
           ],
           "cost": {
-            "remaining": ["$header.x-codex-credits-balance", "$.credits.balance"],
+            "when": {
+              "path": "$.credits.has_credits",
+              "equals": true
+            },
+            "remaining":["$header.x-codex-credits-balance", "$.credits.balance"],
             "limit": 1000
           },
           "email": ["$credential.email"]
