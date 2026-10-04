@@ -1032,3 +1032,66 @@ switching, once per low) → `InUseAnnouncer`. *A link* —
 | another policy than *Switch when low* | a policy beside `SwitchWhenLow` that `InUse.review` asks |
 | In use for API-key providers | an env-variable record and lines — `InUse` and `NewSessions` unchanged |
 
+
+## 12 · Retiring `AIProvider`
+
+> **Status: DESIGN, confirmed** (2026-10-04). Not built.
+
+**The problem.** Someone with two Claude logins opens Settings → Providers and
+finds *personal* and *work* listed as two providers. The page is titled
+*personal*, and its *Enabled* toggle pauses that one login while it looks like
+it turns Claude off (#352). The cause is in the code: one protocol stands for a
+product **or** a login, so every screen guesses which it holds. Extensions work,
+and are moved only because they are the last other thing on that protocol.
+
+`AIProvider` is the legacy shape: one protocol for "some provider", from before
+a provider was a definition and a login an `Account`. CANONICAL §1 has no such
+node — `Monitor → providers: [Provider] → accounts: [Account]`, and the lineup
+is `[Account]`. Today only two things conform: `Account` (a shim, whose `name`
+switches between the product's and the login's) and `ExtensionProvider`. Every
+consumer that receives `any AIProvider` has to guess which of product or login
+it holds, and casts to find out.
+
+### 12.1 · What each consumer really means
+
+| Today | Means | Becomes |
+|---|---|---|
+| `QuotaMonitor` · `AIProviderRepository` (`all`, `enabled`, `provider(id:)`) | the products, and the lineup of their logins | `Monitor.providers: [Provider]`; `lineup: [Account]` derived (enabled logins of enabled products) |
+| pills, menu-bar entries, Touch Bar, notch, alerts, `onRefreshed` | **a login** | `Account` |
+| Settings → Providers rows and pages | **a product** | `Provider` — one row per product; its logins in the Accounts card (#352) |
+| `ProductTab` (`provider: Provider?` from its first account) | a product | `Provider` itself |
+| `Account.name` (product or login, by count) | two things | `account.displayName` for the login; `provider.name` for the product; the page decides which to print |
+| `isEnabled` on `AIProvider` | a login's pause *and* a product's toggle | `account.isEnabled` (pause) · `provider.isEnabled` (hide every login — CANONICAL §8, #352) |
+| `RefreshKind`, `refresh(kind)`, `backgroundRefreshFloor` | the lifecycle | `Provider` (already there) |
+
+### 12.2 · Extensions become definitions
+
+CANONICAL §8: *"the same `Provider`, with script fetches"*. The person's
+`~/.claudebar/extensions/<id>/manifest.json` stays theirs and keeps working;
+`ProviderCatalog` reads it as a definition of origin **extension**:
+
+| Manifest | Definition |
+|---|---|
+| `id`, `name`, `icon` | `profile` (`look.symbol`), origin `extension` |
+| `config` fields | provider-scope `settings` (a `secret` in the vault, as today) |
+| a section's `probe.command` | `Fetch.script(command, timeout)` — run from the extension's folder, settings as `CLAUDEBAR_<ID>` environment variables (the contract the docs promise) |
+| `quotaGrid` · `costUsage` output | `Mapping.json` over the documented keys — rules every definition can use |
+| several sections | one data source per section, run together; the usage is their union, and a failed section is left out (the extension's own law) |
+| `dailyUsage` | the login's **`usageHistory`**, its source a script instead of log files — the same days the *TODAY'S USAGE* and 30-day cards read for every provider |
+| `metricsRow` | **`usage.cost`** and the comparison from `usageHistory` — the cost and daily cards every provider draws. A free-form metric ("Requests: 1,234") has no domain meaning and is **retired** |
+| `healthCheck` | **fetch health**: an `http` data source with no mapping; failing is `account.sync.lastError`, never a quota status (CANONICAL §5) |
+| `statusBanner` | **retired** — free text with no domain meaning; the provider's status page is `profile.links.status` |
+
+### 12.3 · Slices — the visible problem first, each green
+
+| # | Slice | Fixes · pins |
+|---|---|---|
+| 1 | **Settings by product (#352)**: Providers rows and pages take a `Provider` (from `ProductTab`); the page is titled *Claude*, its toggle is `provider.isEnabled` (hides every login), its logins are the Accounts card | the visible problem · one row per product; the toggle hides every login and keeps their settings; extensions keep their own row |
+| 2 | `Monitor.providers: [Provider]`, `lineup: [Account]`; `AIProviderRepository` and `AIProviders` go | the cause, in the domain · every Monitor test on definitions over stubbed connections (`StubbedProvider`, shared) |
+| 3 | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
+| 4 | `Fetch.script` + the manifest → definition reader; extensions load as `Provider`s, their sections mapped as 12.2; `ExtensionProvider` goes | the last other conformer · golden tests on `docs/features/extensions/example-provider`; quotas and cost read the same |
+| 5 | Delete `AIProvider` and the test stubs (`StubClaudeProvider` …) | done · the build has no `AIProvider` |
+
+### 12.4 · Decided
+
+- ~~**Extension sections a definition can't say yet.**~~ **Answered (2026-10-04): they map into the account's own model** — daily usage → `usageHistory` (a script as its source), metrics → `usage.cost` + history, health check → fetch health. Free-form metrics and `statusBanner` have no domain meaning and are **retired**, announced in the release before they go; either can return as a general rule when an issue asks, problem-first. `Usage.extensionMetrics` and `dailyUsageReport` then leave the kernel (CANONICAL §8).
