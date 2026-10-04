@@ -251,8 +251,9 @@ Each slice is test-first and green before the next.
 6. ~~**One record list, merged into the login's totals?**~~ No. Desktop's file has
    no model, so the price list would charge it at Sonnet rates and invent a cost,
    and the Claude Code card would no longer mean Claude Code.
-7. **Limits without Claude Code.** The Desktop user's real question is how
+7. **Limits without Claude Code.** A Desktop user's next question is how
    close they are to their limit, and Desktop's token count doesn't answer it.
    Limits need a claude.ai sign-in, which today only Claude Code provides.
    ClaudeBar signing in itself would answer it, if Anthropic allows that
-   outside Claude Code. #198 stays open for it.
+   outside Claude Code. Not part of #198, which asks for the token count; not
+   filed yet.
