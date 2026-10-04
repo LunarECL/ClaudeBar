@@ -11,8 +11,8 @@ import Infrastructure
 final class Leaderboard {
     let membership: LeaderboardMembership
     let uploader: LeaderboardUploader
-    let boardPage = URL(string: "https://claudebar.tddworks.com/leaderboard")!
-    let globePage = URL(string: "https://claudebar.tddworks.com/leaderboard#globe-section")!
+    let boardPage = URL(string: "https://claudebar.tddworks.com/leaderboard/")!
+    let globePage = URL(string: "https://claudebar.tddworks.com/leaderboard/#globe-section")!
 
     @ObservationIgnored private let api: any LeaderboardAPI
     @ObservationIgnored private let logs: MonitorTokenLogs
@@ -62,6 +62,24 @@ final class Leaderboard {
     func globe() async throws -> GlobeSummary {
         try await api.globe(in: BoardView(period: .thirtyDays))
     }
+}
+
+/// Your username as the popover prints it: `@itshan`, or `@i•••` when hidden.
+func leaderboardName(_ username: String, hidden: Bool) -> String {
+    hidden ? "@\(username.prefix(1))•••" : "@\(username)"
+}
+
+/// A two-letter country as people read it, "🇳🇱 Netherlands", or `🌍 ••` when
+/// *hide my globe country* is on.
+func leaderboardCountryLabel(_ code: String, hidden: Bool) -> String {
+    hidden ? "🌍 ••" : leaderboardCountryLabel(code)
+}
+
+/// A two-letter country as people read it: its flag and its name, "🇳🇱 Netherlands".
+func leaderboardCountryLabel(_ code: String) -> String {
+    let flag = String(String.UnicodeScalarView(code.uppercased().unicodeScalars.compactMap { Unicode.Scalar(0x1F1E6 + $0.value - 65) }))
+    let name = Locale.current.localizedString(forRegionCode: code) ?? code
+    return "\(flag) \(name)"
 }
 
 /// This Mac's token logs, from every login whose provider reads usage

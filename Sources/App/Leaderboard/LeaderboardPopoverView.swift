@@ -226,6 +226,7 @@ struct LeaderboardStandingsView: View {
     @State private var top: [Standing] = []
     @State private var error: String?
     @State private var globe: GlobeSummary?
+    @State private var settings = AppSettings.shared
 
     private var view: BoardView { BoardView(period: period, provider: provider) }
     private var membership: LeaderboardMembership { leaderboard.membership }
@@ -286,26 +287,50 @@ struct LeaderboardStandingsView: View {
         }
     }
 
-    /// *🌍 MEMBERS IN N COUNTRIES* — links to the globe on the web board.
+    /// *🌍 MEMBERS IN N COUNTRIES* — links to the globe on the web board; for
+    /// members on it, says so, with the country kept and a way off.
     @ViewBuilder
     private var globeLine: some View {
-        Link(destination: leaderboard.globePage) {
-            HStack(spacing: 6) {
-                Text("🌍")
-                Text(globeText)
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
-                    .foregroundStyle(theme.textSecondary)
-                Spacer(minLength: 4)
-                Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold)).foregroundStyle(theme.textTertiary)
+        HStack(spacing: 6) {
+            Link(destination: leaderboard.globePage) {
+                HStack(spacing: 6) {
+                    Text("🌍")
+                    Text(globeText)
+                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                        .lineLimit(2)
+                    Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold)).foregroundStyle(theme.textTertiary)
+                }
             }
-            .padding(.horizontal, 4)
+            .buttonStyle(.plain)
+            if membership.sharesCountry, mine?.country != nil {
+                PrivacyEyeBadge(isHidden: $settings.hideLeaderboardCountry, what: "your globe country")
+            }
+            Spacer(minLength: 4)
+            if membership.sharesCountry {
+                Button("Turn off") { Task { try? await membership.setSharesCountry(false) } }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .bold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+                    .padding(.horizontal, 9).padding(.vertical, 3)
+                    .overlay(Capsule().stroke(theme.glassBorder, lineWidth: max(1, theme.cardBorderWidth * 0.6)))
+                    .help("Take your country off the globe; the server forgets it at once")
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 4)
     }
 
     private var globeText: String {
-        guard let count = globe?.countries.count, count > 0 else { return "See where ClaudeBar is used" }
-        return count == 1 ? "Members in 1 country · see the globe" : "Members in \(count) countries · see the globe"
+        let count = globe?.countries.count ?? 0
+        let countries = count == 0 ? "See where ClaudeBar is used" : count == 1 ? "Members in 1 country" : "Members in \(count) countries"
+        guard membership.sharesCountry else { return count == 0 ? countries : countries + " · see the globe" }
+        let me = mine?.country.map { "You're on the globe as \(leaderboardCountryLabel($0, hidden: settings.hideLeaderboardCountry))" }
+            ?? "You're on the globe"
+        // Below the threshold your country isn't drawn yet; say why, without saying how many others there are.
+        if let country = mine?.country, globe?.countries.contains(where: { $0.country == country }) == false {
+            return "\(me) · shows once 3 members there opt in"
+        }
+        return count == 0 ? me : "\(me) · \(countries)"
     }
 
     // MARK: Your rank
@@ -316,20 +341,19 @@ struct LeaderboardStandingsView: View {
                 CardLabel(text: (["YOUR RANK", period.label] + [provider.map { leaderboardProviderName($0, in: monitor) }].compactMap { $0 })
                     .joined(separator: " · ").uppercased())
                 Spacer()
-                if mine?.visible == false {
-                    Label("Hidden", systemImage: "eye.slash")
-                        .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
-                        .foregroundStyle(theme.textTertiary)
-                }
             }
             HStack(alignment: .center, spacing: 12) {
                 OutlinedNumber(text: mine?.standing.map { "#\($0.rank)" } ?? "–", size: 42, color: theme.accentPrimary)
                     .accessibilityLabel(mine?.standing.map { "Rank \($0.rank)" } ?? "Not ranked yet")
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(membership.username?.description ?? "")
-                        .font(.system(size: 15, weight: .bold, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(membership.username.map { leaderboardName($0.value, hidden: settings.hideLeaderboardName) } ?? "")
+                            .font(.system(size: 15, weight: .bold, design: theme.fontDesign))
+                            .foregroundStyle(theme.textPrimary)
+                            .lineLimit(1)
+                        // Like every eye in the popover: masks the text beside it on screen.
+                        PrivacyEyeBadge(isHidden: $settings.hideLeaderboardName, what: "your username")
+                    }
                     Text("\(Self.tokens(mine?.standing?.total ?? 0)) tokens")
                         .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
                         .foregroundStyle(theme.textSecondary)
@@ -364,7 +388,8 @@ struct LeaderboardStandingsView: View {
 
     private var boardCard: some View {
         LeaderboardBoardCard(
-            top: top, mine: mine?.standing, myUsername: membership.username?.value, error: error,
+            top: top, mine: mine?.standing, myUsername: membership.username?.value,
+            hidesMyName: settings.hideLeaderboardName, error: error,
             period: $period, provider: $provider,
             sharedProviders: membership.sharing.sorted().map { ($0, leaderboardProviderName($0, in: monitor)) })
     }

@@ -38,7 +38,7 @@ Quota-only providers (Gemini, Copilot, Cursor and the rest) report percentages, 
 3. Tick the providers to share, and open **Exactly what gets uploaded** if you want to check.
 4. Press **Join leaderboard**. Your last 30 days are uploaded straight away.
 
-The tab then shows your rank and your provider mix, the board (up to the top 100, scrolling inside its card), and when the last upload went. Switch between **Today**, **7 days** and **30 days**, or one provider. **Full board** opens the public page at [claudebar.tddworks.com/leaderboard](https://claudebar.tddworks.com/leaderboard).
+The tab then shows your rank (the eye next to your name shows it as `@i•••` for screen shares) and your provider mix, the board (up to the top 100, scrolling inside its card), and when the last upload went. Switch between **Today**, **7 days** and **30 days**, or one provider. **Full board** opens the public page at [claudebar.tddworks.com/leaderboard](https://claudebar.tddworks.com/leaderboard).
 
 ## Settings → Leaderboard
 
@@ -53,7 +53,7 @@ The tab then shows your rank and your provider mix, the board (up to the top 100
 
 ## The globe
 
-The web board's globe shows where ClaudeBar is used, by country, from members who opted in. Turn it on when you join, from the **New** card in the Leaderboard tab, or in **Settings → Leaderboard**. The tab's **🌍 Members in N countries** line opens it.
+The web board's globe shows where ClaudeBar is used, by country, from members who opted in. Turn it on when you join, from the **New** card in the Leaderboard tab, or in **Settings → Leaderboard**. The tab's **🌍 Members in N countries** line opens it. Once you're on it, that line names your country; the **eye** next to it shows it as `🌍 ••` for screen shares, like the eye that masks account emails, and **Turn off** takes you off the globe.
 
 ## Gotchas
 
