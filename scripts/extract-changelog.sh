@@ -5,7 +5,7 @@
 #
 # Output: The markdown content for that version, suitable for GitHub Release or appcast.xml
 
-set -e
+set -eo pipefail
 
 VERSION="$1"
 CHANGELOG_FILE="${2:-CHANGELOG.md}"
@@ -42,6 +42,9 @@ awk -v version="$VERSION" '
             next  # Skip the header line itself
         }
     }
+
+    # Skip the "---" rule that separates versions
+    printing && /^---$/ { next }
 
     # Print lines when we are in the right section
     printing { print }

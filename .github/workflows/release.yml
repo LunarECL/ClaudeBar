@@ -294,9 +294,13 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Extract release notes from CHANGELOG.md
+          # Extract release notes from CHANGELOG.md. "Promote CHANGELOG" turns
+          # [Unreleased] into [VERSION] later in this job, so a tag pushed
+          # without a promoted section takes its notes from [Unreleased].
           if [ -f "CHANGELOG.md" ]; then
-            NOTES=$(./scripts/extract-changelog.sh "$VERSION" 2>/dev/null || echo "")
+            NOTES=$(./scripts/extract-changelog.sh "$VERSION" 2>/dev/null \
+              || ./scripts/extract-changelog.sh Unreleased 2>/dev/null \
+              || echo "")
           fi
 
           # Fallback if no notes found
