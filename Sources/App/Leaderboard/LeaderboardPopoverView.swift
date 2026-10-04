@@ -65,6 +65,14 @@ struct LeaderboardJoinView: View {
     @State private var showPayload = false
     @State private var preview: [DailyTokens] = []
     @State private var sharesCountry = false
+    @State private var linkPlatform: ProfileLink.Platform?
+    @State private var linkHandle = ""
+
+    /// A platform picked with a handle that breaks its rules: fix it or pick None.
+    private var linkIsInvalid: Bool {
+        guard let linkPlatform, !linkHandle.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        return ProfileLink.typed(linkHandle, on: linkPlatform) == nil
+    }
 
     private var username: Username? { Username(name) }
 
@@ -135,6 +143,9 @@ struct LeaderboardJoinView: View {
                     .padding(4)
                 }
 
+                CardLabel(text: "PROFILE LINK (OPTIONAL)").padding(.top, 4)
+                ProfileLinkField(platform: $linkPlatform, handle: $linkHandle, offersNone: true)
+
                 CardLabel(text: "THE GLOBE").padding(.top, 4)
                 ProviderPill(providerId: "globe", providerName: "Also show my country on the globe", isSelected: sharesCountry,
                              hasData: true, symbol: "globe.europe.africa.fill") { sharesCountry.toggle() }
@@ -187,7 +198,7 @@ struct LeaderboardJoinView: View {
                         .background(RoundedRectangle(cornerRadius: theme.pillCornerRadius).fill(theme.accentGradient))
                 }
                 .buttonStyle(.plain)
-                .disabled(username == nil || sharing.isEmpty || isJoining)
+                .disabled(username == nil || sharing.isEmpty || isJoining || linkIsInvalid)
                 .opacity(username == nil || sharing.isEmpty ? 0.5 : 1)
             }
         }
@@ -201,7 +212,8 @@ struct LeaderboardJoinView: View {
         isJoining = true
         defer { isJoining = false }
         do {
-            try await leaderboard.join(as: username, sharing: sharing, sharesCountry: sharesCountry)
+            try await leaderboard.join(as: username, sharing: sharing, sharesCountry: sharesCountry,
+                                       link: linkPlatform.flatMap { ProfileLink.typed(linkHandle, on: $0) })
             error = nil
         } catch {
             self.error = (error as? LeaderboardError)?.errorDescription ?? error.localizedDescription

@@ -137,6 +137,27 @@ struct LeaderboardHTTPClientTests {
         #expect(body?["shareCountry"] as? Bool == true)
     }
 
+    @Test func `a link is sent as a platform and a handle; removing it as null`() async throws {
+        var sent: URLRequest?
+        let link = try #require(ProfileLink(platform: .github, handle: "octocat"))
+        try await client(sent: { sent = $0 }).update(MemberChange(link: .set(link)), as: member)
+        var body = try JSONSerialization.jsonObject(with: #require(sent?.httpBody)) as? [String: Any]
+        #expect(body?["link"] as? [String: String] == ["platform": "github", "handle": "octocat"])
+
+        try await client(sent: { sent = $0 }).update(MemberChange(link: .remove), as: member)
+        body = try JSONSerialization.jsonObject(with: #require(sent?.httpBody)) as? [String: Any]
+        #expect(body?.keys.sorted() == ["link"])
+        #expect(body?["link"] is NSNull)
+    }
+
+    @Test func `the board carries each member's link, and drops one that breaks its platform's rules`() async throws {
+        let body = #"{"standings":[{"rank":1,"username":"a","total":5,"link":{"platform":"x","handle":"jack"}},{"rank":2,"username":"b","total":3,"link":{"platform":"x","handle":"https://evil.example"}},{"rank":3,"username":"c","total":1}]}"#
+
+        let standings = try await client(body: body).board(in: BoardView(period: .sevenDays))
+
+        #expect(standings.map(\.link?.handle) == ["jack", nil, nil])
+    }
+
     @Test func `the globe is read without signing, countries and the hidden count`() async throws {
         var sent: URLRequest?
         let body = #"{"period":"30d","provider":null,"countries":[{"country":"NL","members":3,"tokens":300}],"hiddenCountries":2}"#

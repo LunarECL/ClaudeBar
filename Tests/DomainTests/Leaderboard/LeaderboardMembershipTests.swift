@@ -217,6 +217,55 @@ struct LeaderboardMembershipTests {
         #expect(!membership().showsGlobeHint)
     }
 
+    // MARK: - Profile link
+
+    @Test func `a link is kept once the server agrees`() async throws {
+        let membership = try await joined()
+        let link = try #require(ProfileLink(platform: .github, handle: "octocat"))
+
+        try await membership.setLink(link)
+
+        #expect(membership.link == link)
+        #expect(settings.record?.link == link)
+    }
+
+    @Test func `removing the link forgets it here too`() async throws {
+        let membership = try await joined()
+        try await membership.setLink(#require(ProfileLink(platform: .x, handle: "jack")))
+
+        try await membership.setLink(nil)
+
+        #expect(membership.link == nil)
+        #expect(settings.record?.link == nil)
+    }
+
+    @Test func `a refused link changes nothing here`() async throws {
+        let membership = try await joined()
+        api.reset([.given])
+        given(api).update(.any, as: .any).willThrow(LeaderboardError.rejected("That isn't a github handle."))
+
+        await #expect(throws: LeaderboardError.rejected("That isn't a github handle.")) {
+            try await membership.setLink(#require(ProfileLink(platform: .github, handle: "octocat")))
+        }
+        #expect(membership.link == nil)
+    }
+
+    @Test func `joining can add a link at once`() async throws {
+        let membership = membership()
+        let link = try #require(ProfileLink(platform: .instagram, handle: "boxcee.codes"))
+
+        try await membership.join(as: #require(Username("tokenwhale")), sharing: ["claude"], link: link)
+
+        #expect(membership.link == link)
+    }
+
+    @Test func `a link survives a restart`() async throws {
+        let first = try await joined()
+        try await first.setLink(#require(ProfileLink(platform: .github, handle: "octocat")))
+
+        #expect(membership().link?.handle == "octocat")
+    }
+
     // MARK: - Leaving
 
     @Test func `leaving deletes on the server, then forgets the key and the membership`() async throws {

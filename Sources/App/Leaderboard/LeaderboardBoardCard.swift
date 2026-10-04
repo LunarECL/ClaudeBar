@@ -159,6 +159,9 @@ struct LeaderboardBoardCard: View {
                 .foregroundStyle(theme.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.tail)
+            if let link = standing.link {
+                ProfileLinkIcon(link: link, username: standing.username)
+            }
             if isMe {
                 Text("YOU")
                     .font(.system(size: 9, weight: .heavy, design: theme.fontDesign))
