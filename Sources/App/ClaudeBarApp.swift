@@ -177,6 +177,9 @@ struct ClaudeBarApp: App {
             let variable = name == "DEEPSEEK_API_KEY" && !configured.isEmpty ? configured : name
             return ProcessInfo.processInfo.environment[variable]
         })
+        // OpenRouter is data: Modules/Providers/Resources/Providers/openrouter.json (#89).
+        let openrouter = Self.builtIn("openrouter", settings: settingsRepository,
+                                      accounts: settingsRepository.accounts(forProvider: "openrouter"), secrets: vault)
 
         // The lineup: each login is its own pill. Legacy providers are their
         // own single login until they become definitions.
@@ -195,6 +198,7 @@ struct ClaudeBarApp: App {
             cursor.defaultAccount,
             minimax.defaultAccount,
             deepseek.defaultAccount,
+            openrouter.defaultAccount,
             vercel.defaultAccount,
             alibaba.defaultAccount,
             mistral.defaultAccount,
@@ -204,7 +208,7 @@ struct ClaudeBarApp: App {
             commandCode.defaultAccount,
         ])
         // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts + openCodeGo.accounts + zai.accounts + kimi.accounts + copilot.accounts + alibaba.accounts + gemini.accounts).filter({ !$0.isDefault }) {
+        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + openrouter.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts + openCodeGo.accounts + zai.accounts + kimi.accounts + copilot.accounts + alibaba.accounts + gemini.accounts).filter({ !$0.isDefault }) {
             repository.add(account)
         }
         // Providers people made in Add Provider (~/.claudebar/providers), after
