@@ -103,6 +103,7 @@ pre.payload mark{background:var(--sun);border-radius:4px;padding:0 2px}
             <span class="chip">Opt-in</span>
             <span class="chip">≥ 3 members per country</span>
             <span>Drag to turn · hover a marker</span>
+            <span class="chip" id="backend">…</span>
           </div>
           <div class="tip" id="tip"></div>
         </div>
@@ -165,7 +166,7 @@ pre.payload mark{background:var(--sun);border-radius:4px;padding:0 2px}
 
 <script type="importmap">
 { "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.webgpu.js",
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
   "topojson-client": "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm",
   "d3-geo": "https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/+esm"
@@ -187,7 +188,8 @@ const SAMPLE = {
 const THRESHOLD = 3;
 const FLAGS = { "United States of America": "🇺🇸", China: "🇨🇳", Japan: "🇯🇵", Germany: "🇩🇪", "United Kingdom": "🇬🇧", India: "🇮🇳", Canada: "🇨🇦",
   France: "🇫🇷", Brazil: "🇧🇷", Netherlands: "🇳🇱", Australia: "🇦🇺", "South Korea": "🇰🇷", Singapore: "🇸🇬", Sweden: "🇸🇪" };
-const CANDY = [0xFFD84D, 0xFFB3C7, 0xA9D8FF, 0x9FE3B8, 0xC9B8FF, 0xFFC98A];
+// No mint: it would vanish on green land.
+const CANDY = [0xFFD84D, 0xFFB3C7, 0xA9D8FF, 0xC9B8FF, 0xFFC98A, 0xFF8A8A];
 const R = 1;
 let metric = "members";
 
@@ -201,7 +203,8 @@ function toVec(lon, lat, r = R) {
 
 // Scene
 const host = document.getElementById("globe");
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+// WebGPU where the browser has it; three.js falls back to WebGL 2 on its own.
+const renderer = new THREE.WebGPURenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
 host.append(renderer.domElement);
 const scene = new THREE.Scene();
@@ -213,11 +216,13 @@ controls.autoRotate = true; controls.autoRotateSpeed = 0.6;
 
 // Ink outline: a slightly larger back-faced sphere, the Pop theme's thick border.
 scene.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.035, 64, 64), new THREE.MeshBasicMaterial({ color: 0x1E1B2E, side: THREE.BackSide })));
-// Ocean
-scene.add(new THREE.Mesh(new THREE.SphereGeometry(R, 64, 64), new THREE.MeshBasicMaterial({ color: 0xEDE6FF })));
+// The Earth: a flat map painted once (sky ocean, green land, ink coasts),
+// wrapped onto the sphere. Its mapping matches toVec, so markers sit right.
+const earth = new THREE.Mesh(new THREE.SphereGeometry(R, 96, 96), new THREE.MeshBasicMaterial({ color: 0xDDEFFF }));
+scene.add(earth);
 // Graticule
 const grid = new THREE.Group();
-const gridMat = new THREE.LineBasicMaterial({ color: 0x7C5CFF, transparent: true, opacity: 0.18 });
+const gridMat = new THREE.LineBasicMaterial({ color: 0x3A7BD5, transparent: true, opacity: 0.16 });
 for (let lat = -60; lat <= 60; lat += 30) {
   const pts = []; for (let lon = -180; lon <= 180; lon += 4) pts.push(toVec(lon, lat, R * 1.001));
   grid.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat));
@@ -238,37 +243,20 @@ async function load() {
   // The merged land shape: testing country by country trips over polygons
   // that cross the date line (Alaska, Russia) and leaves holes.
   const land = feature(world, world.objects.land);
-  // Paint the land once on a flat 0.5° map and read pixels: reliable for
-  // every landmass, unlike point-in-polygon tests on the sphere.
-  const W = 720, H = 360;
+  const W = 4096, H = 2048;
   const canvas = Object.assign(document.createElement("canvas"), { width: W, height: H });
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  const flat = geoEquirectangular().scale(W / (2 * Math.PI)).translate([W / 2, H / 2]);
-  ctx.fillStyle = "#000"; ctx.beginPath(); geoPath(flat, ctx)(land); ctx.fill();
-  const pixels = ctx.getImageData(0, 0, W, H).data;
-  const isLand = (lon, lat) => {
-    const x = Math.min(W - 1, Math.max(0, Math.floor((lon + 180) / 360 * W)));
-    const y = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H)));
-    return pixels[(y * W + x) * 4 + 3] > 0;
-  };
-  const positions = [];
-  const step = 1.6;
-  for (let lat = -84; lat <= 84; lat += step) {
-    const lonStep = step / Math.max(0.2, Math.cos(lat * Math.PI / 180));
-    for (let lon = -180; lon < 180; lon += lonStep) {
-      if (isLand(lon, lat)) {
-        const v = toVec(lon, lat, R * 1.004); positions.push(v.x, v.y, v.z);
-      }
-    }
-  }
-  const dots = new THREE.BufferGeometry();
-  dots.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  // Round dots a little over a pixel wide, so no GPU drops them as sub-pixel points.
-  const sprite = Object.assign(document.createElement("canvas"), { width: 32, height: 32 });
-  const sctx = sprite.getContext("2d"); sctx.fillStyle = "#fff"; sctx.beginPath(); sctx.arc(16, 16, 14, 0, Math.PI * 2); sctx.fill();
-  scene.add(new THREE.Points(dots, new THREE.PointsMaterial({
-    color: 0x1E1B2E, size: 0.02, map: new THREE.CanvasTexture(sprite), transparent: true, alphaTest: 0.5,
-  })));
+  const ctx = canvas.getContext("2d");
+  const path = geoPath(geoEquirectangular().scale(W / (2 * Math.PI)).translate([W / 2, H / 2]), ctx);
+  ctx.fillStyle = "#DDEFFF"; ctx.fillRect(0, 0, W, H);
+  ctx.beginPath(); path(land);
+  ctx.fillStyle = "#4CC38A"; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = "#1E1B2E"; ctx.lineJoin = "round"; ctx.stroke();
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = renderer.getMaxAnisotropy?.() ?? 1;
+  earth.material.color.set(0xffffff);
+  earth.material.map = map;
+  earth.material.needsUpdate = true;
   countries = geo.features.map((f) => ({ name: f.properties.name, centre: geoCentroid(f) }))
     .filter((c) => SAMPLE[c.name]).map((c) => ({ ...c, members: SAMPLE[c.name][0], tokens: SAMPLE[c.name][1] }));
   document.getElementById("loading").remove();
@@ -338,8 +326,13 @@ function resize() {
   camera.aspect = w / h; camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(host); resize();
-(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
-load().catch(() => { document.getElementById("loading").textContent = "The world map couldn't load (offline?)."; });
+await renderer.init();
+document.getElementById("backend").textContent = renderer.backend.isWebGPUBackend ? "WebGPU" : "WebGL 2 fallback";
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+load().catch((error) => {
+  console.error(error);
+  document.getElementById("loading").textContent = "The world map couldn't load (offline?).";
+});
 
 // The upload preview, with and without the toggle.
 const payload = document.getElementById("payload");
