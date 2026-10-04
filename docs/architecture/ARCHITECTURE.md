@@ -80,7 +80,7 @@ public struct UsageQuota: Sendable, Equatable {
 |-------------|------------|
 | `UsageQuota` | `UsageData` |
 | `QuotaStatus` | `HealthStatus` |
-| `AIProvider` | `ServiceProvider` |
+| `Provider` (the product) · `Account` (a login) | `ServiceProvider`, `AIProvider` |
 | `UsageSnapshot` | `UsageDataResponse` |
 | `QuotaMonitor` | `UsageDataFetcher` |
 

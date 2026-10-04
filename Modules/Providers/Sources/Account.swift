@@ -7,12 +7,11 @@ import Observation
 /// it. Two Codex logins are two accounts of one `Provider`: two things to
 /// watch (each its own pill and menu-bar entry), one thing to fix.
 ///
-/// An account has no fetching of its own. It conforms to `AIProvider` only as
-/// a shim, forwarding to its provider, so the monitor, the pills and the menu
-/// bar keep working until `AIProvider` folds into `Provider`.
+/// An account has no fetching of its own: it asks its provider, which runs
+/// one lifecycle for every login.
 @MainActor
 @Observable
-public final class Account: AIProvider {
+public final class Account: Identifiable {
     /// The product this login belongs to. Held strongly: the app keeps
     /// accounts, and an account needs its provider to fetch.
     public let provider: Provider
@@ -141,7 +140,7 @@ public final class Account: AIProvider {
         return accountEmail ?? provider.name
     }
 
-    // MARK: - AIProvider (forwarded to the provider)
+    // MARK: - Forwarded to the provider
 
     /// *The name the lineup prints* — on a pill, the menu bar, an alert: the
     /// product's while this is the only login to tell apart, else the

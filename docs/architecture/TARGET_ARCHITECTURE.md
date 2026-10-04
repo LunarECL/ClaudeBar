@@ -12,8 +12,8 @@ description: The architecture that implements the canonical model — a provider
 > `DataSource`, to the popover — and in what order today's code gets there.
 >
 > **Status: BUILT** for every built-in provider (slices 1–6 below, merged
-> through #419); slice 7 (Claude's renames, `AIProvider` folding into
-> `Provider`) is what remains. Today's wiring is [ARCHITECTURE.md](ARCHITECTURE.md).
+> through #419); slice 7 is Claude's renames — `AIProvider` is gone, by
+> [§12](#12--retiring-aiprovider). Today's wiring is [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
@@ -254,7 +254,7 @@ public enum DataSources {
 
 // Providers — THE lifecycle
 @MainActor @Observable
-public final class Provider: AIProvider {
+public final class Provider {
     public let definition: ProviderDefinition
     public let dataSources: [DataSource]
     public private(set) var activeKind: String       // persisted
@@ -274,9 +274,8 @@ that case needs: `HTTPFetcher` holds a `NetworkClient`, `CLIFetcher` a
 the settings, `KeychainReader` the vault. No type receives a bag of
 everything.
 
-`AIProvider` stays the protocol the Monitor and views consume while the other
-providers move; `Provider` conforms. When the last `XxxProvider` is gone it
-folds into `Provider`. `UsageSnapshot` keeps its name until the renames of
+The Monitor and the views consumed `AIProvider` while the other providers
+moved; it is gone now — they take `Account` or `Provider` (§12). `UsageSnapshot` keeps its name until the renames of
 slice 7 (`Usage`), and gains `source: kind` — *via RPC* — in slice 1.
 
 ### 4.2 · Flows
@@ -379,7 +378,7 @@ Each slice is one PR, green, with no change a user can see unless it says so.
 | 4 ✅ | the kernel laws: `Left` (no fake 100%), `Window` (no guessed length) | balance definitions map money only |
 | 5 ✅ | the CLI, cookie and local providers on the engine of [§8.2](#82--the-engine-the-remaining-migrations-share): Amp #405, Kiro #406, Kimi #411, Alibaba #413, Gemini #414, Antigravity #416, Oh My Pi #418, Mistral #419; Bedrock via `Fetch.cloudWatch` and the `AWSClients` module #417; *PROBE MODE* → *Data fetching method* | no `XxxUsageProbe` is left |
 | 6 ✅ | *Add Provider* (#354), *Export*, *Import* (#355) — the screens of [USER_JOURNEYS.md](USER_JOURNEYS.md) moments 5–11, outer loop from its §5 scenarios | a person adds, shares and imports a provider without a restart, and no exported file contains a key |
-| 7 | Claude (PTY CLI, multi-account, guest passes, budget); the renames (`Usage`, `Plan`, `Cost`, `DataSourceError`) | `AIProvider` folds into `Provider` |
+| 7 | Claude (PTY CLI, multi-account, guest passes, budget); the renames (`Usage`, `Plan`, `Cost`, `DataSourceError`) | ~~`AIProvider` folds into `Provider`~~ — retired instead, by §12 |
 
 ## 8.1 · What each provider added
 
@@ -1035,7 +1034,8 @@ switching, once per low) → `InUseAnnouncer`. *A link* —
 
 ## 12 · Retiring `AIProvider`
 
-> **Status: DESIGN, confirmed** (2026-10-04). Not built.
+> **Status: BUILT** (2026-10-04), slices 1–5; slice 6 is designed when
+> asked. The build has no `AIProvider`.
 
 **The problem.** Someone with two Claude logins opens Settings → Providers and
 finds *personal* and *work* listed as two providers. The page is titled
@@ -1096,7 +1096,7 @@ stay for extensions).
 | 2 ✅ | **Extensions as definitions**: `Fetch.script`; a definition's data sources can **answer together** (each section one, the usage their union, a failed one left out); the manifest → definition reader; sections mapped as 12.2; `ExtensionProvider` goes | every lineup member is an `Account` · golden tests on `docs/features/extensions/example-provider`: quotas and cost read the same; config fields as settings; a failing section left out |
 | 3 ✅ | **`Providers`** (CRUD of the providers you keep, their order and the derived `lineup: [Account]`), held by the Monitor; `AIProviderRepository` and `AIProviders` go; the test stubs become definitions over stubbed connections | the cause, in the domain · every Monitor test |
 | 4 ✅ | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
-| 5 | Delete `AIProvider` | done · the build has no `AIProvider` |
+| 5 ✅ | Delete `AIProvider` | done · the build has no `AIProvider` |
 | 6 | **`Provider` by role** (SRP): one product plays different roles in different contexts — refreshed in Monitoring, configured in Settings, a set of logins in Accounts, a terminal choice in In use (already `InUse`), a history in Usage History (already `UsageHistory`). Each role becomes its own type the product hands out, as `inUse` is; `Provider` keeps only the lifecycle (TARGET §1: it changes when the lifecycle changes). *Designed and confirmed when slice 5 is done* | `Provider` small again · each role's tests move with it |
 
 #### Slice 1 in detail — Settings by product
@@ -1156,8 +1156,8 @@ the vault and the settings, never the Monitor). `AIProviderRepository` and
 #### Slice 4 in detail — views take `Account` or `Provider`
 
 > **Status: BUILT** (2026-10-04, confirmed the same day). No view casts to
-> `Account` any more; `AIProvider` is left only as the protocol `Account`
-> conforms to, for slice 5 to delete. The tab rule of the popover header's
+> `Account` any more; slice 5 then deleted `AIProvider`, which only
+> `Account` still conformed to. The tab rule of the popover header's
 > badge reads `ProviderBadgeState.Login` facts, so it is tested without a login.
 
 | Today | Becomes | Why |

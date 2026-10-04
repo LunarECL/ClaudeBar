@@ -66,45 +66,10 @@ extension ProviderLook {
     }
 }
 
-// MARK: - AIProvider Visual Identity Helper
-
-/// Extension to access visual identity from Account.
-/// Uses type casting to dispatch to the correct implementation.
-extension Account {
-    /// Returns the visual identity if this provider conforms to ProviderVisualIdentity
-    public var visualIdentity: ProviderVisualIdentity? {
-        self as? ProviderVisualIdentity
-    }
-
-    /// SF Symbol icon, with fallback for unknown providers
-    public var symbolIconOrDefault: String {
-        visualIdentity?.symbolIcon ?? "questionmark.circle.fill"
-    }
-
-    /// Icon asset name, with fallback for unknown providers
-    public var iconAssetNameOrDefault: String {
-        visualIdentity?.iconAssetName ?? "QuestionIcon"
-    }
-
-    /// Theme color with fallback
-    public func themeColorOrDefault(for scheme: ColorScheme) -> Color {
-        visualIdentity?.themeColor(for: scheme) ?? BaseTheme.purpleVibrant
-    }
-
-    /// Theme gradient with fallback
-    public func themeGradientOrDefault(for scheme: ColorScheme) -> LinearGradient {
-        visualIdentity?.themeGradient(for: scheme) ?? LinearGradient(
-            colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
-}
-
 // MARK: - Static Provider Identity Lookup
 
 /// Static helpers to look up provider visual identity by ID string.
-/// Used by views that only have a providerId, not the full AIProvider object.
+/// Used by views that only have a providerId, not the login itself.
 enum ProviderVisualIdentityLookup {
     /// Returns `name` when it names an SF Symbol available on this system.
     static func validSymbol(_ name: String?) -> String? {

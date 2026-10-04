@@ -264,7 +264,7 @@ ProviderFactory.make(definition, settings, vault)
 QuotaMonitor(providers) → lineup = provider.accounts.filter(isEnabled), for every enabled provider
 ```
 
-Legacy providers enter the lineup as today: one `AIProvider`, one pill.
+Every provider is a `Provider`: its enabled logins are its pills (TARGET §12).
 
 ### 3.2 · Add Account
 
