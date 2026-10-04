@@ -248,11 +248,11 @@ Each slice is test-first and green before the next.
 5. ~~**A new top-level key (`localApps`) or inside `usageHistory`?**~~ Inside
    `usageHistory`. The added-login merge patch can then remove it with `null`,
    with no new rule, and the definition says that an app's usage is usage history.
+6. ~~**One record list, merged into the login's totals?**~~ No. Desktop's file has
+   no model, so the price list would charge it at Sonnet rates and invent a cost,
+   and the Claude Code card would no longer mean Claude Code.
 7. **Limits without Claude Code.** The Desktop user's real question is how
    close they are to their limit, and Desktop's token count doesn't answer it.
    Limits need a claude.ai sign-in, which today only Claude Code provides.
    ClaudeBar signing in itself would answer it, if Anthropic allows that
    outside Claude Code. #198 stays open for it.
-6. ~~**One record list, merged into the login's totals?**~~ No. Desktop's file has
-   no model, so the price list would charge it at Sonnet rates and invent a cost,
-   and the Claude Code card would no longer mean Claude Code.
