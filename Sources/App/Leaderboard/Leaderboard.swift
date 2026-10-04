@@ -43,8 +43,8 @@ final class Leaderboard {
 
     /// Joins, then sends the last thirty days in the background so the first
     /// rank shows without waiting an hour, and the tab switches at once.
-    func join(as username: Username, sharing: Set<String>, sharesCountry: Bool = false) async throws {
-        try await membership.join(as: username, sharing: sharing, sharesCountry: sharesCountry)
+    func join(as username: Username, sharing: Set<String>, sharesCountry: Bool = false, link: ProfileLink? = nil) async throws {
+        try await membership.join(as: username, sharing: sharing, sharesCountry: sharesCountry, link: link)
         Task { await uploader.uploadDue() }
     }
 

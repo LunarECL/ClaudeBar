@@ -276,10 +276,11 @@ struct MenuContentView: View {
 
     private var headerView: some View {
         HStack(spacing: 12) {
-            // Custom Provider Icon - shows AppLogo in overview mode, provider icon otherwise
+            // Custom Provider Icon - shows AppLogo in overview mode and on the Leaderboard
+            // tab (it isn't any one provider's), the provider icon otherwise.
             // Avoid animation on provider icon to prevent constraint update loops in MenuBarExtra
             ZStack {
-                if settings.overviewModeEnabled, let logo = NSImage(named: "AppLogo") {
+                if settings.overviewModeEnabled || showsLeaderboard, let logo = NSImage(named: "AppLogo") {
                     Image(nsImage: logo)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -302,6 +303,9 @@ struct MenuContentView: View {
                         .offset(x: 14, y: -14)
                 }
             }
+            // One slot for every tab: a provider icon's glow is drawn 1.3× its size,
+            // and without this it made the header taller than the app logo's.
+            .frame(width: 38, height: 38)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
@@ -324,8 +328,13 @@ struct MenuContentView: View {
 
             Spacer()
 
-            // Status Badge
-            statusBadge
+            // Status Badge: the provider's status, or on the Leaderboard tab the
+            // leaderboard's own — same pill, so the header never changes height.
+            if showsLeaderboard {
+                leaderboardBadge
+            } else {
+                statusBadge
+            }
         }
         .opacity(animateIn ? 1 : 0)
         .offset(y: animateIn ? 0 : -10)
@@ -365,22 +374,39 @@ struct MenuContentView: View {
 
     private var statusBadge: some View {
         let statusColor = selectedProviderBadge.badgeColor(theme)
-
         // An outlined theme fills the badge with its status colour, inked —
         // syncing and waiting with a light "in progress" colour, never dark.
-        let outlined = theme.isOutlined
         let fill: Color = switch selectedProviderBadge {
         case .syncing, .awaitingData: theme.accentSecondary
         default: statusColor
         }
+        return headerPill(text: statusText, color: statusColor, fill: fill, pulsing: isSelectedProviderSyncing)
+    }
+
+    /// *NOT JOINED · RANKED · UPLOAD FAILED* — the Leaderboard tab's own pill.
+    private var leaderboardBadge: some View {
+        let membership = leaderboard.membership
+        let (text, color): (String, Color) = if !membership.isJoined {
+            ("NOT JOINED", theme.accentSecondary)
+        } else if leaderboard.uploader.lastError != nil {
+            ("UPLOAD FAILED", theme.statusWarning)
+        } else {
+            ("RANKED", theme.statusHealthy)
+        }
+        return headerPill(text: text, color: color, fill: color, pulsing: leaderboard.uploader.isUploading)
+    }
+
+    /// The header's pill, in the theme's way: a pulse dot and a word.
+    private func headerPill(text: String, color statusColor: Color, fill: Color, pulsing: Bool) -> some View {
+        let outlined = theme.isOutlined
         return HStack(spacing: 6) {
             // Animated pulse dot
             PulsingStatusDot(
                 color: outlined ? theme.textOnStatus : statusColor,
-                isSyncing: isSelectedProviderSyncing
+                isSyncing: pulsing
             )
 
-            Text(statusText)
+            Text(text)
                 .font(.system(size: 11, weight: outlined ? .heavy : .medium, design: theme.fontDesign))
                 .foregroundStyle(outlined ? theme.textOnStatus : theme.textPrimary)
         }

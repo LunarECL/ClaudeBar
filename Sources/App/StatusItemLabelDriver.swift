@@ -319,6 +319,13 @@ final class StatusItemLabelDriver {
         showsQuota && (hasOtherReadouts || hasAccountName || logoAlways)
     }
 
+    /// Whether the themed status icon stands in for the readout. Not beside a
+    /// logo: the logo only shows when a readout was asked for, so a logo
+    /// without one is waiting for its first reading, and alone it says so.
+    static func showsStatusIcon(hasLabel: Bool, showsLogo: Bool) -> Bool {
+        !hasLabel && !showsLogo
+    }
+
     // MARK: - Image Composition
 
     /// Composes the full status-item image: optional session glyph, then the
@@ -352,7 +359,7 @@ final class StatusItemLabelDriver {
         if let label = content.label {
             parts.append(quotaImage(label, stacked: content.stacked, size: content.stackedSize,
                                     colonVisible: content.colonVisible, theme: theme, dark: content.isDarkAppearance))
-        } else {
+        } else if showsStatusIcon(hasLabel: false, showsLogo: content.primaryProviderId != nil) {
             if let symbolName = statusIconSymbol(
                 theme: theme, status: content.fallbackStatus, besideSessionGlyph: showsSessionGlyph
             ) {

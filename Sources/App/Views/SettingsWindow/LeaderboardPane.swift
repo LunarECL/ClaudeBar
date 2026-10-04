@@ -17,6 +17,8 @@ struct LeaderboardPane: View {
     @State private var isWorking = false
     /// The country the server keeps for the globe, read from your own data.
     @State private var storedCountry: String?
+    @State private var linkPlatform: ProfileLink.Platform?
+    @State private var linkHandle = ""
 
     private var membership: LeaderboardMembership { leaderboard.membership }
 
@@ -27,6 +29,7 @@ struct LeaderboardPane: View {
         ) {
             if membership.isJoined {
                 accountCard
+                profileLinkCard
                 sharingCard
                 dataCard
             } else {
@@ -85,6 +88,38 @@ struct LeaderboardPane: View {
         let kept = storedCountry.map { "On the globe as \(leaderboardCountryLabel($0)). It shows once 3 members there opt in." }
             ?? "On. Your country is recorded with your next request."
         return kept + " Turn this off to remove it from the globe at once."
+    }
+
+    /// *PROFILE LINK* — one handle on X, Instagram or GitHub, shown as an icon
+    /// after your name on the board. Not verified; removable any time.
+    private var profileLinkCard: some View {
+        let typed = linkPlatform.flatMap { ProfileLink.typed(linkHandle, on: $0) }
+        return SettingsCard {
+            SettingsRow(title: "Profile link",
+                        subtitle: membership.link.map { "Shown after your name on the board: \($0.platform.prefix)\($0.handle). Not verified; anyone can type any handle." }
+                            ?? "Add where people on the board can find you. Shown as an icon after your name; not verified; removable any time.") {
+                EmptyView()
+            }
+            ProfileLinkField(platform: $linkPlatform, handle: $linkHandle)
+                .padding(.top, 8)
+            HStack(spacing: 8) {
+                SettingsActionButton(title: "Save link", iconName: "link", style: .prominent) {
+                    if let typed { run { try await membership.setLink(typed); message = "Link saved." } }
+                }
+                .disabled(typed == nil || typed == membership.link || isWorking)
+                if membership.link != nil {
+                    SettingsActionButton(title: "Remove", iconName: "xmark", style: .secondary) {
+                        run { try await membership.setLink(nil); linkHandle = ""; message = "Link removed." }
+                    }
+                    .disabled(isWorking)
+                }
+            }
+            .padding(.top, 8)
+        }
+        .onAppear {
+            linkPlatform = membership.link?.platform ?? .x
+            linkHandle = membership.link?.handle ?? ""
+        }
     }
 
     private var sharingCard: some View {

@@ -17,6 +17,8 @@ public final class LeaderboardMembership {
     /// requests come from, never sent by this Mac. Off until you opt in.
     public private(set) var sharesCountry = false
     private var globeHintDismissed = false
+    /// Where people on the board can find you, when you added it. Not verified.
+    public private(set) var link: ProfileLink?
     private var key: SigningKey?
 
     @ObservationIgnored private let api: any LeaderboardAPI
@@ -47,7 +49,8 @@ public final class LeaderboardMembership {
 
     // MARK: - Joining and leaving
 
-    public func join(as username: Username, sharing providers: Set<String>, sharesCountry: Bool = false) async throws {
+    public func join(as username: Username, sharing providers: Set<String>, sharesCountry: Bool = false,
+                     link: ProfileLink? = nil) async throws {
         guard !providers.isEmpty else { throw LeaderboardError.nothingShared }
         try requireShareable(providers)
         let key = SigningKey.generate()
@@ -60,8 +63,10 @@ public final class LeaderboardMembership {
         lastUpload = nil
         self.sharesCountry = false
         globeHintDismissed = false
+        self.link = nil
         save()
         if sharesCountry { try? await setSharesCountry(true) }
+        if let link { try? await setLink(link) }
     }
 
     /// Deletes the member and every row on the server first; the key is
@@ -89,6 +94,7 @@ public final class LeaderboardMembership {
         lastUpload = nil
         sharesCountry = false
         globeHintDismissed = false
+        link = nil
         settings.saveLeaderboardRecord(nil)
     }
 
@@ -130,6 +136,16 @@ public final class LeaderboardMembership {
         guard let credentials else { throw LeaderboardError.notJoined }
         try await api.update(MemberChange(username: newName.value), as: credentials)
         username = newName
+        save()
+    }
+
+    // MARK: - Profile link
+
+    /// Adds, replaces or — with `nil` — removes your profile link on the board.
+    public func setLink(_ newLink: ProfileLink?) async throws {
+        guard let credentials else { throw LeaderboardError.notJoined }
+        try await api.update(MemberChange(link: newLink.map { .set($0) } ?? .remove), as: credentials)
+        link = newLink
         save()
     }
 
@@ -177,12 +193,14 @@ public final class LeaderboardMembership {
         lastUpload = record.lastUpload
         sharesCountry = record.sharesCountry
         globeHintDismissed = record.globeHintDismissed
+        link = record.link
     }
 
     private func save() {
         guard let username else { return }
         settings.saveLeaderboardRecord(LeaderboardRecord(username: username.value, sharing: Array(sharing),
                                                          visible: isVisible, lastUpload: lastUpload,
-                                                         sharesCountry: sharesCountry, globeHintDismissed: globeHintDismissed))
+                                                         sharesCountry: sharesCountry, globeHintDismissed: globeHintDismissed,
+                                                         link: link))
     }
 }

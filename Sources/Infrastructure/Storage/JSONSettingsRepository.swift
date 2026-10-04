@@ -772,7 +772,10 @@ extension JSONSettingsRepository: LeaderboardSettingsRepository {
             visible: store.read(key: "leaderboard.visible") ?? true,
             lastUpload: lastUpload.map(Date.init(timeIntervalSince1970:)),
             sharesCountry: store.read(key: "leaderboard.sharesCountry") ?? false,
-            globeHintDismissed: store.read(key: "leaderboard.globeHintDismissed") ?? false
+            globeHintDismissed: store.read(key: "leaderboard.globeHintDismissed") ?? false,
+            link: (store.read(key: "leaderboard.linkPlatform") as String?)
+                .flatMap(ProfileLink.Platform.init(rawValue:))
+                .flatMap { platform in (store.read(key: "leaderboard.linkHandle") as String?).flatMap { ProfileLink(platform: platform, handle: $0) } }
         )
     }
 
@@ -783,5 +786,7 @@ extension JSONSettingsRepository: LeaderboardSettingsRepository {
         store.write(value: record?.lastUpload?.timeIntervalSince1970, key: "leaderboard.lastUpload")
         store.write(value: record?.sharesCountry, key: "leaderboard.sharesCountry")
         store.write(value: record?.globeHintDismissed, key: "leaderboard.globeHintDismissed")
+        store.write(value: record?.link?.platform.rawValue, key: "leaderboard.linkPlatform")
+        store.write(value: record?.link?.handle, key: "leaderboard.linkHandle")
     }
 }

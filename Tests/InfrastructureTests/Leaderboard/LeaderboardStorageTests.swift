@@ -38,7 +38,8 @@ struct LeaderboardStorageTests {
         let (settings, _) = repository()
         let record = LeaderboardRecord(username: "tokenwhale", sharing: ["codex", "claude"], visible: false,
                                        lastUpload: Date(timeIntervalSince1970: 1_791_080_000),
-                                       sharesCountry: true, globeHintDismissed: true)
+                                       sharesCountry: true, globeHintDismissed: true,
+                                       link: ProfileLink(platform: .instagram, handle: "boxcee.codes"))
 
         settings.saveLeaderboardRecord(record)
 

@@ -46,10 +46,15 @@ The tab then shows your rank (the eye next to your name shows it as `@i•••
 |---|---|
 | **Username → Rename** | Takes a new name if it's free |
 | **Show me on the web board** | Off keeps you ranked only in your own ClaudeBar |
+| **Profile link** | One handle on X, Instagram or GitHub, shown as an icon after your name on the board. Not verified. **Remove** takes it off |
 | **Show my country on the globe** | Puts your country on the web board's globe, counted with others. A country appears once three members there opt in. Off forgets it at once |
 | **Shared providers** | Stops or starts uploads per provider. Days already uploaded stay until you leave |
 | **Export my data** | Saves everything the server holds about you as JSON |
 | **Leave and delete my data** | Deletes your username and every uploaded day from the server, then this Mac's key |
+
+## Profile link
+
+Add one place people on the board can find you: an **X**, **Instagram** or **GitHub** handle, when you join or in **Settings → Leaderboard → Profile link**. It shows as that platform's icon after your name, in the app and on the web board; clicking it opens the profile. You type only the handle; the link is always built from the platform's own address. Links aren't verified, and the board says so.
 
 ## The globe
 
