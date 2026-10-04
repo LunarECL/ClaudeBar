@@ -41,7 +41,7 @@ struct KeptProvidersTests {
 
         #expect(kept.all.map(\.id) == ["claude", "codex"])
         #expect(kept.provider(id: "codex")?.name == "Codex")
-        #expect(kept.login(id: "claude")?.provider.id == "claude")
+        #expect(kept.login(id: "claude")?.providerId == "claude")
     }
 
     @Test

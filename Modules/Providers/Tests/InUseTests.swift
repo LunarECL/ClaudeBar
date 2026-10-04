@@ -39,7 +39,7 @@ struct InUseTests {
         let codex = try ProviderFactory.make("codex", settings: stub.settings)
 
         #expect(codex.inUse == nil)
-        #expect(throws: (any Error).self) { try codex.defaultAccount.useForNewSessions() }
+        #expect(codex.inUse == nil)
     }
 
     @Test
@@ -61,10 +61,10 @@ struct InUseTests {
         let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
 
-        try work.useForNewSessions()
+        try #require(codex.inUse).use(work)
 
-        #expect(work.isInUse)
-        #expect(!codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(work) == true)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) != true)
         #expect(stub.loginsInUse.folder(for: "codex") == work.folder?.url)
     }
 
@@ -75,8 +75,8 @@ struct InUseTests {
         // A second product running the same CLI, on the same record.
         let other = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
 
-        try work.useForNewSessions()
-        try other.defaultAccount.useForNewSessions()
+        try #require(codex.inUse).use(work)
+        try #require(other.inUse).use(other.defaultAccount)
 
         #expect(stub.loginsInUse.folder(for: "codex") == nil)
         let again = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
@@ -86,9 +86,9 @@ struct InUseTests {
 
     @Test
     func `the login in use is still in use after a relaunch`() throws {
-        let (stub, _, work) = try InUseFixture.twoLogins()
+        let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
-        try work.useForNewSessions()
+        try #require(codex.inUse).use(work)
 
         let again = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
 
@@ -99,11 +99,11 @@ struct InUseTests {
     func `choosing the plain login clears the record`() throws {
         let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
-        try work.useForNewSessions()
+        try #require(codex.inUse).use(work)
 
-        try codex.defaultAccount.useForNewSessions()
+        try #require(codex.inUse).use(codex.defaultAccount)
 
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
         #expect(stub.loginsInUse.folder(for: "codex") == nil)
     }
 
@@ -111,7 +111,7 @@ struct InUseTests {
     func `removing the login in use goes back to the plain login`() throws {
         let (stub, codex, work) = try InUseFixture.twoLogins()
         defer { stub.cleanUp() }
-        try work.useForNewSessions()
+        try #require(codex.inUse).use(work)
 
         codex.accounts.remove(work)
 
@@ -127,7 +127,7 @@ struct InUseTests {
 
         let codex = try stub.makeProvider("codex", accounts: stub.settings.accounts(forProvider: "codex"))
 
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
     }
 
     @Test
@@ -139,7 +139,7 @@ struct InUseTests {
         let claude = try claudeStub.makeProvider("claude")
 
         #expect(throws: (any Error).self) { try codex.inUse?.use(claude.defaultAccount) }
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
     }
 
     @Test
@@ -213,7 +213,7 @@ struct InUseTests {
         try await InUseFixture.usage(stub, codex, me: 95, work: 15)
 
         #expect(try inUse.review() == .switched(from: codex.defaultAccount, to: work))
-        #expect(work.isInUse)
+        #expect(codex.inUse?.isInUse(work) == true)
     }
 }
 
@@ -242,7 +242,7 @@ enum InUseFixture {
             given(stub.network).request(.matching { @Sendable in $0.value(forHTTPHeaderField: "ChatGPT-Account-Id") == id })
                 .willReturn((Data(#"{"rate_limit":{"primary_window":{"used_percent":\#(used)}}}"#.utf8), StubbedProvider.response(200)))
         }
-        try await codex.defaultAccount.refresh()
-        try await codex.accounts[1].refresh()
+        try await codex.refreshPlain()
+        try await codex.refresh(codex.accounts[1])
     }
 }

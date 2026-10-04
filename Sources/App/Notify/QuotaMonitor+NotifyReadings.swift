@@ -20,7 +20,7 @@ extension QuotaMonitor {
             (usage(of: provider)?.quotas ?? []).map { quota in
                 NotifyQuotaReading(
                     providerId: provider.id,
-                    providerName: provider.lineupName,
+                    providerName: lineupName(of: provider),
                     quota: quota
                 )
             }

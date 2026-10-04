@@ -94,7 +94,7 @@ final class MonitorTokenLogs: TokenLogs {
 
     private var logins: [(providerId: String, history: UsageHistory)] {
         monitor.logins.compactMap { account in
-            account.usageHistory.map { (account.provider.id, $0) }
+            account.usageHistory.map { (account.providerId, $0) }
         }
     }
 

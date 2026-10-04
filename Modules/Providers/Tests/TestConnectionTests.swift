@@ -15,7 +15,7 @@ struct TestConnectionTests {
         defer { stub.cleanUp() }
         try stub.writeCodexAuth(accountId: "me")
         stub.answerHTTP(#"{"anything":"unmapped"}"#)
-        let codex = try stub.make("codex").provider
+        let codex = try stub.makeProvider("codex")
 
         let result = await codex.testConnection()
 
@@ -26,7 +26,7 @@ struct TestConnectionTests {
     func `a connection with no key names the lookup step`() async throws {
         let stub = try StubbedProvider(dataSourceKind: "api", providerId: "codex")
         defer { stub.cleanUp() }
-        let codex = try stub.make("codex").provider
+        let codex = try stub.makeProvider("codex")
 
         let result = await codex.testConnection()
 
@@ -42,7 +42,7 @@ struct TestConnectionTests {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         stub.answerRPC(#"{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":20}}}}"#)
-        let codex = try stub.make("codex").provider
+        let codex = try stub.makeProvider("codex")
 
         _ = await codex.testConnection()
 
@@ -59,7 +59,7 @@ struct FallbackSettingTests {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         let settings = InMemoryProviderSettings()
-        let provider = try claude.provider(settings: settings).provider
+        let provider = try claude.provider(settings: settings)
 
         #expect(provider.configuration.isFallbackEnabled(from: "api"))
 
@@ -73,7 +73,7 @@ struct FallbackSettingTests {
     func `a fixed fallback is always on and can't be switched`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        let provider = try claude.provider().provider
+        let provider = try claude.provider()
 
         provider.configuration.setFallbackEnabled(false, from: "cli")
 

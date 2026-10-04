@@ -67,7 +67,7 @@ struct MenuBarPane: View {
                         ForEach(monitor.lineup, id: \.id) { provider in
                             let selected = settings.menuBarProviderIds.contains(provider.id)
                             MenuBarProviderChoiceButton(
-                                providerId: provider.id, providerName: provider.lineupName, isSelected: selected
+                                providerId: provider.id, providerName: monitor.lineupName(of: provider), isSelected: selected
                             ) {
                                 var ids = settings.menuBarProviderIds
                                 if selected { ids.removeAll { $0 == provider.id } }
@@ -82,7 +82,7 @@ struct MenuBarPane: View {
                     }
                 }
                 ForEach(selectedProviders, id: \.id) { provider in
-                    MenuBarProviderCard(provider: provider, settings: settings)
+                    MenuBarProviderCard(provider: provider, name: monitor.lineupName(of: provider), settings: settings)
                 }
             }
         }
@@ -91,6 +91,8 @@ struct MenuBarPane: View {
 
 private struct MenuBarProviderCard: View {
     let provider: Account
+    /// The name the lineup prints for it — its product's to say.
+    let name: String
     @Bindable var settings: AppSettings
     @Environment(\.appTheme) private var theme
 
@@ -118,7 +120,7 @@ private struct MenuBarProviderCard: View {
         SettingsCard {
             HStack(spacing: 10) {
                 ProviderIconView(providerId: provider.id, size: 24, showGlow: false)
-                Text(provider.lineupName)
+                Text(name)
                     .font(.system(size: 15, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
                 Spacer()
@@ -132,8 +134,8 @@ private struct MenuBarProviderCard: View {
                             .foregroundStyle(theme.textTertiary)
                     }
                     .buttonStyle(.plain)
-                    .help("Remove \(provider.lineupName) from the menu bar")
-                    .accessibilityLabel("Remove \(provider.lineupName)")
+                    .help("Remove \(name) from the menu bar")
+                    .accessibilityLabel("Remove \(name)")
                 }
             }
             if !provider.isEnabled || quotas.isEmpty {

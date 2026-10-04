@@ -28,15 +28,15 @@ struct MistralDefinitionTests {
         let (provider, cleanUp) = try make(withLogs: true)
         defer { cleanUp() }
         #expect(provider.name == "Mistral")
-        #expect(!provider.defaultAccount.isInLineup)
-        #expect(provider.defaultAccount.dashboardURL?.absoluteString == "https://console.mistral.ai")
+        #expect(!provider.plainIsInLineup)
+        #expect(provider.plainDashboardURL?.absoluteString == "https://console.mistral.ai")
     }
 
     @Test func `with Vibe's logs it is available and reports no quota, never a made-up one`() async throws {
         let (provider, cleanUp) = try make(withLogs: true)
         defer { cleanUp() }
-        #expect(await provider.defaultAccount.isAvailable())
-        let usage = try await provider.defaultAccount.refresh()
+        #expect(await provider.isPlainAvailable())
+        let usage = try await provider.refreshPlain()
         #expect(usage.quotas.isEmpty)
         #expect(usage.costUsage == nil)
     }
@@ -44,6 +44,6 @@ struct MistralDefinitionTests {
     @Test func `without Vibe it isn't available`() async throws {
         let (provider, cleanUp) = try make(withLogs: false)
         defer { cleanUp() }
-        #expect(await provider.defaultAccount.isAvailable() == false)
+        #expect(await provider.isPlainAvailable() == false)
     }
 }

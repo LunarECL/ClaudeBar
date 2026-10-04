@@ -150,7 +150,7 @@ public final class StatusExportDriver {
             let primary = snapshot?.quotas.first ?? snapshot?.lowestQuota
             return ExportPayload.ProviderSummary(
                 id: provider.id,
-                name: provider.lineupName,
+                name: monitor.lineupName(of: provider),
                 status: statusName(snapshot?.overallStatus(under: settings.statusPolicy) ?? .healthy),
                 percentRemaining: primary?.percentRemaining,
                 percentUsed: primary?.percentUsed,
@@ -162,10 +162,10 @@ public final class StatusExportDriver {
         return ExportPayload(
             enabled: true,
             updatedAt: "",
-            menuBarText: label?.text ?? selected?.lineupName ?? "ClaudeBar",
+            menuBarText: label?.text ?? selected.map(monitor.lineupName(of:)) ?? "ClaudeBar",
             status: statusString,
             selectedProviderId: monitor.selectedProviderId,
-            selectedProviderName: selected?.lineupName,
+            selectedProviderName: selected.map(monitor.lineupName(of:)),
             providers: providers
         )
     }

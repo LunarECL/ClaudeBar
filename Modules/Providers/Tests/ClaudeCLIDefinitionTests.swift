@@ -146,7 +146,7 @@ struct ClaudeCLIDefinitionTests {
         given(claude.cli).locate(.any).willReturn("/usr/local/bin/claude")
         let provider = try claude.provider()
 
-        #expect(await provider.isAvailable() == true)
+        #expect(await provider.isPlainAvailable() == true)
     }
 
     @Test
@@ -156,7 +156,7 @@ struct ClaudeCLIDefinitionTests {
         given(claude.cli).locate(.any).willReturn(nil)
         let provider = try claude.provider()
 
-        #expect(await provider.isAvailable() == false)
+        #expect(await provider.isPlainAvailable() == false)
     }
 
     // MARK: - What a probe run gives
@@ -282,11 +282,11 @@ struct ClaudeCLIDefinitionTests {
         """)
         let provider = try claude.provider()
 
-        let snapshot = try await provider.refresh()
+        let snapshot = try await provider.refreshPlain()
 
         #expect(snapshot.costUsage?.totalCost == Decimal(string: "1.25"))
         #expect(snapshot.accountTier == .claudeApi)
-        #expect(provider.answeredBy == "cliCost")
+        #expect(provider.defaultAccount.answeredBy == "cliCost")
     }
 
     @Test
@@ -302,9 +302,9 @@ struct ClaudeCLIDefinitionTests {
         let provider = try claude.provider()
 
         await #expect(throws: UsageError.executionFailed(Self.subscriptionMisread)) {
-            try await provider.refresh()
+            try await provider.refreshPlain()
         }
-        #expect(provider.snapshot == nil)
+        #expect(provider.defaultAccount.snapshot == nil)
     }
 
     @Test
@@ -317,9 +317,9 @@ struct ClaudeCLIDefinitionTests {
         given(claude.network).request(.any).willReturn((Data(Self.apiUsage.utf8), ClaudeHarness.response(200)))
         let provider = try claude.provider()
 
-        let snapshot = try await provider.refresh()
+        let snapshot = try await provider.refreshPlain()
 
-        #expect(provider.answeredBy == "api")
+        #expect(provider.defaultAccount.answeredBy == "api")
         #expect(snapshot.sessionQuota?.percentRemaining == 55)
         #expect(snapshot.costUsage == nil)
     }

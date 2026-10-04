@@ -588,8 +588,8 @@ struct MenuContentView: View {
                             if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
                         } label: {
                             HStack(spacing: 4) {
-                                if account.isInUse { InUseBadge() }
-                                Text(settings.shown(account.lineupName)).lineLimit(1)
+                                if tab.provider.inUse?.isInUse(account) == true { InUseBadge() }
+                                Text(settings.shown(tab.provider.lineupName(of: account))).lineLimit(1)
                                 Circle()
                                     .fill(account.lastError != nil ? theme.textTertiary
                                           : theme.statusColor(for: monitor.status(of: account) ?? .healthy))
@@ -597,24 +597,24 @@ struct MenuContentView: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        .help(hidden ? "Show \(settings.shown(account.lineupName))" : "Hide \(settings.shown(account.lineupName)) from this view")
+                        .help(hidden ? "Show \(settings.shown(tab.provider.lineupName(of: account)))" : "Hide \(settings.shown(tab.provider.lineupName(of: account))) from this view")
                         // One click switches: the other logins end in "Use".
-                        if account.canBeInUse, !account.isInUse {
+                        if tab.provider.inUse?.canBeInUse(account) == true, tab.provider.inUse?.isInUse(account) != true {
                             Button { newSessions.use(account) } label: {
                                 Text("Use")
                                     .font(.system(size: 10, weight: .bold, design: theme.fontDesign))
                                     .foregroundStyle(theme.accentPrimary)
                             }
                             .buttonStyle(.plain)
-                            .help("Use \(settings.shown(account.lineupName)) for new terminal sessions")
-                            .accessibilityLabel("Use \(settings.shown(account.lineupName)) for new terminal sessions")
+                            .help("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
+                            .accessibilityLabel("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
                         }
                     }
                     .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                     // The provider pills' shape and height. A leading IN USE badge sits
                     // concentric: the same gap on its left as above and below it.
                     .frame(height: InUseBadge.chipHeight(in: theme))
-                    .padding(.leading, account.isInUse ? InUseBadge.gap(in: theme) : 10)
+                    .padding(.leading, tab.provider.inUse?.isInUse(account) == true ? InUseBadge.gap(in: theme) : 10)
                     .padding(.trailing, 10)
                     .background(RoundedRectangle(cornerRadius: theme.pillCornerRadius).fill(hidden ? Color.clear : theme.glassBackground))
                     // Stroked across the edge, as the provider pills and the cards are:
@@ -623,8 +623,8 @@ struct MenuContentView: View {
                     .overlay(RoundedRectangle(cornerRadius: theme.pillCornerRadius).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
                     .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
                     .contextMenu {
-                        if account.canBeInUse {
-                            Button("Use for New Terminal Sessions") { newSessions.use(account) }.disabled(account.isInUse)
+                        if tab.provider.inUse?.canBeInUse(account) == true {
+                            Button("Use for New Terminal Sessions") { newSessions.use(account) }.disabled(tab.provider.inUse?.isInUse(account) == true)
                         }
                     }
                 }
@@ -697,7 +697,7 @@ struct MenuContentView: View {
         HStack(spacing: 8) {
             ProviderIconView(providerId: provider.id, size: 20, showGlow: false)
 
-            Text(settings.shown(provider.lineupName))
+            Text(settings.shown(monitor.lineupName(of: provider)))
                 .fixedSize(horizontal: false, vertical: true)
                 .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
@@ -993,7 +993,7 @@ struct MenuContentView: View {
     }
 
     private func setupCard(_ account: Account) -> some View {
-        let setup = account.setupNotice
+        let setup = monitor.setupNotice(of: account)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: "gauge.with.dots.needle.0percent")
@@ -1037,13 +1037,13 @@ struct MenuContentView: View {
 
             // A provider that is data names the step that failed first.
             let failure = selectedLogin.flatMap { RefreshReport.of($0).failure }
-            Text(failure?.headline ?? "\(selectedLogin?.lineupName ?? selectedProviderId) Unavailable")
+            Text(failure?.headline ?? "\(selectedLogin.map(monitor.lineupName(of:)) ?? selectedProviderId) Unavailable")
                 .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                 .foregroundStyle(theme.textPrimary)
 
             // Show actual error message if available, otherwise generic message
             Text(failure?.headline != nil
-                 ? "\(selectedLogin?.lineupName ?? selectedProviderId) Unavailable · \(failure?.detail ?? "")"
+                 ? "\(selectedLogin.map(monitor.lineupName(of:)) ?? selectedProviderId) Unavailable · \(failure?.detail ?? "")"
                  : selectedLogin?.lastError?.localizedDescription ?? "Install CLI or check configuration")
                 .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textTertiary)
@@ -1065,7 +1065,7 @@ struct MenuContentView: View {
                 label: "Dashboard",
                 gradient: theme.accentGradient
             ) {
-                if let url = selectedLogin?.dashboardURL {
+                if let url = selectedLogin.flatMap(monitor.dashboardURL(of:)) {
                     NSWorkspace.shared.open(url)
                 }
             }
@@ -1194,9 +1194,10 @@ struct MenuContentView: View {
             // isolation). Each child task then awaits `refresh(_:)`, whose heavy
             // probe work still suspends off-main, keeping the refreshes concurrent.
             for provider in monitor.lineup where !provider.isSyncing {
+                guard let product = monitor.product(of: provider) else { continue }
                 group.addTask {
                     do {
-                        try await provider.refresh(kind)
+                        try await product.refresh(provider, kind)
                     } catch {
                         // Provider stores error in lastError
                     }
@@ -1216,8 +1217,9 @@ struct MenuContentView: View {
         let members = monitor.tabs.first { $0.contains(providerId) }?.accounts
             ?? monitor.login(id: providerId).map { [$0] } ?? []
         // Provider stores error in lastError; isSyncing prevents duplicates.
-        let refreshes = members.filter { !$0.isSyncing }.map { provider in
-            Task { _ = try? await provider.refresh(kind) }
+        let refreshes: [Task<Void, Never>] = members.filter { !$0.isSyncing }.compactMap { login in
+            guard let product = monitor.product(of: login) else { return nil }
+            return Task { _ = try? await product.refresh(login, kind) }
         }
         // Today's usage is read with the popover open, never in the background.
         let history = members.compactMap(\.usageHistory).map { history in Task { await history.read() } }

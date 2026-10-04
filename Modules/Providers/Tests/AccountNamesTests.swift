@@ -46,7 +46,7 @@ struct AccountNamesTests {
         let codex = try codex(InMemoryProviderSettings())
 
         #expect(codex.accounts.hasSeveral == false)
-        #expect(codex.defaultAccount.lineupName == "Codex")
+        #expect(codex.lineupName(of: codex.defaultAccount) == "Codex")
     }
 
     @Test
@@ -54,7 +54,7 @@ struct AccountNamesTests {
         let codex = try codex(InMemoryProviderSettings(), [login("a", email: "a@example.com", label: "Work")])
 
         #expect(codex.accounts.hasSeveral)
-        #expect(codex.accounts.map(\.lineupName) == ["Codex", "Work"])
+        #expect(codex.accounts.map(codex.lineupName(of:)) == ["Codex", "Work"])
     }
 
     @Test
@@ -64,7 +64,7 @@ struct AccountNamesTests {
         codex.accounts[1].isEnabled = false
 
         #expect(codex.accounts.hasSeveral == false)
-        #expect(codex.defaultAccount.lineupName == "Codex")
+        #expect(codex.lineupName(of: codex.defaultAccount) == "Codex")
     }
 
     // MARK: - Rename

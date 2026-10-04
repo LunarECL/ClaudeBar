@@ -53,7 +53,7 @@ struct OpenRouterDefinitionTests {
         let provider = try make()
         #expect(provider.id == "openrouter")
         #expect(provider.name == "OpenRouter")
-        #expect(!provider.defaultAccount.isInLineup)
+        #expect(!provider.plainIsInLineup)
         #expect(provider.definition.profile.links.dashboard == URL(string: "https://openrouter.ai/credits"))
         #expect(provider.definition.profile.links.status == URL(string: "https://status.openrouter.ai"))
         #expect(provider.definition.profile.look.icon == "OpenRouterIcon")
@@ -63,7 +63,7 @@ struct OpenRouterDefinitionTests {
 
     @Test(arguments: ["6.50", "0", "1245.67", "-1.25", "0.005"])
     func `the balance is the credit left after usage, exact money with no invented ceiling`(_ remaining: String) async throws {
-        let usage = try await keep(make(body: report(remaining: remaining))).defaultAccount.refresh()
+        let usage = try await make(body: report(remaining: remaining)).refreshPlain()
         let quota = try #require(usage.quotas.first)
         #expect(usage.quotas.count == 1)
         #expect(quota.quotaType == .modelSpecific("Credits"))
@@ -75,13 +75,13 @@ struct OpenRouterDefinitionTests {
     }
 
     @Test func `strings and numbers both carry the balance`() async throws {
-        let numbers = try await keep(make(body: #"{"data":{"total_credits":10,"total_usage":3.5}}"#)).defaultAccount.refresh()
+        let numbers = try await make(body: #"{"data":{"total_credits":10,"total_usage":3.5}}"#).refreshPlain()
         #expect(numbers.quotas.first?.left == .money(Money(Decimal(string: "6.5")!, currency: "USD"), of: nil))
     }
 
     @Test(arguments: ["0", "-1.25"])
     func `spent-up credits are depleted without inventing a cap`(_ remaining: String) async throws {
-        let usage = try await keep(make(body: report(remaining: remaining))).defaultAccount.refresh()
+        let usage = try await make(body: report(remaining: remaining)).refreshPlain()
         #expect(usage.quotas.first?.status == .depleted)
         #expect(usage.quotas.first?.percentLeft == nil)
     }
@@ -90,25 +90,28 @@ struct OpenRouterDefinitionTests {
                       #"{"data":{"total_credits":"abc","total_usage":"1"}}"#, #"{"data":{"total_credits":"10","total_usage":"0x1"}}"#,
                       #"{"data":[1]}"#, #"{"data":null}"#])
     func `an invalid or absent report fails mapping`(_ body: String) async throws {
-        let account = try keep(make(body: body)).defaultAccount
-        await #expect(throws: UsageError.self) { try await account.refresh() }
+        let product = try make(body: body)
+        let account = product.defaultAccount
+        await #expect(throws: UsageError.self) { try await product.refresh(account) }
         #expect(account.lastFailedStep == .mapping)
     }
 
     @Test(arguments: [401, 403]) func `rejected keys need authentication`(_ status: Int) async throws {
-        await #expect(throws: UsageError.authenticationRequired) { try await keep(make(status: status)).defaultAccount.refresh() }
+        await #expect(throws: UsageError.authenticationRequired) { try await make(status: status).refreshPlain() }
     }
 
     @Test(arguments: [429, 500]) func `HTTP errors stay fetch errors`(_ status: Int) async throws {
-        let account = try keep(make(status: status)).defaultAccount
-        await #expect(throws: UsageError.self) { try await account.refresh() }
+        let product = try make(status: status)
+        let account = product.defaultAccount
+        await #expect(throws: UsageError.self) { try await product.refresh(account) }
         #expect(account.lastFailedStep == .fetch)
     }
 
     @Test func `a missing key is not configured`() async throws {
-        let account = try keep(make(vault: MemoryVault())).defaultAccount
-        #expect(await account.isAvailable() == false)
-        await #expect(throws: UsageError.authenticationRequired) { try await account.refresh() }
+        let product = try make(vault: MemoryVault())
+        let account = product.defaultAccount
+        #expect(await product.isAvailable(account) == false)
+        await #expect(throws: UsageError.authenticationRequired) { try await product.refresh(account) }
         #expect(account.lastFailedStep == .lookup)
     }
 
@@ -120,8 +123,8 @@ struct OpenRouterDefinitionTests {
                                           "Bearer work": #"{"data":{"total_credits":"7.50","total_usage":"0"}}"#])
         let work = try provider.accounts.add(filling: ["apiKey": "work"])
         #expect(work.isEnabled)
-        #expect(try await provider.defaultAccount.refresh().quotas.first?.dollarRemaining == 40)
-        #expect(try await work.refresh().quotas.first?.dollarRemaining == Decimal(string: "7.50"))
+        #expect(try await provider.refreshPlain().quotas.first?.dollarRemaining == 40)
+        #expect(try await provider.refresh(work).quotas.first?.dollarRemaining == Decimal(string: "7.50"))
         #expect(settings.accounts(forProvider: provider.id).first?.probeConfig["apiKey"] == nil)
         #expect(vault.secrets["\(work.id).apiKey"] == "work")
     }
@@ -133,6 +136,6 @@ struct OpenRouterDefinitionTests {
         settings.setValue("ROUTER_KEY", "authEnvVar", forProvider: "openrouter")
         let provider = try make(environment: ["OPENROUTER_API_KEY": "default", "ROUTER_KEY": "named"],
                                 settings: settings, replies: replies)
-        #expect(try await provider.defaultAccount.refresh().quotas.first?.dollarRemaining == 40)
+        #expect(try await provider.refreshPlain().quotas.first?.dollarRemaining == 40)
     }
 }

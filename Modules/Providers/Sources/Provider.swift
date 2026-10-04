@@ -77,15 +77,15 @@ public final class Provider {
                                           paths: paths, isExecutable: isExecutable)
         self.configuration = configuration
         self.accounts = Accounts(definition: definition, settings: settings, configuration: configuration,
-                                 folders: folders, makeDataSource: makeDataSource,
-                                 defaultHistory: usageHistory, makeUsageHistory: makeUsageHistory)
+                                 folders: folders, makeDataSource: makeDataSource, makeUsageHistory: makeUsageHistory)
         self.isEnabled = Self.productSwitch(definition, settings: settings, accounts: saved)
-        // The provider owns its logins: each points back without owning it.
-        accounts.start(makeLogin: { [unowned self] login, values, madeBy in
-            Account(provider: self, login: login, values: values, madeBy: madeBy)
-        }, onChange: { [unowned self] change in follow(change) }, saved: saved)
+        // `Accounts` is public and can outlive this provider: its callback
+        // holds it weakly (TARGET §12, slice 7).
+        accounts.start(plainHistory: usageHistory, guestPasses: guestPasses,
+                       onChange: { [weak self] change in self?.follow(change) }, saved: saved)
         if let loginsInUse, let call = definition.accounts?.signIn, definition.accounts?.folder != nil {
-            inUse = InUse(provider: self, command: TerminalCommand(name: call.cli, variable: call.homeVariable),
+            inUse = InUse(accounts: accounts, productId: definition.id, productName: definition.profile.name,
+                          command: TerminalCommand(name: call.cli, variable: call.homeVariable),
                           record: loginsInUse, switchWhenLow: SwitchWhenLow(providerId: definition.id, settings: settings))
         }
     }
@@ -171,8 +171,33 @@ public final class Provider {
         dataSource(kind, for: account ?? defaultAccount)?.hasKey ?? false
     }
 
-    /// A login's usage history: the plain login's, or an added login's own.
-    public var usageHistory: UsageHistory? { accounts.history(for: defaultAccount) }
+    /// *TODAY'S USAGE* — the plain login's.
+    public var usageHistory: UsageHistory? { defaultAccount.usageHistory }
+
+    // MARK: - What only the product knows about one of its logins
+
+    /// In the lineup — pills, menu bar, refreshes, alerts: the login is on,
+    /// and so is its product.
+    public func isInLineup(_ account: Account) -> Bool { account.isEnabled && isEnabled }
+
+    /// *The name the lineup prints* — on a pill, the menu bar, an alert: the
+    /// product's while it has one login to tell apart, else the login's own
+    /// (TARGET §12.1). Pages never re-decide it.
+    public func lineupName(of account: Account) -> String {
+        accounts.hasSeveral ? account.displayName : name
+    }
+
+    /// The dashboard for the plan a login's last usage reported (#328).
+    public func dashboardURL(of account: Account) -> URL? {
+        definition.profile.links.dashboard(for: account.snapshot?.accountTier,
+                                           settings: configuration.settingFills(ownValues: account.isDefault ? [:] : account.values))
+    }
+
+    /// What setting a login up takes: the definition's words, or its name
+    /// and what failed when the definition says nothing.
+    public func setupNotice(of account: Account) -> ProviderDefinition.Setup {
+        definition.setup ?? .fallback(for: lineupName(of: account), error: account.lastError)
+    }
 
     /// A data source that serves cached usage sets how often the background
     /// may ask (Claude's API: 15 minutes, #204).

@@ -32,8 +32,6 @@ public protocol ProviderVisualIdentity {
 
 /// A provider that is data takes its face from its definition's profile.
 extension Account: ProviderVisualIdentity {
-    private var look: ProviderLook { provider.definition.profile.look }
-
     public var symbolIcon: String { look.symbol ?? ProviderVisualIdentityLookup.symbolIcon(for: id) }
 
     public var iconAssetName: String { look.icon ?? ProviderVisualIdentityLookup.iconAssetName(for: id) }

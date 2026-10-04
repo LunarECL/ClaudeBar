@@ -459,7 +459,7 @@ struct NotifyPane: View {
                         ForEach(gaugeProviders, id: \.id) { provider in
                             MenuBarProviderChoiceButton(
                                 providerId: provider.id,
-                                providerName: provider.lineupName,
+                                providerName: monitor.lineupName(of: provider),
                                 isSelected: settings.notifyGaugeProviderId == provider.id
                             ) {
                                 settings.notifyGaugeProviderId = provider.id

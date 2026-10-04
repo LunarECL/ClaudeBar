@@ -43,7 +43,7 @@ struct DeepSeekDefinitionTests {
         let provider = try make()
         #expect(provider.id == "deepseek")
         #expect(provider.name == "DeepSeek")
-        #expect(provider.defaultAccount.isInLineup == false)
+        #expect(provider.plainIsInLineup == false)
         #expect(provider.definition.profile.links.dashboard == URL(string: "https://platform.deepseek.com/usage"))
         #expect(provider.definition.profile.look.icon == "DeepSeekIcon")
         #expect(provider.definition.accounts?.ways == [.form])
@@ -52,7 +52,7 @@ struct DeepSeekDefinitionTests {
     @Test
     func `the first balance keeps its currency exact money and paid granted details`() async throws {
         let body = #"{"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"110.123456789","granted_balance":"10","topped_up_balance":"100"},{"currency":"USD","total_balance":"40"}]}"#
-        let usage = try await keep(make(body: body)).defaultAccount.refresh()
+        let usage = try await make(body: body).refreshPlain()
         let quota = try #require(usage.quotas.first)
         #expect(usage.quotas.count == 1)
         #expect(quota.quotaType == .modelSpecific("Balance"))
@@ -65,7 +65,7 @@ struct DeepSeekDefinitionTests {
     @Test
     func `optional breakdown fields can be missing or invalid`() async throws {
         let body = #"{"balance_infos":[{"currency":"USD","total_balance":"40","granted_balance":"bad","topped_up_balance":"30"}]}"#
-        let usage = try await keep(make(body: body)).defaultAccount.refresh()
+        let usage = try await make(body: body).refreshPlain()
         #expect(usage.quotas.first?.resetText == "Paid: $30.00")
     }
 
@@ -77,8 +77,8 @@ struct DeepSeekDefinitionTests {
         let provider = try make(vault: vault, environment: ["DEEPSEEK_API_KEY": "environment"], balancesByKey: replies)
         let work = try provider.accounts.add(filling: ["apiKey": "work"])
         #expect(work.isEnabled)
-        let personalUsage = try await provider.defaultAccount.refresh()
-        let workUsage = try await work.refresh()
+        let personalUsage = try await provider.refreshPlain()
+        let workUsage = try await provider.refresh(work)
         #expect(personalUsage.quotas.first?.left == .money(Money(40, currency: "USD"), of: nil))
         #expect(workUsage.quotas.first?.left == .money(Money(7, currency: "CNY"), of: nil))
         #expect(workUsage.providerId == work.id)
@@ -87,54 +87,60 @@ struct DeepSeekDefinitionTests {
     @Test
     func `an empty environment key falls back to the saved default key`() async throws {
         let provider = try make(environment: ["DEEPSEEK_API_KEY": ""], balancesByKey: ["Bearer personal": balance])
-        #expect(try await provider.defaultAccount.refresh().quotas.first?.dollarRemaining == 40)
+        #expect(try await provider.refreshPlain().quotas.first?.dollarRemaining == 40)
     }
 
     @Test
     func `an unsigned default account is unavailable`() async throws {
-        let account = try keep(make(vault: MemoryVault())).defaultAccount
-        #expect(await account.isAvailable() == false)
-        await #expect(throws: UsageError.authenticationRequired) { try await account.refresh() }
+        let product = try make(vault: MemoryVault())
+        let account = product.defaultAccount
+        #expect(await product.isAvailable(account) == false)
+        await #expect(throws: UsageError.authenticationRequired) { try await product.refresh(account) }
     }
 
     @Test(arguments: ["0", "-1.25"])
     func `zero and negative balances are depleted without inventing a cap`(_ amount: String) async throws {
         let body = #"{"balance_infos":[{"currency":"USD","total_balance":"\#(amount)"}]}"#
-        let usage = try await keep(make(body: body)).defaultAccount.refresh()
+        let usage = try await make(body: body).refreshPlain()
         #expect(usage.quotas.first?.status == .depleted)
         #expect(usage.quotas.first?.percentLeft == nil)
     }
 
     @Test(arguments: [429, 500])
     func `HTTP failures remain fetch failures`(_ status: Int) async throws {
-        let account = try keep(make(status: status)).defaultAccount
-        await #expect(throws: UsageError.self) { try await account.refresh() }
+        let product = try make(status: status)
+        let account = product.defaultAccount
+        await #expect(throws: UsageError.self) { try await product.refresh(account) }
         #expect(account.lastFailedStep == .fetch)
     }
 
     @Test(arguments: [401, 403])
     func `rejected keys fail authentication`(_ status: Int) async throws {
-        let account = try keep(make(status: status)).defaultAccount
-        await #expect(throws: UsageError.authenticationRequired) { try await account.refresh() }
+        let product = try make(status: status)
+        let account = product.defaultAccount
+        await #expect(throws: UsageError.authenticationRequired) { try await product.refresh(account) }
     }
 
     @Test
     func `an empty balance list has no data`() async throws {
-        let account = try keep(make(body: #"{"balance_infos":[]}"#)).defaultAccount
-        await #expect(throws: UsageError.noData) { try await account.refresh() }
+        let product = try make(body: #"{"balance_infos":[]}"#)
+        let account = product.defaultAccount
+        await #expect(throws: UsageError.noData) { try await product.refresh(account) }
     }
 
     @Test(arguments: ["not JSON", #"{"balance_infos":[{"currency":"USD","total_balance":"bad"}]}"#])
     func `malformed balances fail at mapping`(_ body: String) async throws {
-        let account = try keep(make(body: body)).defaultAccount
-        await #expect(throws: UsageError.self) { try await account.refresh() }
+        let product = try make(body: body)
+        let account = product.defaultAccount
+        await #expect(throws: UsageError.self) { try await product.refresh(account) }
         #expect(account.lastFailedStep == .mapping)
     }
 
     @Test
     func `unusable funds are an explicit failure rather than a healthy balance`() async throws {
-        let account = try keep(make(body: #"{"is_available":false,"balance_infos":[{"currency":"USD","total_balance":"5"}]}"#)).defaultAccount
-        await #expect(throws: UsageError.executionFailed("DeepSeek reports that this balance is unavailable for API calls.")) { try await account.refresh() }
+        let product = try make(body: #"{"is_available":false,"balance_infos":[{"currency":"USD","total_balance":"5"}]}"#)
+        let account = product.defaultAccount
+        await #expect(throws: UsageError.executionFailed("DeepSeek reports that this balance is unavailable for API calls.")) { try await product.refresh(account) }
     }
 
     @Test
@@ -147,12 +153,12 @@ struct DeepSeekDefinitionTests {
         #expect(vault.secrets["\(work.id).apiKey"] == "work")
         let reloaded = try make(vault: vault, settings: settings)
         #expect(reloaded.accounts[1].isEnabled)
-        let usage = try await reloaded.accounts[1].refresh()
+        let usage = try await reloaded.refresh(reloaded.accounts[1])
         #expect(usage.providerId == work.id)
         reloaded.accounts[1].isEnabled = false
-        #expect(try keep(make(vault: vault, settings: settings)).accounts[1].isEnabled == false)
+        #expect(try make(vault: vault, settings: settings).accounts[1].isEnabled == false)
         vault.secrets["\(work.id).apiKey"] = nil
-        await #expect(throws: UsageError.authenticationRequired) { try await work.refresh() }
+        await #expect(throws: UsageError.authenticationRequired) { try await provider.refresh(work) }
         #expect(work.lastFailedStep == .lookup)
     }
 }

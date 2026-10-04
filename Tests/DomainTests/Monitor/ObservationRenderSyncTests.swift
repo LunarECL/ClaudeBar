@@ -341,9 +341,10 @@ struct ObservationRenderSyncTests {
             quotas: [UsageQuota(percentRemaining: 64, quotaType: .session, providerId: "claude")],
             capturedAt: Date()
         ))
-        let provider = stubbedLogin("claude", probe: probe, settings: settings)
+        let providerProduct = stubbedProduct("claude", probe: probe, settings: settings)
+        let provider = providerProduct.defaultAccount
         let monitor = QuotaMonitor(
-            providers: kept([provider]),
+            providers: kept([providerProduct]),
             clock: NoOpClock()
         )
 

@@ -210,7 +210,7 @@ struct AddAccountSheet: View {
         step = .verify(account, fetch: .running)
         Task { @MainActor in
             do {
-                try await account.refresh()
+                try await provider.refresh(account)
                 step = .verify(account, fetch: .passed)
             } catch {
                 step = .verify(account, fetch: .failed(error.localizedDescription))

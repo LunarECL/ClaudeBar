@@ -16,7 +16,7 @@ struct ProductTabsTests {
         let work = ProviderAccountConfig(accountId: "work", label: "work", probeConfig: ["codexHome": "/tmp/work", "chatgptAccountId": "work"])
         let codex = try ProviderFactory.make("codex", settings: settings, accounts: [work])
         let claude = try ProviderFactory.make("claude", settings: settings)
-        return (QuotaMonitor(providers: kept(Array(codex.accounts) + Array(claude.accounts))), codex, claude)
+        return (QuotaMonitor(providers: kept([codex, claude])), codex, claude)
     }
 
     @Test

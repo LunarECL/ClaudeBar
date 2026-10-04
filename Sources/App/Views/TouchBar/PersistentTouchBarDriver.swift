@@ -189,7 +189,7 @@ public final class PersistentTouchBarDriver: NSObject, NSTouchBarDelegate {
             return (provider.id, "Antigravity")
         }
 
-        let baseName = provider.lineupName
+        let baseName = monitor?.lineupName(of: provider) ?? provider.displayName
         if isMultiple, let quota {
             let compact = quota.menuBarTitle ?? quota.compactTitle ?? quota.quotaType.shortLabel
             if !compact.isEmpty, !baseName.localizedCaseInsensitiveContains(compact) {

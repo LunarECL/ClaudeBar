@@ -58,9 +58,10 @@ struct QuotaMonitorHiddenQuotasTests {
         alerter: (any QuotaAlerter)? = nil
     ) async -> (QuotaMonitor, MockProviderSettingsRepository) {
         let settings = makeSettings(hiddenKeys: hiddenKeys)
-        let provider = stubbedLogin("gemini", probe: makeGeminiProbe(), settings: settings)
+        let providerProduct = stubbedProduct("gemini", probe: makeGeminiProbe(), settings: settings)
+        let provider = providerProduct.defaultAccount
         let monitor = QuotaMonitor(
-            providers: kept([provider]),
+            providers: kept([providerProduct]),
             alerter: alerter,
             clock: TestClock(),
             settingsRepository: settings
@@ -147,9 +148,10 @@ struct QuotaMonitorHiddenQuotasTests {
     func `monitor without settings treats nothing as hidden`() async {
         // Given — no settings repository wired (existing call sites)
         let settings = makeSettings(hiddenKeys: [])
-        let provider = stubbedLogin("gemini", probe: makeGeminiProbe(), settings: settings)
+        let providerProduct = stubbedProduct("gemini", probe: makeGeminiProbe(), settings: settings)
+        let provider = providerProduct.defaultAccount
         let monitor = QuotaMonitor(
-            providers: kept([provider]),
+            providers: kept([providerProduct]),
             clock: TestClock()
         )
         await monitor.refresh(providerId: "gemini")

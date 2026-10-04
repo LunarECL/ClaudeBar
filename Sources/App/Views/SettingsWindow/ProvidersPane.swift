@@ -311,7 +311,7 @@ private struct ProviderDetailView: View {
     /// still on its own card keeps that card beside them until it moves to JSON.
     @ViewBuilder
     private var configCard: some View {
-        let product = provider.provider
+        let product = tab.provider
         let legacy = legacyCard(for: product.id)
         DataSourceSection(provider: product, monitor: monitor)
         if legacy == nil, !product.definition.defaultLoginSettings.isEmpty {
@@ -364,12 +364,12 @@ private struct QuotaVisibilityCard: View {
                         toggleRow(quota)
                     }
                 }
-                Text(refused ?? "Turn off a quota you don't use: it disappears everywhere and no longer sets \(provider.lineupName)'s status or alerts.")
+                Text(refused ?? "Turn off a quota you don't use: it disappears everywhere and no longer sets \(monitor.lineupName(of: provider))'s status or alerts.")
                     .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(refused == nil ? theme.textTertiary : theme.statusWarning)
                     .padding(.top, 8)
             } else {
-                Text("No quotas to choose from yet. Refresh \(provider.lineupName) once, then pick the ones you watch.")
+                Text("No quotas to choose from yet. Refresh \(monitor.lineupName(of: provider)) once, then pick the ones you watch.")
                     .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
@@ -383,7 +383,7 @@ private struct QuotaVisibilityCard: View {
                 get: { !monitor.hiddenQuotaKeys(for: provider).contains(key) },
                 set: { watched in
                     refused = monitor.setQuota(key, hidden: !watched, for: provider)
-                        ? nil : "Keep at least one quota: \(provider.lineupName) needs something to watch."
+                        ? nil : "Keep at least one quota: \(monitor.lineupName(of: provider)) needs something to watch."
                 }
             ))
         }

@@ -1034,8 +1034,8 @@ switching, once per low) → `InUseAnnouncer`. *A link* —
 
 ## 12 · Retiring `AIProvider`
 
-> **Status: BUILT** (2026-10-04), slices 1–6. The build has no `AIProvider`,
-> and `Provider` keeps only the lifecycle.
+> **Status: BUILT** (2026-10-04), slices 1–7. The build has no `AIProvider`,
+> `Provider` keeps only the lifecycle, and a login refers to nothing above it.
 
 **The problem.** Someone with two Claude logins opens Settings → Providers and
 finds *personal* and *work* listed as two providers. The page is titled
@@ -1098,6 +1098,7 @@ stay for extensions).
 | 4 ✅ | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
 | 5 ✅ | Delete `AIProvider` | done · the build has no `AIProvider` |
 | 6 ✅ | **`Provider` by role** (SRP): one product plays different roles in different contexts — refreshed in Monitoring, configured in Settings, a set of logins in Accounts, a terminal choice in In use (already `InUse`), a history in Usage History (already `UsageHistory`). Each role becomes its own type the product hands out, as `inUse` is; `Provider` keeps only the lifecycle (TARGET §1: it changes when the lifecycle changes). designed in *Slice 6 in detail* | `Provider` small again · each role's tests move with it |
+| 7 ✅ | **A login knows only itself**: `Account` names its product by id; `Providers.provider(of:)` resolves it; every product-level answer about a login is its provider's; no back-reference anywhere (`unowned` and `keep()` gone) | the cycle · no `Account.provider`; a stale login never crashes |
 
 #### Slice 1 in detail — Settings by product
 
@@ -1210,12 +1211,12 @@ Provider  ◆  THE LIFECYCLE — refresh(login), isAvailable, the switch, status
 | A new or removed login? | the provider makes a login's data sources when first asked (`bound[login]` empty) and drops those of a login `accounts` no longer has |
 | Adding a folder must read who is signed in there — a live data source | `Accounts` gets the same `makeDataSource` the provider gets, injected; it never asks the provider |
 | Test Connection | the lifecycle's (it fetches): `provider.testConnection(login)` |
-| `Account` → `Provider` | `unowned` — a child never outlives its parent (answered below) |
+| `Account` → `Provider` | ~~`unowned`~~ — reversed by slice 7: a login names its product by id and refers to nothing |
 
 | Law | Owner |
 |---|---|
 | a role never depends on the lifecycle, nor on a role above it: `Provider → Accounts → Configuration`, never back | each role |
-| the provider owns its children — its roles and its logins — and they end with it; a login's reference back is `unowned` | `Provider` |
+| the provider owns its children — its roles and its logins; none refers back to it (slice 7) | `Provider` |
 | a login's data sources are made in one place, from `configuration.definitionAsRun(for:)` at its current revision | `Provider` |
 | the default login is first and can't be removed; an added login's folder or values are checked before it is kept; the order is yours, saved | `Accounts` |
 | a setting is saved where its definition says (vault for a secret); a CLI location must be a program; the data source is one choice for every login; any change grows `revision` | `Configuration` |
@@ -1223,12 +1224,15 @@ Provider  ◆  THE LIFECYCLE — refresh(login), isAvailable, the switch, status
 **Built** — `Configuration` and `Accounts` are owning classes in
 `Modules/Providers`; `Provider` composes them and makes data sources at the
 configuration's revision. Test Connection and `hasKey` are the lifecycle's
-(`provider.testConnection`, `provider.hasKey`). Tests that hold only a login
-keep its provider (`keep(_:)` in each test target), as the app's `Providers`
-does — `unowned` turns a dropped provider into a crash, which is the point.
+(`provider.testConnection`, `provider.hasKey`). The login's `unowned`
+reference back, and the tests' `keep(_:)` it needed, are gone — reversed by
+slice 7.
 
 ~~**Open.** Should a login stop pointing at its product (`Account.provider`)?~~
-**Answered (2026-10-04): `unowned` — composition.** The provider owns its
+~~**Answered (2026-10-04): `unowned` — composition.**~~ **Reversed by slice 7
+the same day:** `unowned` turned the leak into a crash for anyone holding a
+login after its provider went. What follows is kept as the record of why it
+was tried. The provider owns its
 children: when it is destroyed, so are they. A login's reference to its
 product is therefore non-owning and never outlives it (`unowned`, not `weak`,
 which would say a login can outlive its product). It breaks the retain cycle
@@ -1238,6 +1242,61 @@ product removes its logins from every surface (the lineup is derived from
 `Providers`, so nothing keeps one). `Configuration` and `Accounts` hold no
 reference up at all. Not chosen: a reference by id with every call told to
 the root (the type cycle goes too, but most views change).
+
+#### Slice 7 in detail — a login knows only itself
+
+> **Status: BUILT** (2026-10-04, confirmed the same day). Reverses slice
+> 6's `unowned` answer above. No new type: the tree already has the root and
+> the login (CANONICAL §1: `lineup → [Account]`).
+
+**The problem.** Slice 6 made `Account.provider` `unowned`: the leak became
+a crash. Any holder of a login that let its provider go — a view during a
+delete, a test — aborts the process, and the tests needed a global `keep()`
+array to imitate the app's ownership. `InUse` holds its provider the same
+way. The cycle `Provider ↔ Account` is still there, only cheaper.
+
+**The rule: a child knows only itself; outside, you reach it through its
+root** (DDD: an aggregate's entities are reached through the root, and
+another thing is referred to by its id).
+
+```text
+Providers                       resolves a login's product: provider(of: account) — by id
+└── Provider  ◆                 the root — every product-level question about one of its
+    │                           logins: isInLineup(_:), lineupName(of:), refresh(_:),
+    │                           isAvailable(_:), hasKey, dashboardURL(of:), inUse, history…
+    ├── accounts: Accounts ◆    owns the logins
+    │   └── Account  ◆          A LOGIN — knows only itself: id, providerId (a value), label,
+    │                           email, values, its pause, what we last saw; and what its
+    │                           definition alone says (folder, cliCommand, status page,
+    │                           setup notice). Given its definition and settings at birth,
+    │                           never its provider
+    ├── configuration ◆
+    └── inUse: InUse?           reads `accounts` below it — never its provider
+```
+
+**How a child refers back, in order of preference:** no back-reference →
+the parent passed in as a parameter (or the parent answers) → `weak` →
+`unowned`. `unowned` comes last: it is the only one that crashes when the
+assumption is wrong, and it fits only a private helper that can never be
+handed out. Anything public — `@Observable`, held by views, lists, Tasks or
+tests, or awaiting — gets no back-reference; a callback stored in a public
+object captures `weak`.
+
+| Law | Owner |
+|---|---|
+| a login never refers to its provider; it names it by id. Nothing a provider owns refers up — `Account`, `InUse`, `Accounts` are public, so none holds a back-reference; `Accounts.onChange` captures `weak` | `Account` · each role |
+| a login's product is found through the root, `providers.provider(of:)` — `nil` once it is gone, never a crash | `Providers` |
+| each product-level answer about a login has one owner: its provider | `Provider` |
+| deleting a product removes its logins from every surface, because the lineup is rebuilt without it | `Providers` |
+
+**What dies:** `Account.provider` and `unowned` on `InUse`; `keep()` and
+its copies; `Account`'s forwarding members (`refresh`, `isAvailable`,
+`isInLineup`, `lineupName`, `dashboardURL`, `isInUse`, `usageHistory`, …),
+which move to `Provider`.
+
+**What it costs:** surfaces that climbed `account.provider` or called a
+forwarding member ask the root instead — the Monitor for views
+(`monitor.refresh(login)`, `monitor.lineupName(of:)`), the provider in tests.
 
 ### 12.4 · Decided
 

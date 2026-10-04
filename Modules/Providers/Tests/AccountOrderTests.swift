@@ -40,7 +40,7 @@ struct AccountOrderTests {
         first.accounts.move(first.accounts[2], to: 0)
 
         #expect(first.accounts.map(\.accountId) == ["side", "default", "work"])
-        #expect(try keep(codex(settings)).accounts.map(\.accountId) == ["side", "default", "work"])
+        #expect(try codex(settings).accounts.map(\.accountId) == ["side", "default", "work"])
     }
 
     @Test
@@ -62,7 +62,7 @@ struct AccountOrderTests {
 
         first.accounts.add(login("new"))
 
-        #expect(try keep(codex(settings)).accounts.map(\.accountId) == ["side", "default", "work", "new"])
+        #expect(try codex(settings).accounts.map(\.accountId) == ["side", "default", "work", "new"])
     }
 
     @Test

@@ -22,11 +22,11 @@ struct NotSetUpTests {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         cliNotFound(claude)
-        let account = try claude.provider()
+        let provider = try claude.provider()
 
-        _ = try? await account.refresh()
+        _ = try? await provider.refreshPlain()
 
-        #expect(account.needsSetup)
+        #expect(provider.defaultAccount.needsSetup)
     }
 
     @Test
@@ -34,11 +34,11 @@ struct NotSetUpTests {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         cliNotFound(claude)
-        let account = try claude.provider(settings: InMemoryProviderSettings(dataSourceKinds: ["claude": "api"]))
+        let provider = try claude.provider(settings: InMemoryProviderSettings(dataSourceKinds: ["claude": "api"]))
 
-        _ = try? await account.refresh()
+        _ = try? await provider.refreshPlain()
 
-        #expect(account.needsSetup)
+        #expect(provider.defaultAccount.needsSetup)
     }
 
     @Test
@@ -48,19 +48,19 @@ struct NotSetUpTests {
         given(claude.cli).locate(.any).willReturn("/usr/local/bin/claude")
         given(claude.cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
             .willThrow(UsageError.executionFailed("claude is not running"))
-        let account = try claude.provider()
+        let provider = try claude.provider()
 
-        _ = try? await account.refresh()
+        _ = try? await provider.refreshPlain()
 
-        #expect(account.lastError != nil)
-        #expect(!account.needsSetup)
+        #expect(provider.defaultAccount.lastError != nil)
+        #expect(!provider.defaultAccount.needsSetup)
     }
 
     @Test
     func `a login that has never refreshed is not yet waiting for setup`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        #expect(try !claude.provider().needsSetup)
+        #expect(try !claude.provider().defaultAccount.needsSetup)
     }
 
     @Test
@@ -87,11 +87,11 @@ struct NotSetUpTests {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         cliNotFound(claude)
-        let account = try claude.provider()
-        _ = try? await account.refresh()
+        let provider = try claude.provider()
+        _ = try? await provider.refreshPlain()
 
-        #expect(account.setupNotice.title == "See your session and weekly limits")
-        #expect(account.setupNotice.button == "Set up Claude Code")
+        #expect(provider.setupNotice(of: provider.defaultAccount).title == "See your session and weekly limits")
+        #expect(provider.setupNotice(of: provider.defaultAccount).button == "Set up Claude Code")
     }
 
     @Test
@@ -111,7 +111,7 @@ struct NotSetUpTests {
     func `a login with no usage history reads no usage`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        let account = try claude.provider()
-        #expect(!account.readsUsage)
+        let provider = try claude.provider()
+        #expect(!provider.defaultAccount.readsUsage)
     }
 }

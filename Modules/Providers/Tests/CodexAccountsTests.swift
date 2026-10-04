@@ -21,10 +21,10 @@ struct CodexAccountsTests {
         stub.answerRPC(Self.usage)
         let codex = try stub.make("codex")
 
-        await #expect(throws: UsageError.self) { try await codex.refresh(.background) }
+        await #expect(throws: UsageError.self) { try await codex.refreshPlain(.background) }
 
         #expect(stub.launches.count == 0)
-        #expect(codex.lastError?.localizedDescription.contains("Click Refresh or Connect") == true)
+        #expect(codex.defaultAccount.lastError?.localizedDescription.contains("Click Refresh or Connect") == true)
     }
 
     @Test
@@ -34,7 +34,7 @@ struct CodexAccountsTests {
         stub.answerRPC(Self.usage)
         let codex = try stub.make("codex")
 
-        await #expect(throws: UsageError.self) { try await codex.refresh(.passive) }
+        await #expect(throws: UsageError.self) { try await codex.refreshPlain(.passive) }
 
         #expect(stub.launches.count == 0)
     }
@@ -46,8 +46,8 @@ struct CodexAccountsTests {
         stub.answerRPC(Self.usage)
         let codex = try stub.make("codex")
 
-        try await codex.refresh()
-        let background = try await codex.refresh(.background)
+        try await codex.refreshPlain()
+        let background = try await codex.refreshPlain(.background)
 
         #expect(stub.settings.isOn("verifiedAtLeastOnce", forProvider: "codex") == true)
         #expect(background.quota(for: .session)?.percentRemaining == 80)
@@ -61,7 +61,7 @@ struct CodexAccountsTests {
         try stub.writeCodexAuth(accountId: "account")
         stub.answerHTTP(#"{"rate_limit":{"primary_window":{"used_percent":10}}}"#)
 
-        try await stub.make("codex").refresh()
+        try await stub.make("codex").refreshPlain()
 
         #expect(stub.settings.isOn("verifiedAtLeastOnce", forProvider: "codex") == nil)
     }
@@ -74,7 +74,7 @@ struct CodexAccountsTests {
         stub.answerRPC(Self.usage)
         stub.answerTerminal("5h limit: 99% left")
 
-        await #expect(throws: UsageError.authenticationRequired) { try await stub.make("codex").refresh() }
+        await #expect(throws: UsageError.authenticationRequired) { try await stub.make("codex").refreshPlain() }
 
         #expect(stub.launches.count == 0)
     }
@@ -85,7 +85,7 @@ struct CodexAccountsTests {
         defer { stub.cleanUp() }
         stub.answerRPC(Self.usage, account: #"{"id":3,"result":{"account":{"type":"chatgpt","email":"keychain@example.com"}}}"#)
 
-        let usage = try await stub.make("codex").refresh()
+        let usage = try await stub.make("codex").refreshPlain()
 
         #expect(usage.accountEmail == "keychain@example.com")
         #expect(usage.lowestQuota?.percentRemaining == 80)
@@ -99,9 +99,9 @@ struct CodexAccountsTests {
         defer { stub.cleanUp() }
         let folder = try writeLogin(in: stub.home, "work", email: "work@example.com", accountId: "work")
         stub.answerRPC(Self.usage)
-        let account = try stub.make("codex", account: config("a", folder: folder, accountId: "work"))
+        let (product, account) = try stub.makeAdded("codex", account: config("a", folder: folder, accountId: "work"))
 
-        try await account.refresh(.background)
+        try await product.refresh(account, .background)
 
         let launch = try #require(stub.launches.last)
         #expect(launch.environment?["CODEX_HOME"] == folder.path)
@@ -116,18 +116,18 @@ struct CodexAccountsTests {
         defer { stub.cleanUp() }
         let a = try writeLogin(in: stub.home, "a", email: "a@example.com", accountId: "a")
         stub.answerRPC(Self.usage)
-        let first = try stub.make("codex", account: config("a", folder: a, accountId: "a", email: "a@example.com"))
-        let second = try stub.make("codex", account: config(
+        let (firstProduct, first) = try stub.makeAdded("codex", account: config("a", folder: a, accountId: "a", email: "a@example.com"))
+        let (secondProduct, second) = try stub.makeAdded("codex", account: config(
             "b", folder: stub.home.appendingPathComponent("signed-out"), accountId: "b", email: "b@example.com"
         ))
 
-        let usage = try await first.refresh()
-        await #expect(throws: UsageError.self) { try await second.refresh() }
+        let usage = try await firstProduct.refresh(first)
+        await #expect(throws: UsageError.self) { try await secondProduct.refresh(second) }
 
         #expect(first.id == "codex.a")
         #expect(second.id == "codex.b")
-        #expect(first.lineupName == "a@example.com")
-        #expect(second.lineupName == "b@example.com")
+        #expect(firstProduct.lineupName(of: first) == "a@example.com")
+        #expect(secondProduct.lineupName(of: second) == "b@example.com")
         #expect(usage.providerId == "codex.a")
         #expect(usage.quotas.first?.providerId == "codex.a")
         #expect(second.snapshot == nil)
@@ -141,11 +141,11 @@ struct CodexAccountsTests {
         let folder = try writeLogin(in: stub.home, "work", email: "signed-in@example.com", accountId: "work")
         stub.answerRPC(Self.usage)
         stub.answerHTTP(#"{"rate_limit":{"primary_window":{"used_percent":10}}}"#)
-        let account = try stub.make("codex", account: config("a", folder: folder, accountId: "work"))
+        let (product, account) = try stub.makeAdded("codex", account: config("a", folder: folder, accountId: "work"))
 
-        let viaRPC = try await account.refresh()
-        account.provider.configuration.use("api")
-        let viaAPI = try await account.refresh()
+        let viaRPC = try await product.refresh(account)
+        product.configuration.use("api")
+        let viaAPI = try await product.refresh(account)
 
         #expect(viaRPC.accountEmail == "signed-in@example.com")
         #expect(viaAPI.accountEmail == "signed-in@example.com")
@@ -158,10 +158,10 @@ struct CodexAccountsTests {
         let folder = try writeLogin(in: stub.home, "work", email: "other@example.com", accountId: "other")
         stub.answerRPC(Self.usage)
         given(stub.cli).locate(.any).willReturn("/usr/local/bin/codex")
-        let account = try stub.make("codex", account: config("a", folder: folder, accountId: "original"))
+        let (product, account) = try stub.makeAdded("codex", account: config("a", folder: folder, accountId: "original"))
 
-        #expect(await account.isAvailable() == false)
-        await #expect(throws: UsageError.self) { try await account.refresh() }
+        #expect(await product.isAvailable(account) == false)
+        await #expect(throws: UsageError.self) { try await product.refresh(account) }
 
         #expect(stub.launches.count == 0)
         #expect(account.lastError?.localizedDescription.contains("original account") == true)
@@ -257,7 +257,7 @@ struct CodexAccountsTests {
 
         #expect(codex.accounts.count == 3)
         #expect(codex.defaultAccount.id == "codex")
-        #expect(added.map(\.lineupName) == ["a@example.com", "b@example.com"])
+        #expect(added.map(codex.lineupName(of:)) == ["a@example.com", "b@example.com"])
         #expect(Set(codex.accounts.map(\.id)).count == 3)
         #expect(added[1].isEnabled)
         #expect(stub.settings.isEnabled(forProvider: added[0].id) == false)
@@ -338,8 +338,8 @@ struct CodexAccountsTests {
         given(stub.network).request(.matching { @Sendable in $0.value(forHTTPHeaderField: "ChatGPT-Account-Id") == "work" })
             .willReturn((Data(#"{"rate_limit":{"primary_window":{"used_percent":10}}}"#.utf8), StubbedProvider.response(200)))
 
-        try await me.refresh()
-        try await work.refresh()
+        try await codex.refresh(me)
+        try await codex.refresh(work)
 
         #expect(me.status == .critical)
         #expect(work.status == .healthy)

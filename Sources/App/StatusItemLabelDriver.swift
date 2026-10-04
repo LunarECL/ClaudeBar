@@ -247,14 +247,14 @@ final class StatusItemLabelDriver {
         let shownIds = [settings.menuBarPercentageProviderId] + additionalLabels.map(\.providerId)
         let accountNames = MenuBarAccountName.names(Dictionary(uniqueKeysWithValues: Set(shownIds).compactMap { id in
             monitor.login(id: id)
-                .flatMap { $0.provider.accounts.hasSeveral ? (id, settings.shown($0.displayName)) : nil }
+                .flatMap { monitor.product(of: $0)?.accounts.hasSeveral == true ? (id, settings.shown($0.displayName)) : nil }
         }))
         let primaryProviderName = Self.showsPrimaryLogo(
             showsQuota: showsQuota,
             hasOtherReadouts: !additionalLabels.isEmpty,
             hasAccountName: accountNames[settings.menuBarPercentageProviderId] != nil,
             logoAlways: settings.menuBarProviderLogoEnabled
-        ) ? primaryProvider.map { settings.shown($0.lineupName) } : nil
+        ) ? primaryProvider.map { settings.shown(monitor.lineupName(of: $0)) } : nil
 
         return LabelContent(
             label: label,

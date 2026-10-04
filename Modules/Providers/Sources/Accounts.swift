@@ -30,33 +30,29 @@ public final class Accounts {
     @ObservationIgnored private let configuration: Configuration
     @ObservationIgnored private let folders: any LoginFolders
     @ObservationIgnored private let makeDataSource: (DataSourceDefinition, String) -> DataSource
-    @ObservationIgnored private let defaultHistory: UsageHistory?
     @ObservationIgnored private let makeUsageHistory: ((UsageLog.Definition, String) -> UsageHistory)?
-    /// Each added login's own usage history, by lineup id.
-    @ObservationIgnored private var histories: [String: UsageHistory] = [:]
-    /// Given once by the provider: how a login is made, and where changes go.
-    @ObservationIgnored private var makeLogin: ((ProviderAccount, [String: String], AccountOrigin?) -> Account)!
+    /// Where what happened goes — given once by the provider.
     @ObservationIgnored private var onChange: (Change) -> Void = { _ in }
 
     init(definition: ProviderDefinition, settings: any MultiAccountSettingsRepository, configuration: Configuration,
          folders: any LoginFolders, makeDataSource: @escaping (DataSourceDefinition, String) -> DataSource,
-         defaultHistory: UsageHistory?, makeUsageHistory: ((UsageLog.Definition, String) -> UsageHistory)?) {
+         makeUsageHistory: ((UsageLog.Definition, String) -> UsageHistory)?) {
         self.definition = definition
         self.settings = settings
         self.configuration = configuration
         self.folders = folders
         self.makeDataSource = makeDataSource
-        self.defaultHistory = defaultHistory
         self.makeUsageHistory = makeUsageHistory
     }
 
-    /// The logins saved for this provider, made — the default first, then
-    /// each saved one, in the saved order.
-    func start(makeLogin: @escaping (ProviderAccount, [String: String], AccountOrigin?) -> Account,
+    /// The logins saved for this provider, made — the plain login first
+    /// (with the history and guest passes only it has), then each saved one,
+    /// in the saved order.
+    func start(plainHistory: UsageHistory?, guestPasses: GuestPasses?,
                onChange: @escaping (Change) -> Void, saved: [ProviderAccountConfig]) {
-        self.makeLogin = makeLogin
         let label = settings.defaultAccountLabel(forProvider: id) ?? ""
-        logins = [makeLogin(ProviderAccount(providerId: id, label: label), [:], nil)]
+        logins = [Account(definition: definition, settings: settings, login: ProviderAccount(providerId: id, label: label),
+                          values: [:], usageHistory: plainHistory, guestPasses: guestPasses)]
         for config in saved { attach(config) }
         let order = settings.accountOrder(forProvider: id)
         logins = logins.enumerated().sorted { lhs, rhs in
@@ -107,11 +103,6 @@ public final class Accounts {
     /// data source uses.
     public var form: [Setting] {
         definition.accountSettings.filter { $0.isUsed(by: configuration.activeKind) }
-    }
-
-    /// A login's usage history: the plain login's, or an added login's own.
-    func history(for account: Account) -> UsageHistory? {
-        account.isDefault ? defaultHistory : histories[account.id]
     }
 
     // MARK: - Tell it
@@ -190,16 +181,14 @@ public final class Accounts {
     }
 
     /// *Re-auth* for a login ClaudeBar signed in to: runs the definition's
-    /// login again in that login's own folder, then refreshes it — so the
+    /// login again in that login's own folder. Refresh it after, so the
     /// identity rule decides whether the same person came back. A folder the
     /// person chose is theirs to sign in to; ClaudeBar never runs a login there.
-    @discardableResult
-    public func signInAgain(_ account: Account, with runner: AccountSignIn = AccountSignIn()) async throws -> UsageSnapshot {
+    public func signInAgain(_ account: Account, with runner: AccountSignIn = AccountSignIn()) async throws {
         guard let call = configuration.running.accounts?.signIn, let folder = account.folder, folder.goesWithAccount else {
             throw UsageError.executionFailed("Sign in again in this folder yourself, then refresh.")
         }
         try await runner.signInAgain(call, in: folder.url)
-        return try await account.refresh(.interactive)
     }
 
     /// *Remove* — forgets the login here and its saved settings, and deletes
@@ -215,7 +204,7 @@ public final class Accounts {
             configuration.vault?.delete(setting.id, provider: account.id)
         }
         logins.removeAll { $0 === account }
-        histories[account.id] = nil
+        account.usageHistory = nil
         settings.removeAccount(accountId: account.accountId, forProvider: id)
         onChange(.removed(account))
     }
@@ -244,7 +233,7 @@ public final class Accounts {
     // MARK: - Private
 
     /// A saved login made — its values checked against what the definition
-    /// needs, its own usage history beside it.
+    /// needs, its own usage history handed to it.
     @discardableResult
     private func attach(_ config: ProviderAccountConfig) -> Account? {
         let login = config.toProviderAccount(providerId: id)
@@ -257,11 +246,10 @@ public final class Accounts {
             AppLog.providers.error("\(self.id): can't run account \(login.id): \(error.localizedDescription)")
             return nil
         }
-        let account = makeLogin(login, config.probeConfig, config.madeBy)
+        let history = definition.usageHistory(forAccount: config.probeConfig).flatMap { own in makeUsageHistory?(own, login.id) }
+        let account = Account(definition: definition, settings: settings, login: login, values: config.probeConfig,
+                              madeBy: config.madeBy, usageHistory: history)
         logins.append(account)
-        if let makeUsageHistory, let own = definition.usageHistory(forAccount: config.probeConfig) {
-            histories[login.id] = makeUsageHistory(own, login.id)
-        }
         return account
     }
 

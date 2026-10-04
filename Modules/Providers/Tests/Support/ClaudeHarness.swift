@@ -42,15 +42,15 @@ struct ClaudeHarness {
         settings: any MultiAccountSettingsRepository = InMemoryProviderSettings(),
         accounts: [ProviderAccountConfig] = [],
         guestPasses: GuestPasses? = nil
-    ) throws -> Account {
+    ) throws -> Provider {
         let definition = try ProviderFactory.builtIn("claude")
-        return keep(Provider(
+        return Provider(
             definition: definition,
             settings: settings,
             accounts: accounts,
             makeDataSource: make,
             guestPasses: guestPasses
-        )).defaultAccount
+        )
     }
 
     private func make(_ source: DataSourceDefinition) -> DataSource {

@@ -1,15 +1,15 @@
 import Foundation
 @testable import Domain
 
-/// A login for tests about the Monitor, the lineup and selection: a real
+/// A product for tests about the Monitor, the lineup and selection: a real
 /// `Provider` from a one-source definition, its connection stubbed to answer
 /// with whatever `probe` says (TARGET §12, slice 3 — "the test stubs become
 /// definitions over stubbed connections"). Only the identity matters here;
 /// each real provider is tested end to end in `ProvidersTests`.
 @MainActor
-func stubbedLogin(_ id: String, name: String? = nil, probe: any UsageProbe,
-                  settings: any ProviderSettingsRepository, available: Bool = true,
-                  backgroundRefreshFloor: Duration? = nil) -> Account {
+func stubbedProduct(_ id: String, name: String? = nil, probe: any UsageProbe,
+               settings: any ProviderSettingsRepository, available: Bool = true,
+               backgroundRefreshFloor: Duration? = nil) -> Provider {
     // A data source with a cache sets the background floor, as Claude's API does.
     let cache = backgroundRefreshFloor.map { #","cache":{"ttl":\#($0.components.seconds)}"# } ?? ""
     let json = """
@@ -26,13 +26,13 @@ func stubbedLogin(_ id: String, name: String? = nil, probe: any UsageProbe,
                          environment: { $0 == "STUB_READY" && available ? "ready" : nil },
                          homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
     })
-    return keep(provider).defaultAccount
+    return provider
 }
 
-/// The providers a test keeps — each login's product, once, in order.
+/// The providers a test keeps, in order.
 @MainActor
-func kept(_ logins: [Account], settings: (any ProviderSettingsRepository)? = nil) -> Providers {
-    Providers(logins.map(\.provider), settings: settings, make: { _ in fatalError("tests don't add providers") })
+func kept(_ products: [Provider], settings: (any ProviderSettingsRepository)? = nil) -> Providers {
+    Providers(products, settings: settings, make: { _ in fatalError("tests don't add providers") })
 }
 
 /// The stubbed connection: answers each request with the probe's usage, as

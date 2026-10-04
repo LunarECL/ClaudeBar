@@ -42,7 +42,7 @@ struct NewSessionsTests {
 
         sessions.use(codex.accounts[1])
 
-        #expect(codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) == true)
         #expect(sessions.waiting == nil)
     }
 
@@ -53,7 +53,7 @@ struct NewSessionsTests {
 
         sessions.use(codex.accounts[1])
 
-        #expect(!codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) != true)
         #expect(sessions.isWaiting(in: codex))
     }
 
@@ -67,7 +67,7 @@ struct NewSessionsTests {
 
         #expect(sessions.isSetUp)
         #expect(lines.installed == [.bash])
-        #expect(codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) == true)
         #expect(sessions.waiting == nil)
     }
 
@@ -80,7 +80,7 @@ struct NewSessionsTests {
         let copied = sessions.setUpByHand()
 
         #expect(copied == "# lines for zsh")
-        #expect(codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) == true)
     }
 
     @Test
@@ -91,7 +91,7 @@ struct NewSessionsTests {
 
         sessions.cancel()
 
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
         #expect(sessions.waiting == nil)
     }
 
@@ -105,7 +105,7 @@ struct NewSessionsTests {
 
         sessions.use(codex.defaultAccount)
 
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
         #expect(sessions.waiting == nil)
     }
 
@@ -120,7 +120,7 @@ struct NewSessionsTests {
 
         #expect(!sessions.isSetUp)
         #expect(lines.installed.isEmpty)
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
     }
 
     @Test
@@ -181,7 +181,7 @@ struct NewSessionsTests {
         let sessions = NewSessions(products: [codex], shellLines: lines, shell: .zsh)
 
         #expect(sessions.use(providerId: "codex", account: "work") == .used)
-        #expect(codex.accounts[1].isInUse)
+        #expect(codex.inUse?.isInUse(codex.accounts[1]) == true)
     }
 
     @Test
@@ -199,7 +199,7 @@ struct NewSessionsTests {
 
         #expect(sessions.use(providerId: "gemini", account: "work") == .unknown)
         #expect(sessions.use(providerId: "codex", account: "someone") == .unknown)
-        #expect(codex.defaultAccount.isInUse)
+        #expect(codex.inUse?.isInUse(codex.defaultAccount) == true)
     }
 
     // MARK: - The alert a notice becomes

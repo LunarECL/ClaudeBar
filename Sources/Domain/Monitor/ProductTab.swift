@@ -38,13 +38,13 @@ public struct ProductTab: Identifiable {
         accounts.contains { $0.id == lineupId }
     }
 
-    /// The lineup as tabs, in the order products first appear in it.
-    public static func tabs(of lineup: [Account]) -> [ProductTab] {
+    /// The lineup as tabs, in the order products first appear in it — each
+    /// login's product found through the root.
+    public static func tabs(of lineup: [Account], in providers: Providers) -> [ProductTab] {
         let shown = Set(lineup.map(\.id))
         var seen: Set<String> = []
         return lineup.compactMap { login in
-            let product = login.provider
-            guard seen.insert(product.id).inserted else { return nil }
+            guard let product = providers.provider(of: login), seen.insert(product.id).inserted else { return nil }
             return ProductTab(provider: product, accounts: product.accounts.filter { shown.contains($0.id) })
         }
     }

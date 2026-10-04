@@ -18,7 +18,7 @@ struct LeaderboardPopoverView: View {
 /// A provider's name as ClaudeBar shows it, from its id.
 @MainActor
 func leaderboardProviderName(_ id: String, in monitor: QuotaMonitor) -> String {
-    monitor.logins.first { $0.provider.id == id }?.provider.name ?? id.capitalized
+    monitor.providers.provider(id: id)?.name ?? id.capitalized
 }
 
 /// A card in the current theme.

@@ -77,7 +77,7 @@ public final class Provider {
     public var inUse: InUse? { ... }
 }
 
-if let inUse = account.provider.inUse { inUse.use(account) }
+if let inUse = provider.inUse { try inUse.use(account) }   // ask the product, never the login
 ```
 
 ## Value Types for Data

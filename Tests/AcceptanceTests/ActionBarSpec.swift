@@ -55,15 +55,15 @@ struct ActionBarSpec {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let copilot = try keep(ProviderFactory.make("copilot", settings: settings)).defaultAccount
-            #expect(copilot.dashboardURL?.absoluteString == "https://github.com/settings/copilot/features")
+            let copilot = try ProviderFactory.make("copilot", settings: settings)
+            #expect(copilot.dashboardURL(of: copilot.defaultAccount)?.absoluteString == "https://github.com/settings/copilot/features")
         }
 
         @Test
         func `Antigravity has no dashboard URL`() throws {
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
-            let antigravity = try keep(ProviderFactory.make("antigravity", settings: settings)).defaultAccount
-            #expect(antigravity.dashboardURL == nil)
+            let antigravity = try ProviderFactory.make("antigravity", settings: settings)
+            #expect(antigravity.dashboardURL(of: antigravity.defaultAccount) == nil)
         }
 
         @Test
@@ -71,8 +71,8 @@ struct ActionBarSpec {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let bedrock = try keep(ProviderFactory.make("bedrock", settings: settings)).defaultAccount
-            #expect(bedrock.dashboardURL?.absoluteString == "https://console.aws.amazon.com/bedrock/home")
+            let bedrock = try ProviderFactory.make("bedrock", settings: settings)
+            #expect(bedrock.dashboardURL(of: bedrock.defaultAccount)?.absoluteString == "https://console.aws.amazon.com/bedrock/home")
         }
 
         @Test
@@ -80,8 +80,8 @@ struct ActionBarSpec {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-            let zai = try keep(ProviderFactory.make("zai", settings: settings)).defaultAccount
-            #expect(zai.dashboardURL?.absoluteString == "https://z.ai/subscribe")
+            let zai = try ProviderFactory.make("zai", settings: settings)
+            #expect(zai.dashboardURL(of: zai.defaultAccount)?.absoluteString == "https://z.ai/subscribe")
         }
     }
 
@@ -98,8 +98,8 @@ struct ActionBarSpec {
         @Test
         func `Claude offers guest passes only when it has a pass probe`() throws {
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
-            let withoutPasses = try keep(ProviderFactory.make("claude", settings: settings)).defaultAccount
-            let withPasses = try keep(ProviderFactory.make("claude", settings: settings, guestPasses: GuestPasses(source: MockGuestPassSource()))).defaultAccount
+            let withoutPasses = try ProviderFactory.make("claude", settings: settings).defaultAccount
+            let withPasses = try ProviderFactory.make("claude", settings: settings, guestPasses: GuestPasses(source: MockGuestPassSource())).defaultAccount
 
             #expect(withoutPasses.guestPasses == nil)
             #expect(withPasses.guestPasses != nil)

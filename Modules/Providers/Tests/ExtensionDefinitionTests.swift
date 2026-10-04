@@ -81,7 +81,7 @@ struct ExtensionDefinitionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let provider = ProviderFactory.make(try read(try example()), settings: InMemoryProviderSettings())
 
-        let usage = try await provider.defaultAccount.refresh()
+        let usage = try await provider.refreshPlain()
 
         #expect(usage.quota(for: .session)?.percentRemaining == 85)
         #expect(usage.quota(for: .weekly)?.percentRemaining == 62)

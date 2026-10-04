@@ -226,7 +226,7 @@ struct ClaudeUsageHistoryTests {
         try FileManager.default.createDirectory(at: work.appendingPathComponent("projects/p"), withIntermediateDirectories: true)
         try Self.line("acme-internal-7b").write(to: work.appendingPathComponent("projects/p/s.jsonl"), atomically: true, encoding: .utf8)
         try #"{"env":{"ANTHROPIC_BASE_URL":"http://localhost:11434"}}"#.write(to: work.appendingPathComponent(".claude.json"), atomically: true, encoding: .utf8)
-        let added = try #require(try keep(provider(work: work)).accounts.first { !$0.isDefault })
+        let added = try #require(try provider(work: work).accounts.first { !$0.isDefault })
 
         await added.usageHistory?.read()
 

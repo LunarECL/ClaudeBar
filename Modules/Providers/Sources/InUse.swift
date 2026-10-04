@@ -12,7 +12,12 @@ import Quotas
 @MainActor
 @Observable
 public final class InUse {
-    @ObservationIgnored private unowned let provider: Provider
+    /// Its product's logins — below it; never the product itself (TARGET §12,
+    /// slice 7: anything public holds no back-reference).
+    @ObservationIgnored private let accounts: Accounts
+    /// Its product, by name — for what it says.
+    @ObservationIgnored private let productId: String
+    @ObservationIgnored private let productName: String
     /// The command new sessions run, and the variable that points it at a folder.
     public let command: TerminalCommand
     /// *Switch when low* — the opt-in policy `review()` asks.
@@ -22,47 +27,60 @@ public final class InUse {
     /// The suggestion already told — `<in use>><suggested>` — so a low is told once.
     @ObservationIgnored private var told: String?
 
-    init(provider: Provider, command: TerminalCommand, record: any LoginsInUse, switchWhenLow: SwitchWhenLow) {
-        self.provider = provider
+    init(accounts: Accounts, productId: String, productName: String, command: TerminalCommand,
+         record: any LoginsInUse, switchWhenLow: SwitchWhenLow) {
+        self.accounts = accounts
+        self.productId = productId
+        self.productName = productName
         self.command = command
         self.record = record
         self.switchWhenLow = switchWhenLow
-        self.loginId = provider.defaultAccount.id
+        self.loginId = accounts.plain.id
         // A record naming a folder no login has is the plain login.
         if let folder = record.folder(for: command.name),
-           let chosen = provider.accounts.first(where: { $0.folder?.url.path == folder.standardizedFileURL.path }) {
+           let chosen = accounts.first(where: { $0.folder?.url.path == folder.standardizedFileURL.path }) {
             loginId = chosen.id
         }
     }
 
     /// The login new sessions start with — the plain login until another is chosen.
     public var login: Account {
-        provider.accounts.first { $0.id == loginId } ?? provider.defaultAccount
+        accounts.first { $0.id == loginId } ?? accounts.plain
     }
 
     /// The logins new sessions can start on: the plain login and every folder login.
     public var logins: [Account] {
-        provider.accounts.filter { $0.isDefault || $0.folder != nil }
+        accounts.filter { $0.isDefault || $0.folder != nil }
     }
 
     /// Whether there is a choice to offer: more than one login to start on.
     public var offersChoice: Bool { logins.count > 1 }
 
+    /// Whether `account` is the login new sessions start with — only when
+    /// there is a choice.
+    public func isInUse(_ account: Account) -> Bool { canBeInUse(account) && login === account }
+
+    /// Whether `account` can be chosen for new sessions: there is a choice,
+    /// and it is one of the logins offered.
+    public func canBeInUse(_ account: Account) -> Bool {
+        offersChoice && logins.contains { $0 === account }
+    }
+
     /// *Use for new sessions* — records `account`'s folder, nothing for the plain login.
     public func use(_ account: Account) throws {
         guard logins.contains(where: { $0 === account }) else {
-            throw UsageError.executionFailed("This login can't be used for new \(provider.name) sessions.")
+            throw UsageError.executionFailed("This login can't be used for new \(productName) sessions.")
         }
         try record.use(account.isDefault ? nil : account.folder?.url, for: command.name)
         loginId = account.id
-        AppLog.providers.info("\(provider.id): new sessions use \(account.isDefault ? "the plain login" : "an added login")")
+        AppLog.providers.info("\(productId): new sessions use \(account.isDefault ? "the plain login" : "an added login")")
     }
 
     /// The removed login was in use: new sessions go back to the plain login.
     func forget(_ account: Account) {
         guard loginId == account.id else { return }
         try? record.use(nil, for: command.name)
-        loginId = provider.defaultAccount.id
+        loginId = accounts.plain.id
     }
 
     /// The login worth moving to: the one in use is critical or out, and

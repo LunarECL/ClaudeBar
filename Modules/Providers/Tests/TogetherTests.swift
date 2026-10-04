@@ -36,7 +36,7 @@ struct TogetherTests {
         try write("cost.json", #"{"costUsage":{"totalCost":10.26,"apiDuration":0}}"#)
         let acme = try provider()
 
-        let usage = try await acme.defaultAccount.refresh()
+        let usage = try await acme.refreshPlain()
 
         #expect(usage.quota(for: .weekly)?.percentRemaining == 62)
         #expect(usage.costUsage?.totalCost == Decimal(string: "10.26"))
@@ -48,7 +48,7 @@ struct TogetherTests {
         try write("quotas.json", #"{"quotas":[{"type":"weekly","percentRemaining":62}]}"#)
         let acme = try provider()
 
-        let usage = try await acme.defaultAccount.refresh()
+        let usage = try await acme.refreshPlain()
 
         #expect(usage.quota(for: .weekly)?.percentRemaining == 62)
         #expect(usage.costUsage == nil)
@@ -62,7 +62,7 @@ struct TogetherTests {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let acme = try provider()
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain() }
         #expect(acme.defaultAccount.lastError != nil)
     }
 
@@ -73,7 +73,7 @@ struct TogetherTests {
         try write("cost.json", #"{"costUsage":{"totalCost":10.26,"apiDuration":0}}"#)
         let acme = try provider(together: false)
 
-        let usage = try await acme.defaultAccount.refresh()
+        let usage = try await acme.refreshPlain()
 
         #expect(usage.quota(for: .weekly) != nil)
         #expect(usage.costUsage == nil)

@@ -43,12 +43,17 @@ public final class Providers {
 
     /// The enabled logins of enabled providers, in the pane's order — what
     /// the pills, the menu bar, refreshes and alerts show. Derived, never kept.
-    public var lineup: [Account] { logins.filter(\.isInLineup) }
+    public var lineup: [Account] { all.flatMap { provider in provider.accounts.filter(provider.isInLineup) } }
 
     public func provider(id: String) -> Provider? { all.first { $0.id == id } }
 
     /// A login by its lineup id — `claude`, `codex.<acct>`.
     public func login(id: String) -> Account? { logins.first { $0.id == id } }
+
+    /// A login's product — found by the id the login names, `nil` once it is
+    /// gone. The way to ask anything product-level about a login (TARGET §12,
+    /// slice 7: a login never refers to its provider).
+    public func provider(of account: Account) -> Provider? { provider(id: account.providerId) }
 
     // MARK: - Create
 

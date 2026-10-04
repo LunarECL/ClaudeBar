@@ -89,8 +89,8 @@ struct AccountFormTests {
         let openRouter = provider(try openRouter(), vault: vault, network: network(["sk-mine": 40, "sk-work": 7]))
 
         let work = try openRouter.accounts.add(filling: ["apiKey": "sk-work"])
-        let theirs = try await work.refresh()
-        let mine = try await openRouter.defaultAccount.refresh()
+        let theirs = try await openRouter.refresh(work)
+        let mine = try await openRouter.refreshPlain()
 
         #expect(theirs.quotas.first?.left == .money(Money(7, currency: "USD"), of: Money(50, currency: "USD")))
         #expect(mine.quotas.first?.left == .money(Money(40, currency: "USD"), of: Money(50, currency: "USD")))
@@ -105,7 +105,7 @@ struct AccountFormTests {
         let work = try openRouter.accounts.add(filling: ["apiKey": "sk-work"])
 
         #expect(openRouter.isEnabled)
-        #expect(work.isInLineup)
+        #expect(openRouter.isInLineup(work))
     }
 
     @Test
@@ -127,7 +127,7 @@ struct AccountFormTests {
         let work = try openRouter.accounts.add(filling: ["apiKey": "sk-work"])
         vault.secrets["\(work.id).apiKey"] = nil
 
-        await #expect(throws: (any Error).self) { try await work.refresh() }
+        await #expect(throws: (any Error).self) { try await openRouter.refresh(work) }
 
         #expect(work.lastFailedStep == .lookup)
     }
@@ -159,7 +159,7 @@ struct AccountFormTests {
         try first.accounts.add(filling: ["apiKey": "sk-work"])
 
         let relaunched = provider(try openRouter(), vault: vault, network: network(["sk-work": 7]), settings: settings)
-        let usage = try await relaunched.accounts[1].refresh()
+        let usage = try await relaunched.refresh(relaunched.accounts[1])
 
         #expect(usage.quotas.first?.left == .money(Money(7, currency: "USD"), of: Money(50, currency: "USD")))
     }

@@ -26,7 +26,7 @@ struct ProductSwitchTests {
     func `a product is on, and every login of it is in the lineup`() throws {
         let codex = try codex(twoLogins())
 
-        let shown = codex.accounts.filter(\.isInLineup).count
+        let shown = codex.accounts.filter(codex.isInLineup).count
         #expect(codex.isEnabled)
         #expect(shown == 2)
     }
@@ -37,7 +37,7 @@ struct ProductSwitchTests {
 
         codex.isEnabled = false
 
-        let shown = codex.accounts.filter(\.isInLineup).count
+        let shown = codex.accounts.filter(codex.isInLineup).count
         let on = codex.accounts.filter(\.isEnabled).count
         #expect(shown == 0)
         #expect(on == 2)
@@ -50,8 +50,8 @@ struct ProductSwitchTests {
         codex.defaultAccount.isEnabled = false
 
         #expect(codex.isEnabled)
-        #expect(!codex.defaultAccount.isInLineup)
-        #expect(codex.accounts[1].isInLineup)
+        #expect(!codex.plainIsInLineup)
+        #expect(codex.isInLineup(codex.accounts[1]))
     }
 
     @Test
@@ -79,7 +79,7 @@ struct ProductSwitchTests {
 
         #expect(codex.isEnabled)
         #expect(!codex.defaultAccount.isEnabled)
-        #expect(codex.accounts[1].isInLineup)
+        #expect(codex.isInLineup(codex.accounts[1]))
     }
 
     @Test

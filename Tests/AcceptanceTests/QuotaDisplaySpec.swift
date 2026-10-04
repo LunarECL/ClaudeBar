@@ -59,9 +59,10 @@ struct QuotaDisplaySpec {
                 """)
 
             try world.account(email: "user@example.com", organization: "Acme Corp")
-            let claude = try world.claude()
+            let claudeProduct = try world.claude()
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -110,9 +111,10 @@ struct QuotaDisplaySpec {
                 Login method: Claude Max
                 """)
 
-            let claude = try world.claude()
+            let claudeProduct = try world.claude()
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -143,9 +145,10 @@ struct QuotaDisplaySpec {
                 Resets in 30m
                 """)
 
-            let claude = try world.claude()
+            let claudeProduct = try world.claude()
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -211,9 +214,10 @@ struct QuotaDisplaySpec {
             given(settings).isEnabled(forProvider: .any).willReturn(true)
             given(settings).setEnabled(.any, forProvider: .any).willReturn()
 
-            let claude = stubbedLogin("claude", probe: probe, settings: settings, available: false)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings, available: false)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -236,9 +240,10 @@ struct QuotaDisplaySpec {
             given(settings).isEnabled(forProvider: .any).willReturn(true)
             given(settings).setEnabled(.any, forProvider: .any).willReturn()
 
-            let claude = stubbedLogin("claude", probe: probe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 

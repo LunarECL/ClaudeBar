@@ -55,12 +55,14 @@ struct ProviderEnableDisableSpec {
             let codexProbe = MockUsageProbe()
             // No setup — Codex should never be called
 
-            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
-            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
-                providers: kept([claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -93,10 +95,12 @@ struct ProviderEnableDisableSpec {
                 capturedAt: Date()
             ))
 
-            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
-            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -125,12 +129,14 @@ struct ProviderEnableDisableSpec {
         func `enabling Codex does not change Claude selection`() {
             // Given — Claude selected, Codex disabled
             let settings = ProviderEnableDisableSpec.makeSettings()
-            let claude = stubbedLogin("claude", probe: MockUsageProbe(), settings: settings)
-            let codex = stubbedLogin("codex", probe: MockUsageProbe(), settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: MockUsageProbe(), settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: MockUsageProbe(), settings: settings)
+            let codex = codexProduct.defaultAccount
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
-                providers: kept([claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
             #expect(monitor.selectedProviderId == "claude")

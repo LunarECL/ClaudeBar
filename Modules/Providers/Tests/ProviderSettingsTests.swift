@@ -71,7 +71,7 @@ struct ProviderSettingsTests {
 
         #expect(sent.hosts == ["api.acme.com"])
         #expect(settings.value("region", forProvider: "acme") == "international")
-        #expect(acme.defaultAccount.dashboardURL == URL(string: "https://console.acme.com/usage"))
+        #expect(acme.plainDashboardURL == URL(string: "https://console.acme.com/usage"))
     }
 
     @Test
@@ -83,7 +83,7 @@ struct ProviderSettingsTests {
 
         #expect(sent.hosts == ["api.acme.com"])
         #expect(sent.authorizations == ["Bearer sk-work"])
-        #expect(work.dashboardURL == URL(string: "https://console.acme.com/usage"))
+        #expect(acme.dashboardURL(of: work) == URL(string: "https://console.acme.com/usage"))
         #expect(work.values["apiKey"] == nil)
     }
 

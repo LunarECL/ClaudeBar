@@ -159,7 +159,8 @@ struct SignInAccountsTests {
         let added = try await signIn(codexLogin(email: "work@example.com", folders: stub.folders), into: codex)
         let launch = SignInLaunch()
 
-        let usage = try await codex.accounts.signInAgain(added, with: launch.recording(folders: stub.folders))
+        try await codex.accounts.signInAgain(added, with: launch.recording(folders: stub.folders))
+        let usage = try await codex.refresh(added)
 
         #expect(launch.directory == added.folder?.url.path)
         #expect(usage.sessionQuota?.percentRemaining == 90)

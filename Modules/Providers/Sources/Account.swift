@@ -7,15 +7,20 @@ import Observation
 /// it. Two Codex logins are two accounts of one `Provider`: two things to
 /// watch (each its own pill and menu-bar entry), one thing to fix.
 ///
-/// An account has no fetching of its own: it asks its provider, which runs
-/// one lifecycle for every login.
+/// It knows only itself (TARGET §12, slice 7): who it is, its values, its
+/// pause, what we last saw, and what its definition alone says. It names its
+/// product by id and never refers to it — ask the product about a login
+/// (`provider.refresh(account)`, `provider.isInLineup(account)`), found
+/// through the root (`providers.provider(of: account)`).
 @MainActor
 @Observable
 public final class Account: Identifiable {
-    /// The product this login belongs to. The provider owns its logins and
-    /// they end with it, so this points back without owning: `unowned`, never
-    /// outliving it (TARGET §12, slice 6).
-    public unowned let provider: Provider
+    /// Its product, by id — a value, never a reference.
+    public let providerId: String
+    /// What its product's definition says — data, given at birth.
+    @ObservationIgnored let definition: ProviderDefinition
+    /// Where its own pause is kept.
+    @ObservationIgnored private let settings: any ProviderSettingsRepository
     /// `codex` for the default login, `codex.<account>` for an added one —
     /// the ids every saved setting and menu-bar pin is keyed by.
     public let id: String
@@ -36,16 +41,12 @@ public final class Account: Identifiable {
     public var isEnabled: Bool {
         didSet {
             if isDefault {
-                provider.settings.setOn(isEnabled, Provider.plainLoginKey, forProvider: provider.id)
+                settings.setOn(isEnabled, Provider.plainLoginKey, forProvider: providerId)
             } else {
-                provider.settings.setEnabled(isEnabled, forProvider: id)
+                settings.setEnabled(isEnabled, forProvider: id)
             }
         }
     }
-
-    /// In the lineup — pills, menu bar, refreshes, alerts: the login is on,
-    /// and so is its product.
-    public var isInLineup: Bool { isEnabled && provider.isEnabled }
 
     // MARK: - What we last saw
 
@@ -60,11 +61,17 @@ public final class Account: Identifiable {
 
     /// What Settings calls that data source — *RPC*, *API*, *Terminal*.
     public var answeredByLabel: String? {
-        answeredBy.map { provider.definition.dataSource($0)?.label ?? $0 }
+        answeredBy.map { definition.dataSource($0)?.label ?? $0 }
     }
 
-    init(provider: Provider, login: ProviderAccount, values: [String: String], madeBy: AccountOrigin? = nil) {
-        self.provider = provider
+    init(definition: ProviderDefinition, settings: any ProviderSettingsRepository, login: ProviderAccount,
+         values: [String: String], madeBy: AccountOrigin? = nil,
+         usageHistory: UsageHistory? = nil, guestPasses: GuestPasses? = nil) {
+        self.providerId = definition.id
+        self.definition = definition
+        self.settings = settings
+        self.usageHistory = usageHistory
+        self.guestPasses = guestPasses
         self.id = login.id
         self.isDefault = login.isDefault
         self.accountId = login.accountId
@@ -73,8 +80,8 @@ public final class Account: Identifiable {
         self.values = values
         self.madeBy = madeBy
         self.isEnabled = login.isDefault
-            ? provider.settings.isOn(Provider.plainLoginKey, forProvider: provider.definition.id) ?? true
-            : provider.settings.isEnabled(forProvider: login.id, defaultValue: provider.definition.enabledByDefault)
+            ? settings.isOn(Provider.plainLoginKey, forProvider: definition.id) ?? true
+            : settings.isEnabled(forProvider: login.id, defaultValue: definition.enabledByDefault)
     }
 
     /// *NOT SET UP* — no usage yet, and the last refresh found no tool on
@@ -88,12 +95,6 @@ public final class Account: Identifiable {
         }
     }
 
-    /// What setting this login up takes: its definition's words, or its
-    /// name and what failed when the definition says nothing.
-    public var setupNotice: ProviderDefinition.Setup {
-        provider.definition.setup ?? .fallback(for: lineupName, error: lastError)
-    }
-
     public var readsUsage: Bool { usageHistory?.hasUsage == true }
 
     /// QUOTA health — the worst quota in its usage. A failed fetch is not a
@@ -102,33 +103,12 @@ public final class Account: Identifiable {
 
     /// Where the login lives, for a login added by its folder.
     public var folder: SignedInFolder? {
-        guard !isDefault, let rule = provider.definition.accounts?.folder, let path = values[rule.savedAs] else { return nil }
+        guard !isDefault, let rule = definition.accounts?.folder, let path = values[rule.savedAs] else { return nil }
         return SignedInFolder(url: URL(fileURLWithPath: path), madeBy: madeBy ?? .folder)
     }
 
     /// What its tightest quota has left, in percent — `nil` before a usage.
     public var percentLeft: Double? { snapshot?.lowestQuota?.percentRemaining }
-
-    // MARK: - In use
-
-    /// The login new terminal sessions of its product start with, when its
-    /// product offers a choice of logins.
-    public var isInUse: Bool { canBeInUse && provider.inUse?.login === self }
-
-    /// Whether it can be chosen for new terminal sessions: its product offers
-    /// a choice, and it is one of the logins offered.
-    public var canBeInUse: Bool {
-        guard let inUse = provider.inUse, inUse.offersChoice else { return false }
-        return inUse.logins.contains { $0 === self }
-    }
-
-    /// *Use for new sessions*.
-    public func useForNewSessions() throws {
-        guard let inUse = provider.inUse else {
-            throw UsageError.executionFailed("\(provider.name) can't choose a login for new sessions.")
-        }
-        try inUse.use(self)
-    }
 
     /// The email the data source reported, else the one it was added with.
     public var accountEmail: String? { snapshot?.accountEmail ?? email }
@@ -138,47 +118,21 @@ public final class Account: Identifiable {
     public var displayName: String {
         let given = label.trimmingCharacters(in: .whitespacesAndNewlines)
         if !given.isEmpty { return given }
-        return accountEmail ?? provider.name
+        return accountEmail ?? definition.profile.name
     }
 
-    // MARK: - Forwarded to the provider
+    // MARK: - What its definition says
 
-    /// *The name the lineup prints* — on a pill, the menu bar, an alert: the
-    /// product's while this is the only login to tell apart, else the
-    /// login's own (TARGET §12.1). Pages never re-decide it.
-    public var lineupName: String { provider.accounts.hasSeveral ? displayName : provider.name }
-
-    public var cliCommand: String { provider.definition.cli ?? "" }
-    /// The dashboard for the plan the last usage reported (#328).
-    public var dashboardURL: URL? {
-        provider.definition.profile.links.dashboard(for: snapshot?.accountTier, settings: provider.configuration.settingFills(ownValues: isDefault ? [:] : values))
-    }
-    public var statusPageURL: URL? { provider.definition.profile.links.status }
-    public var backgroundRefreshFloor: Duration? { provider.backgroundRefreshFloor }
-    /// Guest passes are read with the default login's CLI, so only it has them.
-    public var guestPasses: GuestPasses? { isDefault ? provider.guestPasses : nil }
+    /// Its product's face — symbol, colours — as the definition gives it.
+    public var look: ProviderLook { definition.profile.look }
+    public var cliCommand: String { definition.cli ?? "" }
+    public var statusPageURL: URL? { definition.profile.links.status }
+    /// *Share Claude Code* — read with the plain login's CLI, so only it has them.
+    public let guestPasses: GuestPasses?
     /// What this login used, day by day, from its own logs — `nil` when the
-    /// provider offers no usage history, or doesn't say where an added
-    /// login's logs are.
-    public var usageHistory: UsageHistory? { provider.accounts.history(for: self) }
-
-    public func isAvailable() async -> Bool {
-        await provider.isAvailable(self)
-    }
-
-    @discardableResult
-    public func refresh() async throws -> UsageSnapshot {
-        try await provider.refresh(self, .interactive)
-    }
-
-    @discardableResult
-    public func refresh(_ kind: RefreshKind) async throws -> UsageSnapshot {
-        try await provider.refresh(self, kind)
-    }
-
-    public func hasKey(for kind: String) -> Bool {
-        provider.hasKey(for: kind, account: self)
-    }
+    /// provider offers no usage history, doesn't say where an added login's
+    /// logs are, or the login was removed (its history goes with it).
+    public internal(set) var usageHistory: UsageHistory?
 
     // MARK: - Recording a fetch (the provider's)
 

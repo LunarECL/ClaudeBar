@@ -73,7 +73,7 @@ struct AddProviderTests {
                              environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
         })
 
-        let usage = try await provider.defaultAccount.refresh()
+        let usage = try await provider.refreshPlain()
 
         let quota = try #require(usage.quotas.first)
         #expect(quota.left == .money(Money(Decimal(string: "12.4")!, currency: "USD"), of: Money(50, currency: "USD")))

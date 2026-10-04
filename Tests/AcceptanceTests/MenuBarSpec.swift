@@ -60,10 +60,12 @@ struct MenuBarSpec {
                 capturedAt: Date()
             ))
 
-            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
-            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -95,12 +97,14 @@ struct MenuBarSpec {
                 capturedAt: Date()
             ))
 
-            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
-            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
-                providers: kept([claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -123,9 +127,10 @@ struct MenuBarSpec {
                 capturedAt: Date()
             ))
 
-            let claude = stubbedLogin("claude", probe: probe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -140,9 +145,10 @@ struct MenuBarSpec {
         func `no snapshots defaults to healthy`() {
             // Given — fresh monitor, no refresh yet
             let settings = MenuBarSpec.makeSettings()
-            let claude = stubbedLogin("claude", probe: MockUsageProbe(), settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: MockUsageProbe(), settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 

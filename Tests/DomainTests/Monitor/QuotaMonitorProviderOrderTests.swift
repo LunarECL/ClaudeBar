@@ -33,9 +33,9 @@ struct QuotaMonitorProviderOrderTests {
     /// Monitor shows it.
     private func makeProviders(settings: any ProviderSettingsRepository) -> Providers {
         kept([
-            stubbedLogin("claude", probe: MockUsageProbe(), settings: settings),
-            stubbedLogin("codex", probe: MockUsageProbe(), settings: settings),
-            stubbedLogin("gemini", probe: MockUsageProbe(), settings: settings),
+            stubbedProduct("claude", probe: MockUsageProbe(), settings: settings),
+            stubbedProduct("codex", probe: MockUsageProbe(), settings: settings),
+            stubbedProduct("gemini", probe: MockUsageProbe(), settings: settings),
         ], settings: settings)
     }
 

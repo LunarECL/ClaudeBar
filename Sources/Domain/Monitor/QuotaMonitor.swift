@@ -123,7 +123,7 @@ public final class QuotaMonitor {
     }
 
     /// The product a lineup entry belongs to — `codex` for `codex.<acct>`.
-    private static func productId(of login: Account) -> String { login.provider.id }
+    private static func productId(of login: Account) -> String { login.providerId }
 
     // MARK: - The logins
 
@@ -136,6 +136,23 @@ public final class QuotaMonitor {
 
     /// The login with the given lineup id (`claude`, `codex.<acct>`).
     public func login(id: String) -> Account? { providers.login(id: id) }
+
+    /// A login's product — found through the root, by the id the login names
+    /// (TARGET §12, slice 7). Ask it anything product-level about the login.
+    public func product(of login: Account) -> Provider? { providers.provider(of: login) }
+
+    /// *The name the lineup prints* for a login — its product's to say.
+    public func lineupName(of login: Account) -> String {
+        product(of: login)?.lineupName(of: login) ?? login.displayName
+    }
+
+    /// What setting a login up takes — its product's words.
+    public func setupNotice(of login: Account) -> ProviderDefinition.Setup {
+        product(of: login)?.setupNotice(of: login) ?? .fallback(for: login.displayName, error: login.lastError)
+    }
+
+    /// The dashboard for a login's plan — its product's to say.
+    public func dashboardURL(of login: Account) -> URL? { product(of: login)?.dashboardURL(of: login) }
 
     // MARK: - Monitoring Operations
 
@@ -156,12 +173,12 @@ public final class QuotaMonitor {
     /// `kind` defaults to `.interactive`; the background monitoring loop passes
     /// `.background` so providers can skip non-glanceable work (issue #204).
     private func refreshProvider(_ provider: Account, kind: RefreshKind = .interactive) async {
-        guard await provider.isAvailable() else {
+        guard let product = providers.provider(of: provider), await product.isAvailable(provider) else {
             return
         }
 
         do {
-            let snapshot = try await provider.refresh(kind)
+            let snapshot = try await product.refresh(provider, kind)
             await handleSnapshotUpdate(provider: provider, snapshot: snapshot)
         } catch {
             // Provider stores error in lastError - no need for external observer
@@ -317,10 +334,10 @@ public final class QuotaMonitor {
                     mode: mode, burnRateWarningEnabled: burnRateWarningEnabled,
                     burnRateThreshold: burnRateThreshold
                   ) else {
-                return MenuBarProviderLabel(providerId: id, providerName: provider.lineupName,
+                return MenuBarProviderLabel(providerId: id, providerName: lineupName(of: provider),
                                             label: MenuBarLabel(text: "—", status: .healthy))
             }
-            return MenuBarProviderLabel(providerId: id, providerName: provider.lineupName, label: label,
+            return MenuBarProviderLabel(providerId: id, providerName: lineupName(of: provider), label: label,
                                         stacked: config.stacked, stackedSize: MenuBarStackedSize(storedRawValue: config.stackedSize))
         }
     }
@@ -464,11 +481,11 @@ public final class QuotaMonitor {
     /// The popover's pills: one per product, its enabled logins inside —
     /// the tabs follow the persisted order (issue #141), not the
     /// registration order.
-    public var tabs: [ProductTab] { ProductTab.tabs(of: lineup) }
+    public var tabs: [ProductTab] { ProductTab.tabs(of: lineup, in: providers) }
 
     /// Settings → Providers: every product, on or off, each with all its
     /// logins, in the pane's order (TARGET §12, slice 1).
-    public var productTabs: [ProductTab] { ProductTab.tabs(of: logins) }
+    public var productTabs: [ProductTab] { ProductTab.tabs(of: logins, in: providers) }
 
     /// A product's switch — off hides every login of it and keeps them; the
     /// selection moves off a product that is turned off.
@@ -567,7 +584,7 @@ public final class QuotaMonitor {
     /// `probeMode`, so the cadence would otherwise stay stale (issue #204).
     private func backgroundRefreshFloors(for providerIds: [String]?) -> [Duration] {
         let ids = providerIds ?? [selectedProviderId]
-        return ids.compactMap { login(id: $0)?.backgroundRefreshFloor }
+        return ids.compactMap { login(id: $0).flatMap(product(of:))?.backgroundRefreshFloor }
     }
 
     /// Starts continuous monitoring at the specified interval.

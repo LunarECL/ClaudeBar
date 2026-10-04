@@ -51,9 +51,10 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = stubbedLogin("claude", probe: probe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -84,10 +85,12 @@ struct RefreshSpec {
             given(codexProbe).isAvailable().willReturn(true)
             given(codexProbe).probe().willThrow(UsageError.timeout)
 
-            let claude = stubbedLogin("claude", probe: claudeProbe, settings: settings)
-            let codex = stubbedLogin("codex", probe: codexProbe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -123,9 +126,10 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = stubbedLogin("claude", probe: probe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -156,9 +160,10 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = stubbedLogin("claude", probe: probe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -238,9 +243,10 @@ struct RefreshSpec {
                 quotas: [UsageQuota(percentRemaining: 42, quotaType: .session, providerId: "claude")],
                 capturedAt: Date()
             ))
-            let claude = stubbedLogin("claude", probe: probe, settings: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: kept([claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -269,9 +275,10 @@ struct RefreshSpec {
             given(apiProbe).isAvailable().willReturn(true)
             given(apiProbe).probe().willReturn(snapshot)
             _ = cliProbe
-            let claude = stubbedLogin("claude", probe: apiProbe, settings: settings, backgroundRefreshFloor: .seconds(900))
+            let claudeProduct = stubbedProduct("claude", probe: apiProbe, settings: settings, backgroundRefreshFloor: .seconds(900))
+            let claude = claudeProduct.defaultAccount
             let clock = RecordingClock()
-            let monitor = QuotaMonitor(providers: kept([claude]), clock: clock)
+            let monitor = QuotaMonitor(providers: kept([claudeProduct]), clock: clock)
 
             // When — background sync runs one tick.
             let stream = monitor.startMonitoring(interval: .seconds(60), providerIds: ["claude"])
@@ -300,8 +307,9 @@ struct RefreshSpec {
             ])
             // No cache here: Claude's API keeps its usage 15 min, and that is
             // the data source's own law (ClaudeAPITests), not the Monitor's.
-            let claude = stubbedLogin("claude", probe: probe, settings: settings)
-            let monitor = QuotaMonitor(providers: kept([claude]), clock: TestClock())
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let monitor = QuotaMonitor(providers: kept([claudeProduct]), clock: TestClock())
 
             // When/Then — two back-to-back user-initiated refreshes both update the
             // snapshot. The Monitor's floor governs only the background loop, never
