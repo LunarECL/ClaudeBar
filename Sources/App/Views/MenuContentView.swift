@@ -303,6 +303,9 @@ struct MenuContentView: View {
                         .offset(x: 14, y: -14)
                 }
             }
+            // One slot for every tab: a provider icon's glow is drawn 1.3× its size,
+            // and without this it made the header taller than the app logo's.
+            .frame(width: 38, height: 38)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
