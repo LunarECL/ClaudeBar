@@ -66,4 +66,61 @@ struct ProviderBadgeStateTests {
         #expect(ProviderBadgeState(isSyncing: true, quotaStatus: nil, hasError: true) == .syncing)
         #expect(ProviderBadgeState(isSyncing: true, quotaStatus: .healthy, hasError: false) == .syncing)
     }
+
+    // MARK: - A tab of logins
+
+    @MainActor @Test
+    func `a tab whose every login waits for setup is not set up`() {
+        let state = ProviderBadgeState(of: [Login(needsSetup: true), Login(needsSetup: true)], quotaStatus: nil)
+        #expect(state == .notSetUp)
+    }
+
+    @MainActor @Test
+    func `a tab where one login's usage is read says nothing alarming`() {
+        let state = ProviderBadgeState(of: [Login(needsSetup: true, readsUsage: true)], quotaStatus: nil)
+        #expect(state == .usageOnly)
+        #expect(!state.showsBadge)
+    }
+
+    @MainActor @Test
+    func `one login failing for real makes the tab unavailable, not waiting for setup`() {
+        let state = ProviderBadgeState(of: [Login(needsSetup: true), Login(failed: true)], quotaStatus: nil)
+        #expect(state == .unavailable)
+        #expect(state.showsBadge)
+    }
+
+    @MainActor @Test
+    func `a tab with no logins is awaiting data`() {
+        #expect(ProviderBadgeState(of: [], quotaStatus: nil) == .awaitingData)
+    }
+
+    @MainActor @Test
+    func `a login syncing makes the tab syncing`() {
+        #expect(ProviderBadgeState(of: [Login(syncing: true), Login(failed: true)], quotaStatus: nil) == .syncing)
+    }
+}
+
+/// A login as the badge sees it.
+@MainActor
+private final class Login: AIProvider {
+    let id = UUID().uuidString
+    let name = "Acme"
+    let cliCommand = "acme"
+    let dashboardURL: URL? = nil
+    var isEnabled = true
+    let isSyncing: Bool
+    let snapshot: UsageSnapshot? = nil
+    let lastError: Error?
+    let needsSetup: Bool
+    let readsUsage: Bool
+
+    init(needsSetup: Bool = false, readsUsage: Bool = false, failed: Bool = false, syncing: Bool = false) {
+        self.needsSetup = needsSetup
+        self.readsUsage = readsUsage
+        self.lastError = needsSetup || failed ? UsageError.noData : nil
+        self.isSyncing = syncing
+    }
+
+    func isAvailable() async -> Bool { true }
+    func refresh() async throws -> UsageSnapshot { throw UsageError.noData }
 }

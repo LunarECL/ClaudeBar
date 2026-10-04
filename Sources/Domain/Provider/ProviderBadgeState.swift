@@ -48,6 +48,24 @@ public enum ProviderBadgeState: Equatable, Sendable {
         }
     }
 
+    /// What the header says about a tab of logins: syncing while any is;
+    /// unavailable only when every one failed; not set up only when every one
+    /// is waiting for setup — and nothing alarming while any shows usage.
+    @MainActor
+    public init(of logins: [any AIProvider], quotaStatus: QuotaStatus?) {
+        self.init(
+            isSyncing: logins.contains { $0.isSyncing },
+            quotaStatus: quotaStatus,
+            hasError: !logins.isEmpty && logins.allSatisfy { $0.lastError != nil },
+            needsSetup: !logins.isEmpty && logins.allSatisfy { $0.needsSetup },
+            readsUsage: logins.contains { $0.readsUsage }
+        )
+    }
+
+    /// Whether the header shows a badge at all — not while a login waiting
+    /// for setup still shows its usage.
+    public var showsBadge: Bool { self != .usageOnly }
+
     /// Whether this state represents real usage data.
     public var hasData: Bool {
         if case .quota = self { return true }

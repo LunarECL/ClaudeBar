@@ -117,6 +117,11 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         }
 
         private enum CodingKeys: String, CodingKey { case title, text, url, button }
+
+        /// For a definition with no `setup`: *Set up <name>*, and what failed.
+        public static func fallback(for name: String, error: Error?) -> Setup {
+            Setup(title: "Set up \(name)", text: error?.localizedDescription ?? "")
+        }
     }
 
     /// What *Add Account*'s form asks for: the account-scope settings.

@@ -361,17 +361,8 @@ struct MenuContentView: View {
     /// "UNAVAILABLE" rather than borrowing a green "HEALTHY" it has no data
     /// for (#259).
     private var selectedProviderBadge: ProviderBadgeState {
-        ProviderBadgeState(
-            isSyncing: isSelectedProviderSyncing,
-            quotaStatus: selectedProviderStatus,
-            hasError: (monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? []).allSatisfy { $0.lastError != nil },
-            needsSetup: {
-                let members = monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? []
-                return !members.isEmpty && members.allSatisfy { ($0 as? Account)?.needsSetup == true }
-            }(),
-            readsUsage: (monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? [])
-                .contains { ($0 as? Account)?.usageHistory?.hasUsage == true }
-        )
+        ProviderBadgeState(of: monitor.selectedTab?.accounts ?? selectedProvider.map { [$0] } ?? [],
+                           quotaStatus: selectedProviderStatus)
     }
 
     /// Whether the selected provider is currently syncing
@@ -390,7 +381,7 @@ struct MenuContentView: View {
         // Nothing to say about limits it can't read while its usage shows
         // below: hidden, not removed, so the header keeps its height.
         return headerPill(text: statusText, color: statusColor, fill: fill, pulsing: isSelectedProviderSyncing)
-            .opacity(selectedProviderBadge == .usageOnly ? 0 : 1)
+            .opacity(selectedProviderBadge.showsBadge ? 1 : 0)
     }
 
     /// *NOT JOINED · RANKED · UPLOAD FAILED* — the Leaderboard tab's own pill.
@@ -983,7 +974,7 @@ struct MenuContentView: View {
                 DailyUsageCardView(metric: .tokens, report: report, delay: baseDelay + 0.08)
                     .frame(maxWidth: .infinity)
             }
-            if report.today.workingTime > 0 || report.previous.workingTime > 0 {
+            if report.hasWorkingTime {
                 DailyUsageCardView(metric: .workingTime, report: report, delay: baseDelay + 0.16)
             }
         }
@@ -1016,22 +1007,22 @@ struct MenuContentView: View {
     }
 
     private func setupCard(_ account: Account) -> some View {
-        let setup = account.setup
+        let setup = account.setupNotice
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: "gauge.with.dots.needle.0percent")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(theme.textSecondary)
-                Text(setup?.title ?? "Set up \(account.name)")
+                Text(setup.title)
                     .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
                 Spacer()
             }
-            Text(setup?.text ?? account.lastError?.localizedDescription ?? "")
+            Text(setup.text)
                 .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                 .foregroundStyle(theme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
-            if let setup, let url = setup.url {
+            if let url = setup.url {
                 Button(setup.button) { NSWorkspace.shared.open(url) }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)

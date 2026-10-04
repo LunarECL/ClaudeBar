@@ -81,4 +81,37 @@ struct NotSetUpTests {
         #expect(setup.button == "Set up")
         #expect(try Providers.builtIn("grok").setup == nil)
     }
+
+    @Test
+    func `the notice is the definition's setup`() async throws {
+        let claude = try ClaudeHarness()
+        defer { claude.cleanUp() }
+        cliNotFound(claude)
+        let account = try claude.provider()
+        _ = try? await account.refresh()
+
+        #expect(account.setupNotice.title == "See your session and weekly limits")
+        #expect(account.setupNotice.button == "Set up Claude Code")
+    }
+
+    @Test
+    func `without a setup in the definition, the notice names the provider and says what failed`() throws {
+        let definition = try ProviderDefinition(
+            profile: Providers.builtIn("claude").profile, dataSources: Providers.builtIn("claude").dataSources,
+            defaultDataSource: "cli")
+        let notice = ProviderDefinition.Setup.fallback(for: definition.profile.name, error: UsageError.cliNotFound("acme"))
+
+        #expect(definition.setup == nil)
+        #expect(notice.title == "Set up Claude")
+        #expect(notice.text == UsageError.cliNotFound("acme").localizedDescription)
+        #expect(notice.url == nil)
+    }
+
+    @Test
+    func `a login with no usage history reads no usage`() async throws {
+        let claude = try ClaudeHarness()
+        defer { claude.cleanUp() }
+        let account = try claude.provider()
+        #expect(!account.readsUsage)
+    }
 }

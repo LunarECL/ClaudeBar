@@ -75,8 +75,13 @@ public final class Account: AIProvider {
         }
     }
 
-    /// What setting this login's provider up takes, when its definition says.
-    public var setup: ProviderDefinition.Setup? { provider.definition.setup }
+    /// What setting this login up takes: its definition's words, or its
+    /// name and what failed when the definition says nothing.
+    public var setupNotice: ProviderDefinition.Setup {
+        provider.definition.setup ?? .fallback(for: name, error: lastError)
+    }
+
+    public var readsUsage: Bool { usageHistory?.hasUsage == true }
 
     /// QUOTA health — the worst quota in its usage. A failed fetch is not a
     /// status: it is `lastError`, and the last usage stays.
