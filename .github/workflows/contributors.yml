@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: sync-contributors
@@ -59,3 +60,7 @@ jobs:
           git add .all-contributorsrc README.md docs/index.html
           git commit -m "docs: sync contributors [skip ci]"
           git push
+          # A push with GITHUB_TOKEN starts no workflows, so deploy the site here
+          gh workflow run deploy-pages.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
