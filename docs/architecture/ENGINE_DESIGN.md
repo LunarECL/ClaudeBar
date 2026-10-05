@@ -244,8 +244,8 @@ extension Fetch {
 
 ### 2.7 · Where a provider's CLI is
 
-> **Status: PROPOSED** (for #458) — not built: today only sign-in looks
-> beyond the PATH, through `signIn.alsoAt`.
+> **Status: DECIDED** (2026-10-05, for #458; journey moment 3a) — not built:
+> today only sign-in looks beyond the PATH, through `signIn.alsoAt`.
 
 *Where is this product's program on this Mac?* is one question per product, so
 the definition answers it once, beside the name — a place its own app installs
