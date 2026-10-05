@@ -422,11 +422,13 @@ jobs:
           git diff --cached --quiet \
             && echo "No CHANGELOG changes to commit" \
             || git commit -m "chore(changelog): promote [Unreleased] to v$VERSION"
+          # The build left Info.plist edited and uncommitted, so a rebase
+          # stashes it (autoStash) — a plain `pull --rebase` refuses to run.
           pushed=false
           for attempt in 1 2 3; do
-            if git pull --rebase origin main && git push origin HEAD:main; then pushed=true; break; fi
-            echo "::warning::Pushing the promoted CHANGELOG failed (attempt $attempt): main moved; retrying on the latest main"
-            git rebase --abort 2>/dev/null || true
+            if git push origin HEAD:main; then pushed=true; break; fi
+            echo "::warning::Pushing the promoted CHANGELOG was rejected (attempt $attempt): main moved; replaying it on the latest main"
+            git -c rebase.autoStash=true pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }
             sleep 5
           done
           if [ "$pushed" != "true" ]; then
