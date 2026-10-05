@@ -142,14 +142,17 @@ struct ClaudeCLIDefinitionTests {
     // MARK: - One shared probe session (issue #132)
 
     @Test
-    func `should run both commands in one named ClaudeBar session (#132)`() throws {
+    func `should run both commands in one named ClaudeBar session, the same id every time (#132)`() throws {
         let usage = try call("cli").session
         let cost = try call("cliCost").session
 
-        // The session contract is the same on both — only the vendor's facts;
-        // which session a login is in is the worker's own memory.
+        // The session contract is the same on both — only the vendor's facts.
+        // The id is stable: one per login, created each run, resumed only when
+        // a CLI that kept the session says it is already in use.
         for session in [usage, cost] {
             let session = try #require(session)
+            #expect(session.id == .stable("ClaudeBar Probe"))
+            #expect(session.resumeOn == ["already in use"])
             #expect(session.create == ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"])
             #expect(session.resume == ["--resume", "{{id}}"])
             #expect(session.recreateOn == ["no conversation found", "no session found"])

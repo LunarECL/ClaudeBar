@@ -1,3 +1,4 @@
+import CryptoKit
 import Diagnostics
 import Foundation
 
@@ -60,6 +61,9 @@ struct CLISessionRunner: Sendable {
     /// Runs the call under the session plan and answers what the screen showed.
     func run() async throws -> CLIResult {
         guard await !memory.isRefused else { return try await plain() }
+        if case .stable(let text)? = session.id {
+            return try await runStable(id: Self.stableID(text, environment: call.environment))
+        }
         if let remembered = await memory.id {
             let result = try await execute(session.resume, id: remembered)
             if Self.isRefused(result, tokens: session.unsupportedOn) {
@@ -73,6 +77,32 @@ struct CLISessionRunner: Sendable {
             return result
         }
         return try await create()
+    }
+
+    /// A stable session: created under its one id; resumed under the same
+    /// id only when the CLI says the id is taken (a CLI that kept it).
+    private func runStable(id: String) async throws -> CLIResult {
+        let result = try await execute(session.create, id: id)
+        if Self.isRefused(result, tokens: session.unsupportedOn) {
+            return try await giveUp()
+        }
+        if Self.matches(result.output, tokens: session.resumeOn) {
+            AppLog.probes.info("\(call.cli): the session is kept, resuming it")
+            return try await execute(session.resume, id: id)
+        }
+        return result
+    }
+
+    /// One login's session id, the same forever: a UUID from the definition's
+    /// text and the call's environment — another `CLAUDE_CONFIG_DIR`, another id.
+    static func stableID(_ text: String, environment: ProcessEnvironment) -> String {
+        let seed = ([text] + environment.set.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }).joined(separator: "\n")
+        var bytes = Array(SHA256.hash(data: Data(seed.utf8)).prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x50   // version 5: name-based
+        bytes[8] = (bytes[8] & 0x3F) | 0x80   // the RFC 4122 variant
+        let uuid = UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                               bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
+        return uuid.uuidString.lowercased()
     }
 
     /// Creates the session under a fresh id and remembers it. The session
@@ -129,7 +159,7 @@ struct CLISessionRunner: Sendable {
     /// Matched on the text the screen shows, as a ready marker is: a TUI
     /// positions each word with a cursor move (`No␛[4Gconversation␛[17Gfound`),
     /// so the raw bytes never hold the phrase as one run of text.
-    private static func matches(_ output: String, tokens: [String]) -> Bool {
+    static func matches(_ output: String, tokens: [String]) -> Bool {
         !tokens.isEmpty && CLICompletionRule(readyMarkers: tokens.map { CLICompletionRule.Marker($0) }).isReady(output)
     }
 }

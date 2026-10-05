@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Claude**: each refresh in CLI mode runs Claude Code once, not twice, under one ClaudeBar session that keeps its id across restarts — about 2 seconds faster, and your session hooks fire once per refresh. ([#491](https://github.com/tddworks/ClaudeBar/pull/491)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/claude/design.md)
+
 ### Fixed
 - **Claude**: in CLI mode, your limits are read from Claude Code again instead of switching to the API after the first refresh. ClaudeBar misread Claude Code 2.1.289's usage screen and its "no conversation found" answer. ([#490](https://github.com/tddworks/ClaudeBar/pull/490))
 - **Claude**: your email stays on the account card after a refresh answered by the API. It used to show at first and vanish when the API stood in for the CLI, leaving only "Updated · via API". ([#489](https://github.com/tddworks/ClaudeBar/pull/489))

@@ -196,6 +196,46 @@ fields would mean nothing in each mode.
 - **`{{token}}` reaches a command through its environment**, never its
   arguments, the same way it reaches a header.
 
+#### A terminal's session: one id per login, the same forever
+
+A TUI run can sit in a named session (`cli.session`), so polling doesn't
+leave a session behind each time (#132). The id is **stable**: derived from
+the definition's `stable` text and the call's own environment, so the default
+login and each added login (its `CLAUDE_CONFIG_DIR`) get their own, and the
+same login gets the same one across restarts. A run **creates** the session
+under that id; only a CLI that answers the id is taken gets a **resume** of
+the same id.
+
+```text
+refresh ─► create:  --session-id <this login's stable id> --name "ClaudeBar Probe"
+             │  answers ───────────────────────────────► read it        (one launch)
+             │  "already in use" (a CLI that kept the session)
+             ▼
+           resume:  --resume <the same id> ─────────────► read it
+             │  "unknown option '--session-id'" + a non-zero exit
+             ▼
+           the call's plain args, for this worker's lifetime
+```
+
+```json
+"session": {
+  "id": { "stable": "ClaudeBar Probe" },
+  "create": ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"],
+  "resume": ["--resume", "{{id}}"],
+  "resumeOn": ["already in use"],
+  "unsupportedOn": ["unknown option '--session-id'"]
+}
+```
+
+| Law | Owner |
+|---|---|
+| a stable id is a UUID derived from the `stable` text and the call's environment — the same login, the same id, across restarts; another login, another id | `CLISessionRunner` |
+| a stable session is created first; only `resumeOn` sends the same id to `resume` | `CLISessionRunner` |
+| `resumeOn`, `recreateOn` and `unsupportedOn` match the text the screen shows, as a ready marker does | `CLICompletionRule` |
+
+A plan without `id` keeps the older order — resume a remembered random id,
+create again on `recreateOn` — for a CLI that keeps every session.
+
 ### 2.5 · A worker reports a fact; the definition words it
 
 A worker's failure is a fact that answers for itself (`ReportedFailure`): its
