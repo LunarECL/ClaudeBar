@@ -38,14 +38,14 @@ struct ClaudeConfigSpec {
     /// A fresh home folder, isolated settings, a stubbed terminal and network.
     final class World {
         let home: URL
-        let settings: UserDefaultsProviderSettingsRepository
+        let settings: JSONSettingsRepository
         let cli = MockCLIExecutor()
         let network = MockNetworkClient()
 
         init() throws {
             home = FileManager.default.temporaryDirectory.appendingPathComponent("claude-spec-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
-            settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            settings = isolatedSettings()
             settings.setEnabled(true, forProvider: "claude")
         }
 
@@ -141,7 +141,7 @@ struct ClaudeConfigSpec {
 
         @Test
         func `should remember the chosen Claude data source, CLI by default`() {
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let settings = isolatedSettings()
             #expect(settings.claudeProbeMode() == .cli)
 
             settings.setClaudeProbeMode(.api)

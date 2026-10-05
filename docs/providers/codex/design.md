@@ -183,7 +183,7 @@ no longer exist.
 ### Modified Files
 - `Sources/Domain/Provider/ProviderSettingsRepository.swift` - Add `CodexSettingsRepository` protocol
 - `Sources/Domain/Provider/CodexProvider.swift` - Add dual-probe support (cliProbe + apiProbe)
-- `Sources/Infrastructure/Storage/UserDefaultsProviderSettingsRepository.swift` - Implement `CodexSettingsRepository`
+- `Sources/Infrastructure/Storage/JSONSettingsRepository.swift` - Implement `CodexSettingsRepository`
 - `Sources/App/ClaudeBarApp.swift` - Pass API probe to CodexProvider
 - `Sources/App/Views/SettingsView.swift` - Add Codex probe mode picker
 ## Findings since

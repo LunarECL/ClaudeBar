@@ -78,7 +78,7 @@ struct CodexConfigSpec {
         @Test
         func `should show the API's quotas, not the app server's, after the person switches Codex to API mode`() async throws {
             // Given — isolated settings, credentials, and both endpoints answering
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let settings = isolatedSettings()
             settings.setEnabled(true, forProvider: "codex")
             let home = try CodexConfigSpec.makeHome()
             defer { try? FileManager.default.removeItem(at: home) }
@@ -117,7 +117,7 @@ struct CodexConfigSpec {
         @Test
         func `should use the data source the Codex card saves, RPC by default`() throws {
             // Given
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let settings = isolatedSettings()
             let home = try CodexConfigSpec.makeHome()
             defer { try? FileManager.default.removeItem(at: home) }
             let codexProduct = try CodexConfigSpec.makeCodex(settings: settings, home: home)
@@ -142,7 +142,7 @@ struct CodexConfigSpec {
         @Test
         func `should keep the last usage and its source, and say the key couldn't be read, when the Codex key disappears (#351)`() async throws {
             // Given — Codex on its API data source, showing usage
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let settings = isolatedSettings()
             let home = try CodexConfigSpec.makeHome()
             defer { try? FileManager.default.removeItem(at: home) }
             try CodexConfigSpec.writeAuth(in: home)
@@ -176,7 +176,7 @@ struct CodexConfigSpec {
 
         @Test
         func `should find no API key until the person has logged in to Codex`() throws {
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let settings = isolatedSettings()
             let home = try CodexConfigSpec.makeHome()
             defer { try? FileManager.default.removeItem(at: home) }
             let codexProduct = try CodexConfigSpec.makeCodex(settings: settings, home: home)

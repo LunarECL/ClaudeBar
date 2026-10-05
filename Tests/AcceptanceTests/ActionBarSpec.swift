@@ -52,34 +52,28 @@ struct ActionBarSpec {
 
         @Test
         func `should open GitHub's Copilot features page from Copilot's Dashboard (#24)`() throws {
-            let suiteName = "com.claudebar.test.\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: suiteName)!
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+            let settings = isolatedSettings()
             let copilot = try ProviderFactory.make("copilot", settings: settings)
             #expect(copilot.dashboardURL(of: copilot.defaultAccount)?.absoluteString == "https://github.com/settings/copilot/features")
         }
 
         @Test
         func `should offer no Dashboard for Antigravity (#24)`() throws {
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let settings = isolatedSettings()
             let antigravity = try ProviderFactory.make("antigravity", settings: settings)
             #expect(antigravity.dashboardURL(of: antigravity.defaultAccount) == nil)
         }
 
         @Test
         func `should open the AWS Bedrock console from Bedrock's Dashboard (#24)`() throws {
-            let suiteName = "com.claudebar.test.\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: suiteName)!
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+            let settings = isolatedSettings()
             let bedrock = try ProviderFactory.make("bedrock", settings: settings)
             #expect(bedrock.dashboardURL(of: bedrock.defaultAccount)?.absoluteString == "https://console.aws.amazon.com/bedrock/home")
         }
 
         @Test
         func `should open Z.ai's subscription page from Z.ai's Dashboard (#24)`() throws {
-            let suiteName = "com.claudebar.test.\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: suiteName)!
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+            let settings = isolatedSettings()
             let zai = try ProviderFactory.make("zai", settings: settings)
             #expect(zai.dashboardURL(of: zai.defaultAccount)?.absoluteString == "https://z.ai/subscribe")
         }
@@ -97,7 +91,7 @@ struct ActionBarSpec {
 
         @Test
         func `should offer Claude guest passes only when ClaudeBar can read them (#25)`() throws {
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let settings = isolatedSettings()
             let withoutPasses = try ProviderFactory.make("claude", settings: settings).defaultAccount
             let withPasses = try ProviderFactory.make("claude", settings: settings, guestPasses: GuestPasses(source: MockGuestPassSource())).defaultAccount
 

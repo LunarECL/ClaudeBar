@@ -6,8 +6,7 @@ import Providers
 
 /// Claude-specific settings repository, extending base ProviderSettingsRepository.
 /// Includes configuration for probe mode (CLI vs API).
-/// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.
-/// App uses UserDefaultsProviderSettingsRepository.
+/// App uses JSONSettingsRepository (`~/.claudebar/settings.json`).
 public protocol ClaudeSettingsRepository: ProviderSettingsRepository {
     /// Gets the probe mode for Claude (CLI or API)
     func claudeProbeMode() -> ClaudeProbeMode
@@ -25,8 +24,7 @@ public protocol ClaudeSettingsRepository: ProviderSettingsRepository {
 
 /// Codex-specific settings repository, extending base ProviderSettingsRepository.
 /// Includes configuration for probe mode (RPC vs API).
-/// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.
-/// App uses UserDefaultsProviderSettingsRepository.
+/// App uses JSONSettingsRepository (`~/.claudebar/settings.json`).
 public protocol CodexSettingsRepository: ProviderSettingsRepository {
     /// Gets the probe mode for Codex (RPC or API)
     func codexProbeMode() -> CodexProbeMode

@@ -15,24 +15,4 @@ public enum ClaudeProbeMode: String, Sendable, Equatable, CaseIterable {
     /// Requires valid OAuth credentials in ~/.claude/.credentials.json or Keychain.
     /// Faster than CLI mode as it doesn't spawn a subprocess.
     case api
-
-    /// Human-readable display name for the mode
-    public var displayName: String {
-        switch self {
-        case .cli:
-            return "CLI"
-        case .api:
-            return "API"
-        }
-    }
-
-    /// Description of what this mode does
-    public var description: String {
-        switch self {
-        case .cli:
-            return "Uses claude /usage command"
-        case .api:
-            return "Calls Anthropic API directly"
-        }
-    }
 }

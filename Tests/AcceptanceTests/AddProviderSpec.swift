@@ -46,7 +46,7 @@ struct AddProviderSpec {
             vault.keys["provider.\(id).apiKey"] = "sk-or-ken"
 
             let saved = try #require(catalog.custom().first)
-            let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
+            let settings = isolatedSettings()
             let openRouterProduct = Provider(definition: saved, settings: settings, makeDataSource: {
                 DataSources.make($0, providerId: saved.id, cliExecutor: MockCLIExecutor(), network: network,
                                  makeTransport: { _, _, _, _ in MockRPCTransport() }, secrets: vault,
