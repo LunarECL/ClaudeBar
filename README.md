@@ -197,4 +197,6 @@ To credit someone, comment on any issue or pull request:
 
 ## License
 
-MIT
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The notch view uses [matrix-swift](https://github.com/mana-am/matrix-swift), which has its own license: you may use it in an app, but not republish its components as a standalone library.

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **License**: ClaudeBar is now licensed under Apache 2.0 instead of MIT. It stays free and open source, and the license now also grants patent rights. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/LICENSE)
 - **Claude**: each refresh in CLI mode runs Claude Code once, not twice, under one ClaudeBar session that keeps its id across restarts — about 2 seconds faster, and your session hooks fire once per refresh. ([#491](https://github.com/tddworks/ClaudeBar/pull/491)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/claude/design.md)
 
 ### Fixed
