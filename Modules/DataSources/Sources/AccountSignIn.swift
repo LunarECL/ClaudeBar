@@ -5,7 +5,7 @@ import Mockable
 /// variable that points it at a folder of its own.
 ///
 /// `{ "cli": "codex", "args": ["login"], "homeVariable": "CODEX_HOME",
-///    "unset": ["OPENAI_API_KEY"], "alsoAt": ["/Applications/Codex.app/…/codex"] }`
+///    "unset": ["OPENAI_API_KEY"] }`
 public struct SignInCall: Sendable, Equatable, Codable {
     public let cli: String
     public let args: [String]
@@ -16,17 +16,13 @@ public struct SignInCall: Sendable, Equatable, Codable {
     public let unset: [String]
     /// Seconds to wait for the person to finish in the browser.
     public let timeout: TimeInterval
-    /// Where else the CLI may be, when it ships inside a desktop app rather
-    /// than on the PATH. `~` expands to the home directory.
-    public let alsoAt: [String]
 
-    public init(cli: String, args: [String], homeVariable: String, unset: [String] = [], timeout: TimeInterval = 300, alsoAt: [String] = []) {
+    public init(cli: String, args: [String], homeVariable: String, unset: [String] = [], timeout: TimeInterval = 300) {
         self.cli = cli
         self.args = args
         self.homeVariable = homeVariable
         self.unset = unset
         self.timeout = timeout
-        self.alsoAt = alsoAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -36,7 +32,6 @@ public struct SignInCall: Sendable, Equatable, Codable {
         homeVariable = try container.decode(String.self, forKey: .homeVariable)
         unset = try container.decodeIfPresent([String].self, forKey: .unset) ?? []
         timeout = try container.decodeIfPresent(TimeInterval.self, forKey: .timeout) ?? 300
-        alsoAt = try container.decodeIfPresent([String].self, forKey: .alsoAt) ?? []
     }
 }
 
@@ -75,20 +70,17 @@ public struct AccountSignIn: Sendable {
     private let process: any SignInProcess
     private let folders: any LoginFolders
     private let locate: @Sendable (String) -> String?
-    private let isExecutable: @Sendable (String) -> Bool
     private let environment: @Sendable () -> [String: String]
 
     public init(
         process: any SignInProcess = FoundationSignInProcess(),
         folders: any LoginFolders = DiskLoginFolders(),
         locate: @escaping @Sendable (String) -> String? = { BinaryLocator.which($0) },
-        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
         environment: @escaping @Sendable () -> [String: String] = { ProcessInfo.processInfo.environment }
     ) {
         self.process = process
         self.folders = folders
         self.locate = locate
-        self.isExecutable = isExecutable
         self.environment = environment
     }
 
@@ -124,12 +116,10 @@ public struct AccountSignIn: Sendable {
         guard status == 0 else { throw SignInError.didNotFinish }
     }
 
+    /// The CLI the call names — a name on the PATH, or the path its
+    /// provider's CLI location gave it.
     private func executable(for call: SignInCall) -> String? {
-        if let found = locate(call.cli) { return found }
-        let home = environment()["HOME"] ?? NSHomeDirectory()
-        return call.alsoAt
-            .map { $0.hasPrefix("~/") ? home + $0.dropFirst() : $0 }
-            .first(where: isExecutable)
+        locate(call.cli)
     }
 }
 

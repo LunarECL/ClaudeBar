@@ -78,6 +78,9 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     public var id: String { profile.id }
     /// The CLI a person would run (`codex`), when there is one.
     public let cli: String?
+    /// Where else this CLI may be when `cli` isn't on the PATH — the copy
+    /// a product's own app carries. `cli` lists them after the name.
+    public let cliPlaces: [String]
     public let enabledByDefault: Bool
     public let dataSources: [DataSourceDefinition]
     public let defaultDataSource: String
@@ -287,6 +290,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     public init(
         profile: ProviderProfile,
         cli: String? = nil,
+        cliPlaces: [String] = [],
         enabledByDefault: Bool = true,
         dataSources: [DataSourceDefinition],
         defaultDataSource: String,
@@ -301,6 +305,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         self.setup = setup
         self.profile = profile
         self.cli = cli
+        self.cliPlaces = cliPlaces
         self.enabledByDefault = enabledByDefault
         self.dataSources = dataSources
         self.defaultDataSource = defaultDataSource
@@ -325,9 +330,13 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             throw DecodingError.dataCorruptedError(forKey: .settings, in: container,
                 debugDescription: "Setting '\(twice.id)' is in both settings and accounts.form")
         }
+        // `cli` is a name, or the name and the other places it may be.
+        let cli = try (try? container.decodeIfPresent(String.self, forKey: .cli)).map { [$0] }
+            ?? container.decodeIfPresent([String].self, forKey: .cli) ?? []
         self.init(
             profile: try container.decode(ProviderProfile.self, forKey: .profile),
-            cli: try container.decodeIfPresent(String.self, forKey: .cli),
+            cli: cli.first,
+            cliPlaces: Array(cli.dropFirst()),
             enabledByDefault: try container.decodeIfPresent(Bool.self, forKey: .enabledByDefault) ?? true,
             dataSources: try container.decode([DataSourceDefinition].self, forKey: .dataSources),
             defaultDataSource: try container.decode(String.self, forKey: .defaultDataSource),
@@ -343,7 +352,10 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(profile, forKey: .profile)
-        try container.encodeIfPresent(cli, forKey: .cli)
+        if let cli {
+            if cliPlaces.isEmpty { try container.encode(cli, forKey: .cli) }
+            else { try container.encode([cli] + cliPlaces, forKey: .cli) }
+        }
         try container.encode(enabledByDefault, forKey: .enabledByDefault)
         try container.encode(dataSources, forKey: .dataSources)
         try container.encode(defaultDataSource, forKey: .defaultDataSource)
@@ -429,27 +441,36 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         dataSources.first { $0.kind == kind }
     }
 
+    private static func json(_ value: some Encodable) throws -> JSONValue {
+        try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
+    }
+
     /// The same definition running `binary` instead of its CLI's name — the
     /// person's *CLI location* (#210). Only the executable changes: every
-    /// CLI and JSON-RPC data source keeps its arguments, prompts and
-    /// timing, and so does Add Account's sign-in. The value reaches a
+    /// CLI and JSON-RPC data source and every credential refresh that runs
+    /// the CLI keeps its arguments, prompts and timing, and so does Add
+    /// Account's sign-in. The value reaches a
     /// subprocess as argv[0], never a shell command line. An empty,
     /// whitespace-only or unchanged name is a no-op.
     public func runningCLI(_ binary: String) throws -> ProviderDefinition {
         let binary = binary.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let cli, !binary.isEmpty, binary != cli else { return self }
         let sources = try dataSources.map { source -> DataSourceDefinition in
+            var patch: [String: JSONValue] = [:]
             let fetch = source.fetch.runningCLI(cli, at: binary)
-            guard fetch != source.fetch else { return source }
-            let json = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(fetch))
-            return try source.patched(with: .object(["fetch": json]))
+            if fetch != source.fetch { patch["fetch"] = try Self.json(fetch) }
+            if let credential = source.credential {
+                let repointed = credential.runningCLI(cli, at: binary)
+                if repointed != credential { patch["credential"] = try Self.json(repointed) }
+            }
+            return patch.isEmpty ? source : try source.patched(with: .object(patch))
         }
         var accounts = accounts
         if let signIn = accounts?.signIn, signIn.cli == cli {
             accounts = Accounts(
                 folder: accounts?.folder,
                 signIn: SignInCall(cli: binary, args: signIn.args, homeVariable: signIn.homeVariable,
-                                   unset: signIn.unset, timeout: signIn.timeout, alsoAt: signIn.alsoAt),
+                                   unset: signIn.unset, timeout: signIn.timeout),
                 form: accounts?.form ?? [],
                 patch: accounts?.patch ?? [:]
             )
@@ -457,13 +478,15 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         return ProviderDefinition(
             profile: profile,
             cli: cli,
+            cliPlaces: cliPlaces,
             enabledByDefault: enabledByDefault,
             dataSources: sources,
             defaultDataSource: defaultDataSource,
             together: together,
             accounts: accounts,
             settings: settings,
-            usageHistory: usageHistory
+            usageHistory: usageHistory,
+            setup: setup
         )
     }
 }

@@ -20,6 +20,7 @@ public final class Configuration {
     @ObservationIgnored let vault: (any SecretVault)?
     @ObservationIgnored let paths: any PathChecking
     @ObservationIgnored private let isExecutable: @Sendable (String) -> Bool
+    @ObservationIgnored private let locate: @Sendable (String) -> String?
 
     /// Grows on every change a login's data sources are made from.
     public private(set) var revision = 0
@@ -30,16 +31,19 @@ public final class Configuration {
     private(set) var running: ProviderDefinition
 
     init(definition: ProviderDefinition, settings: any ProviderSettingsRepository, vault: (any SecretVault)?,
-         paths: any PathChecking, isExecutable: @escaping @Sendable (String) -> Bool) {
+         paths: any PathChecking, isExecutable: @escaping @Sendable (String) -> Bool,
+         locate: @escaping @Sendable (String) -> String?) {
         self.definition = definition
         self.settings = settings
         self.vault = vault
         self.paths = paths
         self.isExecutable = isExecutable
+        self.locate = locate
         let cliPath = settings.cliPath(forProvider: definition.id)
         self.cliPath = cliPath
+        self.running = definition
         do {
-            self.running = try definition.runningCLI(cliPath ?? "")
+            self.running = try definition.runningCLI(cliPath ?? installedCLI() ?? "")
         } catch {
             AppLog.providers.error("\(definition.id): can't run the CLI at the saved location: \(error.localizedDescription)")
             self.running = definition
@@ -120,7 +124,7 @@ public final class Configuration {
             throw UsageError.executionFailed(problem)
         }
         var entry = SettingEntry()
-        if let kept { found.keep(kept, in: &entry) }
+        if let kept { found.keep(kept, in: &entry, paths: paths) }
         guard entry.secrets.isEmpty || vault != nil else {
             throw UsageError.executionFailed("ClaudeBar can't keep this key securely here.")
         }
@@ -152,6 +156,16 @@ public final class Configuration {
 
     // MARK: - CLI location
 
+    /// Where the CLI is when the person chose no location: on the PATH, or
+    /// else the first other place in `cli` that is a program. The PATH is
+    /// asked only when such a place exists, so most launches never ask it.
+    private func installedCLI() -> String? {
+        guard let name = definition.cli,
+              let place = definition.cliPlaces.map(paths.expanded).first(where: isExecutable),
+              locate(name) == nil else { return nil }
+        return place
+    }
+
     /// Runs this provider's CLI from `path` for every login and for Add
     /// Account's sign-in, saved and in effect at once. Empty goes back to
     /// finding the CLI as usual. A path that isn't a program is refused, and
@@ -162,7 +176,7 @@ public final class Configuration {
         if let chosen, !isExecutable(chosen) {
             throw UsageError.executionFailed("\(chosen) isn't a program ClaudeBar can run. Choose the \(definition.cli ?? name) executable itself.")
         }
-        running = try definition.runningCLI(chosen ?? "")
+        running = try definition.runningCLI(chosen ?? installedCLI() ?? "")
         cliPath = chosen
         settings.setCLIPath(chosen, forProvider: id)
         revision += 1

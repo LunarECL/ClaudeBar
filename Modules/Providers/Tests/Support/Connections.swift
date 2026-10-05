@@ -41,7 +41,8 @@ struct StubbedProvider {
     func makeProvider(
         _ id: String,
         accounts: [ProviderAccountConfig] = [],
-        isExecutable: @escaping @Sendable (String) -> Bool = { _ in true }
+        isExecutable: @escaping @Sendable (String) -> Bool = { _ in true },
+        locate: @escaping @Sendable (String) -> String? = { $0 }
     ) throws -> Provider {
         let transport = self.transport
         let launches = self.launches
@@ -71,7 +72,8 @@ struct StubbedProvider {
             },
             folders: folders,
             loginsInUse: loginsInUse,
-            isExecutable: isExecutable
+            isExecutable: isExecutable,
+            locate: locate
         )
     }
 
