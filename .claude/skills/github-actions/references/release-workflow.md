@@ -118,6 +118,9 @@ base64 -i AuthKey_XXXX.p8 | tr -d '\n' | pbcopy
 - The `sign_update` binary must exist at `Tuist/.build/.../Sparkle/bin/sign_update` (present after `tuist install`)
 - GitHub Pages must be enabled: **Settings → Pages → Source: GitHub Actions**
 
+### Release published, but the app still says "up to date"
+The DMG is on GitHub but `appcast.xml` didn't change: a step before *Generate Sparkle Appcast* failed and the feed steps were skipped. For v0.5.6 it was *Promote CHANGELOG* — `main` moved during the build, so `git push origin HEAD:main` was rejected "fetch first". That step now rebases onto the latest `main` and retries, and `continue-on-error` keeps the feed publishing even if the CHANGELOG can't be pushed (promote it by hand then). To recover a stranded release, delete it and its tag (`gh release delete vX.Y.Z --cleanup-tag`) and run the release again: `deploy-pages.yml` always republishes the *live* appcast, and `docs/appcast.xml` is never hand-edited.
+
 ### Cert and key are separate in Keychain
 
 ```bash
