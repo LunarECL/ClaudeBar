@@ -5,7 +5,7 @@
 **Issue:** [#207](https://github.com/tddworks/ClaudeBar/issues/207) — Daily Usage cost & token cards overcount ~4×
 **Follow-up:** [#190](https://github.com/tddworks/ClaudeBar/issues/190) — locally served models billed at Anthropic rates (§11)
 **Affected code:** written for `Sources/Infrastructure/Claude/`, which is now data (UH2,
-[daily-usage design §10](design.md#10--usage-history-as-data)).
+[daily-usage design](design.md)).
 The rules below hold unchanged; their homes moved:
 
 | Named below | Now |

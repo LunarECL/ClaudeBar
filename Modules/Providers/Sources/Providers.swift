@@ -4,7 +4,7 @@ import Foundation
 import Observation
 
 /// *Providers* — the providers you keep: the Settings → Providers pane
-/// (TARGET §12, slice 3). It creates a custom provider, reads them and the
+/// (TARGET §2.1). It creates a custom provider, reads them and the
 /// lineup, keeps their order and deletes a custom one. The Monitor holds it
 /// and only watches; a login added to a provider is the provider's own
 /// business, never this collection's.
@@ -51,8 +51,8 @@ public final class Providers {
     public func login(id: String) -> Account? { logins.first { $0.id == id } }
 
     /// A login's product — found by the id the login names, `nil` once it is
-    /// gone. The way to ask anything product-level about a login (TARGET §12,
-    /// slice 7: a login never refers to its provider).
+    /// gone. The way to ask anything product-level about a login (TARGET §2.1:
+    /// a login never refers to its provider).
     public func provider(of account: Account) -> Provider? { provider(id: account.providerId) }
 
     // MARK: - Create

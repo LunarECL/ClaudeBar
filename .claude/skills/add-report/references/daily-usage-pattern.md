@@ -4,7 +4,7 @@
 day before — as the reference for new report cards. Since UH2 it is data:
 Claude's logs, prices and local-route rule live in `claude.json` and
 `claude-prices.json`; the engine names no vendor
-([daily-usage design §10](../../../../docs/features/daily-usage/design.md#10--usage-history-as-data)).
+([daily-usage design](../../../../docs/features/daily-usage/design.md)).
 
 ## File Map
 

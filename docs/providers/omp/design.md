@@ -4,7 +4,7 @@ Contributor research for the Oh My Pi provider (`omp`). User-facing setup is in 
 
 ## As data
 
-Oh My Pi is `Modules/Providers/Resources/Providers/omp.json` and `omp-usage.js`, run by the generic engine (TARGET_ARCHITECTURE §8.2); no Swift names it. Ported from #387. The sections below are the research; the payload and the labels are unchanged.
+Oh My Pi is `Modules/Providers/Resources/Providers/omp.json` and `omp-usage.js`, run by the generic [engine](../../architecture/ENGINE_DESIGN.md); no Swift names it. Ported from #387. The sections below are the research; the payload and the labels are unchanged.
 
 - **A `command` fetch** runs `omp usage --json` over pipes; a non-zero exit is `cli.nonzero`, which never carries the output (it holds account emails and ids). The script slices the first `{` to the last `}` and reads numbers as exact texts (`jsonDecimal`).
 - **Each limit is a quota with its `group`** — the provider, and the account tag when one provider has several. A capped USD limit is money left of its cap (`left: {money, of}`), its share following the cents shown.

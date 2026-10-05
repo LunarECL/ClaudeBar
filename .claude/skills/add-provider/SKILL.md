@@ -202,7 +202,7 @@ kinds are unique, and the default and every fallback name an existing kind.
 Don't write vendor code. Find the **generic** shape of the need, for example
 "a list filtered by a field" or "money in minor units", and add it to
 `DataSources` test-first in `Modules/DataSources/Tests/`. Then use it from the
-JSON. [TARGET_ARCHITECTURE §8.1](../../../docs/architecture/TARGET_ARCHITECTURE.md#81--what-each-provider-added)
+JSON. [ENGINE_DESIGN §1](../../../docs/architecture/ENGINE_DESIGN.md#1--what-each-provider-needed-as-a-general-rule)
 lists the pieces each provider needed. Add your row there.
 
 Only a format no rule can read, like a terminal UI screen, gets a mapping
@@ -246,7 +246,7 @@ Each moves to its new place the first time it's saved, and each needs a test.
 - [ ] Real fixtures captured (success and every failure), research in `design.md`
 - [ ] Golden tests written first and failing
 - [ ] `<id>.json` makes them pass; no vendor-named Swift anywhere
-- [ ] Any new mapping/fetch/lookup ability added generically to `DataSources`, test-first, and listed in TARGET_ARCHITECTURE §8.1
+- [ ] Any new mapping/fetch/lookup ability added generically to `DataSources`, test-first, and listed in ENGINE_DESIGN §1
 - [ ] Registered in `ClaudeBarApp` with `Self.builtIn`
 - [ ] `profile.look` filled in and the icon added to the asset catalog
 - [ ] Provider docs and CHANGELOG line written; docs check passes

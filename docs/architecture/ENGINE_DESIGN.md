@@ -8,11 +8,34 @@ description: How each case a provider definition can use works — what the pers
 > works — every fetch, credential, setting and CLI rule a definition can use ·
 > **Builds on:** [MODULAR_DESIGN.md](MODULAR_DESIGN.md) · **Next:** the
 > provider's own `docs/providers/<id>/design.md`
->
-> Split out of TARGET_ARCHITECTURE with its numbers kept, so *TARGET §8.2.x*
-> still names this text; a bare § elsewhere here is TARGET's.
 
-## 8.2 · The engine the remaining migrations share
+## 1 · What each provider needed, as a general rule
+
+Claude needed more than Codex, and every provider after it brought its own
+needs; each became a generic piece, never a vendor type:
+
+| Need | Generic piece |
+|---|---|
+| a TUI screen and human reset dates no rule can say | `Mapping.script` — a JavaScript file in JavaScriptCore, no I/O, host `humanDate()`; the scripts ship beside the definition. `values` hands it settings (`{{setting.x}}`); a blank one isn't there, and the script never writes one back |
+| Claude Code's Keychain item | `CredentialLookup.keychain(service, fields)` via `security`, hex-decoded, written back as compact JSON |
+| expiry in milliseconds, a JSON refresh body with `scope` | `OAuth2Refresh.dueWhen`, `bodyFormat`, `scope`; values keep their JSON type on write-back; a failed refresh re-reads the store |
+| another CLI's Keychain login (`gh`, go-keyring) | `keychain.account`, `keychain.encoding: goKeyringBase64`; an encoded item is never written back |
+| one report covering many accounts (Oh My Pi) | a script quota's `group`, and `notes` — a row under a group with nothing to measure |
+| a cloud's metrics priced into money (Bedrock) | `cloudWatch` with `prices`: `CloudWatchClient` and `PriceCatalog` ports, implemented in `AWSClients`; a script prices them exactly (`decimalMultiply`) into one `Cost` with lines |
+| an app's own server on this Mac (Antigravity) | `localServer`: the process by name and command line, values from its arguments, its listening ports, declared loopback paths; readiness without starting a process |
+| a login file a CLI renews itself (Gemini) | `refresh: {"cli": …}` beside `oauth2`: on a 401 the CLI runs and the file is read again; the refresher says it doesn't write back |
+| a console session: one cookie read out of the Cookie header (`sec_token`, a CSRF cookie), a header left out when its value is missing | `"cookies"` on a credential lookup; `dropEmpty` covers headers |
+| `env`, ready markers and a rendered screen for the CLI; a TUI that discards input typed during its startup paint | `CLICall.environment`, `readyWhen`, `screen`, `inputDelay` |
+| `/cost` only for API-billed accounts; API→CLI only while a setting allows | `fallbackOn` (hand-off by failure) and `fallback.enabledBySetting`; the provider follows the chain and reports the first real failure |
+| 15-minute cache, a remembered 429 | `cache.ttl` (also the background floor) and rate-limit memory on `DataSource` |
+| the account's email and billing type | `context` files handed to the mapping |
+| the folder-trust prompt | `recover.patchJSONFile`, tried once |
+| Codex logins in their own folders (#326) | `accounts` (`folder`), `{{account.x}}`, `identity` (fail closed when a folder signs in to someone else), `requiresFiles` (#216), `verifyBeforeBackground`, JSON-RPC `then` + `environment`, `#jwt.claim` and `$credential.` paths |
+| the usage API's model limits, plan and money | JSON mapping rules, not a script: `each` + `where`, names by `firstWord`/`lowercase`, `unique` (first wins), `overLimit` (negative left), `countdown: "hours"`, `plan.plans` from `$credential.`, and a list of `cost` shapes with `when` and exact `{amount, decimals}` minor units |
+| today's usage and guest passes | `UsageHistory` beside the providers (read with the popover open, never in the background; keyed by the login whose logs it reads) and the `GuestPasses` capability |
+| Claude logins in their own config folders | `accounts.folder` with `email` and `accountId.field` as an `IdentityField` (`$context.account.email`), `derived` values (the Keychain service, from a sha256 of the folder), `identity` read from a context file; today's usage and guest passes stay with the default login |
+
+## 2 · The engine
 
 Seventeen migration PRs (#381–#398) were built against slices 2 and 5, and
 every one of them edited the same Swift:
@@ -35,7 +58,7 @@ are the same folder and where its value is kept. A worker's failure says which
 fact it is. A fetch case says where it sends a key. A data source says which
 one takes over when it has no key. Views may look at a kind only to draw it.
 
-### 8.2.1 · What the person sees, and the one piece behind each
+### 2.1 · What the person sees, and the one piece behind each
 
 | On screen | The person thinks | The piece | Its rule |
 |---|---|---|---|
@@ -50,7 +73,7 @@ one takes over when it has no key. Views may look at a kind only to draw it.
 | ***Configured*** | "it will work" | `isReady` of the data source a refresh would end on | follows the no-key hand-off |
 | *Add Account* → saved | "my key is kept" | the vault, read back before the account is kept | nothing half-saved |
 
-### 8.2.2 · Settings: one form, two scopes
+### 2.2 · Settings: one form, two scopes
 
 ```json
 "settings": [
@@ -106,12 +129,10 @@ a fetch only through its credential lookup.
 **Old files still decode.** Today's `accounts.form` (`"secret": true`,
 `"choices": […]`) reads as account-scope settings.
 
-**This is slice 3's form.** Settings draws it (`ProviderSettingsSection`) for
-every definition-driven provider that has no card of its own yet; the Region
-and API-key cards of the providers that migrate go, and no new Swift card
-comes.
+**One form for every provider.** Settings draws it (`ProviderSettingsSection`)
+for every provider that has no card of its own; no new Swift card comes.
 
-### 8.2.3 · HTTP in steps, instead of a planner script
+### 2.3 · HTTP in steps, instead of a planner script
 
 The PRs needed four shapes, and all of them are *call A, then B with something
 A said*:
@@ -152,7 +173,7 @@ planner script is the escape hatch §3 warns about: the person cannot read what
 it will do, and Import cannot show it. If a provider proves a flow these rules
 cannot say, that provider brings the rule in its own PR.
 
-### 8.2.4 · A command, and a terminal
+### 2.4 · A command, and a terminal
 
 Two protocols, two cases — never one type with a mode flag, where half the
 fields would mean nothing in each mode.
@@ -169,7 +190,7 @@ fields would mean nothing in each mode.
 - **`{{token}}` reaches a command through its environment**, never its
   arguments, the same way it reaches a header.
 
-### 8.2.5 · A worker reports a fact; the definition words it
+### 2.5 · A worker reports a fact; the definition words it
 
 A worker's failure is a fact that answers for itself (`ReportedFailure`): its
 key in `errors`, and the reason it gives when the definition says nothing.
@@ -197,7 +218,7 @@ key in `errors`, and the reason it gives when the definition says nothing.
 - **What stays on the request.** `acceptedStatuses` stays on the request,
   because which statuses are an answer is part of the protocol.
 
-### 8.2.6 · A case answers for itself
+### 2.6 · A case answers for itself
 
 ```swift
 public protocol Connection: Sendable {
@@ -220,7 +241,7 @@ extension Fetch {
   - its worker
   - one factory line
 
-### 8.2.7 · Kept as they were, and left out
+### 2.7 · Kept as they were, and left out
 
 **Kept as built in the PRs:**
 - `browserCookies` + `BrowserCookieReader` (SweetCookieKit, behind a

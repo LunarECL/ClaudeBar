@@ -4,8 +4,8 @@ import Providers
 import Quotas
 import Testing
 
-/// `Providers` — the providers you keep, the Providers pane (TARGET §12,
-/// slice 3): create a custom one, read them and the lineup, order them,
+/// `Providers` — the providers you keep, the Providers pane (TARGET
+/// §2.1): create a custom one, read them and the lineup, order them,
 /// delete a custom one.
 @MainActor
 @Suite

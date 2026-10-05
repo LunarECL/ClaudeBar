@@ -47,28 +47,26 @@ the command that lands on the domain, and the node that answers.
 | 10 | Lin exports | *Built in · Custom · Extension*, *Export…*, *no keys — they stay in your Keychain* | posts the file | `definition.exported()` | `ProviderDefinition`, secrets stripped |
 | 11 | A teammate imports | *Import provider*, *It will send your key to that address*, *Key needed*, *Test Connection*, *Add* | pastes his own key, adds | `catalog.import(file)` · `definition.missingSettings` | `ProviderCatalog` · `SettingsForm` |
 
-## 3 · What the journeys changed
+## 3 · What the journeys found
 
-Twelve findings. Each is now in the canonical model; the column says where.
+Twelve findings; each is a word or a law the model must keep.
 
-| # | Finding | From moment | Model change |
-|---|---|---|---|
-| F1 | The popover says **which data source answered** (*via RPC*, *via Terminal* after a fallback) | 2 | `Usage.source: kind` |
-| F2 | An error **names the step that failed** — *Couldn't read your key* · *Couldn't connect* · *Couldn't find the numbers* — because each sends the person somewhere different | 3 | `DataSourceError.step: lookup · fetch · mapping` |
-| F3 | Settings prints **DATA SOURCE** and the API source's **key lookup order**; the fallback is one sentence, not a setting | 4 | confirms `DataSource`, `CredentialLookup`, `fallback` |
-| F4 | *Add Provider*'s picker is a **closed list in the words Settings already prints** — *API · CLI · File* — plus *Copy a provider* | 5 | `Fetch` stays a closed sum; the picker offers `http` · `cli` · `file` (RPC, Terminal and CloudWatch stay built-in only); `definition.copy()` mints a new id |
-| F5 | *Test Connection* must **stop before mapping**: Ken has nothing mapped yet, but must see what came back | 6 | a public **`Response`** (status · headers · body); `dataSource.fetchResponse()`; `fetchUsage() = mapping.read(fetchResponse())` |
-| F6 | *Map fields* asks four questions — **Used · Remaining · Limit · Resets** — plus the currency; a balance has no percentage to ask for and *never* resets | 7 | the `JSONMapping` vocabulary is those words; `Left` and `Window` laws made visible |
-| F7 | A custom provider has its **look from day one** | 8 | `ProviderLook` in the definition for every origin — built-ins must catch up (target slice 3) |
-| F8 | The screen calls a user-made provider **CUSTOM** | 9, 10 | the model's *declared* kind is renamed **custom**; origins are `builtIn` · `custom` · `extension` |
-| F9 | An exported provider **carries no key** | 10 | law on `ProviderDefinition`: a secret is a reference, never a value, and `exported()` keeps only the lookup order and the setting's name |
-| F10 | Import **says where the key will go** before asking for it; a *CLI* provider from someone else shows its command and asks before saving | 11 | law on `ProviderCatalog.import`; answers the model's open question about commands from the UI |
-| F11 | Two logins of one product are **two things Mia watches** but **one thing Raj fixes**: each login is a pill and a menu-bar entry; the data source, its settings and the look are set once for Codex | 2a, 4 | `Provider` is the product, `Account` a login; accounts are simultaneous (no `active`); one definition, the account's values filled at fetch time |
-| F12 | **Pause is not remove**: a login can be switched off without losing its folder; and an expired key is not a red quota — it reads *Couldn't read your key*, not CRITICAL | 2a, 3 | `Account.isEnabled`; `Account.status` (quota health) apart from `Account.sync` (fetch health) |
+| # | Finding | From moment |
+|---|---|---|
+| F1 | The popover says **which data source answered** (*via RPC*, *via Terminal* after a fallback) | 2 |
+| F2 | An error **names the step that failed** — *Couldn't read your key* · *Couldn't connect* · *Couldn't find the numbers* — because each sends the person somewhere different | 3 |
+| F3 | Settings prints **DATA SOURCE** and the API source's **key lookup order**; the fallback is one sentence, not a setting | 4 |
+| F4 | *Add Provider*'s picker is a **closed list in the words Settings already prints** — *API · CLI · File* — plus *Copy a provider* | 5 |
+| F5 | *Test Connection* must **stop before mapping**: Ken has nothing mapped yet, but must see what came back | 6 |
+| F6 | *Map fields* asks four questions — **Used · Remaining · Limit · Resets** — plus the currency; a balance has no percentage to ask for and *never* resets | 7 |
+| F7 | A custom provider has its **look from day one** | 8 |
+| F8 | The screen calls a user-made provider **CUSTOM** | 9, 10 |
+| F9 | An exported provider **carries no key** | 10 |
+| F10 | Import **says where the key will go** before asking for it; a *CLI* provider from someone else shows its command and asks before saving | 11 |
+| F11 | Two logins of one product are **two things Mia watches** but **one thing Raj fixes**: each login is a pill and a menu-bar entry; the data source, its settings and the look are set once for Codex | 2a, 4 |
+| F12 | **Pause is not remove**: a login can be switched off without losing its folder; and an expired key is not a red quota — it reads *Couldn't read your key*, not CRITICAL | 2a, 3 |
 
 ## 4 · The words the new screens print
-
-These join the harvested words in [the model §0](CANONICAL_MODEL.md#0--how-to-read-it):
 
 *Add Provider* · *Start from* · *API · CLI · File* · *Copy a provider* ·
 *Import* · *Connect* · *URL* · *Key lookup order* · *Environment variable* ·
@@ -80,8 +78,7 @@ numbers* · *via API*.
 
 ## 5 · Acceptance scenarios
 
-The outer loop for the slices that build these screens (target slice 6), in
-the shape of [USER_BEHAVIORS.md](USER_BEHAVIORS.md):
+The outer loop for these screens, in `Tests/AcceptanceTests`:
 
 ```gherkin
 Scenario: Add a custom provider from an API

@@ -5,8 +5,8 @@ import Observation
 import Quotas
 
 /// *The provider's Settings page* — its DATA SOURCE (which one, its
-/// fallback), its settings form's values and its CLI location (TARGET §12,
-/// slice 6).
+/// fallback), its settings form's values and its CLI location (TARGET
+/// §2.1).
 ///
 /// It owns what it decides and knows no one above it: not the provider, not
 /// a login. It answers what a login runs (`sources(for:isDefault:)`), and

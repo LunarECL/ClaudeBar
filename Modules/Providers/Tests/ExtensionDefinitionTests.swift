@@ -5,7 +5,7 @@ import Quotas
 import Testing
 
 /// An extension's `manifest.json`, read as a definition of origin
-/// *Extension* (TARGET §12, slice 2). The person's file stays as it is.
+/// *Extension* (docs/features/extensions/design.md). The person's file stays as it is.
 @MainActor
 @Suite
 struct ExtensionDefinitionTests {

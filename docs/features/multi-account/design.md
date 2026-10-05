@@ -264,7 +264,7 @@ ProviderFactory.make(definition, settings, vault)
 QuotaMonitor(providers) → lineup = provider.accounts.filter(isEnabled), for every enabled provider
 ```
 
-Every provider is a `Provider`: its enabled logins are its pills (TARGET §12).
+Every provider is a `Provider`: its enabled logins are its pills ([TARGET §2.1](../../architecture/TARGET_ARCHITECTURE.md#21--the-product-and-its-roles)).
 
 ### 3.2 · Add Account
 
@@ -483,7 +483,7 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 | `AddedAccounts` (a static namespace) | **gone**: `provider.addAccount(signedInAt:)` and `provider.signIn(…)`; the deletable-folder rule is `SignedInFolder.goesWithAccount` |
 | `BinaryLocator.findInApplicationBundles` | **built** as `signIn.alsoAt: [paths]` — checked only when the CLI isn't on the PATH |
 | `Provider.rename`, `ProviderAccountConfig.named` | **built**: `Provider` receives `any MultiAccountSettingsRepository`, so `rename` and `remove` save without a downcast; the default login's name is `setDefaultAccountLabel` (`providers.<id>.defaultAccountLabel`); the unused `activeAccountId` is gone |
-| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | **built**: one `displayName`; `lineupName` (the pill, the menu bar, an alert) is the product's while `provider.hasSeveralAccounts` is false (it was `name`, TARGET §12 slice 4); `nameFromEmail` is gone |
+| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | **built**: one `displayName`; `lineupName` (the pill, the menu bar, an alert) is the product's while `provider.hasSeveralAccounts` is false (it was `name`); `nameFromEmail` is gone |
 | `AccountMenuBarLabel` (Domain) | **built**: `MenuBarAccountName` in App ([CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree): not in the model). Named so, not `MenuBarLabel`, which is already the quota text |
 | `ProviderAccountsCard` | **kept**, rendering `accounts.ways` and the form's account scope; no `switch provider.id` |
 | `CodexAccountsCard` | folded into `ProviderAccountsCard` |

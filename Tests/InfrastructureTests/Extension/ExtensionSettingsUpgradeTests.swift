@@ -3,7 +3,7 @@ import Testing
 @testable import Domain
 @testable import Infrastructure
 
-/// Extensions become definitions (TARGET §12, slice 2): what a person saved
+/// Extensions become definitions (docs/features/extensions/design.md): what a person saved
 /// for an extension moves once — values into the provider's settings,
 /// secrets from UserDefaults into the vault.
 @Suite

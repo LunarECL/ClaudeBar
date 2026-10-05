@@ -3,7 +3,7 @@ import Diagnostics
 import Foundation
 
 /// *Extensions* — `~/.claudebar/extensions/<id>/manifest.json`, read as
-/// definitions of origin *Extension* (TARGET §12, slice 2). The person's file
+/// definitions of origin *Extension* (docs/features/extensions/design.md). The person's file
 /// stays as it is: each section a definition can read becomes a data source,
 /// and they answer together, as sections always did.
 ///
@@ -60,7 +60,7 @@ public enum Extensions {
                     fetch: .http(HTTPRequest(url: url, method: "HEAD", timeout: section.probe.timeout ?? 10)),
                     mapping: .text(TextMapping(quotas: []))))
             default:
-                AppLog.providers.info("Extension \(manifest.id): its \(section.type) section is no longer read (TARGET §12)")
+                AppLog.providers.info("Extension \(manifest.id): its \(section.type) section is no longer read")
             }
         }
         guard let first = sources.first else {

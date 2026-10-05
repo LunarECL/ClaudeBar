@@ -1,5 +1,5 @@
 ---
-description: The architecture that implements the canonical model — a provider as a JSON definition, one DataSource type that fetches for every provider through single-job internal workers, no vendor-named code, the runtime from definition to popover, settings keys, testing, and the migration slices starting with Codex; read before moving a provider to JSON or adding a fetch, mapping or credential case.
+description: How a provider runs — a provider as a JSON definition, one DataSource type that fetches for every provider through single-job workers, the product and its roles, the runtime from definition to popover, testing; read before changing the lifecycle, a role or a flow.
 ---
 
 # ClaudeBar — the target architecture
@@ -8,10 +8,6 @@ description: The architecture that implements the canonical model — a provider
 > runs — from a JSON file, through one `DataSource`, to the popover ·
 > **Builds on:** [CANONICAL_MODEL.md](CANONICAL_MODEL.md) · **Next:**
 > [MODULAR_DESIGN.md](MODULAR_DESIGN.md)
->
-> **Status: BUILT** for every built-in provider (slices 1–6 below, merged
-> through #419); slice 7 is Claude's renames — `AIProvider` is gone, by
-> [§12](#12--retiring-aiprovider).
 
 ---
 
@@ -75,11 +71,56 @@ paths, field names, client ids, CLI arguments — is data.
 | a worker (`HTTPFetcher`, `JSONMapper`, `OAuth2Refresher`, …) | carries out one case | that protocol or format changes |
 | `DataSources.make(_:settings:vault:cloudWatch:)` | the one place a case meets the connection it needs | a connection is added |
 
+## 2.1 · The product and its roles
+
+A product plays a different role in each context — refreshed by the Monitor,
+configured on its Settings page, a set of logins on the Accounts card — and
+each role is its own type that owns what it decides. Dependencies point one
+way, down; nothing refers back up.
+
+```text
+Providers  ◆                    THE PROVIDERS YOU KEEP — the Providers pane: add a custom one,
+│                               delete it, the order (saved), lineup → [Account] (derived);
+│                               provider(of: login) — a login's product, by id
+└── Provider  ◆                 THE LIFECYCLE — refresh(login), isAvailable, the switch, status,
+    │                           testConnection, hasKey; every product-level answer about a login
+    ├── accounts: Accounts  ◆   THE ACCOUNTS CARD — the logins and their order: add (form ·
+    │   │                       folder · sign in), remove, rename, move
+    │   ├── Account  ◆          A LOGIN — knows only itself; names its product by id
+    │   └── depends on ↓ Configuration
+    ├── configuration: Configuration  ◆   THE SETTINGS PAGE — data source and fallback, the form's
+    │                           values, CLI location; answers definitionAsRun(for: login) and
+    │                           revision, which grows on every change. Knows no one
+    └── inUse: InUse?           reads accounts below it, never its provider (§9)
+```
+
+| Question | Answer |
+|---|---|
+| How does a changed setting reach the fetch, with no arrow up? | **pulled, not pushed**: the provider remakes a login's data sources when the configuration's `revision` is newer than the one it made them at |
+| A new or removed login? | the provider makes a login's data sources when first asked, and drops those of a login `accounts` no longer has |
+| Adding a folder reads who is signed in there | `Accounts` is handed the same `makeDataSource` the provider is; it never asks the provider |
+| What the lineup prints for a login | `provider.lineupName(of:)`: the product's name while it is the only login, else the login's own — decided once, never by a page |
+| How a child refers back, if it must | in order: not at all → the parent passed in (or the parent answers) → `weak` → `unowned`, only in a private helper. Anything public — observable, held by views, Tasks or tests — holds no back-reference; a stored callback captures `weak` |
+
+| Rule | Owner |
+|---|---|
+| a role never depends on the lifecycle, nor on a role above it: `Provider → Accounts → Configuration` | each role |
+| a login's data sources are made in one place, from `configuration.definitionAsRun(for:)` at its current revision | `Provider` |
+| a setting is saved where its definition says (vault for a secret); a CLI location must be a program; any change grows `revision` | `Configuration` |
+| the default login is first and can't be removed; an added login's folder or values are checked before it is kept | `Accounts` |
+| adding or removing a login is the product's, never the collection's or the Monitor's | `Provider` |
+
+- **The product's switch is its own setting**; each login's *Pause* is the
+  login's. An older `providers.<id>.isEnabled` was the plain login's switch,
+  so it is read once: off while another login of the product is on means the
+  plain login was paused; otherwise the product was off.
+- `selectedProviderId` keeps its name and value (a login's id): the status
+  export and `claudebar://` links carry it.
+
 ## 3 · Codex, as data
 
-`Resources/Providers/codex.json` — the whole of Codex. The fields below are the
-ones today's two probes hard-code; slice 1 pins every one of them with a test
-against the current probes' fixtures before those probes are deleted.
+`Resources/Providers/codex.json` — the whole of Codex, shown here as the worked
+example of a definition; the file itself is the truth.
 
 ```json
 {
@@ -272,9 +313,9 @@ that case needs: `HTTPFetcher` holds a `NetworkClient`, `CLIFetcher` a
 the settings, `KeychainReader` the vault. No type receives a bag of
 everything.
 
-The Monitor and the views consumed `AIProvider` while the other providers
-moved; it is gone now — they take `Account` or `Provider` (§12). `UsageSnapshot` keeps its name until the renames of
-slice 7 (`Usage`), and gains `source: kind` — *via RPC* — in slice 1.
+The Monitor and the views take `Account` (a login) or `Provider` (the
+product), never a type that could be either. A usage says which data source
+answered (`source: kind` — *via RPC*).
 
 ### 4.2 · Flows
 
@@ -354,53 +395,7 @@ found — are [CANONICAL §5](CANONICAL_MODEL.md#5--the-laws-on-the-node-that-ow
 The golden tests are how deleting `CodexUsageProbe` stays safe: the JSON must
 reproduce its output, quota for quota, before the Swift goes.
 
-## 8 · Migration slices
-
-Each slice is one PR, green, with no change a user can see unless it says so.
-
-| # | Slice | Done when |
-|---|---|---|
-| 1 ✅ | **Codex** — the definition types, `CredentialLookup` · `Fetch` · `Mapping`, `DataSource`, `Provider`; workers `JSONFileReader`, `OAuth2Refresher`, `HTTPFetcher`, `JSONRPCFetcher`, `CLIFetcher` (terminal), `JSONMapper`, `TextMapper`; `codex.json`; golden tests | `CodexProvider`, `CodexUsageProbe`, `CodexAPIUsageProbe`, `DefaultCodexRPCClient`, `CodexCredentialLoader` are deleted; both modes and the fallback work; `codex.probeMode` is read as before |
-| 1a ✅ | **Accounts under one Provider** — `Provider` owns `[Account]`; `{{account.x}}` filled at fetch time; `codex.json`'s `accounts.dataSources` deleted; `AddedAccounts` → `provider.add(account:)` | same ids, pills, pins and settings keys; no visible change |
-| 2a ✅ | **DeepSeek** — `deepseek.json`, balance script, `accounts.form`, scoped keys and verified legacy-key migration | its probe and provider class are deleted; golden tests cover currency, paid/granted details and independent keys |
-| 2 ✅ | the remaining HTTP + API-key providers on the engine of [§8.2](ENGINE_DESIGN.md#82--the-engine-the-remaining-migrations-share): MiniMax #401, Vercel #403, Command Code #404, Cursor #407, Grok #408, OpenCode Go #409, Z.ai #410, Copilot #412, #415 | their probes and provider classes are deleted |
-| 3 ✅ | the look (#353), the Data source section (#352) and the settings form (#399) move into the JSON; the `switch id` tables and the config cards go — only Claude's budget card and DeepSeek's card remain | adding a provider edits no Swift |
-| 4 ✅ | the kernel laws: `Left` (no fake 100%), `Window` (no guessed length) | balance definitions map money only |
-| 5 ✅ | the CLI, cookie and local providers on the engine of [§8.2](ENGINE_DESIGN.md#82--the-engine-the-remaining-migrations-share): Amp #405, Kiro #406, Kimi #411, Alibaba #413, Gemini #414, Antigravity #416, Oh My Pi #418, Mistral #419; Bedrock via `Fetch.cloudWatch` and the `AWSClients` module #417; *PROBE MODE* → *Data fetching method* | no `XxxUsageProbe` is left |
-| 6 ✅ | *Add Provider* (#354), *Export*, *Import* (#355) — the screens of [USER_JOURNEYS.md](USER_JOURNEYS.md) moments 5–11, outer loop from its §5 scenarios | a person adds, shares and imports a provider without a restart, and no exported file contains a key |
-| 7 | Claude (PTY CLI, multi-account, guest passes, budget); the renames (`Usage`, `Plan`, `Cost`, `DataSourceError`) | ~~`AIProvider` folds into `Provider`~~ — retired instead, by §12 |
-
-## 8.1 · What each provider added
-
-Claude needed more than Codex, and every provider after it brought its own
-needs; each became a generic piece, never a vendor type:
-
-| Need | Generic piece |
-|---|---|
-| a TUI screen and human reset dates no rule can say | `Mapping.script` — a JavaScript file in JavaScriptCore, no I/O, host `humanDate()`; the scripts ship beside the definition. `values` hands it settings (`{{setting.x}}`); a blank one isn't there, and the script never writes one back |
-| Claude Code's Keychain item | `CredentialLookup.keychain(service, fields)` via `security`, hex-decoded, written back as compact JSON |
-| expiry in milliseconds, a JSON refresh body with `scope` | `OAuth2Refresh.dueWhen`, `bodyFormat`, `scope`; values keep their JSON type on write-back; a failed refresh re-reads the store |
-| another CLI's Keychain login (`gh`, go-keyring) | `keychain.account`, `keychain.encoding: goKeyringBase64`; an encoded item is never written back |
-| one report covering many accounts (Oh My Pi) | a script quota's `group`, and `notes` — a row under a group with nothing to measure |
-| a cloud's metrics priced into money (Bedrock) | `cloudWatch` with `prices`: `CloudWatchClient` and `PriceCatalog` ports, implemented in `AWSClients`; a script prices them exactly (`decimalMultiply`) into one `Cost` with lines |
-| an app's own server on this Mac (Antigravity) | `localServer`: the process by name and command line, values from its arguments, its listening ports, declared loopback paths; readiness without starting a process |
-| a login file a CLI renews itself (Gemini) | `refresh: {"cli": …}` beside `oauth2`: on a 401 the CLI runs and the file is read again; the refresher says it doesn't write back |
-| a console session: one cookie read out of the Cookie header (`sec_token`, a CSRF cookie), a header left out when its value is missing | `"cookies"` on a credential lookup; `dropEmpty` covers headers |
-| `env`, ready markers and a rendered screen for the CLI; a TUI that discards input typed during its startup paint | `CLICall.environment`, `readyWhen`, `screen`, `inputDelay` |
-| `/cost` only for API-billed accounts; API→CLI only while a setting allows | `fallbackOn` (hand-off by failure) and `fallback.enabledBySetting`; the provider follows the chain and reports the first real failure |
-| 15-minute cache, a remembered 429 | `cache.ttl` (also the background floor) and rate-limit memory on `DataSource` |
-| the account's email and billing type | `context` files handed to the mapping |
-| the folder-trust prompt | `recover.patchJSONFile`, tried once |
-| Codex logins in their own folders (#326) | `accounts` (`folder`), `{{account.x}}`, `identity` (fail closed when a folder signs in to someone else), `requiresFiles` (#216), `verifyBeforeBackground`, JSON-RPC `then` + `environment`, `#jwt.claim` and `$credential.` paths |
-| the usage API's model limits, plan and money | JSON mapping rules, not a script: `each` + `where`, names by `firstWord`/`lowercase`, `unique` (first wins), `overLimit` (negative left), `countdown: "hours"`, `plan.plans` from `$credential.`, and a list of `cost` shapes with `when` and exact `{amount, decimals}` minor units |
-| today's usage and guest passes | `UsageHistory` beside the providers (read with the popover open, never in the background; keyed by the login whose logs it reads) and the `GuestPasses` capability |
-| Claude logins in their own config folders | `accounts.folder` with `email` and `accountId.field` as an `IdentityField` (`$context.account.email`), `derived` values (the Keychain service, from a sha256 of the folder), `identity` read from a context file; today's usage and guest passes stay with the default login |
-
-## 8.2 · The engine the remaining migrations share
-
-Moved to [ENGINE_DESIGN.md](ENGINE_DESIGN.md), numbers unchanged.
-
-## 9 · Open
+## 8 · Open
 
 - **The mapping language's ceiling.** Slices 1, 2 and 5 will find what it must
   express. If a provider needs real computation (Bedrock prices tokens per
@@ -418,11 +413,7 @@ Moved to [ENGINE_DESIGN.md](ENGINE_DESIGN.md), numbers unchanged.
   [features/multi-account/design.md](../features/multi-account/design.md).
 - **A `command` fetch from the UI** — see [CANONICAL_MODEL §9](CANONICAL_MODEL.md#9--open).
 
-## 10 · Usage History as data
-
-Moved to [features/daily-usage/design.md](../features/daily-usage/design.md), numbers unchanged.
-
-## 11 · In use as a capability
+## 9 · In use as a capability
 
 *Which login does my next terminal session start with?* is a question the
 monitor doesn't answer — every login is still fetched — so it is a
@@ -459,278 +450,3 @@ switching, once per low) → `InUseAnnouncer`. *A link* —
 | another shell | one case in `LoginShell`, its lines in `ShellSetup`, a test that runs it |
 | another policy than *Switch when low* | a policy beside `SwitchWhenLow` that `InUse.review` asks |
 | In use for API-key providers | an env-variable record and lines — `InUse` and `NewSessions` unchanged |
-
-
-## 12 · Retiring `AIProvider`
-
-> **Status: BUILT** (2026-10-04), slices 1–7. The build has no `AIProvider`,
-> `Provider` keeps only the lifecycle, and a login refers to nothing above it.
-
-**The problem.** Someone with two Claude logins opens Settings → Providers and
-finds *personal* and *work* listed as two providers. The page is titled
-*personal*, and its *Enabled* toggle pauses that one login while it looks like
-it turns Claude off. The cause is in the code: one protocol stands for a
-product **or** a login, so every screen guesses which it holds. Extensions work,
-and are moved only because they are the last other thing on that protocol.
-
-`AIProvider` is the legacy shape: one protocol for "some provider", from before
-a provider was a definition and a login an `Account`. CANONICAL §1 has no such
-node — `Monitor → providers: [Provider] → accounts: [Account]`, and the lineup
-is `[Account]`. Today only two things conform: `Account` (a shim, whose `name`
-switches between the product's and the login's) and `ExtensionProvider`. Every
-consumer that receives `any AIProvider` has to guess which of product or login
-it holds, and casts to find out.
-
-### 12.1 · What each consumer really means
-
-| Today | Means | Becomes |
-|---|---|---|
-| `QuotaMonitor` · `AIProviderRepository` (`all`, `enabled`, `provider(id:)`) | the products, and the lineup of their logins | `Monitor.providers: [Provider]`; `lineup: [Account]` derived (enabled logins of enabled products) |
-| pills, menu-bar entries, Touch Bar, notch, alerts, `onRefreshed` | **a login** | `Account` |
-| Settings → Providers rows and pages | **a product** | `Provider` — one row per product; its logins in the Accounts card |
-| `ProductTab` (`provider: Provider?` from its first account) | a product | `Provider` itself |
-| `Account.name` (product or login, by count) | two things | `account.lineupName` — *the name the lineup prints*: the product's while it is the only login, else the login's; one owner, never re-decided by a page (corrected 2026-10-04: "the page decides" would copy the rule into every view). `account.displayName` is the login's own; `provider.name` the product's |
-| `isEnabled` on `AIProvider` | a login's pause *and* a product's toggle | `account.isEnabled` (pause) · `provider.isEnabled` (hide every login — CANONICAL §8, ) |
-| `RefreshKind`, `refresh(kind)`, `backgroundRefreshFloor` | the lifecycle | `Provider` (already there) |
-
-### 12.2 · Extensions become definitions
-
-CANONICAL §8: *"the same `Provider`, with script fetches"*. The person's
-`~/.claudebar/extensions/<id>/manifest.json` stays theirs and keeps working;
-`ProviderCatalog` reads it as a definition of origin **extension**:
-
-| Manifest | Definition |
-|---|---|
-| `id`, `name`, `icon` | `profile` (`look.symbol`), origin `extension` |
-| `config` fields | provider-scope `settings` (a `secret` in the vault, as today) |
-| a section's `probe.command` | **`Fetch.script`** — run with `/bin/sh` from the extension's folder, **every** setting as `CLAUDEBAR_<UPPER_SNAKE>` in the environment, secrets read from the vault (a command fetch reaches one key and runs only in the dedicated folder) |
-| `quotaGrid` · `costUsage` output | **`Mapping.usage`** — ClaudeBar's own documented output (`quotas[]` with `type` / `percentRemaining` / `resetsAt`, `costUsage`), which any script provider can print. `Mapping.json` can't take a quota's kind from a field |
-| several sections | one data source per section, and the definition says **`"together": true`**: every data source runs, the usage is their union in definition order, a failed one is left out of it **and shows beside it as fetch health** (a down health check stays visible, as today's DOWN card is), and the refresh fails only when all do. Without it, one data source answers, with its fallback, as today |
-| `dailyUsage` | **retired** with a note — `usageHistory` reads raw records from log files, and this section prints ready-made totals. An extension that wants daily usage writes JSON-lines records a `usageHistory` `files` glob reads, as every provider does |
-| `metricsRow` | **`usage.cost`** and the comparison from `usageHistory` — the cost and daily cards every provider draws. A free-form metric ("Requests: 1,234") has no domain meaning and is **retired** |
-| `healthCheck` | **fetch health**: an `http` data source with no mapping; failing is `account.sync.lastError`, never a quota status (CANONICAL §5) |
-| `statusBanner` | **retired** — free text with no domain meaning (already decoded and dropped today); the provider's status page is `profile.links.status` |
-| `config` fields and their saved values | provider-scope `settings`; on upgrade, once, values move from `extensions.<id>.<field>` and secrets from UserDefaults into the vault (the Keychain). The id stays `ext-<id>`, so its switch and place in the order are kept |
-
-### 12.3 · Slices — the visible problem first, each green
-
-The lineup can only be `[Account]` once every member is one, so extensions
-become definitions before the Monitor changes type (corrected 2026-10-04: the
-first order put the Monitor first, which would have needed `AIProvider` to
-stay for extensions).
-
-| # | Slice | Fixes · pins |
-|---|---|---|
-| 1 ✅ | **Settings by product**: Providers rows and pages take a `Provider` (from `ProductTab`); the page is titled *Claude*, its toggle is `provider.isEnabled` (hides every login), its logins are the Accounts card | the visible problem · one row per product; the toggle hides every login and keeps their settings; extensions keep their own row |
-| 2 ✅ | **Extensions as definitions**: `Fetch.script`; a definition's data sources can **answer together** (each section one, the usage their union, a failed one left out); the manifest → definition reader; sections mapped as 12.2; `ExtensionProvider` goes | every lineup member is an `Account` · golden tests on `docs/features/extensions/example-provider`: quotas and cost read the same; config fields as settings; a failing section left out |
-| 3 ✅ | **`Providers`** (CRUD of the providers you keep, their order and the derived `lineup: [Account]`), held by the Monitor; `AIProviderRepository` and `AIProviders` go; the test stubs become definitions over stubbed connections | the cause, in the domain · every Monitor test |
-| 4 ✅ | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
-| 5 ✅ | Delete `AIProvider` | done · the build has no `AIProvider` |
-| 6 ✅ | **`Provider` by role** (SRP): one product plays different roles in different contexts — refreshed in Monitoring, configured in Settings, a set of logins in Accounts, a terminal choice in In use (already `InUse`), a history in Usage History (already `UsageHistory`). Each role becomes its own type the product hands out, as `inUse` is; `Provider` keeps only the lifecycle (TARGET §1: it changes when the lifecycle changes). designed in *Slice 6 in detail* | `Provider` small again · each role's tests move with it |
-| 7 ✅ | **A login knows only itself**: `Account` names its product by id; `Providers.provider(of:)` resolves it; every product-level answer about a login is its provider's; no back-reference anywhere (`unowned` and `keep()` gone) | the cycle · no `Account.provider`; a stale login never crashes |
-
-#### Slice 1 in detail — Settings by product
-
-Mockup: `design-concept/settings-by-product/index.html`.
-
-| Piece | Rule |
-|---|---|
-| a Providers row | the **product**: its name, "*n* accounts" when there is more than one, **each login's usage** (one meter per login, by name), its switch. An extension keeps its own row until slice 4 |
-| the page | titled by the product; its switch is the product's; its logins are the Accounts card, each with its own *Pause* |
-| `Provider.isEnabled` | **its own setting**: off hides every login — no pill, no menu-bar entry, no refresh, no alert — and keeps every login and its settings. The lineup is the enabled logins **of enabled products** |
-| `Account.isEnabled` | the login's own *Pause*, its own setting — never the product's. A product whose logins are all paused reads as disabled (CANONICAL §5) |
-| upgrade | today `providers.<id>.isEnabled` is the plain login's switch. Read once: **off while another login of it is on** meant *the plain login was paused* — kept as its pause, the product on; **otherwise** it meant *the product was off* — kept as the product's switch. Nobody's setup changes |
-
-#### Slice 3 in detail — `Providers`: the providers you keep
-
-> **Status: BUILT** (2026-10-04, confirmed the same day). `Providers` in
-> `Modules/Providers`; the module's factory is `ProviderFactory` (it was
-> `Providers`). The Monitor's members still take and return `Account` under
-> their old names (`allProviders`, `enabledProviders`); slice 4 renames them
-> with the views.
-
-The Monitor does two jobs today: it **watches** (refresh, alerts, selection,
-status) and it **keeps the person's providers** (add a custom one, delete it,
-order the pane, look one up). They change for different reasons, so the
-keeping becomes its own aggregate in the Providers context, the one the
-Settings → Providers pane shows, and the Monitor holds it.
-
-```text
-Monitor  ◆                      watches: refresh, alerts, selection, status, onRefreshed
-└── providers: Providers  ◆     the providers you keep — the Providers pane
-    ├── all: [Provider]         in the pane's order (persisted; a product's logins move together)
-    ├── lineup → [Account]      DERIVED — enabled logins of enabled products, in that order
-    └── Provider  ◆             the product (unchanged); its logins are its own business
-```
-
-| Tell it | It does |
-|---|---|
-| `providers.add(definition)` | **Create** — a custom provider (Add Provider, Import): saves the definition to the catalog, registers it, makes it live, appends it |
-| `providers.all` · `provider(id:)` · `login(id:)` · `lineup` | **Read** |
-| `providers.move(id, by:)` | **Update** the order — persisted; ids no longer kept are dropped |
-| `providers.remove(id)` | **Delete** — a custom provider: its definition file, its vault keys, its registration. A built-in is never deleted (turn it off instead) |
-
-| Law | Owner |
-|---|---|
-| one provider per id; adding an id already kept is refused | `Providers` |
-| the order is the pane's, saved; a product's logins stay together; unknown ids are dropped | `Providers` |
-| a built-in provider can't be deleted, only turned off | `Providers` |
-| the lineup is derived — enabled logins of enabled products, in the order — never stored | `Providers` |
-| adding or removing a **login** is the product's (`provider.addAccount` / `remove`), never the collection's or the Monitor's | `Provider` |
-| the Monitor never adds, deletes or orders a provider; it reads `providers` and watches | `Monitor` |
-
-It lives in `Modules/Providers` (the Providers context; it needs the catalog,
-the vault and the settings, never the Monitor). `AIProviderRepository` and
-`AIProviders` are what it replaces.
-
-#### Slice 4 in detail — views take `Account` or `Provider`
-
-> **Status: BUILT** (2026-10-04, confirmed the same day). No view casts to
-> `Account` any more; slice 5 then deleted `AIProvider`, which only
-> `Account` still conformed to. The tab rule of the popover header's
-> badge reads `ProviderBadgeState.Login` facts, so it is tested without a login.
-
-| Today | Becomes | Why |
-|---|---|---|
-| `any AIProvider` in views, `ProductTab`, `ProviderBadgeState`, `RefreshReport`, `NewSessions.review`, the Monitor's queries | `Account` | every one of them holds a login |
-| `extension AIProvider` (visual identity) | `extension Account` | the face is the product's, reached from the login |
-| `account.name` | `account.lineupName` | one name, one meaning (12.1) |
-| `monitor.allProviders` · `enabledProviders` · `provider(for:)` · `selectedProvider` · `selectedLogins` | `monitor.logins` · `lineup` · `login(id:)` · `selectedLogin` · `selectedLogins` (`[Account]`) | the words of the tree (CANONICAL §1); a login is never called a provider |
-| `ProductTab.provider: Provider?`, `page: (any AIProvider)?` | `provider: Provider`, `page: Account` | every tab is a product now; nothing is legacy |
-| `MultiAccountProvider`, `AccountPickerView`, `AccountManagementCard` | deleted | nothing conforms or shows them since accounts became the provider's |
-
-`selectedProviderId` keeps its name and value (a lineup id): the status export
-file and `claudebar://` links carry it. Nothing on screen changes; mock-data screenshots
-of the pills, menu bar, Settings → Providers and the overview confirm it.
-
-#### Slice 6 in detail — `Provider` by role
-
-> **Status: BUILT** (2026-10-04, second take, confirmed the same day). The first take —
-> roles as stateless views holding their provider — was **circular**:
-> `Configuration` held `Provider`, `Provider` handed out `Configuration`, and
-> each "role" reached into the provider's state (`settings`, `vault`,
-> `running`, `bind`). That moved code, not responsibility: `Provider` still
-> owned everything. 6a (`Accounts` as a view) shipped that way and is redone here.
-
-**The problem.** `Provider` changes for three reasons: the lifecycle
-(refresh, fallback), the Accounts card (add, sign in, rename, order), and the
-provider's Settings page (data source, setting values, CLI location). One
-product plays a different role in each context — a student at school, a son
-or daughter at home — and each role decides different things.
-
-**The rule: dependencies point one way — down.** Each role *owns* what it
-decides and knows nothing above it; the lifecycle composes them.
-
-```text
-Provider  ◆  THE LIFECYCLE — refresh(login), isAvailable, the switch, status
-│            depends on ↓ both; neither knows it
-├── accounts: Accounts  ◆           THE ACCOUNTS CARD — owns the logins and their order
-│   │                               (saved), adding (form · folder · sign in), remove,
-│   │                               rename, move; each added login's usage history
-│   └── depends on ↓ Configuration  (the form, and the definition a new login runs)
-└── configuration: Configuration ◆  THE SETTINGS PAGE — owns DATA SOURCE (which one,
-                                    fallback on/off), the settings form's values, CLI
-                                    location; answers `definitionAsRun(for: login)` and
-                                    `revision`, which grows on every change. Knows no one
-```
-
-| Question | Answer |
-|---|---|
-| How does a changed setting reach the fetch, with no arrow up? | **pulled, not pushed**: `Configuration.revision` grows on each change; the provider remakes a login's data sources when the revision it made them at is older. No callback, no back-reference |
-| A new or removed login? | the provider makes a login's data sources when first asked (`bound[login]` empty) and drops those of a login `accounts` no longer has |
-| Adding a folder must read who is signed in there — a live data source | `Accounts` gets the same `makeDataSource` the provider gets, injected; it never asks the provider |
-| Test Connection | the lifecycle's (it fetches): `provider.testConnection(login)` |
-| `Account` → `Provider` | ~~`unowned`~~ — reversed by slice 7: a login names its product by id and refers to nothing |
-
-| Law | Owner |
-|---|---|
-| a role never depends on the lifecycle, nor on a role above it: `Provider → Accounts → Configuration`, never back | each role |
-| the provider owns its children — its roles and its logins; none refers back to it (slice 7) | `Provider` |
-| a login's data sources are made in one place, from `configuration.definitionAsRun(for:)` at its current revision | `Provider` |
-| the default login is first and can't be removed; an added login's folder or values are checked before it is kept; the order is yours, saved | `Accounts` |
-| a setting is saved where its definition says (vault for a secret); a CLI location must be a program; the data source is one choice for every login; any change grows `revision` | `Configuration` |
-
-**Built** — `Configuration` and `Accounts` are owning classes in
-`Modules/Providers`; `Provider` composes them and makes data sources at the
-configuration's revision. Test Connection and `hasKey` are the lifecycle's
-(`provider.testConnection`, `provider.hasKey`). The login's `unowned`
-reference back, and the tests' `keep(_:)` it needed, are gone — reversed by
-slice 7.
-
-~~**Open.** Should a login stop pointing at its product (`Account.provider`)?~~
-~~**Answered (2026-10-04): `unowned` — composition.**~~ **Reversed by slice 7
-the same day:** `unowned` turned the leak into a crash for anyone holding a
-login after its provider went. What follows is kept as the record of why it
-was tried. The provider owns its
-children: when it is destroyed, so are they. A login's reference to its
-product is therefore non-owning and never outlives it (`unowned`, not `weak`,
-which would say a login can outlive its product). It breaks the retain cycle
-— a deleted custom provider and its logins were never freed — and keeps
-`account.provider` non-optional. The law it puts on the rest: deleting a
-product removes its logins from every surface (the lineup is derived from
-`Providers`, so nothing keeps one). `Configuration` and `Accounts` hold no
-reference up at all. Not chosen: a reference by id with every call told to
-the root (the type cycle goes too, but most views change).
-
-#### Slice 7 in detail — a login knows only itself
-
-> **Status: BUILT** (2026-10-04, confirmed the same day). Reverses slice
-> 6's `unowned` answer above. No new type: the tree already has the root and
-> the login (CANONICAL §1: `lineup → [Account]`).
-
-**The problem.** Slice 6 made `Account.provider` `unowned`: the leak became
-a crash. Any holder of a login that let its provider go — a view during a
-delete, a test — aborts the process, and the tests needed a global `keep()`
-array to imitate the app's ownership. `InUse` holds its provider the same
-way. The cycle `Provider ↔ Account` is still there, only cheaper.
-
-**The rule: a child knows only itself; outside, you reach it through its
-root** (DDD: an aggregate's entities are reached through the root, and
-another thing is referred to by its id).
-
-```text
-Providers                       resolves a login's product: provider(of: account) — by id
-└── Provider  ◆                 the root — every product-level question about one of its
-    │                           logins: isInLineup(_:), lineupName(of:), refresh(_:),
-    │                           isAvailable(_:), hasKey, dashboardURL(of:), inUse, history…
-    ├── accounts: Accounts ◆    owns the logins
-    │   └── Account  ◆          A LOGIN — knows only itself: id, providerId (a value), label,
-    │                           email, values, its pause, what we last saw; and what its
-    │                           definition alone says (folder, cliCommand, status page,
-    │                           setup notice). Given its definition and settings at birth,
-    │                           never its provider
-    ├── configuration ◆
-    └── inUse: InUse?           reads `accounts` below it — never its provider
-```
-
-**How a child refers back, in order of preference:** no back-reference →
-the parent passed in as a parameter (or the parent answers) → `weak` →
-`unowned`. `unowned` comes last: it is the only one that crashes when the
-assumption is wrong, and it fits only a private helper that can never be
-handed out. Anything public — `@Observable`, held by views, lists, Tasks or
-tests, or awaiting — gets no back-reference; a callback stored in a public
-object captures `weak`.
-
-| Law | Owner |
-|---|---|
-| a login never refers to its provider; it names it by id. Nothing a provider owns refers up — `Account`, `InUse`, `Accounts` are public, so none holds a back-reference; `Accounts.onChange` captures `weak` | `Account` · each role |
-| a login's product is found through the root, `providers.provider(of:)` — `nil` once it is gone, never a crash | `Providers` |
-| each product-level answer about a login has one owner: its provider | `Provider` |
-| deleting a product removes its logins from every surface, because the lineup is rebuilt without it | `Providers` |
-
-**What dies:** `Account.provider` and `unowned` on `InUse`; `keep()` and
-its copies; `Account`'s forwarding members (`refresh`, `isAvailable`,
-`isInLineup`, `lineupName`, `dashboardURL`, `isInUse`, `usageHistory`, …),
-which move to `Provider`.
-
-**What it costs:** surfaces that climbed `account.provider` or called a
-forwarding member ask the root instead — the Monitor for views
-(`monitor.refresh(login)`, `monitor.lineupName(of:)`), the provider in tests.
-
-### 12.4 · Decided
-
-- ~~**The product's switch.**~~ **Answered (2026-10-04): its own setting**, as CANONICAL §1 says (*"off hides every login"*); each login's *Pause* stays its own; the upgrade rule above keeps everyone's setup. Not chosen: a switch that pauses every login, which would also resume logins paused on purpose.
-- ~~**Settings rows lose a login's usage.**~~ **Answered:** the product row shows each login's usage, one meter per login.
-- ~~**Daily usage from an extension's script.**~~ **Answered (2026-10-04): retired** — `usageHistory` reads raw records, the section prints totals; an extension writes records instead.
-- ~~**The engine additions.**~~ **Answered (2026-10-04):** `Fetch.script`, `Mapping.usage` and `"together": true`, each one case of a closed sum or one field (CANONICAL §2).
-- ~~**Extension sections a definition can't say yet.**~~ **Answered (2026-10-04): they map into the account's own model** — metrics → `usage.cost` + history, health check → fetch health. Free-form metrics and `statusBanner` have no domain meaning and are **retired**, announced in the release before they go; either can return as a general rule when an issue asks, problem-first. `Usage.extensionMetrics` and `dailyUsageReport` then leave the kernel (CANONICAL §8).

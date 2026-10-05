@@ -5,13 +5,8 @@
 > this says how it runs. Users: [README.md](README.md). How duplicates are
 > found: [dedup.md](dedup.md). Claude Desktop beside a login:
 > [other-apps-design.md](other-apps-design.md).
->
-> Moved from TARGET_ARCHITECTURE §10 with its numbers kept, so *TARGET §10.x*
-> still names this text.
 
-## 10 · Usage History as data
-
-### 10.1 · What a person asks, and what is true
+## 1 · What a person asks, and what is true
 
 A person asks **"how much did I use, day by day?"** *TODAY'S USAGE* (today
 against yesterday) and a *Daily token usage — last 30 days* chart (input,
@@ -44,7 +39,7 @@ None of these is a vendor's behaviour; each is a value. So, as for usage
 tool's logs, a new model's price or a new view never edit a vendor's Swift
 (OCP).
 
-### 10.2 · The definition: `usageHistory` beside `dataSources`
+## 2 · The definition: `usageHistory` beside `dataSources`
 
 Record fields use **the mapping's path language** (§3: `$.a.b`, a list is the
 first that answers, `where`), so there is one way to point into JSON.
@@ -231,7 +226,7 @@ no cost. An added login's patch sets `otherApps` to `null`. A token count that
 is negative or not whole drops the record. Design:
 [other-apps-design.md](other-apps-design.md).
 
-### 10.3 · Thirty days without re-reading thirty days: the ledger
+## 3 · Thirty days without re-reading thirty days: the ledger
 
 Claude's logs run to gigabytes; re-reading thirty days on every popover open
 is not an option, and today's in-memory cache only covers two. The day is the
@@ -249,7 +244,7 @@ natural unit to keep:
 - **A ledger is a cache, not a record**: deleting it re-reads the logs; a
   change to the definition (`usageHistory` or the prices) invalidates it.
 
-### 10.4 · Where it lives: the login owns it, `DataSources` extracts it
+## 4 · Where it lives: the login owns it, `DataSources` extracts it
 
 **No new module.** A module earns its place with its own SDK, a second
 consumer, or a boundary the build must enforce; usage history has none —
@@ -300,7 +295,7 @@ a vendor; the readers are named for formats. The page owns the views:
 *TODAY'S USAGE* cards read `days(in: .last(2))`, a chart reads
 `days(in: .last(30))` and stacks `tokens` by kind (or `cost.lines` by model).
 
-### 10.5 · Is it easy to change? The checks
+## 5 · Is it easy to change? The checks
 
 | A person or a contributor wants… | They change |
 |---|---|
@@ -311,7 +306,7 @@ a vendor; the readers are named for formats. The page owns the views:
 | a binary log format | one new reader, named for the format |
 | an added login's own usage history | nothing: `accounts.patch.usageHistory` |
 
-### 10.6 · Guest passes stay Swift
+## 6 · Guest passes stay Swift
 
 **Guest passes** (`ClaudeGuestPassSource`: `claude /passes` in a terminal,
 the referral link from the screen or the clipboard, an optional count) are
@@ -319,7 +314,7 @@ the referral link from the screen or the clipboard, an optional count) are
 in the shared definition, with a `clipboard` option on every `cli` fetch,
 would put one vendor's feature into the format every provider uses —
 speculative generality, the opposite of OCP. The rule that decides it is the
-one for log shapes (§10.2): *an idea several providers share is data; an
+one for log shapes (§2): *an idea several providers share is data; an
 idea only one product has stays at the edge.*
 
 So the capability is generic and its one source is Claude's: `GuestPasses`
@@ -329,18 +324,3 @@ and the `@Mockable` `GuestPassSource` port live in `Providers`;
 `Infrastructure/Claude`, and moves to the App when `Infrastructure` is
 carved — the composition root is where a vendor may be named. If a second
 product ever offers passes or referrals, that is the moment to make it data.
-
-### 10.7 · Slices
-
-Each slice is one PR, green, with no change a user can see unless it says so.
-
-| # | Slice | Done when |
-|---|---|---|
-| UH1 ✅ | **Move**: `UsageHistory` into `Providers`, held by each `Account` (`account.usageHistory`), over today's analyzers behind `DailyUsageAnalyzing` | `Domain/UsageHistory` is empty; the App reads `account.usageHistory`; no visible change |
-| UH2 ✅ | **Claude as data**: `UsageLog` + `UsageLog.Definition` in `DataSources`, `JSONLinesReader`, `PriceList` + `claude-prices.json`, `LocalEndpoint`, `DayAggregator`, `days(in:)`; claude.json's `usageHistory`. Golden tests: today's `ClaudeDailyUsageAnalyzerTests`, `SessionJSONLParserTests`, `SessionLogCacheTests`, `ModelPricingTests` fixtures through the definition | `ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector` deleted; the same two-day numbers |
-| UH3 ✅ | **Mistral as data**: `JSONLogReader`, `at.fromPath`; mistral.json's `usageHistory`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
-| UH4 ✅ | **The ledger**: `DayLedger`, closed days kept, invalidated by a definition change | 30 days read in the time 2 take today |
-| UH5 ✅ | **The chart**: *Daily usage — last 30 days* (tokens by kind, two axes; cost by model) on the provider's page | visible |
-| UH6 ✅ | **Per login**: `accounts.patch.usageHistory`; `account.usageHistory` on every login | an added Claude login shows its own usage history (visible) |
-| GP ✗ | ~~Guest passes as data~~ — dropped: Claude's alone (§10.6) | `ClaudeGuestPassSource` stays Swift, handed in by the App |
-| — | the words: `Day`, `DayLedger`; the typealiases go | with §8 slice 7 |

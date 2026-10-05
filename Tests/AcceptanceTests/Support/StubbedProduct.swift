@@ -3,7 +3,7 @@ import Foundation
 
 /// A product for tests about the Monitor, the lineup and selection: a real
 /// `Provider` from a one-source definition, its connection stubbed to answer
-/// with whatever `probe` says (TARGET §12, slice 3 — "the test stubs become
+/// with whatever `probe` says (TARGET §7 — "the test stubs become
 /// definitions over stubbed connections"). Only the identity matters here;
 /// each real provider is tested end to end in `ProvidersTests`.
 @MainActor

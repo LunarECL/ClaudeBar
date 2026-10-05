@@ -3,7 +3,7 @@ import Providers
 import Quotas
 
 /// Tests ask a product about its plain login, as the app asks it about any
-/// login: a login never refers to its provider (TARGET §12, slice 7).
+/// login: a login never refers to its provider (TARGET §2.1).
 @MainActor
 extension Provider {
     @discardableResult

@@ -200,7 +200,7 @@ struct ClaudeBarApp: App {
                                             loginsInUse: DiskLoginsInUse()))
         }
         // Extensions (~/.claudebar/extensions), read as definitions whose
-        // sections answer together (TARGET §12); what was saved for one moves once.
+        // sections answer together (docs/features/extensions/design.md); what was saved for one moves once.
         let extensions = Extensions.catalog()
         ExtensionSettingsUpgrade.run(extensions, store: .shared, settings: settingsRepository, vault: vault)
         for definition in extensions {

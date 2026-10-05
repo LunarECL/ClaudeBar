@@ -2,7 +2,7 @@ import Foundation
 import Providers
 import Testing
 
-/// *The product's switch* (TARGET §12, slice 1): Claude on or off hides every
+/// *The product's switch* (CANONICAL §1: the product's switch): Claude on or off hides every
 /// login of it, and keeps each login's own *Pause*. On upgrade, the old
 /// switch — which was the plain login's — keeps meaning what it did.
 @MainActor

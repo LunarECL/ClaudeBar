@@ -7,7 +7,7 @@ import Observation
 /// it. Two Codex logins are two accounts of one `Provider`: two things to
 /// watch (each its own pill and menu-bar entry), one thing to fix.
 ///
-/// It knows only itself (TARGET §12, slice 7): who it is, its values, its
+/// It knows only itself (TARGET §2.1): who it is, its values, its
 /// pause, what we last saw, and what its definition alone says. It names its
 /// product by id and never refers to it — ask the product about a login
 /// (`provider.refresh(account)`, `provider.isInLineup(account)`), found
