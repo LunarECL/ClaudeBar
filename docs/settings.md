@@ -36,6 +36,7 @@ A key that's missing means "use the default", so a fresh install starts with an 
 | `providers.<id>.hiddenQuotaKeys` | Quotas a person stopped watching for a product, by quota key (`model:gemini-2.0-flash`); shared by its accounts. A key no longer reported is ignored, and hiding every quota hides none (#140) | `"providers": { "gemini": { "hiddenQuotaKeys": ["model:gemini-2.0-flash"] } }` |
 | `<provider>.*` | A provider's own settings, each named in its definition's `settings` (`<id>.<setting>`), and its data source choice (`<id>.probeMode`) | `"kimi": { "probeMode": "api", "region": "international" }` |
 | `hook.*` | [Session hooks](features/session-hooks/README.md) | `"hook": { "enabled": true }` |
+| `alerts.*` | [Quota alerts](features/quota-alerts/README.md): the percentages you chose | `"alerts": { "thresholds": [60, 35] }` |
 | `notify.*` | [Notify!](features/notify/README.md) device link and surfaces | `"notify": { "enabled": true, "widgetEnabled": true }` |
 | `ext-<extension-id>.*` | A user [extension](features/extensions/README.md)'s non-secret config fields, as provider settings. Values an older version kept under `extensions.<extension-id>.*` move here once | `"ext-my-api": { "baseURL": "https://…" }` |
 
