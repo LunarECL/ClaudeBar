@@ -82,7 +82,7 @@ struct QuotaCardView: View {
                             path.addLine(to: CGPoint(x: tickX, y: 0))
                             path.closeSubpath()
                         }
-                        .fill(Color.secondary.opacity(0.6))
+                        .fill(quota.paceLevel?.displayColor ?? Color.secondary.opacity(0.6))
                     }
                     .frame(height: 5)
                 }

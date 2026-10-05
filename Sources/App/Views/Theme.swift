@@ -729,6 +729,22 @@ extension UsagePace {
     }
 }
 
+// MARK: - PaceLevel Theme Extension
+
+extension PaceLevel {
+    /// Display color for the expected-pace tick
+    var displayColor: Color {
+        switch self {
+        case .comfortable: .green
+        case .onTrack: .teal
+        case .warming: .yellow
+        case .pressing: .orange
+        case .critical: .red
+        case .runaway: .purple
+        }
+    }
+}
+
 // MARK: - BudgetStatus Theme Extension
 
 extension BudgetStatus {

@@ -33,39 +33,40 @@ public enum QuotaStatus: Sendable, Equatable, Hashable, Comparable {
         }
     }
 
-    /// Creates a pace-aware status using burn rate (usage% / timeElapsed%).
-    /// Burn rate > threshold means consuming faster than the period can sustain.
-    /// Critical and depleted thresholds are always absolute (safety net).
-    /// Falls back to absolute thresholds when time elapsed is 0 (start of period).
+    /// Creates a pace-aware status from the projected end-of-period usage
+    /// (usage% / timeElapsed%): under 70% healthy, 70-90% warning, 90%+ critical.
+    /// Before 15% of the period has elapsed, once it is over, or with nothing
+    /// used yet, falls back to used% thresholds: under 70% healthy, 70-90%
+    /// warning, 90%+ critical. Depleted stays absolute.
     ///
     /// - Parameters:
     ///   - percentRemaining: The percentage of quota remaining (0-100)
     ///   - percentTimeElapsed: How much of the reset period has elapsed (0-100)
-    ///   - burnRateThreshold: The multiplier above which a warning fires (e.g., 1.5 = 50% faster than sustainable)
+    ///   - burnRateThreshold: Unused; kept for source compatibility with the burn-rate setting
     public static func from(
         percentRemaining: Double,
         percentTimeElapsed: Double,
         burnRateThreshold: Double
     ) -> QuotaStatus {
-        // Absolute safety nets — always apply regardless of pace
         if percentRemaining <= 0 { return .depleted }
-        if percentRemaining < 20 { return .critical }
-
-        // At start of period or no time data, fall back to absolute thresholds
-        guard percentTimeElapsed > 0 else {
-            return from(percentRemaining: percentRemaining)
-        }
 
         let percentUsed = 100 - percentRemaining
-        let burnRate = percentUsed / percentTimeElapsed
 
-        // Only warn if burn rate exceeds threshold AND remaining is below 50%
-        // (no point warning about high burn rate when there's plenty of quota left)
-        if burnRate > burnRateThreshold && percentRemaining < 50 {
-            return .warning
+        // Project end-of-period usage once enough of the period has elapsed
+        if percentTimeElapsed >= 15, percentTimeElapsed < 100, percentUsed > 0 {
+            let projected = percentUsed / percentTimeElapsed
+            switch projected {
+            case ..<0.70: return .healthy
+            case 0.70..<0.90: return .warning
+            default: return .critical
+            }
         }
 
-        return .healthy
+        switch percentUsed {
+        case ..<70: return .healthy
+        case 70..<90: return .warning
+        default: return .critical
+        }
     }
 
     // MARK: - Status Behavior
