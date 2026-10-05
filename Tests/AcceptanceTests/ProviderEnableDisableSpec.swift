@@ -159,10 +159,8 @@ struct ProviderEnableDisableSpec {
 
         @Test
         func `should remember whether the person turned a provider on or off`() {
-            // Given — isolated UserDefaults
-            let suiteName = "com.claudebar.test.\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: suiteName)!
-            let repo = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+            // Given — settings of its own
+            let repo = isolatedSettings()
 
             // When — set enabled to false
             repo.setEnabled(false, forProvider: "codex")

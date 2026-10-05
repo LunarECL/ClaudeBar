@@ -36,15 +36,123 @@ struct HookInstallerTests {
         #expect(events.count == 7)
     }
 
+    // MARK: - Claude Code's settings file
+
+    /// A settings file in its own temporary folder, never the person's own.
+    private struct SettingsFile {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("hook-installer-\(UUID().uuidString)")
+        var path: String { folder.appendingPathComponent(".claude/settings.json").path }
+
+        func write(_ json: String) throws {
+            try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+            try Data(json.utf8).write(to: URL(fileURLWithPath: path))
+        }
+
+        func read() throws -> [String: Any] {
+            let data = try Data(contentsOf: URL(fileURLWithPath: path))
+            return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        }
+
+        func hooks(_ event: String) throws -> [[String: Any]] {
+            (try read()["hooks"] as? [String: Any])?[event] as? [[String: Any]] ?? []
+        }
+
+        func remove() { try? FileManager.default.removeItem(at: folder) }
+    }
+
+    private func commands(_ entries: [[String: Any]]) -> [String] {
+        entries.flatMap { ($0["hooks"] as? [[String: Any]] ?? []).compactMap { $0["command"] as? String } }
+    }
+
     @Test
     func `should count the hook not installed when Claude Code has no settings file`() {
-        // When there's no settings file at all, isInstalled should be false
-        // This tests the code path, not the actual file system
-        let settings = HookInstaller.readSettings()
-        if settings == nil {
-            #expect(HookInstaller.isInstalled() == false)
+        let file = SettingsFile()
+        #expect(HookInstaller.isInstalled(at: file.path) == false)
+    }
+
+    @Test
+    func `should create Claude Code's settings with the hook on every session event when there is none yet`() throws {
+        let file = SettingsFile()
+        defer { file.remove() }
+
+        try HookInstaller.install(at: file.path)
+
+        #expect(HookInstaller.isInstalled(at: file.path))
+        for event in HookInstaller.hookEvents {
+            #expect(try commands(file.hooks(event)) == [HookInstaller.hookCommand])
         }
-        // If settings exist, we can't make assumptions about the file
+    }
+
+    @Test
+    func `should keep the person's own settings and other tools' hooks when turning the hook on`() throws {
+        let file = SettingsFile()
+        defer { file.remove() }
+        try file.write(#"{"model":"opus","hooks":{"Stop":[{"matcher":".*","hooks":[{"type":"command","command":"say done"}]}]}}"#)
+
+        try HookInstaller.install(at: file.path)
+
+        #expect(try file.read()["model"] as? String == "opus")
+        #expect(try commands(file.hooks("Stop")) == ["say done", HookInstaller.hookCommand])
+    }
+
+    @Test
+    func `should add the hook once when it is turned on twice`() throws {
+        let file = SettingsFile()
+        defer { file.remove() }
+
+        try HookInstaller.install(at: file.path)
+        try HookInstaller.install(at: file.path)
+
+        #expect(try commands(file.hooks("SessionStart")) == [HookInstaller.hookCommand])
+    }
+
+    @Test
+    func `should remove only ClaudeBar's hook when turning it off, leaving other tools' hooks`() throws {
+        let file = SettingsFile()
+        defer { file.remove() }
+        try file.write(#"{"hooks":{"Stop":[{"matcher":".*","hooks":[{"type":"command","command":"say done"}]}]}}"#)
+        try HookInstaller.install(at: file.path)
+
+        try HookInstaller.uninstall(at: file.path)
+
+        #expect(HookInstaller.isInstalled(at: file.path) == false)
+        #expect(try commands(file.hooks("Stop")) == ["say done"])
+        #expect((try file.read()["hooks"] as? [String: Any])?["SessionStart"] == nil)
+    }
+
+    @Test
+    func `should leave no empty hooks section once the hook is turned off`() throws {
+        let file = SettingsFile()
+        defer { file.remove() }
+        try file.write(#"{"model":"opus"}"#)
+        try HookInstaller.install(at: file.path)
+
+        try HookInstaller.uninstall(at: file.path)
+
+        #expect(try file.read()["hooks"] == nil)
+        #expect(try file.read()["model"] as? String == "opus")
+    }
+
+    @Test
+    func `should refuse to change a settings file it cannot read, and leave it as it was`() throws {
+        let file = SettingsFile()
+        defer { file.remove() }
+        try file.write("{ not json")
+
+        #expect(throws: (any Error).self) { try HookInstaller.install(at: file.path) }
+        #expect(try String(contentsOfFile: file.path, encoding: .utf8) == "{ not json")
+        #expect(HookInstaller.isInstalled(at: file.path) == false)
+    }
+
+    @Test
+    func `should treat an empty settings file as no settings`() throws {
+        let file = SettingsFile()
+        defer { file.remove() }
+        try file.write("")
+
+        try HookInstaller.install(at: file.path)
+
+        #expect(HookInstaller.isInstalled(at: file.path))
     }
 
     @Test

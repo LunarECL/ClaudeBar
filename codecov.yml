@@ -18,3 +18,23 @@ ignore:
   - "Sources/App/Views/**/*"  # UI code - harder to test
   - "Sources/Infrastructure/Adapters/**/*"  # Pure adapters for 3rd party CLI/APIs
   - "**/*Preview*.swift"  # SwiftUI previews
+  # Thin wrappers whose only job is I/O or a system call. Tests stand in for
+  # each through its port, so a test of the real one would test macOS or the SDK.
+  - "Modules/AWSClients/Sources/**/*"  # AWS SDK
+  - "Modules/Diagnostics/Sources/FileLogger.swift"  # the log file
+  - "Modules/DataSources/Sources/Internal/Process/ProcessRPCTransport.swift"  # stdio pipe
+  - "Modules/DataSources/Sources/Internal/Process/RunningProcesses.swift"  # ps
+  - "Modules/DataSources/Sources/Internal/Process/DefaultCLIExecutor.swift"  # Process
+  - "Modules/DataSources/Sources/Internal/Process/PipeCLIExecutor.swift"  # Process
+  - "Modules/DataSources/Sources/Internal/Process/FoundationSignInProcess.swift"  # Process
+  - "Modules/DataSources/Sources/Internal/Network/URLSessionNetworkClient.swift"  # URLSession
+  - "Modules/DataSources/Sources/Internal/Network/InsecureLocalhostNetworkClient.swift"  # URLSession
+  - "Modules/DataSources/Sources/Internal/Lookup/BrowserCookieReader.swift"  # browser cookie stores
+  - "Modules/DataSources/Sources/Internal/Lookup/SystemBrowserStorage.swift"  # browser profiles
+  - "Sources/Infrastructure/Hooks/HookHTTPServer.swift"  # a local socket server
+  - "Sources/Infrastructure/Shared/SystemAlertSender.swift"  # NSAlert, notifications
+  - "Sources/Infrastructure/Shared/SystemPowerStateProvider.swift"  # IOKit
+  - "Sources/Infrastructure/Shared/SystemClock.swift"  # the clock
+  - "Sources/Infrastructure/Shared/SimpleCLIExecutor.swift"  # Process
+  - "Sources/Infrastructure/Notch/NSScreen+NotchMetrics.swift"  # NSScreen
+  - "Sources/Infrastructure/Storage/KeychainCredentialRepository.swift"  # Keychain

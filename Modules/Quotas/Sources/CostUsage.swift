@@ -122,11 +122,6 @@ public struct CostUsage: Sendable, Equatable, Hashable {
         formatDuration(apiDuration)
     }
 
-    /// Formatted wall duration (e.g., "6h 33m 10.2s")
-    public var formattedWallDuration: String {
-        formatDuration(wallDuration)
-    }
-
     /// Formatted code changes (e.g., "+10 / -5 lines")
     public var formattedCodeChanges: String {
         "+\(linesAdded) / -\(linesRemoved) lines"
@@ -152,28 +147,10 @@ public struct CostUsage: Sendable, Equatable, Hashable {
         return Double(truncating: percentage as NSDecimalNumber)
     }
 
-    /// Calculates percentage used from built-in budget (for Pro Extra usage)
-    public var budgetPercentUsedFromBuiltIn: Double? {
-        guard let budget else { return nil }
-        return budgetPercentUsed(budget: budget)
-    }
-
     /// The unspent built-in budget, floored at zero.
     public var budgetRemaining: Decimal? {
         guard let budget else { return nil }
         return max(0, budget - totalCost)
-    }
-
-    /// Formatted budget string (e.g., "$20.00")
-    public var formattedBudget: String? {
-        guard let budget else { return nil }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: budget as NSDecimalNumber) ?? "$\(budget)"
     }
 
     // MARK: - Private Helpers

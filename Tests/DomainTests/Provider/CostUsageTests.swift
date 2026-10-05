@@ -89,6 +89,13 @@ struct CostUsageTests {
         return formatter.string(from: value as NSDecimalNumber) ?? "$\(value)"
     }
 
+    @Test(arguments: ["0.5", "1234.567"])
+    func `should print a part of the cost the same way as the whole cost`(amount: String) {
+        let value = Decimal(string: amount)!
+        let whole = CostUsage(totalCost: value, apiDuration: 0, providerId: "claude")
+        #expect(CostLine(label: "opus", amount: value).formattedAmount == whole.formattedCost)
+    }
+
     @Test
     func `should print API time of over an hour as hours, minutes and seconds`() {
         // Given

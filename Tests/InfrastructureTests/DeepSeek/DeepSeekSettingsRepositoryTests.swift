@@ -5,28 +5,6 @@ import Foundation
 @Suite
 struct DeepSeekSettingsRepositoryTests {
     @Test
-    func `should remember and forget the DeepSeek key and its environment variable when settings live in the app's defaults`() {
-        let suiteName = "DeepSeekSettingsRepositoryTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let repository = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-
-        #expect(repository.deepseekAuthEnvVar().isEmpty)
-        #expect(repository.hasDeepSeekApiKey() == false)
-
-        repository.setDeepSeekAuthEnvVar("CUSTOM_DEEPSEEK_KEY")
-        repository.saveDeepSeekApiKey("sk-test")
-
-        #expect(repository.deepseekAuthEnvVar() == "CUSTOM_DEEPSEEK_KEY")
-        #expect(repository.getDeepSeekApiKey() == "sk-test")
-        #expect(repository.hasDeepSeekApiKey() == true)
-
-        repository.deleteDeepSeekApiKey()
-        #expect(repository.getDeepSeekApiKey() == nil)
-        #expect(repository.hasDeepSeekApiKey() == false)
-    }
-
-    @Test
     func `should remember and forget the DeepSeek key and its environment variable when settings live in settings.json`() {
         let tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("DeepSeekJSONSettingsTests.\(UUID().uuidString)")

@@ -347,10 +347,10 @@ public protocol BedrockSettingsRepository: ProviderSettingsRepository {
 }
 ```
 
-Implementation in `UserDefaultsProviderSettingsRepository`:
+Implementation in `JSONSettingsRepository`:
 
 ```swift
-extension UserDefaultsProviderSettingsRepository: BedrockSettingsRepository {
+extension JSONSettingsRepository: BedrockSettingsRepository {
     private enum BedrockKeys {
         static let awsProfile = "bedrock.awsProfile"
         static let regions = "bedrock.regions"

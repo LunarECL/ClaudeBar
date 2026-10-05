@@ -15,24 +15,4 @@ public enum CodexProbeMode: String, Sendable, Equatable, CaseIterable {
     /// Requires valid OAuth credentials in ~/.codex/auth.json.
     /// Faster than RPC mode as it doesn't spawn a subprocess.
     case api
-
-    /// Human-readable display name for the mode
-    public var displayName: String {
-        switch self {
-        case .rpc:
-            return "RPC"
-        case .api:
-            return "API"
-        }
-    }
-
-    /// Description of what this mode does
-    public var description: String {
-        switch self {
-        case .rpc:
-            return "Uses codex app-server RPC"
-        case .api:
-            return "Calls ChatGPT API directly"
-        }
-    }
 }

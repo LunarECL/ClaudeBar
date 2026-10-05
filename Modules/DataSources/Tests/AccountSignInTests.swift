@@ -137,4 +137,14 @@ struct DiskLoginFoldersTests {
         disk.delete(folder)
         #expect(!disk.exists(folder))
     }
+
+    @Test(arguments: [
+        (SignInError.cliNotFound("codex"), "`codex` wasn't found. Install it, or choose a folder you already signed in to."),
+        (.folderExists, "That folder already exists, so ClaudeBar won't sign in there. Try again."),
+        (.didNotFinish, "Sign-in didn't finish. Try again and complete it in your browser."),
+        (.timedOut, "Sign-in timed out. Try again and complete it in your browser within five minutes."),
+    ])
+    func `should tell the person why the sign-in stopped and what to do next`(error: SignInError, message: String) {
+        #expect(error.errorDescription == message)
+    }
 }
