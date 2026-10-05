@@ -187,7 +187,8 @@ final class SparkleUpdater {
     /// Logs why an update check or install failed. Sparkle alerts are
     /// transient; until now a failure left no trace in ClaudeBar's own logs
     /// at all, so "it said failed but it updated" was undiagnosable.
-    fileprivate static func logFailure(_ message: String) {
+    /// Pure, so `nonisolated`: Sparkle calls its delegate off the main actor.
+    nonisolated fileprivate static func logFailure(_ message: String) {
         AppLog.updates.error(message)
     }
 
@@ -196,7 +197,8 @@ final class SparkleUpdater {
     /// declining an install (`SUInstallationCanceledError`) as errors too —
     /// `updater(_:didAbortWithError:)` receives both on every routine check —
     /// and neither may be logged as a failure.
-    static func isUpdateFailure(_ error: any Error) -> Bool {
+    /// Pure, so `nonisolated`: Sparkle calls its delegate off the main actor.
+    nonisolated static func isUpdateFailure(_ error: any Error) -> Bool {
         let nsError = error as NSError
         guard nsError.domain == SUSparkleErrorDomain else { return true }
         return nsError.code != Int(SUError.noUpdateError.rawValue)
