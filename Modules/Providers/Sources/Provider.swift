@@ -67,14 +67,15 @@ public final class Provider {
         loginsInUse: (any LoginsInUse)? = nil,
         vault: (any SecretVault)? = nil,
         paths: any PathChecking = DiskPaths(),
-        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
+        locate: @escaping @Sendable (String) -> String? = { BinaryLocator.which($0) }
     ) {
         self.definition = definition
         self.settings = settings
         self.makeDataSource = makeDataSource
         self.guestPasses = guestPasses
         let configuration = Configuration(definition: definition, settings: settings, vault: vault,
-                                          paths: paths, isExecutable: isExecutable)
+                                          paths: paths, isExecutable: isExecutable, locate: locate)
         self.configuration = configuration
         self.accounts = Accounts(definition: definition, settings: settings, configuration: configuration,
                                  folders: folders, makeDataSource: makeDataSource, makeUsageHistory: makeUsageHistory)
@@ -122,11 +123,13 @@ public final class Provider {
         guestPasses: GuestPasses? = nil,
         folders: any LoginFolders = DiskLoginFolders(),
         loginsInUse: (any LoginsInUse)? = nil,
-        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
+        locate: @escaping @Sendable (String) -> String? = { BinaryLocator.which($0) }
     ) {
         self.init(definition: definition, settings: settings, accounts: accounts,
                   makeDataSource: { source, _ in makeDataSource(source) },
-                  guestPasses: guestPasses, folders: folders, loginsInUse: loginsInUse, isExecutable: isExecutable)
+                  guestPasses: guestPasses, folders: folders, loginsInUse: loginsInUse, isExecutable: isExecutable,
+                  locate: locate)
     }
 
     public var id: String { definition.id }

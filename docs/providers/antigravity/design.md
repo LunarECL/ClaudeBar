@@ -58,5 +58,7 @@ Antigravity is `Modules/Providers/Resources/Providers/antigravity.json` and `ant
 
 ## Known limits
 
+- The local server is reached on `localhost` / `127.0.0.1` only, and a redirect must keep its scheme, host and port; anything else is refused before the server's token could leave the Mac.
+
 - `pgrep` matches on `language_server`, so an `agy` process is only found if its command line contains that string. The `agy` name check only runs on lines `pgrep` has already matched.
 - If the keychain item's service or account changes in a future Antigravity build, the app-closed fallback stops working without any error beyond "not running and no stored credentials".

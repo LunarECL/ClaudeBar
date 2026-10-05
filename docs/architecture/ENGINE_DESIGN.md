@@ -244,7 +244,7 @@ extension Fetch {
 
 ### 2.7 · Where a provider's CLI is
 
-> **Status: DECIDED** (2026-10-05, for #458; journey moment 3a) — not built.
+> **Status: BUILT** (2026-10-05, for #458; journey moment 3a).
 
 *Where is this product's program on this Mac?* already has one answer per
 product: the **CLI location**, which `runningCLI` applies to every call that
@@ -267,8 +267,7 @@ so no definition changes unless its app carries the program.
 | found when the provider is configured — at launch and when the CLI location changes; the PATH is asked only when a later entry exists on this Mac | `Configuration` |
 | every call that starts the CLI follows the location; no call carries places of its own | `ProviderDefinition.runningCLI` |
 
-`signIn.alsoAt`, which only sign-in read, becomes entries of `cli`; nothing
-in `DataSources` changes. Which places a product uses is that provider's
+Sign-in has no places of its own; nothing in `DataSources` knows them. Which places a product uses is that provider's
 research: its `design.md` ([Codex](../providers/codex/design.md#desktop-app-cli)).
 
 ### 2.8 · Kept as they were, and left out

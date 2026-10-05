@@ -12,7 +12,7 @@ struct AccountSignInTests {
 
     private let call = SignInCall(
         cli: "codex", args: ["login"], homeVariable: "CODEX_HOME",
-        unset: ["OPENAI_API_KEY"], alsoAt: []
+        unset: ["OPENAI_API_KEY"]
     )
 
     /// What the login was started with.
@@ -41,14 +41,12 @@ struct AccountSignInTests {
     private func signIn(
         _ process: MockSignInProcess,
         folders: InMemoryLoginFolders = InMemoryLoginFolders(),
-        found: [String: String] = ["codex": "/usr/local/bin/codex"],
-        executables: Set<String> = []
+        found: [String: String] = ["codex": "/usr/local/bin/codex"]
     ) -> AccountSignIn {
         AccountSignIn(
             process: process,
             folders: folders,
             locate: { found[$0] },
-            isExecutable: { executables.contains($0) },
             environment: { ["PATH": "/usr/bin", "OPENAI_API_KEY": "sk-shared", "HOME": "/Users/me"] }
         )
     }
@@ -66,18 +64,6 @@ struct AccountSignInTests {
         #expect(launch.directory == folder)
         #expect(launch.timeout == 300)
         #expect(folders.all == [folder.path])
-    }
-
-    @Test
-    func `should find a CLI bundled inside an app where the definition says`() async throws {
-        let launch = Launch()
-        let bundled = SignInCall(cli: "codex", args: ["login"], homeVariable: "CODEX_HOME",
-                                 alsoAt: ["~/Applications/Codex.app/Contents/Resources/codex"])
-
-        try await signIn(recording(launch), found: [:], executables: ["/Users/me/Applications/Codex.app/Contents/Resources/codex"])
-            .signIn(bundled, into: folder)
-
-        #expect(launch.executable == "/Users/me/Applications/Codex.app/Contents/Resources/codex")
     }
 
     @Test
@@ -123,13 +109,12 @@ struct AccountSignInTests {
     }
 
     @Test
-    func `should unset nothing, look nowhere else and wait five minutes when the definition gives only the command`() throws {
+    func `should unset nothing and wait five minutes when the definition gives only the command`() throws {
         let json = #"{ "cli": "claude", "args": ["auth", "login"], "homeVariable": "CLAUDE_CONFIG_DIR" }"#
 
         let decoded = try JSONDecoder().decode(SignInCall.self, from: Data(json.utf8))
 
         #expect(decoded.unset.isEmpty)
-        #expect(decoded.alsoAt.isEmpty)
         #expect(decoded.timeout == 300)
     }
 }
