@@ -1,5 +1,5 @@
 ---
-description: Who uses ClaudeBar and what they ask — four people, the moments from glancing at the menu bar to adding and sharing a provider, the words each screen prints and the command each lands on; read first, before any design change.
+description: Who uses ClaudeBar and what they ask — the people, the moments from glancing at the menu bar, fixing and adding a provider, to switching logins, following a session and looking back, the words each screen prints and the command each lands on; read first, before any design change.
 ---
 
 # ClaudeBar — user journeys
@@ -23,9 +23,13 @@ description: Who uses ClaudeBar and what they ask — four people, the moments f
 | **Raj** — Codex stopped updating | the app to say what is wrong and where to fix it, in one place | *Fix* |
 | **Ken** — pays for a gateway ClaudeBar doesn't ship (OpenRouter) | to track its credits without writing a script | *Add* |
 | **Lin** — runs the team's internal LLM gateway | her team to get the provider without anyone retyping it | *Share* |
+| **Mia**, again — a personal and a work login | the next `claude` to start on the one with room, without signing out | *Switch* |
+| **Ana** — long Claude Code sessions, often in another window | to know when Claude needs her, or is done, without watching the terminal | *Follow* |
+| **Tom** — on a subscription, curious what it's worth | what he used, day by day, and what it would have cost on the API | *Look back* |
+| **Mia**, away from her desk | her quota on her phone | *Carry* |
 
-Today only Mia and Raj are served. Ken can only write an extension — a
-manifest and a shell script — and Lin can only send that folder around.
+Each journey is a promise. A screen that serves none of them is a screen to
+question; a person here that no screen serves is a gap.
 
 ## 2 · The moments
 
@@ -38,6 +42,7 @@ the command that lands on the domain, and the node that answers.
 | 2 | Mia opens the popover | *Session · Weekly · Spark*, *% left*, *Resets in 1h 12m*, *Running hot*, *EXTRA USAGE*, *Updated 2m ago · via RPC*, *PLUS* | switches to a lighter model for an hour | `account.usage` | `Usage` → `[Quota]` · `Cost` · `Plan` |
 | 2a | Mia has two Codex logins | two pills, *Codex · me@…* and *Codex · work@…*, both pinned in the menu bar; Settings lists one **Codex** with *Add Account…* and a toggle per login | pauses *work* on the weekend; later clicks *work* when *me* runs low | `monitor.select(account)` · `account.disable()` · `provider.bestAccount` | `Provider` (the product) → `[Account]` (the logins) |
 | 3 | Raj sees Codex fail | *Couldn't read your key* · *Session expired. Run `codex` in terminal to log in again.* · last usage dimmed, *Last seen 3h ago* | logs in, or opens settings | `account.sync.lastError` | `DataSourceError(step: .lookup)`; `usage` kept |
+| 3a | Raj has only the Codex app, no `codex` command | *NOT SET UP* — *CLI not found* — though the app on his Mac carries one | expects nothing to do | `provider.refresh(account)` | the definition says where its CLI may be; no setting needed (#458) |
 | 4 | Raj opens Codex settings | *DATA SOURCE: RPC · API*, *KEY LOOKUP ORDER*, *Test Connection*, *Built in* | switches to RPC, tests | `provider.use("rpc")` · `dataSource.fetchUsage()` | `Provider.dataSources` · `CredentialLookup` |
 | 5 | Ken: *Add Provider* | *Start from: API · CLI · File · Copy a provider*, *Import…* | chooses API | `ProviderDefinition.blank(.http)` · `definition.copy()` | `ProviderDefinition` (unsaved) |
 | 6 | Ken: *Connect* | *URL*, *Key lookup order: Environment variable · API key*, *Sent as*, *Test Connection*, *200 OK* | pastes his key, tests | `dataSource.fetchResponse()` | `Fetch.http` · `CredentialLookup` → `Response` |
@@ -46,6 +51,18 @@ the command that lands on the domain, and the node that answers.
 | 9 | Ken sees it in the popover | *OpenRouter*, *$12.40 of $50.00*, *via API*, *CUSTOM* | nothing — no restart | `provider.refresh()` | one `Provider`, one `DataSource` — the types Codex uses |
 | 10 | Lin exports | *Built in · Custom · Extension*, *Export…*, *no keys — they stay in your Keychain* | posts the file | `definition.exported()` | `ProviderDefinition`, secrets stripped |
 | 11 | A teammate imports | *Import provider*, *It will send your key to that address*, *Key needed*, *Test Connection*, *Add* | pastes his own key, adds | `catalog.import(file)` · `definition.missingSettings` | `ProviderCatalog` · `SettingsForm` |
+
+### Beyond the menu bar
+
+| # | Moment | Sees | Does | Command | Node |
+|---|---|---|---|---|---|
+| 12 | Mia's work login runs low in the terminal | the popover: *IN USE* on *work*'s chip, *Use* on *me*'s; below 20%, *Use for New Sessions*, and a notification with the same button | clicks *Use* | `newSessions.use(account)` → `provider.inUse.use(account)` | `InUse` — the terminal's choice, not the monitor's |
+| 13 | Mia's first switch | the lines ClaudeBar will add to her shell; *Add to ~/.zshrc* · *Copy — I'll Add It* | adds them | `newSessions.setUp()` | `NewSessions` · `ShellSetup` |
+| 14 | Mia turns on *Switch when low* | below the threshold, new sessions move to the ticked login with the most left; a notification with *Undo* | nothing more | `inUse.switchWhenLow.isOn` | `SwitchWhenLow` |
+| 15 | Ana's session waits for a permission | the notch: ⚠︎ *Needs you* and the prompt text; it never times out | answers in the terminal | — (hooks report it) | Activity: `SessionMonitor` → `NotchActivityResolver` |
+| 16 | Ana's turn ends | ✓, the repo, the task count and duration; *Claude Code Finished: project — Completed 3 tasks in 12m* | nothing | — | Activity; a destination for the notification |
+| 17 | Tom opens the popover | *TODAY'S USAGE*: *Cost Usage*, *Token Usage*, *Working Time*, each *Vs* yesterday; *Daily usage — last 30 days* | hovers a bar | `account.usageHistory?.days(in:)` | `UsageHistory` — the login's, read when the popover opens |
+| 18 | Mia glances at her phone | the Lock Screen *ClaudeBar* Live Activity: the worst quota first, *% left*, the reset countdown | nothing | — (published on refresh) | a destination: Notify! |
 
 ## 3 · What the journeys found
 

@@ -6,7 +6,7 @@ description: Contributor research behind the notch Live Activity. Covers why the
 
 User guide: [README.md](README.md). Mockup: [notch-live-activity.html](../../../design-concept/notch-live-activity.html).
 
-The notch is a **view**, not a new source of truth. `QuotaMonitor` and `SessionMonitor` stay authoritative, per the single-source-of-truth rule in [ARCHITECTURE.md](../../architecture/ARCHITECTURE.md).
+The notch is a **view**, not a new source of truth. `QuotaMonitor` and `SessionMonitor` stay authoritative, per [the canonical model](../../architecture/CANONICAL_MODEL.md#1--the-tree): one tree, read by every surface, none adding a rule to it.
 
 ## The problem
 
