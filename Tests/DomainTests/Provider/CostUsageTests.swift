@@ -89,10 +89,11 @@ struct CostUsageTests {
         return formatter.string(from: value as NSDecimalNumber) ?? "$\(value)"
     }
 
-    @Test
-    func `should print a part of the cost in US dollars with two decimals`() {
-        #expect(CostLine(label: "opus", amount: Decimal(string: "0.5")!).formattedAmount == "$0.50")
-        #expect(CostLine(label: "sonnet", amount: Decimal(string: "1234.567")!).formattedAmount == "$1,234.57")
+    @Test(arguments: ["0.5", "1234.567"])
+    func `should print a part of the cost the same way as the whole cost`(amount: String) {
+        let value = Decimal(string: amount)!
+        let whole = CostUsage(totalCost: value, apiDuration: 0, providerId: "claude")
+        #expect(CostLine(label: "opus", amount: value).formattedAmount == whole.formattedCost)
     }
 
     @Test

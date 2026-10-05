@@ -29,7 +29,8 @@ struct NotifyPublishErrorTests {
         (30.0, "a minute"),
         (60.0, "a minute"),
         (300.0, "5 minutes"),
-        (3599.0, "60 minutes"),
+        (3540.0, "59 minutes"),
+        (3599.0, "an hour"),
         (3600.0, "an hour"),
         (7200.0, "2 hours"),
     ])
