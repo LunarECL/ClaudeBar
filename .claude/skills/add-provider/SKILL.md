@@ -142,7 +142,9 @@ the background-refresh floor), `context` (JSON files the mapping may read),
 ```
 
 Paths: `$.a.b` from the root, `a.b` from the current object, `$header.x`, `$key`
-(the map key inside `each`), `$credential.x` (a non-secret credential value).
+(the map key inside `each`), `$credential.x` (a non-secret credential value),
+`$context.file.field` (a field of a `context` file the data source reads, such as
+the email a tool keeps in its own account file).
 A list of values means *the first that answers*; a number is a constant.
 
 ## TDD workflow (Chicago school)

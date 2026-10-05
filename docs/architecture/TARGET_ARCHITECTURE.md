@@ -401,7 +401,7 @@ reproduce its output, quota for quota, before the Swift goes.
   express. If a provider needs real computation (Bedrock prices tokens per
   model), that is a fetch case's job — `Fetch.cloudWatch` returns usage
   already priced — not a scripting language inside the mapping.
-- **JSONPath dialect.** A small, documented subset (`$.a.b`, `[*]`, maps by
+- **JSONPath dialect.** A small, documented subset (`$.a.b`, `[*]`, `$credential.x`, `$context.file.field`, maps by
   key, `$header.`), implemented and tested here, rather than a dependency.
 - ~~**Multi-account in a definition.**~~ — **decided** ([CANONICAL_MODEL §1, §5](CANONICAL_MODEL.md#1--the-tree)):
   a definition declares how an account is added (`accounts.folder` today, an

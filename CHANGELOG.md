@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Claude**: your email stays on the account card after a refresh answered by the API. It used to show at first and vanish when the API stood in for the CLI, leaving only "Updated · via API". ([#489](https://github.com/tddworks/ClaudeBar/pull/489))
+
 ### Added
 - **Grok** shows your plan (SuperGrok, SuperGrok Heavy, …) and your prepaid balance, and a reset time when xAI names only the billing period. ([#485](https://github.com/tddworks/ClaudeBar/pull/485)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/grok/README.md)
 - **Six new providers**, off until you turn them on: Cline and Warp limits and credits, Devin's quota from your browser sign-in, Windsurf and JetBrains AI from their apps on your Mac, and OpenAI API spend over 30 days. ([#485](https://github.com/tddworks/ClaudeBar/pull/485)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/README.md)

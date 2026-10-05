@@ -582,6 +582,28 @@ struct ClaudeAPITests {
         #expect(snapshot.accountTier == .claudeMax)
     }
 
+    // MARK: - Signed-in email
+
+    @Test
+    func `should show the email Claude is signed in as when the API answers`() async throws {
+        let claude = try ClaudeHarness()
+        defer { claude.cleanUp() }
+        try claude.writeClaudeConfig(email: "person@example.com", displayName: "Example Org")
+
+        let usage = try await claude.readAPIResponse(#"{ "five_hour": { "utilization": 25.0 } }"#, subscriptionType: "claude_max")
+
+        #expect(usage.accountEmail == "person@example.com")
+        #expect(usage.quota(for: .session)?.percentRemaining == 75)
+    }
+
+    @Test
+    func `should still show the usage, without an email, when Claude keeps no account file`() async throws {
+        let usage = try await usage(#"{ "five_hour": { "utilization": 25.0 } }"#)
+
+        #expect(usage.accountEmail == nil)
+        #expect(usage.quota(for: .session)?.percentRemaining == 75)
+    }
+
     // MARK: - Account tier
 
     @Test
