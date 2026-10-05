@@ -1,7 +1,7 @@
 import Foundation
 
 /// The small path dialect definitions use — implemented here rather than
-/// taken as a dependency (docs/architecture/TARGET_ARCHITECTURE.md §9):
+/// taken as a dependency (docs/architecture/TARGET_ARCHITECTURE.md §8):
 ///
 /// - `$.a.b` — from the root of the document
 /// - `a.b` — from the current object (inside `at` or `each`)

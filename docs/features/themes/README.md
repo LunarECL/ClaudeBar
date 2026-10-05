@@ -44,4 +44,4 @@ Match ClaudeBar to your terminal with any iTerm2 color scheme:
 
 ## See also
 
-[Status colors](../status-colors/README.md) · [menu bar](../menu-bar/README.md) · [THEME_DESIGN.md](../../architecture/THEME_DESIGN.md) for contributors adding a theme
+[Status colors](../status-colors/README.md) · [menu bar](../menu-bar/README.md) · [design.md](design.md) for contributors adding a theme

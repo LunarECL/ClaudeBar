@@ -40,7 +40,7 @@ struct MenuBarSpec {
         }
 
         @Test
-        func `worst status across providers wins`() async {
+        func `should show critical in the menu bar when one provider is critical and another healthy`() async {
             // Given — Claude healthy (70%), Codex critical (15%)
             let settings = MenuBarSpec.makeSettings()
 
@@ -60,10 +60,12 @@ struct MenuBarSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -75,7 +77,7 @@ struct MenuBarSpec {
         }
 
         @Test
-        func `disabled provider does not affect overall status`() async {
+        func `should stay healthy in the menu bar when only a turned-off provider is critical`() async {
             // Given — Claude healthy, Codex critical but disabled
             let settings = MenuBarSpec.makeSettings()
 
@@ -95,12 +97,14 @@ struct MenuBarSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -111,7 +115,7 @@ struct MenuBarSpec {
         }
 
         @Test
-        func `selected provider status shown in menu bar`() async {
+        func `should show a warning for the selected provider when it has 30% left`() async {
             // Given
             let settings = MenuBarSpec.makeSettings()
 
@@ -123,9 +127,10 @@ struct MenuBarSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -137,12 +142,13 @@ struct MenuBarSpec {
         }
 
         @Test
-        func `no snapshots defaults to healthy`() {
+        func `should show healthy before any quota has been read`() {
             // Given — fresh monitor, no refresh yet
             let settings = MenuBarSpec.makeSettings()
-            let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: MockUsageProbe(), settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 

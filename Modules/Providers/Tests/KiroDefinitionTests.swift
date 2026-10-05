@@ -10,7 +10,7 @@ import Quotas
 @MainActor @Suite("Kiro definition")
 struct KiroDefinitionTests {
     private func make(_ output: String, located: Bool = true, workHome: String? = nil, now: Date = Date()) throws -> Provider {
-        let definition = try Providers.builtIn("kiro")
+        let definition = try ProviderFactory.builtIn("kiro")
         let cli = MockCLIExecutor()
         given(cli).locate(.any).willReturn(located ? "/usr/local/bin/kiro-cli" : nil)
         given(cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
@@ -36,15 +36,15 @@ struct KiroDefinitionTests {
                 }
                 return cli
             }, network: MockNetworkClient(),
-                makeTransport: { _,_,_,_ in MockRPCTransport() }, security: { _ in (1, "") }, scripts: Providers.builtInScripts, secrets: nil,
+                makeTransport: { _,_,_,_ in MockRPCTransport() }, security: { _ in (1, "") }, scripts: ProviderFactory.builtInScripts, secrets: nil,
                 browserCookies: SystemBrowserCookies(), environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory, now: { now })
         }, paths: DiskPaths())
     }
-    private func parse(_ output: String) async throws -> UsageSnapshot { try await make(output).defaultAccount.refresh() }
+    private func parse(_ output: String) async throws -> UsageSnapshot { try await make(output).refreshPlain() }
 
     
     @Test
-    func `parse normal output with both bonus and regular credits`() async throws {
+    func `should show the bonus credits and the monthly credits when Kiro reports both`() async throws {
         let output = """
         Estimated Usage | resets on 03/01 | KIRO FREE
         
@@ -79,7 +79,7 @@ struct KiroDefinitionTests {
     }
     
     @Test
-    func `parse bonus credits only`() async throws {
+    func `should show only the bonus credits when Kiro reports no monthly credits`() async throws {
         let output = """
         🎁 Bonus credits: 250.0/500 credits used, expires in 15 days
         """
@@ -92,7 +92,7 @@ struct KiroDefinitionTests {
     }
     
     @Test
-    func `parse regular credits only`() async throws {
+    func `should show only the monthly credits when Kiro reports no bonus credits`() async throws {
         let output = """
         Credits (25.0 of 50 covered in plan)
         resets on 03/15
@@ -106,7 +106,7 @@ struct KiroDefinitionTests {
     }
     
     @Test
-    func `parse empty output throws error`() async {
+    func `should fail to read usage when kiro-cli prints nothing`() async {
         let output = ""
         
         await #expect(throws: UsageError.self) {
@@ -115,7 +115,7 @@ struct KiroDefinitionTests {
     }
     
     @Test
-    func `parse malformed output throws error`() async {
+    func `should fail to read usage when kiro-cli prints no credits`() async {
         let output = "Some random text without quota data"
         
         await #expect(throws: UsageError.self) {
@@ -124,7 +124,7 @@ struct KiroDefinitionTests {
     }
     
     @Test
-    func `parse zero total credits throws error`() async {
+    func `should fail to read usage when every credit pool is zero`() async {
         let output = """
         🎁 Bonus credits: 0.0/0 credits used, expires in 10 days
         Credits (0.00 of 0 covered in plan)
@@ -138,7 +138,7 @@ struct KiroDefinitionTests {
     }
     
     @Test
-    func `parse without reset info`() async throws {
+    func `should show no reset when Kiro gives no reset or expiry`() async throws {
         let output = """
         🎁 Bonus credits: 100.0/500 credits used
         Credits (10.0 of 50 covered in plan)
@@ -156,7 +156,7 @@ struct KiroDefinitionTests {
     }
     
     @Test
-    func `parse with ANSI escape codes`() async throws {
+    func `should show the credits when kiro-cli colours its output`() async throws {
         let output = """
         \u{001B}[38;5;141mEstimated Usage\u{001B}[0m | resets on 03/01 | \u{001B}[38;5;141mKIRO FREE\u{001B}[0m
         
@@ -171,28 +171,29 @@ struct KiroDefinitionTests {
         #expect(abs(snapshot.quotas[0].percentRemaining - 75.492) < 0.01)
         #expect(abs(snapshot.quotas[1].percentRemaining - 100.0) < 0.01)
     }
-    @Test func `separate home profiles produce separate usage`() async throws {
+    @Test func `should show each added login's own credits from its own home, and ask to sign in when that home is gone`() async throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: home) }
         let provider = try make("Credits (10 of 50 covered in plan)", workHome: home.path)
-        let work = try provider.addAccount(filling: ["home":home.path])
+        let work = try provider.accounts.add(filling: ["home":home.path])
         #expect(work.isEnabled)
-        #expect(try await work.refresh().quotas.first?.percentRemaining == 20)
-        #expect(try await provider.defaultAccount.refresh().quotas.first?.percentRemaining == 80)
+        #expect(try await provider.refresh(work).quotas.first?.percentRemaining == 20)
+        #expect(try await provider.refreshPlain().quotas.first?.percentRemaining == 80)
         try FileManager.default.removeItem(at: home)
-        await #expect(throws: UsageError.authenticationRequired) { try await work.refresh() }
-        #expect(try await provider.defaultAccount.refresh().quotas.first?.percentRemaining == 80)
+        await #expect(throws: UsageError.authenticationRequired) { try await provider.refresh(work) }
+        #expect(try await provider.refreshPlain().quotas.first?.percentRemaining == 80)
     }
-    @Test func `missing binary preserves the CLI error`() async throws {
-        let account = try make("", located: false).defaultAccount
-        #expect(!(await account.isAvailable()))
-        await #expect(throws: UsageError.cliNotFound("kiro-cli")) { try await account.refresh() }
+    @Test func `should be unavailable and say kiro-cli is not found when it is not installed`() async throws {
+        let product = try make("", located: false)
+        let account = product.defaultAccount
+        #expect(!(await product.isAvailable(account)))
+        await #expect(throws: UsageError.cliNotFound("kiro-cli")) { try await product.refresh(account) }
     }
 
-    @Test func `reset dates retain relative expiry and next-year rollover`() async throws {
+    @Test func `should expire bonus credits in 29 days and reset the monthly credits next year when today is the reset day`() async throws {
         let now = try #require(Calendar.current.date(from: DateComponents(year:2026,month:3,day:15,hour:12)))
-        let snapshot = try await make("Bonus credits: 100/500 used, expires in 29 days\nCredits (10 of 50 covered in plan) resets on 03/15", now:now).defaultAccount.refresh()
+        let snapshot = try await make("Bonus credits: 100/500 used, expires in 29 days\nCredits (10 of 50 covered in plan) resets on 03/15", now:now).refreshPlain()
         let bonus = snapshot.quota(for: .timeLimit("Bonus credits"))
         #expect(bonus?.resetsAt == now.addingTimeInterval(29*86400))
         #expect(bonus?.window?.length == nil) // an expiring grant is not a 7-day window

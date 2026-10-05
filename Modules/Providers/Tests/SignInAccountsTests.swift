@@ -2,7 +2,7 @@ import DataSources
 import Quotas
 import Foundation
 import Mockable
-import Providers
+@testable import Providers
 import Testing
 
 /// *Sign in with browser*: the definition's login runs into a new folder, and
@@ -33,14 +33,14 @@ struct SignInAccountsTests {
     }
 
     private func signIn(_ login: AccountSignIn, into codex: Provider) async throws -> Account {
-        try await codex.signIn(with: login, under: root)
+        try await codex.accounts.signIn(with: login, under: root)
     }
 
 
     // MARK: - Signing in
 
     @Test
-    func `signing in adds the login the new folder holds`() async throws {
+    func `should add the login the new folder holds when the person signs in with the browser`() async throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp(); try? FileManager.default.removeItem(at: root) }
         let codex = try stub.makeProvider("codex")
@@ -56,7 +56,7 @@ struct SignInAccountsTests {
     }
 
     @Test
-    func `a sign-in that ends without a login leaves no folder`() async throws {
+    func `should add no login and leave no folder when sign-in ends without a login`() async throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp(); try? FileManager.default.removeItem(at: root) }
         let codex = try stub.makeProvider("codex")
@@ -68,7 +68,7 @@ struct SignInAccountsTests {
     }
 
     @Test
-    func `signing in to a login already listed leaves no folder`() async throws {
+    func `should leave no new folder when the person signs in to a login already listed`() async throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp(); try? FileManager.default.removeItem(at: root) }
         let codex = try stub.makeProvider("codex")
@@ -82,21 +82,21 @@ struct SignInAccountsTests {
     // MARK: - Which folder goes with an account
 
     @Test
-    func `a folder ClaudeBar made by signing in goes with its account`() {
+    func `should remove the folder with its login when ClaudeBar made it by signing in`() {
         let folder = SignedInFolder.forSignIn(to: "codex", under: root)
 
         #expect(folder.goesWithAccount)
     }
 
     @Test
-    func `a folder the person chose stays`() {
+    func `should keep a folder the person chose when its login is removed`() {
         let chosen = SignedInFolder(url: root.appendingPathComponent("codex/\(UUID().uuidString)"), madeBy: .folder)
 
         #expect(!chosen.goesWithAccount)
     }
 
     @Test
-    func `a signed-in folder ClaudeBar did not name is never deleted`() {
+    func `should never delete a signed-in folder ClaudeBar did not name`() {
         let renamed = SignedInFolder(url: URL(fileURLWithPath: "/Users/me/.codex"), madeBy: .signIn)
 
         #expect(!renamed.goesWithAccount)
@@ -105,32 +105,32 @@ struct SignInAccountsTests {
     // MARK: - Adding and removing
 
     @Test
-    func `adding a login saves it`() throws {
+    func `should remember a login once it is added`() throws {
         let settings = InMemoryProviderSettings()
-        let codex = try Providers.make("codex", settings: settings)
+        let codex = try ProviderFactory.make("codex", settings: settings)
         let work = ProviderAccountConfig(accountId: "a", label: "", email: "w@example.com",
                                          probeConfig: ["codexHome": "/tmp/a", "chatgptAccountId": "a"])
 
-        codex.add(work)
+        codex.accounts.add(work)
 
         #expect(settings.accounts(forProvider: "codex") == [work])
     }
 
     @Test
-    func `removing a signed-in login deletes the folder ClaudeBar made`() async throws {
+    func `should delete the folder ClaudeBar made when its signed-in login is removed`() async throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp(); try? FileManager.default.removeItem(at: root) }
         let codex = try stub.makeProvider("codex")
         let added = try await signIn(codexLogin(email: "work@example.com", folders: stub.folders), into: codex)
 
-        codex.remove(added)
+        codex.accounts.remove(added)
 
         #expect(stub.folders.all.isEmpty)
         #expect(stub.settings.accounts(forProvider: "codex").isEmpty)
     }
 
     @Test
-    func `removing a login in a chosen folder keeps the folder`() throws {
+    func `should keep the person's folder when its login is removed`() throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         let claims = try JSONSerialization.data(withJSONObject: ["email": "me@example.com"])
@@ -141,9 +141,9 @@ struct SignInAccountsTests {
             .write(to: folder.appendingPathComponent("auth.json"))
         try stub.folders.create(folder)
         let codex = try stub.makeProvider("codex")
-        let added = try codex.addAccount(signedInAt: folder)
+        let added = try codex.accounts.add(signedInAt: folder)
 
-        codex.remove(added)
+        codex.accounts.remove(added)
 
         #expect(stub.folders.exists(folder))
     }
@@ -151,7 +151,7 @@ struct SignInAccountsTests {
     // MARK: - Signing in again
 
     @Test
-    func `signing in again runs the login in the folder ClaudeBar made, then refreshes it`() async throws {
+    func `should sign in again in the folder ClaudeBar made and then show fresh usage`() async throws {
         let stub = try StubbedProvider(dataSourceKind: "api", providerId: "codex")
         defer { stub.cleanUp(); try? FileManager.default.removeItem(at: root) }
         stub.answerHTTP(#"{"rate_limit":{"primary_window":{"used_percent":10}}}"#)
@@ -159,7 +159,8 @@ struct SignInAccountsTests {
         let added = try await signIn(codexLogin(email: "work@example.com", folders: stub.folders), into: codex)
         let launch = SignInLaunch()
 
-        let usage = try await codex.signInAgain(added, with: launch.recording(folders: stub.folders))
+        try await codex.accounts.signInAgain(added, with: launch.recording(folders: stub.folders))
+        let usage = try await codex.refresh(added)
 
         #expect(launch.directory == added.folder?.url.path)
         #expect(usage.sessionQuota?.percentRemaining == 90)
@@ -167,7 +168,7 @@ struct SignInAccountsTests {
     }
 
     @Test
-    func `a folder the person chose is never signed into by ClaudeBar`() async throws {
+    func `should refuse to sign in again in a folder the person chose`() async throws {
         let stub = try StubbedProvider(providerId: "codex")
         defer { stub.cleanUp() }
         let claims = try JSONSerialization.data(withJSONObject: ["email": "me@example.com"])
@@ -177,10 +178,10 @@ struct SignInAccountsTests {
         try JSONSerialization.data(withJSONObject: ["tokens": ["access_token": "t", "account_id": "me", "id_token": jwt]])
             .write(to: folder.appendingPathComponent("auth.json"))
         let codex = try stub.makeProvider("codex")
-        let added = try codex.addAccount(signedInAt: folder)
+        let added = try codex.accounts.add(signedInAt: folder)
         let launch = SignInLaunch()
 
-        await #expect(throws: UsageError.self) { try await codex.signInAgain(added, with: launch.recording(folders: stub.folders)) }
+        await #expect(throws: UsageError.self) { try await codex.accounts.signInAgain(added, with: launch.recording(folders: stub.folders)) }
 
         #expect(launch.directory == nil)
     }
@@ -188,14 +189,14 @@ struct SignInAccountsTests {
     // MARK: - The ways to add, from the definition
 
     @Test
-    func `codex and claude offer sign-in first, then choosing a folder`() throws {
-        #expect(try Providers.builtIn("codex").accounts?.ways == [.signIn, .folder])
-        #expect(try Providers.builtIn("claude").accounts?.ways == [.signIn, .folder])
+    func `should offer Codex and Claude logins by browser sign-in first, then by choosing a folder`() throws {
+        #expect(try ProviderFactory.builtIn("codex").accounts?.ways == [.signIn, .folder])
+        #expect(try ProviderFactory.builtIn("claude").accounts?.ways == [.signIn, .folder])
     }
 
     @Test
-    func `claude signs in with its own config folder and no inherited keys`() throws {
-        let signIn = try #require(try Providers.builtIn("claude").accounts?.signIn)
+    func `should sign Claude in with its own config folder and no inherited API key`() throws {
+        let signIn = try #require(try ProviderFactory.builtIn("claude").accounts?.signIn)
 
         #expect(signIn.args == ["auth", "login", "--claudeai"])
         #expect(signIn.homeVariable == "CLAUDE_CONFIG_DIR")
@@ -203,7 +204,7 @@ struct SignInAccountsTests {
     }
 
     @Test
-    func `a sign-in with no folder rule to check it is refused on load`() {
+    func `should refuse a provider whose browser sign-in has no way to check the folder`() {
         let json = #"{ "signIn": { "cli": "x", "args": [], "homeVariable": "X_HOME" } }"#
 
         #expect(throws: DecodingError.self) {

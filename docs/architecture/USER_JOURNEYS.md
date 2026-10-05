@@ -1,25 +1,17 @@
 ---
-description: The provider redesign seen from outside in — four people, twelve moments from glancing at the menu bar to adding and sharing a custom provider, the words each screen prints, the command each lands on, and the twelve findings that changed the canonical model; read before designing a provider screen or changing a provider-facing type.
+description: Who uses ClaudeBar and what they ask — the people, the moments from glancing at the menu bar, fixing and adding a provider, to switching logins, following a session and looking back, the words each screen prints and the command each lands on; read first, before any design change.
 ---
 
-# Provider journeys — outside in
+# ClaudeBar — user journeys
 
-> The canonical model was harvested from the screens ClaudeBar has. The
-> redesign adds screens it does not have yet — *Add Provider*, *Import*,
-> *Export* — so this document walks them FIRST, as the people who will use
-> them, and only then says what the model must be. Where a journey and the
-> model disagree, the journey wins and the model moves.
+> **#1 of 5** in [the design](ARCHITECTURE.md) · **Answers:** who is asking,
+> and what · **Builds on:** nothing — every other document answers this one ·
+> **Next:** [CANONICAL_MODEL.md](CANONICAL_MODEL.md)
+>
+> Where a journey and the model disagree, the journey wins and the model moves.
 >
 > **The mockup:** [provider-user-journeys.html](../../design-concept/provider-user-journeys.html)
 > — open it in a browser; ← → step through the moments, `#7` jumps to one.
->
-> | Question | Document |
-> |---|---|
-> | *What does a person do, and what does the screen say?* | **this one** |
-> | *What are the nodes, the words, the laws?* | [CANONICAL_MODEL.md](CANONICAL_MODEL.md) |
-> | *How does a provider run?* | [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) |
-> | *Which module holds it?* | [MODULAR_DESIGN.md](MODULAR_DESIGN.md) |
-> | *Every behaviour the app has today, as BDD scenarios* | [USER_BEHAVIORS.md](USER_BEHAVIORS.md) |
 
 ---
 
@@ -31,9 +23,13 @@ description: The provider redesign seen from outside in — four people, twelve 
 | **Raj** — Codex stopped updating | the app to say what is wrong and where to fix it, in one place | *Fix* |
 | **Ken** — pays for a gateway ClaudeBar doesn't ship (OpenRouter) | to track its credits without writing a script | *Add* |
 | **Lin** — runs the team's internal LLM gateway | her team to get the provider without anyone retyping it | *Share* |
+| **Mia**, again — a personal and a work login | the next `claude` to start on the one with room, without signing out | *Switch* |
+| **Ana** — long Claude Code sessions, often in another window | to know when Claude needs her, or is done, without watching the terminal | *Follow* |
+| **Tom** — on a subscription, curious what it's worth | what he used, day by day, and what it would have cost on the API | *Look back* |
+| **Mia**, away from her desk | her quota on her phone | *Carry* |
 
-Today only Mia and Raj are served. Ken can only write an extension — a
-manifest and a shell script — and Lin can only send that folder around.
+Each journey is a promise. A screen that serves none of them is a screen to
+question; a person here that no screen serves is a gap.
 
 ## 2 · The moments
 
@@ -46,6 +42,7 @@ the command that lands on the domain, and the node that answers.
 | 2 | Mia opens the popover | *Session · Weekly · Spark*, *% left*, *Resets in 1h 12m*, *Running hot*, *EXTRA USAGE*, *Updated 2m ago · via RPC*, *PLUS* | switches to a lighter model for an hour | `account.usage` | `Usage` → `[Quota]` · `Cost` · `Plan` |
 | 2a | Mia has two Codex logins | two pills, *Codex · me@…* and *Codex · work@…*, both pinned in the menu bar; Settings lists one **Codex** with *Add Account…* and a toggle per login | pauses *work* on the weekend; later clicks *work* when *me* runs low | `monitor.select(account)` · `account.disable()` · `provider.bestAccount` | `Provider` (the product) → `[Account]` (the logins) |
 | 3 | Raj sees Codex fail | *Couldn't read your key* · *Session expired. Run `codex` in terminal to log in again.* · last usage dimmed, *Last seen 3h ago* | logs in, or opens settings | `account.sync.lastError` | `DataSourceError(step: .lookup)`; `usage` kept |
+| 3a | Raj has only the Codex app, no `codex` command | *NOT SET UP* — *CLI not found* — though the app on his Mac carries one | expects nothing to do | `provider.refresh(account)` | the definition says where its CLI may be; no setting needed (#458) |
 | 4 | Raj opens Codex settings | *DATA SOURCE: RPC · API*, *KEY LOOKUP ORDER*, *Test Connection*, *Built in* | switches to RPC, tests | `provider.use("rpc")` · `dataSource.fetchUsage()` | `Provider.dataSources` · `CredentialLookup` |
 | 5 | Ken: *Add Provider* | *Start from: API · CLI · File · Copy a provider*, *Import…* | chooses API | `ProviderDefinition.blank(.http)` · `definition.copy()` | `ProviderDefinition` (unsaved) |
 | 6 | Ken: *Connect* | *URL*, *Key lookup order: Environment variable · API key*, *Sent as*, *Test Connection*, *200 OK* | pastes his key, tests | `dataSource.fetchResponse()` | `Fetch.http` · `CredentialLookup` → `Response` |
@@ -55,28 +52,39 @@ the command that lands on the domain, and the node that answers.
 | 10 | Lin exports | *Built in · Custom · Extension*, *Export…*, *no keys — they stay in your Keychain* | posts the file | `definition.exported()` | `ProviderDefinition`, secrets stripped |
 | 11 | A teammate imports | *Import provider*, *It will send your key to that address*, *Key needed*, *Test Connection*, *Add* | pastes his own key, adds | `catalog.import(file)` · `definition.missingSettings` | `ProviderCatalog` · `SettingsForm` |
 
-## 3 · What the journeys changed
+### Beyond the menu bar
 
-Twelve findings. Each is now in the canonical model; the column says where.
+| # | Moment | Sees | Does | Command | Node |
+|---|---|---|---|---|---|
+| 12 | Mia's work login runs low in the terminal | the popover: *IN USE* on *work*'s chip, *Use* on *me*'s; below 20%, *Use for New Sessions*, and a notification with the same button | clicks *Use* | `newSessions.use(account)` → `provider.inUse.use(account)` | `InUse` — the terminal's choice, not the monitor's |
+| 13 | Mia's first switch | the lines ClaudeBar will add to her shell; *Add to ~/.zshrc* · *Copy — I'll Add It* | adds them | `newSessions.setUp()` | `NewSessions` · `ShellSetup` |
+| 14 | Mia turns on *Switch when low* | below the threshold, new sessions move to the ticked login with the most left; a notification with *Undo* | nothing more | `inUse.switchWhenLow.isOn` | `SwitchWhenLow` |
+| 15 | Ana's session waits for a permission | the notch: ⚠︎ *Needs you* and the prompt text; it never times out | answers in the terminal | — (hooks report it) | Activity: `SessionMonitor` → `NotchActivityResolver` |
+| 16 | Ana's turn ends | ✓, the repo, the task count and duration; *Claude Code Finished: project — Completed 3 tasks in 12m* | nothing | — | Activity; a destination for the notification |
+| 17 | Tom opens the popover | *TODAY'S USAGE*: *Cost Usage*, *Token Usage*, *Working Time*, each *Vs* yesterday; *Daily usage — last 30 days* | hovers a bar | `account.usageHistory?.days(in:)` | `UsageHistory` — the login's, read when the popover opens |
+| 18 | Mia glances at her phone | the Lock Screen *ClaudeBar* Live Activity: the worst quota first, *% left*, the reset countdown | nothing | — (published on refresh) | a destination: Notify! |
+| 19 | Mia wants warning sooner than 20% | Settings → Sync & Alerts: *Quota alerts*, *Alert me below 35%*; later a notification: *Claude · work is below 35% — 34% left* | adds 35%, keeps working | `quotaAlerts.add(35)`; after a refresh `quotaAlerts.review(login)` | `QuotaAlerts` — a destination, outside the monitor |
 
-| # | Finding | From moment | Model change |
-|---|---|---|---|
-| F1 | The popover says **which data source answered** (*via RPC*, *via Terminal* after a fallback) | 2 | `Usage.source: kind` |
-| F2 | An error **names the step that failed** — *Couldn't read your key* · *Couldn't connect* · *Couldn't find the numbers* — because each sends the person somewhere different | 3 | `DataSourceError.step: lookup · fetch · mapping` |
-| F3 | Settings prints **DATA SOURCE** and the API source's **key lookup order**; the fallback is one sentence, not a setting | 4 | confirms `DataSource`, `CredentialLookup`, `fallback` |
-| F4 | *Add Provider*'s picker is a **closed list in the words Settings already prints** — *API · CLI · File* — plus *Copy a provider* | 5 | `Fetch` stays a closed sum; the picker offers `http` · `cli` · `file` (RPC, Terminal and CloudWatch stay built-in only); `definition.copy()` mints a new id |
-| F5 | *Test Connection* must **stop before mapping**: Ken has nothing mapped yet, but must see what came back | 6 | a public **`Response`** (status · headers · body); `dataSource.fetchResponse()`; `fetchUsage() = mapping.read(fetchResponse())` |
-| F6 | *Map fields* asks four questions — **Used · Remaining · Limit · Resets** — plus the currency; a balance has no percentage to ask for and *never* resets | 7 | the `JSONMapping` vocabulary is those words; `Left` and `Window` laws made visible |
-| F7 | A custom provider has its **look from day one** | 8 | `ProviderLook` in the definition for every origin — built-ins must catch up (target slice 3) |
-| F8 | The screen calls a user-made provider **CUSTOM** | 9, 10 | the model's *declared* kind is renamed **custom**; origins are `builtIn` · `custom` · `extension` |
-| F9 | An exported provider **carries no key** | 10 | law on `ProviderDefinition`: a secret is a reference, never a value, and `exported()` keeps only the lookup order and the setting's name |
-| F10 | Import **says where the key will go** before asking for it; a *CLI* provider from someone else shows its command and asks before saving | 11 | law on `ProviderCatalog.import`; answers the model's open question about commands from the UI |
-| F11 | Two logins of one product are **two things Mia watches** but **one thing Raj fixes**: each login is a pill and a menu-bar entry; the data source, its settings and the look are set once for Codex | 2a, 4 | `Provider` is the product, `Account` a login; accounts are simultaneous (no `active`); one definition, the account's values filled at fetch time |
-| F12 | **Pause is not remove**: a login can be switched off without losing its folder; and an expired key is not a red quota — it reads *Couldn't read your key*, not CRITICAL | 2a, 3 | `Account.isEnabled`; `Account.status` (quota health) apart from `Account.sync` (fetch health) |
+## 3 · What the journeys found
+
+Twelve findings; each is a word or a law the model must keep.
+
+| # | Finding | From moment |
+|---|---|---|
+| F1 | The popover says **which data source answered** (*via RPC*, *via Terminal* after a fallback) | 2 |
+| F2 | An error **names the step that failed** — *Couldn't read your key* · *Couldn't connect* · *Couldn't find the numbers* — because each sends the person somewhere different | 3 |
+| F3 | Settings prints **DATA SOURCE** and the API source's **key lookup order**; the fallback is one sentence, not a setting | 4 |
+| F4 | *Add Provider*'s picker is a **closed list in the words Settings already prints** — *API · CLI · File* — plus *Copy a provider* | 5 |
+| F5 | *Test Connection* must **stop before mapping**: Ken has nothing mapped yet, but must see what came back | 6 |
+| F6 | *Map fields* asks four questions — **Used · Remaining · Limit · Resets** — plus the currency; a balance has no percentage to ask for and *never* resets | 7 |
+| F7 | A custom provider has its **look from day one** | 8 |
+| F8 | The screen calls a user-made provider **CUSTOM** | 9, 10 |
+| F9 | An exported provider **carries no key** | 10 |
+| F10 | Import **says where the key will go** before asking for it; a *CLI* provider from someone else shows its command and asks before saving | 11 |
+| F11 | Two logins of one product are **two things Mia watches** but **one thing Raj fixes**: each login is a pill and a menu-bar entry; the data source, its settings and the look are set once for Codex | 2a, 4 |
+| F12 | **Pause is not remove**: a login can be switched off without losing its folder; and an expired key is not a red quota — it reads *Couldn't read your key*, not CRITICAL | 2a, 3 |
 
 ## 4 · The words the new screens print
-
-These join the harvested words in [the model §0](CANONICAL_MODEL.md#0--how-to-read-it):
 
 *Add Provider* · *Start from* · *API · CLI · File* · *Copy a provider* ·
 *Import* · *Connect* · *URL* · *Key lookup order* · *Environment variable* ·
@@ -88,8 +96,7 @@ numbers* · *via API*.
 
 ## 5 · Acceptance scenarios
 
-The outer loop for the slices that build these screens (target slice 6), in
-the shape of [USER_BEHAVIORS.md](USER_BEHAVIORS.md):
+The outer loop for these screens, in `Tests/AcceptanceTests`:
 
 ```gherkin
 Scenario: Add a custom provider from an API

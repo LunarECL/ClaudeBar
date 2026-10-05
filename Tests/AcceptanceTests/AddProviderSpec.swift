@@ -21,7 +21,7 @@ struct AddProviderSpec {
     struct FromAnAPI {
 
         @Test
-        func `Ken adds OpenRouter and sees its credits, with no reset and no percentage`() async throws {
+        func `should show Ken OpenRouter's credits, with no reset and no percentage, after adding it`() async throws {
             // Given — Ken has an OpenRouter key
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent("add-provider-\(UUID().uuidString)")
             defer { try? FileManager.default.removeItem(at: folder) }
@@ -47,17 +47,18 @@ struct AddProviderSpec {
 
             let saved = try #require(catalog.custom().first)
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
-            let openRouter = Provider(definition: saved, settings: settings, makeDataSource: {
+            let openRouterProduct = Provider(definition: saved, settings: settings, makeDataSource: {
                 DataSources.make($0, providerId: saved.id, cliExecutor: MockCLIExecutor(), network: network,
                                  makeTransport: { _, _, _, _ in MockRPCTransport() }, secrets: vault,
                                  environment: { _ in nil }, homeDirectory: folder, now: { Date() })
-            }).defaultAccount
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [openRouter]), clock: ClaudeConfigSpec.TestClock())
+            })
+            let openRouter = openRouterProduct.defaultAccount
+            let monitor = QuotaMonitor(providers: kept([openRouterProduct]), clock: ClaudeConfigSpec.TestClock())
             await monitor.refresh(providerId: openRouter.id)
 
             // Then — "OpenRouter" appears with $12.40 of $50.00, no reset and no percentage of a window
             #expect(saved.profile.origin == .custom)
-            #expect(monitor.allProviders.map(\.name) == ["OpenRouter"])
+            #expect(monitor.logins.map(monitor.lineupName(of:)) == ["OpenRouter"])
             let credits = try #require(openRouter.snapshot?.quotas.first)
             #expect(credits.left == .money(Money(Decimal(string: "12.4")!, currency: "USD"), of: Money(50, currency: "USD")))
             #expect(credits.resetsAt == nil)
@@ -65,7 +66,7 @@ struct AddProviderSpec {
         }
 
         @Test
-        func `the saved file names the key but never holds it`() throws {
+        func `should keep Ken's key out of the saved provider file, naming it only`() throws {
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent("add-provider-\(UUID().uuidString)")
             defer { try? FileManager.default.removeItem(at: folder) }
             var draft = ProviderDraft(start: .api)

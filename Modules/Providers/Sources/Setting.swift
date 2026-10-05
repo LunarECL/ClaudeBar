@@ -1,3 +1,4 @@
+import DataSources
 import Foundation
 import Mockable
 
@@ -179,6 +180,7 @@ public struct Setting: Sendable, Equatable, Codable, Identifiable {
         case .choice(let options):
             return options.contains { $0.id == value } ? nil : "Choose a \(label) from the list."
         case .path(let mustExist):
+            let value = paths.expanded(value)
             guard value.hasPrefix("/") || value.hasPrefix("~") else { return "Enter a full path for \(label)." }
             return mustExist && !paths.isFolder(value) ? "Choose an existing folder for \(label)." : nil
         }
@@ -217,7 +219,8 @@ public struct Setting: Sendable, Equatable, Codable, Identifiable {
 
     /// Puts `value` where this setting keeps it: a secret with the keys for
     /// the vault, anything else with the saved values.
-    public func keep(_ value: String, in entry: inout SettingEntry) {
+    public func keep(_ value: String, in entry: inout SettingEntry, paths: any PathChecking = DiskPaths()) {
+        let value: String = if case .path = kind { paths.canonical(value) } else { value }
         if isSecret { entry.secrets[id] = value } else { entry.values[id] = value }
     }
 
@@ -276,11 +279,17 @@ public struct SettingEntry: Sendable, Equatable {
 /// What a path setting asks of this Mac — the port its rule reads through.
 @Mockable
 public protocol PathChecking: Sendable {
+    /// Expand home and environment defaults without making relative paths absolute.
+    func expanded(_ path: String) -> String
     /// Whether `path` (`~` allowed) is an existing folder.
     func isFolder(_ path: String) -> Bool
     /// The same place written one way, symlinks resolved, so two spellings
     /// of one folder compare equal.
     func canonical(_ path: String) -> String
+}
+
+public extension PathChecking {
+    func expanded(_ path: String) -> String { DataSources.expandPath(path) }
 }
 
 /// The real file system.
@@ -293,6 +302,6 @@ public struct DiskPaths: PathChecking {
     }
 
     public func canonical(_ path: String) -> String {
-        URL(fileURLWithPath: (path as NSString).expandingTildeInPath).resolvingSymlinksInPath().standardizedFileURL.path
+        URL(fileURLWithPath: expanded(path)).resolvingSymlinksInPath().standardizedFileURL.path
     }
 }

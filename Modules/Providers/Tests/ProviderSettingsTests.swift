@@ -52,9 +52,9 @@ struct ProviderSettingsTests {
     }
 
     @Test
-    func `the default login runs with the setting's default`() async throws {
+    func `should ask the default region when nothing is chosen`() async throws {
         let acme = try provider()
-        try acme.set("apiKey", to: "sk-default")
+        try acme.configuration.set("apiKey", to: "sk-default")
 
         _ = try await acme.refresh(acme.defaultAccount)
 
@@ -62,88 +62,88 @@ struct ProviderSettingsTests {
     }
 
     @Test
-    func `changing the region runs every login there from the next refresh`() async throws {
+    func `should ask the new region and open its dashboard once the region is changed`() async throws {
         let acme = try provider()
-        try acme.set("apiKey", to: "sk-default")
-        try acme.set("region", to: "international")
+        try acme.configuration.set("apiKey", to: "sk-default")
+        try acme.configuration.set("region", to: "international")
 
         _ = try await acme.refresh(acme.defaultAccount)
 
         #expect(sent.hosts == ["api.acme.com"])
         #expect(settings.value("region", forProvider: "acme") == "international")
-        #expect(acme.defaultAccount.dashboardURL == URL(string: "https://console.acme.com/usage"))
+        #expect(acme.plainDashboardURL == URL(string: "https://console.acme.com/usage"))
     }
 
     @Test
-    func `an added login's own region wins over the provider's`() async throws {
+    func `should use an added login's own region and key over the provider's, never keeping the key in plain settings`() async throws {
         let acme = try provider()
-        let work = try acme.addAccount(filling: ["region": "international", "apiKey": "sk-work", "home": "/Users/me/.acme-work"])
+        let work = try acme.accounts.add(filling: ["region": "international", "apiKey": "sk-work", "home": "/Users/me/.acme-work"])
 
         _ = try await acme.refresh(work)
 
         #expect(sent.hosts == ["api.acme.com"])
         #expect(sent.authorizations == ["Bearer sk-work"])
-        #expect(work.dashboardURL == URL(string: "https://console.acme.com/usage"))
+        #expect(acme.dashboardURL(of: work) == URL(string: "https://console.acme.com/usage"))
         #expect(work.values["apiKey"] == nil)
     }
 
     @Test
-    func `Settings can tell a key is saved without ever showing it`() throws {
+    func `should tell a key is saved without ever showing it`() throws {
         let acme = try provider()
         let key = try #require(acme.definition.setting("apiKey"))
-        #expect(acme.hasSaved(key, for: acme.defaultAccount) == false)
+        #expect(acme.configuration.hasSaved(key, for: acme.defaultAccount) == false)
 
-        try acme.set("apiKey", to: "sk-default")
-        #expect(acme.hasSaved(key, for: acme.defaultAccount))
-        #expect(acme.value(of: key, for: acme.defaultAccount) == nil)
+        try acme.configuration.set("apiKey", to: "sk-default")
+        #expect(acme.configuration.hasSaved(key, for: acme.defaultAccount))
+        #expect(acme.configuration.value(of: key, for: acme.defaultAccount) == nil)
 
-        try acme.set("apiKey", to: nil)
-        #expect(acme.hasSaved(key, for: acme.defaultAccount) == false)
+        try acme.configuration.set("apiKey", to: nil)
+        #expect(acme.configuration.hasSaved(key, for: acme.defaultAccount) == false)
     }
 
     @Test
-    func `a choice that isn't one of its options is refused`() throws {
+    func `should refuse a region that is not one of its options`() throws {
         let acme = try provider()
         #expect(throws: UsageError.executionFailed("Choose a Region from the list.")) {
-            try acme.addAccount(filling: ["region": "mars", "apiKey": "sk", "home": "/Users/me/.acme-work"])
+            try acme.accounts.add(filling: ["region": "mars", "apiKey": "sk", "home": "/Users/me/.acme-work"])
         }
-        #expect(throws: UsageError.executionFailed("Choose a Region from the list.")) { try acme.set("region", to: "mars") }
+        #expect(throws: UsageError.executionFailed("Choose a Region from the list.")) { try acme.configuration.set("region", to: "mars") }
     }
 
     @Test
-    func `two logins never share a folder — the default login's included`() throws {
+    func `should refuse a folder another login already uses, the default login's included`() throws {
         let acme = try provider()
         #expect(throws: UsageError.self) {
-            try acme.addAccount(filling: ["apiKey": "sk", "home": "/Users/me/.acme"])
+            try acme.accounts.add(filling: ["apiKey": "sk", "home": "/Users/me/.acme"])
         }
-        _ = try acme.addAccount(filling: ["apiKey": "sk", "home": "/Users/me/.acme-work"])
+        _ = try acme.accounts.add(filling: ["apiKey": "sk", "home": "/Users/me/.acme-work"])
         #expect(throws: UsageError.self) {
-            try acme.addAccount(filling: ["apiKey": "sk-2", "home": "/Users/me/.acme-work"])
+            try acme.accounts.add(filling: ["apiKey": "sk-2", "home": "/Users/me/.acme-work"])
         }
         #expect(acme.accounts.count == 2)
     }
 
     @Test
-    func `a key the vault does not keep leaves no account behind`() throws {
+    func `should add no login when the Keychain does not keep its key`() throws {
         let acme = try providerWith(vault: RefusingVault())
         #expect(throws: UsageError.executionFailed("ClaudeBar couldn't keep this key securely. The account wasn't added.")) {
-            try acme.addAccount(filling: ["apiKey": "sk", "home": "/Users/me/.acme-work"])
+            try acme.accounts.add(filling: ["apiKey": "sk", "home": "/Users/me/.acme-work"])
         }
         #expect(acme.accounts.count == 1)
     }
 
     @Test
-    func `a key the vault refuses to replace leaves the old key in place`() throws {
+    func `should keep the old key when the Keychain will not replace it`() throws {
         let vault = ReplacementRefusingVault(["acme.apiKey": "sk-old"])
         let acme = try providerWith(vault: vault)
 
-        #expect(throws: UsageError.self) { try acme.set("apiKey", to: "sk-new") }
+        #expect(throws: UsageError.self) { try acme.configuration.set("apiKey", to: "sk-new") }
 
         #expect(vault.secret("apiKey", provider: "acme") == "sk-old")
     }
 
     @Test
-    func `a setting declared twice, at the top and in the account form, is refused`() {
+    func `should refuse a provider that declares a setting both for itself and in its login form`() {
         let json = Self.acme.replacingOccurrences(of: #""defaultDataSource":"api"}"#,
             with: #""defaultDataSource":"api","accounts":{"form":[{"id":"region","label":"Region","choices":["x"]}]}}"#)
         #expect(throws: DecodingError.self) { try ProviderDefinition.parse(Data(json.utf8)) }
@@ -156,11 +156,11 @@ struct ProviderSettingsTests {
     }
 
     @Test
-    func `Settings is shown the definition as the default login runs it`() throws {
+    func `should show in Settings the address the default login asks, in its chosen region`() throws {
         let acme = try provider()
-        try acme.set("region", to: "international")
+        try acme.configuration.set("region", to: "international")
 
-        guard case .http(let request)? = acme.definitionAsRun.dataSource("api")?.fetch else {
+        guard case .http(let request)? = acme.configuration.definitionAsRun.dataSource("api")?.fetch else {
             Issue.record("Expected an http fetch")
             return
         }
@@ -168,7 +168,7 @@ struct ProviderSettingsTests {
     }
 
     @Test
-    func `Settings shows only what the default login uses`() throws {
+    func `should show in Settings only the settings the default login uses`() throws {
         let json = #"""
         {"profile":{"id":"tool","name":"Tool"},"cli":"tool","defaultDataSource":"cli",
          "settings":[{"id":"home","label":"Home","scope":"account","kind":"path"},
@@ -183,7 +183,7 @@ struct ProviderSettingsTests {
     }
 
     @Test
-    func `import lists the host of every region a key may go to`() throws {
+    func `should list on import every host a key may be sent to, one per region`() throws {
         let definition = try ProviderDefinition.parse(Data(Self.acme.utf8))
         #expect(definition.keyDestinations == ["api.acme.cn", "api.acme.com"])
     }

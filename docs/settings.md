@@ -36,8 +36,9 @@ A key that's missing means "use the default", so a fresh install starts with an 
 | `providers.<id>.hiddenQuotaKeys` | Quotas a person stopped watching for a product, by quota key (`model:gemini-2.0-flash`); shared by its accounts. A key no longer reported is ignored, and hiding every quota hides none (#140) | `"providers": { "gemini": { "hiddenQuotaKeys": ["model:gemini-2.0-flash"] } }` |
 | `<provider>.*` | A provider's own settings, each named in its definition's `settings` (`<id>.<setting>`), and its data source choice (`<id>.probeMode`) | `"kimi": { "probeMode": "api", "region": "international" }` |
 | `hook.*` | [Session hooks](features/session-hooks/README.md) | `"hook": { "enabled": true }` |
+| `alerts.*` | [Quota alerts](features/quota-alerts/README.md): the percentages you chose | `"alerts": { "thresholds": [60, 35] }` |
 | `notify.*` | [Notify!](features/notify/README.md) device link and surfaces | `"notify": { "enabled": true, "widgetEnabled": true }` |
-| `extensions.<extension-id>.*` | Non-secret fields of a user [extension](features/extensions/README.md)'s config | `"extensions": { "my-api": { "baseURL": "https://…" } }` |
+| `ext-<extension-id>.*` | A user [extension](features/extensions/README.md)'s non-secret config fields, as provider settings. Values an older version kept under `extensions.<extension-id>.*` move here once | `"ext-my-api": { "baseURL": "https://…" }` |
 
 Provider ids are the folder names under [providers/](providers/) (`claude`, `codex`, `zai`, `opencode-go`…). A provider's settings are listed in its definition, `Modules/Providers/Resources/Providers/<id>.json`; an added account's own values are kept with that account. A value an older version saved under another key, or as a number or a list, is still read, and moves to `<id>.<setting>` the first time it's saved.
 
@@ -54,7 +55,7 @@ A few `app.*` keys worth knowing:
 | `app.nativeMenuBarIconsEnabled` | `false` (default) keeps brand colors; `true` uses monochrome provider marks for every menu bar account, adapting to the bar’s appearance |
 | `app.statusColorOverrides` | `{ "warning": "#F2BF33" }`; only the levels you set |
 
-The full list is the code: app-wide keys are read and written in [`JSONSettingsRepository.swift`](../Sources/Infrastructure/Storage/JSONSettingsRepository.swift), provider keys come from each definition's `settings`, and extension fields live in [`JSONExtensionConfigStore.swift`](../Sources/Infrastructure/Extension/JSONExtensionConfigStore.swift).
+The full list is the code: app-wide keys are read and written in [`JSONSettingsRepository.swift`](../Sources/Infrastructure/Storage/JSONSettingsRepository.swift), and provider keys, extensions' included, come from each definition's `settings` (an extension's config is read as one in [`Extensions.swift`](../Modules/Providers/Sources/Extensions.swift)).
 
 ## Editing by hand
 
@@ -70,18 +71,18 @@ Deleting the file resets every setting to its default. Secrets stay where they a
 |---|---|
 | Provider keys you paste into ClaudeBar — API keys, tokens, session cookies, for the default login and every added account | Keychain (the provider vault). A key an older version kept in the app credential store moves to the Keychain after a verified write, the first time it's read |
 | Notify! device token | Keychain, or the app credential store on builds the Keychain refuses (see below) |
-| Secret fields of user extensions | App credential store |
+| Secret fields of user extensions | Keychain (the provider vault). One an older version kept in the app credential store moves there once |
 | Your provider sign-ins (Claude Code, Codex, Gemini, Grok, Cursor…) | Where that provider's own CLI or app keeps them. ClaudeBar reads them there; see each [provider doc](providers/) |
 
 - **Keychain** items are generic passwords under the service `com.tddworks.claudebar.credentials`, readable only after first unlock. Look them up in Keychain Access.
-- **The app credential store** is ClaudeBar's own macOS preferences (`defaults read com.tddworks.claudebar`), with keys starting `com.claudebar.credentials.`. It isn't encrypted beyond your account's normal file protection. Provider keys left there by older versions move to the Keychain the first time they're read; extension secrets still live there.
+- **The app credential store** is ClaudeBar's own macOS preferences (`defaults read com.tddworks.claudebar`), with keys starting `com.claudebar.credentials.`. It isn't encrypted beyond your account's normal file protection. Provider and extension keys left there by older versions move to the Keychain.
 - **Environment variables**: some providers take a key from an env var instead (`zai.glmAuthEnvVar`, `copilot.authEnvVar`, `minimax.authEnvVar`…). The settings file stores only the variable's *name*, never its value.
 - **Another tool's login** (the GitHub CLI's, Antigravity's, Claude Code's) is read from that tool's own Keychain item or file and never written by ClaudeBar, except where the provider's doc says it renews a token there.
 - **Ad-hoc signed builds** (ones you compile yourself) can't use the Keychain, so the Notify! token falls back to the app credential store and the Notify! pane says so. A Developer ID build from the release page isn't affected.
 
 ## See also
 
-[Troubleshooting](troubleshooting.md) · [ARCHITECTURE.md](architecture/ARCHITECTURE.md) for how the settings repositories are split per provider
+[Troubleshooting](troubleshooting.md) · [ENGINE_DESIGN §2.2](architecture/ENGINE_DESIGN.md#22--settings-one-form-two-scopes) for how a provider's settings form is read and kept
 
 
 ## Additional Codex accounts

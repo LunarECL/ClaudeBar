@@ -15,13 +15,13 @@ struct AccountNamesTests {
     }
 
     private func codex(_ settings: InMemoryProviderSettings, _ logins: [ProviderAccountConfig] = []) throws -> Provider {
-        try Providers.make("codex", settings: settings, accounts: logins)
+        try ProviderFactory.make("codex", settings: settings, accounts: logins)
     }
 
     // MARK: - Display name
 
     @Test
-    func `the display name is the label, else the email, else the product`() throws {
+    func `should call a login by its label, else its email, else the product's name`() throws {
         let codex = try codex(InMemoryProviderSettings(), [
             login("a", email: "a@example.com", label: "Work"),
             login("b", email: "b@example.com"),
@@ -33,7 +33,7 @@ struct AccountNamesTests {
     }
 
     @Test
-    func `a blank label does not hide the email`() throws {
+    func `should show the email when a login's label is blank`() throws {
         let codex = try codex(InMemoryProviderSettings(), [login("a", email: "a@example.com", label: "   ")])
 
         #expect(codex.accounts[1].displayName == "a@example.com")
@@ -42,41 +42,41 @@ struct AccountNamesTests {
     // MARK: - The pill's name
 
     @Test
-    func `a single login is called by the product's name`() throws {
+    func `should call a single login by the product's name`() throws {
         let codex = try codex(InMemoryProviderSettings())
 
-        #expect(codex.hasSeveralAccounts == false)
-        #expect(codex.defaultAccount.name == "Codex")
+        #expect(codex.accounts.hasSeveral == false)
+        #expect(codex.lineupName(of: codex.defaultAccount) == "Codex")
     }
 
     @Test
-    func `several logins are called by their display names`() throws {
+    func `should call several logins by their display names`() throws {
         let codex = try codex(InMemoryProviderSettings(), [login("a", email: "a@example.com", label: "Work")])
 
-        #expect(codex.hasSeveralAccounts)
-        #expect(codex.accounts.map(\.name) == ["Codex", "Work"])
+        #expect(codex.accounts.hasSeveral)
+        #expect(codex.accounts.map(codex.lineupName(of:)) == ["Codex", "Work"])
     }
 
     @Test
-    func `a paused login no longer needs telling apart`() throws {
+    func `should stop telling a login apart when the other is paused`() throws {
         let codex = try codex(InMemoryProviderSettings(), [login("a", email: "a@example.com")])
 
         codex.accounts[1].isEnabled = false
 
-        #expect(codex.hasSeveralAccounts == false)
-        #expect(codex.defaultAccount.name == "Codex")
+        #expect(codex.accounts.hasSeveral == false)
+        #expect(codex.lineupName(of: codex.defaultAccount) == "Codex")
     }
 
     // MARK: - Rename
 
     @Test
-    func `renaming an added login saves its label and keeps who it is`() throws {
+    func `should save a renamed login's label and keep who it is`() throws {
         let settings = InMemoryProviderSettings()
         let work = login("a", email: "a@example.com")
         settings.addAccount(work, forProvider: "codex")
         let codex = try codex(settings, [work])
 
-        codex.rename(codex.accounts[1], to: "  Acme  ")
+        codex.accounts.rename(codex.accounts[1], to: "  Acme  ")
 
         #expect(codex.accounts[1].displayName == "Acme")
         #expect(settings.accounts(forProvider: "codex").first?.label == "Acme")
@@ -85,10 +85,10 @@ struct AccountNamesTests {
     }
 
     @Test
-    func `the default login's name survives a relaunch`() throws {
+    func `should keep the default login's name after a relaunch`() throws {
         let settings = InMemoryProviderSettings()
         let first = try codex(settings)
-        first.rename(first.defaultAccount, to: "Personal")
+        first.accounts.rename(first.defaultAccount, to: "Personal")
 
         let relaunched = try codex(settings)
 
@@ -96,13 +96,13 @@ struct AccountNamesTests {
     }
 
     @Test
-    func `clearing a name goes back to the email`() throws {
+    func `should go back to the email when a login's name is cleared`() throws {
         let settings = InMemoryProviderSettings()
         let work = login("a", email: "a@example.com", label: "Acme")
         settings.addAccount(work, forProvider: "codex")
         let codex = try codex(settings, [work])
 
-        codex.rename(codex.accounts[1], to: "")
+        codex.accounts.rename(codex.accounts[1], to: "")
 
         #expect(codex.accounts[1].displayName == "a@example.com")
         #expect(settings.accounts(forProvider: "codex").first?.label == "")
@@ -111,23 +111,23 @@ struct AccountNamesTests {
     // MARK: - Remove
 
     @Test
-    func `removing an added login forgets its saved settings`() throws {
+    func `should forget an added login's saved settings when it is removed`() throws {
         let settings = InMemoryProviderSettings()
         let work = login("a", email: "a@example.com")
         settings.addAccount(work, forProvider: "codex")
         let codex = try codex(settings, [work])
 
-        codex.remove(codex.accounts[1])
+        codex.accounts.remove(codex.accounts[1])
 
         #expect(codex.accounts.count == 1)
         #expect(settings.accounts(forProvider: "codex").isEmpty)
     }
 
     @Test
-    func `the default login cannot be removed`() throws {
+    func `should keep the default login when asked to remove it`() throws {
         let codex = try codex(InMemoryProviderSettings())
 
-        codex.remove(codex.defaultAccount)
+        codex.accounts.remove(codex.defaultAccount)
 
         #expect(codex.accounts.count == 1)
     }

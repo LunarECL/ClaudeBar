@@ -113,13 +113,13 @@ struct ProviderTests {
     // MARK: - Refresh
 
     @Test
-    func `a refresh records the usage, under the login's own id, and who answered`() async throws {
+    func `should show a login's usage under its own id and say which data source answered`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 30)
         let acme = acme(network, logins: ["work"])
         let work = acme.accounts[1]
 
-        let usage = try await work.refresh()
+        let usage = try await acme.refresh(work)
 
         #expect(usage.providerId == "acme.work")
         #expect(work.snapshot?.sessionQuota?.percentRemaining == 70)
@@ -128,15 +128,15 @@ struct ProviderTests {
     }
 
     @Test
-    func `a failed refresh keeps the last usage and says which step failed`() async throws {
+    func `should keep the last usage and say which step failed when a refresh fails`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.backup, used: 30)
         let acme = acme(network)
-        acme.use("backup")
-        try await acme.defaultAccount.refresh()
+        acme.configuration.use("backup")
+        try await acme.refreshPlain()
         network.fail(Self.backup)
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain() }
 
         #expect(acme.defaultAccount.snapshot?.sessionQuota?.percentRemaining == 70)
         #expect(acme.defaultAccount.lastError != nil)
@@ -144,14 +144,14 @@ struct ProviderTests {
     }
 
     @Test
-    func `one login failing leaves another's usage alone`() async throws {
+    func `should leave another login's usage alone when one login fails`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, login: "home", used: 10)
         network.fail(Self.backup)
         let acme = acme(network, logins: ["home", "work"])
 
-        try await acme.accounts[1].refresh()
-        await #expect(throws: (any Error).self) { try await acme.accounts[2].refresh() }
+        try await acme.refresh(acme.accounts[1])
+        await #expect(throws: (any Error).self) { try await acme.refresh(acme.accounts[2]) }
 
         #expect(acme.accounts[1].snapshot?.sessionQuota?.percentRemaining == 90)
         #expect(acme.accounts[1].lastError == nil)
@@ -159,14 +159,14 @@ struct ProviderTests {
     }
 
     @Test
-    func `overlapping refreshes of one login share one request`() async throws {
+    func `should ask the provider once when one login is refreshed twice at the same time`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 30)
         network.held = true
         let acme = acme(network)
 
-        async let first = acme.defaultAccount.refresh()
-        async let second = acme.defaultAccount.refresh()
+        async let first = acme.refreshPlain()
+        async let second = acme.refreshPlain()
         try await Task.sleep(for: .milliseconds(50))
         network.release()
         _ = try await (first, second)
@@ -177,64 +177,64 @@ struct ProviderTests {
     // MARK: - Fallback
 
     @Test
-    func `when the active data source fails its fallback answers, and says so`() async throws {
+    func `should show the fallback's usage, and say it answered, when the chosen data source fails`() async throws {
         let network = AcmeNetwork()
         network.fail(Self.api)
         network.answer(Self.backup, used: 40)
         let acme = acme(network)
 
-        let usage = try await acme.defaultAccount.refresh()
+        let usage = try await acme.refreshPlain()
 
         #expect(usage.sessionQuota?.percentRemaining == 60)
         #expect(acme.defaultAccount.answeredBy == "backup")
     }
 
     @Test
-    func `when every data source fails the active one's failure is reported`() async throws {
+    func `should report the chosen data source's failure when every data source fails`() async throws {
         let network = AcmeNetwork()
         network.fail(Self.api, status: 401)
         network.fail(Self.backup, status: 500)
         let acme = acme(network)
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain() }
 
         #expect((acme.defaultAccount.lastError as? UsageError)?.tag == "authenticationRequired")
     }
 
     @Test
-    func `a fallback switched off is not tried`() async throws {
+    func `should not ask the fallback when the person switched it off`() async throws {
         let network = AcmeNetwork()
         network.fail(Self.api)
         network.answer(Self.backup, used: 40)
         let acme = acme(network)
-        acme.setFallbackEnabled(false, from: "api")
+        acme.configuration.setFallbackEnabled(false, from: "api")
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain() }
 
         #expect(network.requests(to: Self.backup) == 0)
     }
 
     @Test
-    func `a rate limit is not a reason to ask the fallback`() async throws {
+    func `should not ask the fallback when the chosen data source is rate-limited`() async throws {
         let network = AcmeNetwork()
         network.fail(Self.api, status: 429)
         network.answer(Self.backup, used: 40)
         let acme = acme(network)
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh() }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain() }
 
         #expect(network.requests(to: Self.backup) == 0)
     }
 
     @Test
-    func `a login whose patch leaves out the active data source uses the next on its fallback chain`() async throws {
+    func `should use the next data source on the fallback chain when a login cannot use the chosen one`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.backup, used: 25)
         var patch = Self.loginPatch
         patch["api"] = try JSONDecoder().decode(JSONValue.self, from: Data("null".utf8))
         let acme = acme(network, definition: Self.acme(patch: patch), logins: ["work"])
 
-        let usage = try await acme.accounts[1].refresh()
+        let usage = try await acme.refresh(acme.accounts[1])
 
         #expect(usage.sessionQuota?.percentRemaining == 75)
         #expect(acme.accounts[1].answeredBy == "backup")
@@ -244,72 +244,72 @@ struct ProviderTests {
     // MARK: - The data source choice — one for every login
 
     @Test
-    func `choosing a data source is saved, and an unknown one is refused`() {
+    func `should save the chosen data source and refuse one the provider does not have`() {
         let settings = InMemoryProviderSettings()
         let acme = acme(AcmeNetwork(), settings: settings)
 
-        #expect(acme.use("backup"))
-        #expect(acme.use("tty") == false)
+        #expect(acme.configuration.use("backup"))
+        #expect(acme.configuration.use("tty") == false)
 
-        #expect(acme.activeKind == "backup")
+        #expect(acme.configuration.activeKind == "backup")
         #expect(settings.dataSourceKind(forProvider: "acme") == "backup")
     }
 
     @Test
-    func `a cached data source sets how often the background may ask`() {
+    func `should ask in the background no more often than the chosen data source's cache allows`() {
         let acme = acme(AcmeNetwork())
 
         #expect(acme.backgroundRefreshFloor == .seconds(600))
-        acme.use("backup")
+        acme.configuration.use("backup")
         #expect(acme.backgroundRefreshFloor == nil)
     }
 
     // MARK: - Held back until checked (#216)
 
     @Test
-    func `a background refresh waits for one the person asked for`() async throws {
+    func `should not ask in the background until the person has refreshed once, when the data source must be checked first (#216)`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 30)
         let acme = acme(network, definition: Self.acme(verifyBeforeBackground: true))
 
-        await #expect(throws: (any Error).self) { try await acme.defaultAccount.refresh(.background) }
+        await #expect(throws: (any Error).self) { try await acme.refreshPlain(.background) }
         #expect(network.requests(to: Self.api) == 0)
 
-        try await acme.defaultAccount.refresh(.interactive)
-        try await acme.defaultAccount.refresh(.background)
+        try await acme.refreshPlain(.interactive)
+        try await acme.refreshPlain(.background)
         #expect(network.requests(to: Self.api) == 1)
     }
 
     // MARK: - Status across logins
 
     @Test
-    func `status is the worst enabled login, and the best has the most left`() async throws {
+    func `should take the worst enabled login's status, and call the login with the most left the best`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 40)
         network.answer(Self.api, login: "low", used: 90)
         network.answer(Self.api, login: "high", used: 10)
         let acme = acme(network, logins: ["low", "high"])
-        for account in acme.accounts { try await account.refresh() }
+        for account in acme.accounts { try await acme.refresh(account) }
 
         #expect(acme.status == .critical)
-        #expect(acme.bestAccount?.accountId == "high")
+        #expect(acme.accounts.best?.accountId == "high")
 
         acme.accounts[1].isEnabled = false
         #expect(acme.status == .healthy)
     }
 
     @Test
-    func `the worst login is the one that makes the provider's status, and nobody when all is well`() async throws {
+    func `should name the login that makes the provider's status, and none when all is well`() async throws {
         let network = AcmeNetwork()
         network.answer(Self.api, used: 40)
         network.answer(Self.api, login: "low", used: 90)
         let acme = acme(network, logins: ["low"])
 
-        #expect(acme.worstAccount == nil)
-        for account in acme.accounts { try await account.refresh() }
+        #expect(acme.accounts.worst == nil)
+        for account in acme.accounts { try await acme.refresh(account) }
 
-        #expect(acme.worstAccount?.accountId == "low")
+        #expect(acme.accounts.worst?.accountId == "low")
         acme.accounts[1].isEnabled = false
-        #expect(acme.worstAccount == nil)
+        #expect(acme.accounts.worst == nil)
     }
 }

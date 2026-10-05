@@ -52,8 +52,8 @@ struct ClaudeConfigSpec {
         deinit { try? FileManager.default.removeItem(at: home) }
 
         @MainActor
-        func claude() throws -> Account {
-            let definition = try Providers.builtIn("claude")
+        func claude() throws -> Provider {
+            let definition = try ProviderFactory.builtIn("claude")
             let home = self.home
             let cli = self.cli
             let network = self.network
@@ -67,13 +67,13 @@ struct ClaudeConfigSpec {
                         cliExecutor: cli,
                         network: network,
                         makeTransport: { _, _, _, _ in MockRPCTransport() },
-                        scripts: Providers.builtInScripts,
+                        scripts: ProviderFactory.builtInScripts,
                         environment: { _ in nil },
                         homeDirectory: home,
                         now: { Date() }
                     )
                 }
-            ).defaultAccount
+            )
         }
 
         func cliAnswers(_ screen: String) {
@@ -119,27 +119,28 @@ struct ClaudeConfigSpec {
     struct SwitchProbeMode {
 
         @Test
-        func `switching to API mode uses the API for refresh`() async throws {
+        func `should show the API's quotas after the person switches Claude to API mode`() async throws {
             // Given — the CLI says 80% left, the API 45% left
             let world = try World()
             world.cliAnswers(ClaudeConfigSpec.usageScreen)
             world.apiAnswers(ClaudeConfigSpec.apiUsage)
             try world.loggedIn()
-            let claude = try world.claude()
-            #expect(claude.provider.activeKind == "cli")
+            let claudeProduct = try world.claude()
+            let claude = claudeProduct.defaultAccount
+            #expect(claudeProduct.configuration.activeKind == "cli")
 
             // When — the Claude card saves API mode
             world.settings.setClaudeProbeMode(.api)
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: ClaudeConfigSpec.TestClock())
+            let monitor = QuotaMonitor(providers: kept([claudeProduct]), clock: ClaudeConfigSpec.TestClock())
             await monitor.refresh(providerId: "claude")
 
             // Then — the API's answer is shown
-            #expect(claude.provider.activeKind == "api")
+            #expect(claudeProduct.configuration.activeKind == "api")
             #expect(claude.snapshot?.quotas.first?.percentRemaining == 45)
         }
 
         @Test
-        func `probe mode is persisted in UserDefaults`() {
+        func `should remember the chosen Claude data source, CLI by default`() {
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: UserDefaults(suiteName: "com.claudebar.test.\(UUID().uuidString)")!)
             #expect(settings.claudeProbeMode() == .cli)
 
@@ -150,13 +151,14 @@ struct ClaudeConfigSpec {
         }
 
         @Test
-        func `api mode falls back to CLI when OAuth API is unavailable`() async throws {
+        func `should show the CLI's quotas in API mode when nobody is logged in to the API`() async throws {
             // Given — API mode, nobody logged in, the CLI works
             let world = try World()
             world.cliAnswers(ClaudeConfigSpec.usageScreen)
             world.settings.setClaudeProbeMode(.api)
-            let claude = try world.claude()
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: ClaudeConfigSpec.TestClock())
+            let claudeProduct = try world.claude()
+            let claude = claudeProduct.defaultAccount
+            let monitor = QuotaMonitor(providers: kept([claudeProduct]), clock: ClaudeConfigSpec.TestClock())
 
             // When
             await monitor.refresh(providerId: "claude")
@@ -167,29 +169,31 @@ struct ClaudeConfigSpec {
         }
 
         @Test
-        func `api mode does not fall back to CLI when cli fallback is disabled`() async throws {
+        func `should be unavailable and ask to sign in when the API has no login and CLI fallback is off`() async throws {
             // Given — API mode with the card's "CLI fallback" off
             let world = try World()
             world.cliAnswers(ClaudeConfigSpec.usageScreen)
             world.settings.setClaudeProbeMode(.api)
             world.settings.setClaudeCliFallbackEnabled(false)
-            let claude = try world.claude()
+            let claudeProduct = try world.claude()
+            let claude = claudeProduct.defaultAccount
 
             // Then — nothing is available, and a refresh reports the API's failure
-            #expect(await claude.isAvailable() == false)
-            await #expect(throws: UsageError.authenticationRequired) { try await claude.refresh() }
+            #expect(await claudeProduct.isAvailable(claude) == false)
+            await #expect(throws: UsageError.authenticationRequired) { try await claudeProduct.refresh(claude) }
             #expect(claude.snapshot == nil)
         }
 
         @Test
-        func `cli mode falls back to API when CLI parsing fails and OAuth is available`() async throws {
+        func `should show the API's quotas in CLI mode when the CLI screen shows no usage and the person is logged in`() async throws {
             // Given — the CLI screen has no usage, the API answers
             let world = try World()
             world.cliAnswers("Claude Code v2.1.0\nSomething unexpected")
             world.apiAnswers(ClaudeConfigSpec.apiUsage)
             try world.loggedIn()
-            let claude = try world.claude()
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: ClaudeConfigSpec.TestClock())
+            let claudeProduct = try world.claude()
+            let claude = claudeProduct.defaultAccount
+            let monitor = QuotaMonitor(providers: kept([claudeProduct]), clock: ClaudeConfigSpec.TestClock())
 
             // When
             await monitor.refresh(providerId: "claude")
@@ -208,15 +212,16 @@ struct ClaudeConfigSpec {
     struct CredentialStatus {
 
         @Test
-        func `OAuth credentials are found once claude has logged in`() throws {
+        func `should find the API key once the person has logged in to Claude`() throws {
             let world = try World()
-            let claude = try world.claude()
+            let claudeProduct = try world.claude()
+            let claude = claudeProduct.defaultAccount
 
-            #expect(claude.hasKey(for: "api") == false)
+            #expect(claudeProduct.hasKey(for: "api", account: claude) == false)
 
             try world.loggedIn()
 
-            #expect(claude.hasKey(for: "api") == true)
+            #expect(claudeProduct.hasKey(for: "api", account: claude) == true)
         }
     }
 
@@ -227,15 +232,16 @@ struct ClaudeConfigSpec {
     struct SessionExpired {
 
         @Test
-        func `sessionExpired error has user-friendly description`() async throws {
+        func `should tell the person their session expired, naming claude, when the saved login and its refresh are refused`() async throws {
             // Given — API mode, the token is refused and so is its refresh
             let world = try World()
             world.settings.setClaudeProbeMode(.api)
             world.settings.setClaudeCliFallbackEnabled(false)
             world.apiAnswers("", status: 401)
             try world.loggedIn()
-            let claude = try world.claude()
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: ClaudeConfigSpec.TestClock())
+            let claudeProduct = try world.claude()
+            let claude = claudeProduct.defaultAccount
+            let monitor = QuotaMonitor(providers: kept([claudeProduct]), clock: ClaudeConfigSpec.TestClock())
 
             // When
             await monitor.refresh(providerId: "claude")

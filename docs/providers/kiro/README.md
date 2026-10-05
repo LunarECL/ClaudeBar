@@ -20,6 +20,7 @@ Shows your Kiro plan credits for the month (with the date they reset) and any bo
 - **"Timed out"** means `kiro-cli` didn't exit after `/usage` and `/quit`, for example because it's waiting at a prompt. Run it in a terminal and finish any sign-in or setup it asks for.
 - **Bonus credits have their own card** showing how many are left and "Expires in N days". They are a grant that runs out, not a window that refills, so there is no pace for them.
 - **The plan-credits reset date has no year.** Kiro prints `resets on MM/DD`; a date that has already passed this year is taken as next year.
+- **An added login needs a folder of its own.** The default login's folder and another listed login's are refused, `~` included. A path you type with `~` is saved as the full folder, because the CLI can't expand it.
 
 ## See also
 

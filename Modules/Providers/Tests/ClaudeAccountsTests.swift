@@ -34,18 +34,18 @@ struct ClaudeAccountsTests {
     // MARK: - Each login reads its own folder
 
     @Test
-    func `an added login reads its own key and its own email`() async throws {
+    func `should show an added login the usage of its own key and its own email`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         try claude.writeCredentials(accessToken: "default-token")
         try claude.writeClaudeConfig(email: "me@example.com")
         let work = try claude.writeLogin(in: "work", email: "work@example.com", token: "work-token")
         answerByToken(claude, ["default-token": 20, "work-token": 70])
-        let provider = try claude.provider(settings: Self.api, accounts: [config("w", folder: work, email: "work@example.com")]).provider
+        let provider = try claude.provider(settings: Self.api, accounts: [config("w", folder: work, email: "work@example.com")])
         let (me, added) = (provider.accounts[0], provider.accounts[1])
 
-        let mine = try await me.refresh()
-        let theirs = try await added.refresh()
+        let mine = try await provider.refresh(me)
+        let theirs = try await provider.refresh(added)
 
         #expect(added.id == "claude.w")
         #expect(mine.sessionQuota?.percentRemaining == 80)
@@ -55,17 +55,17 @@ struct ClaudeAccountsTests {
     }
 
     @Test
-    func `a folder now signed in to someone else fails closed and the others keep their usage`() async throws {
+    func `should fail closed for a folder now signed in to someone else while the others keep their usage`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         try claude.writeCredentials(accessToken: "default-token")
         let work = try claude.writeLogin(in: "work", email: "someone-else@example.com", token: "work-token")
         answerByToken(claude, ["default-token": 20, "work-token": 70])
-        let provider = try claude.provider(settings: Self.api, accounts: [config("w", folder: work, email: "work@example.com")]).provider
+        let provider = try claude.provider(settings: Self.api, accounts: [config("w", folder: work, email: "work@example.com")])
         let (me, added) = (provider.accounts[0], provider.accounts[1])
 
-        try await me.refresh()
-        await #expect(throws: UsageError.self) { try await added.refresh() }
+        try await provider.refresh(me)
+        await #expect(throws: UsageError.self) { try await provider.refresh(added) }
 
         #expect(added.snapshot == nil)
         #expect(added.lastError?.localizedDescription.contains("Reconnect the original Claude account") == true)
@@ -73,8 +73,8 @@ struct ClaudeAccountsTests {
     }
 
     @Test
-    func `the cli for an added login runs in its folder without the default login's keys`() throws {
-        let sources = try Providers.builtIn("claude").dataSources(forAccount: [
+    func `should run the CLI for an added login in its own folder without the default login's keys`() throws {
+        let sources = try ProviderFactory.builtIn("claude").dataSources(forAccount: [
             "configDirectory": "/Users/me/claude-work", "loginEmail": "work@example.com", "credentialService": "svc",
         ])
 
@@ -91,8 +91,8 @@ struct ClaudeAccountsTests {
     }
 
     @Test
-    func `folder trust is granted in the added login's own config`() throws {
-        let sources = try Providers.builtIn("claude").dataSources(forAccount: [
+    func `should grant folder trust in the added login's own config`() throws {
+        let sources = try ProviderFactory.builtIn("claude").dataSources(forAccount: [
             "configDirectory": "/Users/me/claude-work", "loginEmail": "work@example.com", "credentialService": "svc",
         ])
         let cli = try #require(sources.first { $0.kind == "cli" })
@@ -104,8 +104,8 @@ struct ClaudeAccountsTests {
     }
 
     @Test
-    func `the default login is untouched by the accounts block`() throws {
-        let definition = try Providers.builtIn("claude")
+    func `should leave the default login as it was when accounts are added`() throws {
+        let definition = try ProviderFactory.builtIn("claude")
         let cli = try #require(definition.dataSource("cli"))
 
         #expect(cli.identity == nil)
@@ -115,7 +115,7 @@ struct ClaudeAccountsTests {
     // MARK: - Guest passes are the default login's
 
     @Test
-    func `guest passes belong to the default login only`() throws {
+    func `should give guest passes to the default login only`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         let work = try claude.writeLogin(in: "work", email: "work@example.com", token: "work-token")
@@ -123,7 +123,7 @@ struct ClaudeAccountsTests {
             settings: Self.api,
             accounts: [config("w", folder: work, email: "work@example.com")],
             guestPasses: GuestPasses(source: MockGuestPassSource())
-        ).provider
+        )
 
         #expect(provider.accounts[1].guestPasses == nil)
         #expect(provider.defaultAccount.guestPasses != nil)
@@ -132,14 +132,14 @@ struct ClaudeAccountsTests {
     // MARK: - Add Account: choosing a signed-in folder
 
     @Test
-    func `choosing a signed-in folder saves the folder, its email and its keychain service`() throws {
+    func `should save the folder, its email and its keychain service when the person chooses a signed-in folder`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         let settings = InMemoryProviderSettings()
         let work = try claude.writeLogin(in: "work", email: "work@example.com")
-        let provider = try claude.provider(settings: settings).provider
+        let provider = try claude.provider(settings: settings)
 
-        let added = try provider.addAccount(signedInAt: work)
+        let added = try provider.accounts.add(signedInAt: work)
 
         let folder = try #require(added.values["configDirectory"])
         let hash = SHA256.hash(data: Data(folder.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -150,38 +150,38 @@ struct ClaudeAccountsTests {
     }
 
     @Test
-    func `the same login is not added twice`() throws {
+    func `should not add the same login twice`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         let work = try claude.writeLogin(in: "work", email: "work@example.com")
         let again = try claude.writeLogin(in: "work-again", email: "work@example.com")
-        let provider = try claude.provider().provider
-        try provider.addAccount(signedInAt: work)
+        let provider = try claude.provider()
+        try provider.accounts.add(signedInAt: work)
 
-        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: work) }
-        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: again) }
+        #expect(throws: UsageError.self) { try provider.accounts.add(signedInAt: work) }
+        #expect(throws: UsageError.self) { try provider.accounts.add(signedInAt: again) }
         #expect(provider.accounts.count == 2)
     }
 
     @Test
-    func `a folder with an email but no key is not a login`() throws {
+    func `should refuse a folder with an email but no key as a login`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         let folder = try claude.writeLogin(in: "half", email: "half@example.com")
         try FileManager.default.removeItem(at: folder.appendingPathComponent(".credentials.json"))
-        let provider = try claude.provider().provider
+        let provider = try claude.provider()
 
-        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: folder) }
+        #expect(throws: UsageError.self) { try provider.accounts.add(signedInAt: folder) }
     }
 
     @Test
-    func `the default login is not added again from another folder`() throws {
+    func `should not add the default login again from another folder`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         try claude.writeClaudeConfig(email: "me@example.com")
         let copy = try claude.writeLogin(in: "copy", email: "me@example.com")
-        let provider = try claude.provider().provider
+        let provider = try claude.provider()
 
-        #expect(throws: UsageError.self) { try provider.addAccount(signedInAt: copy) }
+        #expect(throws: UsageError.self) { try provider.accounts.add(signedInAt: copy) }
     }
 }

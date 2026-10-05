@@ -114,7 +114,7 @@ diff:
 | **account values** | the account-scope settings that fill `{{account.x}}` — a folder, a login id, a region | secrets |
 | **account secret** | an account-scope secret (an API key) — a *name*, its value in the vault under that account | a value in `settings.json` |
 | **way to add** (`accounts.ways`) | how the definition lets a person add one — the keys it has: `signIn` · `folder` · `form` | a data source kind |
-| **signed-in folder** | the folder an added login lives in, and who made it — the person, or ClaudeBar by signing in | the default login's folder |
+| **signed-in folder** | the folder an added login lives in, and who made it — the person, or ClaudeBar by signing in. Put [*in use*](../in-use/design.md), the person's terminal starts on it too | the default login's folder |
 | **identity** | the fact that names a login (email, account id) and the rule that a fetch must still match it | the label |
 | **label** | the name a person gave an account ("work") | the email |
 | **display name** | what the pill says: label, else email, else the provider's name | the menu bar label |
@@ -179,7 +179,7 @@ into JSON, and not before.
 | Case | JSON | Carries | What it does |
 |---|---|---|---|
 | **folder** | `"folder": { savedAs, default, accountId: {field, savedAs}, email?, derived?, notSignedIn }` | where the login lives, which field names it | reads the folder through the definition's own credential/context lookup (filled with that folder), refuses the default folder and duplicates, saves `{savedAs: folder, accountId.savedAs: fact}` |
-| **signIn** | `"signIn": { cli, args, homeVariable, unset, timeout, alsoAt }` | the vendor's login command, and where else its CLI may be | makes `~/.claudebar/accounts/<provider>/<uuid>/` (0700), runs `cli args` with `homeVariable=<folder>` and `unset` removed, waits; on exit 0 the provider checks the folder as **folder** does, recorded `madeBy: .signIn` |
+| **signIn** | `"signIn": { cli, args, homeVariable, unset, timeout }` | the vendor's login command ([where its CLI is](../../architecture/ENGINE_DESIGN.md#27--where-a-providers-cli-is)) | makes `~/.claudebar/accounts/<provider>/<uuid>/` (0700), runs `cli args` with `homeVariable=<folder>` and `unset` removed, waits; on exit 0 the provider checks the folder as **folder** does, recorded `madeBy: .signIn` |
 | **form** | `"form": true` | — | renders the form's account-scope settings; non-secrets → `values`, secrets → the account's vault; then *Test Connection* with them before saving |
 
 `signIn` requires `folder` (it ends in one) — a definition with one and not
@@ -248,7 +248,7 @@ ClaudeBarApp.init (composition root)
   │ ProviderCatalog → [ProviderDefinition]          bundled · ~/.claudebar/providers · (extensions, slice 5)
   │ settings.accounts(forProvider: id) → [ProviderAccountConfig]
   ▼
-Providers.make(definition, settings, vault)
+ProviderFactory.make(definition, settings, vault)
   │
   ├─ default account:  definition.dataSources ──map──▶ DataSources.make(_, secrets: vault.scoped(to: "<id>"))
   │
@@ -264,7 +264,7 @@ Providers.make(definition, settings, vault)
 QuotaMonitor(providers) → lineup = provider.accounts.filter(isEnabled), for every enabled provider
 ```
 
-Legacy providers enter the lineup as today: one `AIProvider`, one pill.
+Every provider is a `Provider`: its enabled logins are its pills ([TARGET §2.1](../../architecture/TARGET_ARCHITECTURE.md#21--the-product-and-its-roles)).
 
 ### 3.2 · Add Account
 
@@ -446,7 +446,7 @@ are the cases the definition declares (§8).
 
 Two laws #358 put in two places, now one each: the identity check (it ran in
 `DataSource` **and** in `Provider.refresh`'s bridge branch) and display naming
-(in `Account.name`, `Account.accountDescription` **and** `StatusItemLabelDriver`).
+(in `Account.name` — now `lineupName` —, `Account.accountDescription` **and** `StatusItemLabelDriver`).
 
 ## 5 · The tells
 
@@ -460,7 +460,7 @@ provider.remove(account)
 
 // Composition root
 let vault = ProviderVault()
-Providers.make(definition, settings: settings, vault: vault)   // binds every saved account
+ProviderFactory.make(definition, settings: settings, vault: vault)   // binds every saved account
 
 // Page
 Text(account.displayName)
@@ -481,9 +481,9 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 | `DataSource.fetchUsage` checks identity before the cache | **built**: checked with the lookup, before and after each fetch; a cached usage is what that login showed when it was fetched |
 | `BrowserAccountLogin` (Infrastructure, Codex defaults) | **built**: `AccountSignIn` in `DataSources`, driven by `accounts.signIn` in `codex.json` / `claude.json` (Claude: `claude auth login --claudeai`); the process behind `SignInProcess`, folders behind `LoginFolders` |
 | `AddedAccounts` (a static namespace) | **gone**: `provider.addAccount(signedInAt:)` and `provider.signIn(…)`; the deletable-folder rule is `SignedInFolder.goesWithAccount` |
-| `BinaryLocator.findInApplicationBundles` | **built** as `signIn.alsoAt: [paths]` — checked only when the CLI isn't on the PATH |
+| `BinaryLocator.findInApplicationBundles` | **built** as the places `cli` lists after the name ([where a provider's CLI is](../../architecture/ENGINE_DESIGN.md#27--where-a-providers-cli-is)) |
 | `Provider.rename`, `ProviderAccountConfig.named` | **built**: `Provider` receives `any MultiAccountSettingsRepository`, so `rename` and `remove` save without a downcast; the default login's name is `setDefaultAccountLabel` (`providers.<id>.defaultAccountLabel`); the unused `activeAccountId` is gone |
-| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | **built**: one `displayName`; `name` (the pill) is the product's while `provider.hasSeveralAccounts` is false; `nameFromEmail` is gone |
+| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | **built**: one `displayName`; `lineupName` (the pill, the menu bar, an alert) is the product's while `provider.hasSeveralAccounts` is false (it was `name`); `nameFromEmail` is gone |
 | `AccountMenuBarLabel` (Domain) | **built**: `MenuBarAccountName` in App ([CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree): not in the model). Named so, not `MenuBarLabel`, which is already the quota text |
 | `ProviderAccountsCard` | **kept**, rendering `accounts.ways` and the form's account scope; no `switch provider.id` |
 | `CodexAccountsCard` | folded into `ProviderAccountsCard` |
@@ -508,7 +508,7 @@ Each slice one PR, test first, green.
 |---|---|---|
 | 1 ✅ | **Claude accounts as data** — #358's `claude.json` block, typed `identity`, identity in lookup only; `ClaudeAccountsTests` | a Claude folder adds; another email in it fails closed; default untouched |
 | 2 ✅ | **Rename + display name** — `Account.displayName`, `setLabel` for default and added, `MenuBarAccountName` in App | labels survive relaunch; one login shows the product name; collisions number, never widen |
-| 3 ✅ | **`accounts.signIn` + the ways to add** — `AccountSignIn` worker, `codex.json`/`claude.json` declare it; `signIn.alsoAt`; `SignedInFolder`, `LoginFolders` | cancel/timeout/fail leave no folder and no config; env carries only `homeVariable`, `unset` removed; *Remove* of a signed-in account deletes its folder, of a chosen one never — README's *Remove* paragraph updated with the screen (slice 4) |
+| 3 ✅ | **`accounts.signIn` + the ways to add** — `AccountSignIn` worker, `codex.json`/`claude.json` declare it; `SignedInFolder`, `LoginFolders` | cancel/timeout/fail leave no folder and no config; env carries only `homeVariable`, `unset` removed; *Remove* of a signed-in account deletes its folder, of a chosen one never — README's *Remove* paragraph updated with the screen (slice 4) |
 | 4 ✅ | **one Accounts card** (§3.5) — renders `accounts.ways`, reorder, menu-bar pin, Rename · Pause · Remove, Re-auth; the 4-step Add Account sheet with VERIFY by step; `CodexAccountsCard` goes | a provider with `accounts: nil` shows no button; *Add anyway* is absent until identity passed; order survives relaunch |
 | 6 ✅ | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |
 | 5 ✅ | **`form` + scoped secrets** (`SecretStore.scoped(to:)`, `SecretVault`) — account-scope settings in the form; custom definitions can declare `accounts` | an added account's missing key is *Key needed*, never the default's |

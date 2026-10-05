@@ -17,7 +17,7 @@ extension Notification.Name {
     static let notifySettingsChanged = Notification.Name("com.tddworks.claudebar.notifySettingsChanged")
 }
 
-@main
+/// Started by `ClaudeBarMain` — never while it hosts tests (see `LaunchMode`).
 struct ClaudeBarApp: App {
     /// A built-in provider from its bundled definition. A definition that fails
     /// to load is a packaging bug the catalog tests catch before release.
@@ -29,11 +29,13 @@ struct ClaudeBarApp: App {
         secrets: (any SecretVault)? = nil,
         guestPasses: GuestPasses? = nil,
         usageHistory: UsageHistory? = nil,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        // Every product gets the record; `inUse` exists only where its definition declares it.
+        loginsInUse: (any LoginsInUse)? = DiskLoginsInUse()
     ) -> Provider {
         do {
-            return try Providers.make(id, settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses,
-                                      usageHistory: usageHistory, environment: environment)
+            return try ProviderFactory.make(id, settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses,
+                                      usageHistory: usageHistory, environment: environment, loginsInUse: loginsInUse)
         } catch {
             preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
         }
@@ -42,6 +44,12 @@ struct ClaudeBarApp: App {
     /// The main domain service - monitors all AI providers
     /// This is the single source of truth for providers and their state
     @State private var monitor: QuotaMonitor
+
+    /// *New terminal sessions* — which login `claude` / `codex` start with.
+    @State private var newSessions: NewSessions
+
+    /// *Quota alerts* — the person's own percentages (#68).
+    @State private var quotaAlerts: QuotaAlerts
 
     /// Monitors Claude Code sessions via hook events
     @State private var sessionMonitor: SessionMonitor
@@ -60,6 +68,7 @@ struct ClaudeBarApp: App {
     /// Publishes quota state to a linked Notify! device. Comes up and goes down
     /// with `notify.enabled`; does nothing until a device is linked.
     private let notifyDriver: NotifyPublishDriver
+    private let leaderboard: Leaderboard
 
     /// Binding required by `.menuBarExtraAccess`; also enables programmatic
     /// dropdown control if ever needed.
@@ -144,7 +153,7 @@ struct ClaudeBarApp: App {
         // Bedrock's metrics and prices come from the AWS SDK, linked by AWSClients alone.
         let bedrock: Provider = {
             do {
-                return try Providers.make("bedrock", settings: settingsRepository,
+                return try ProviderFactory.make("bedrock", settings: settingsRepository,
                                           cloudWatch: AWSClients.makeCloudWatch(), priceCatalog: AWSClients.makePriceCatalog())
             } catch {
                 preconditionFailure("Built-in provider 'bedrock' failed to load: \(error.localizedDescription)")
@@ -177,45 +186,41 @@ struct ClaudeBarApp: App {
             let variable = name == "DEEPSEEK_API_KEY" && !configured.isEmpty ? configured : name
             return ProcessInfo.processInfo.environment[variable]
         })
+        // OpenRouter is data: Modules/Providers/Resources/Providers/openrouter.json (#89).
+        let openrouter = Self.builtIn("openrouter", settings: settingsRepository,
+                                      accounts: settingsRepository.accounts(forProvider: "openrouter"), secrets: vault)
 
-        // The lineup: each login is its own pill. Legacy providers are their
-        // own single login until they become definitions.
-        // Each provider manages its own isEnabled state (persisted via ProviderSettingsRepository)
-        let repository = AIProviders(providers: [
-            claude.defaultAccount,
-            codex.defaultAccount,
-            gemini.defaultAccount,
-            antigravity.defaultAccount,
-            zai.defaultAccount,
-            copilot.defaultAccount,
-            bedrock.defaultAccount,
-            amp.defaultAccount,
-            kimi.defaultAccount,
-            kiro.defaultAccount,
-            cursor.defaultAccount,
-            minimax.defaultAccount,
-            deepseek.defaultAccount,
-            vercel.defaultAccount,
-            alibaba.defaultAccount,
-            mistral.defaultAccount,
-            openCodeGo.defaultAccount,
-            omp.defaultAccount,
-            grok.defaultAccount,
-            commandCode.defaultAccount,
-        ])
-        // Added logins follow the built-in lineup, as they always have.
-        for account in (claude.accounts + codex.accounts + minimax.accounts + deepseek.accounts + vercel.accounts + commandCode.accounts + amp.accounts + kiro.accounts + cursor.accounts + grok.accounts + openCodeGo.accounts + zai.accounts + kimi.accounts + copilot.accounts + alibaba.accounts + gemini.accounts).filter({ !$0.isDefault }) {
-            repository.add(account)
-        }
+        // The products, in the built-in order; each holds its logins, and the
+        // lineup is the enabled logins of enabled products (CANONICAL §1).
+        var providers = [claude, codex, gemini, antigravity, zai, copilot, bedrock, amp, kimi, kiro, cursor,
+                         minimax, deepseek, openrouter, vercel, alibaba, mistral, openCodeGo, omp, grok, commandCode]
         // Providers people made in Add Provider (~/.claudebar/providers), after
         // the built-ins; their keys come from ClaudeBar's vault.
         for definition in ProviderCatalog().custom() {
-            Providers.register(custom: definition)
-            let custom = Providers.make(definition, settings: settingsRepository,
-                                        accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault)
-            for account in custom.accounts { repository.add(account) }
+            ProviderFactory.register(custom: definition)
+            providers.append(ProviderFactory.make(definition, settings: settingsRepository,
+                                            accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault,
+                                            loginsInUse: DiskLoginsInUse()))
         }
-        AppLog.providers.info("Created \(repository.all.count) providers")
+        // Extensions (~/.claudebar/extensions), read as definitions whose
+        // sections answer together (docs/features/extensions/design.md); what was saved for one moves once.
+        let extensions = Extensions.catalog()
+        ExtensionSettingsUpgrade.run(extensions, store: .shared, settings: settingsRepository, vault: vault)
+        for definition in extensions {
+            ProviderFactory.register(custom: definition)
+            providers.append(ProviderFactory.make(definition, settings: settingsRepository,
+                                            accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault,
+                                            loginsInUse: DiskLoginsInUse()))
+        }
+        AppLog.providers.info("Created \(providers.count) providers")
+
+        // *In use*: every product whose definition declares it — chosen by the
+        // definition, never by a provider's name (CANONICAL §2.1).
+        let products = providers
+        let newSessions = NewSessions(products: products,
+                                      shellLines: ShellSetup(commands: products.compactMap { $0.inUse?.command }),
+                                      announcer: InUseNotifications())
+        self.newSessions = newSessions
 
         // Initialize the domain service with quota alerter
         // QuotaMonitor automatically validates selected provider on init
@@ -224,12 +229,23 @@ struct ClaudeBarApp: App {
         // Alerts and every status follow the person's burn-rate setting (#357).
         // Hidden quotas (#140) are read from the same settings, per product.
         let monitor = QuotaMonitor(
-            providers: repository,
+            providers: Providers(providers, settings: settingsRepository, vault: vault, make: { definition in
+                ProviderFactory.make(definition, settings: settingsRepository, secrets: vault, loginsInUse: DiskLoginsInUse())
+            }),
             alerter: quotaAlerter,
             settingsRepository: settingsRepository,
             statusPolicy: { AppSettings.shared.statusPolicy }
         )
         self.monitor = monitor
+        // *In use* follows every refresh: Switch when low, or a login worth moving to.
+        monitor.onRefreshed { refreshed in await newSessions.review(refreshed) }
+        // *Quota alerts* follow every refresh too, on what the person sees.
+        let quotaAlerts = QuotaAlerts(settings: settingsRepository, announcer: QuotaAlertNotifications())
+        self.quotaAlerts = quotaAlerts
+        monitor.onRefreshed { [weak monitor] refreshed in
+            guard let monitor else { return }
+            await quotaAlerts.review(refreshed.id, named: monitor.lineupName(of: refreshed), usage: monitor.usage(of: refreshed))
+        }
         AppLog.monitor.info("QuotaMonitor initialized")
 
         let sessionMonitor = SessionMonitor()
@@ -276,16 +292,9 @@ struct ClaudeBarApp: App {
         )
         notifyDriver.start()
 
-        // Load user extensions from ~/.claudebar/extensions/
-        let extensionRegistry = ExtensionRegistry(
-            settingsRepository: settingsRepository,
-            configRepository: AppSettings.shared.extensionConfig
-        )
-        let extensionProviders = extensionRegistry.loadExtensions(into: monitor)
-        ProviderVisualIdentityLookup.registerExtensionIcons(from: extensionProviders)
-        if !extensionProviders.isEmpty {
-            AppLog.providers.info("Loaded \(extensionProviders.count) extension provider(s): \(extensionProviders.map(\.name).joined(separator: ", "))")
-        }
+        // Uploads only once the user joined; until then it reads nothing.
+        leaderboard = Leaderboard(monitor: monitor)
+        leaderboard.start()
 
         // Start hook server if hooks are enabled
         if settingsRepository.isHookEnabled() {
@@ -386,6 +395,18 @@ struct ClaudeBarApp: App {
         case .settings:
             openWindow(id: "settings")
             NSApp.activate(ignoringOtherApps: true)
+        case let .use(providerId, name):
+            switch newSessions.use(providerId: providerId, account: name) {
+            case .used:
+                break
+            case .unknown:
+                AppLog.ui.info("claudebar://use names no login that can be used for new sessions")
+            case .waitingForSetup:
+                // The shell lines aren't there yet: the popover shows the setup.
+                monitor.selectedProviderId = providerId
+                isMenuPresented = true
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
     }
 
@@ -393,18 +414,20 @@ struct ClaudeBarApp: App {
         MenuBarExtra {
             Group {
                 #if ENABLE_SPARKLE
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, onClose: { isMenuPresented = false }) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, leaderboard: leaderboard, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)
                     .environment(\.sparkleUpdater, sparkleUpdater)
                 #else
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, onClose: { isMenuPresented = false }) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, leaderboard: leaderboard, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)
                 #endif
             }
+            .environment(newSessions)
+            .environment(quotaAlerts)
             // Opening/closing the dropdown flips `isMenuPresented`, which makes
             // SwiftUI re-evaluate the scene and wipe the AppKit-drawn button
             // image. The dropdown's lifecycle maps 1:1 to those flips, so
@@ -438,18 +461,20 @@ struct ClaudeBarApp: App {
         Window("ClaudeBar Settings", id: "settings") {
             Group {
                 #if ENABLE_SPARKLE
-                SettingsWindowView(monitor: monitor, notifyDriver: notifyDriver) { enabled in
+                SettingsWindowView(monitor: monitor, notifyDriver: notifyDriver, leaderboard: leaderboard) { enabled in
                     if enabled { startHookServer() } else { stopHookServer() }
                 }
                 .appThemeProvider(themeModeId: settings.themeMode)
                 .environment(\.sparkleUpdater, sparkleUpdater)
                 #else
-                SettingsWindowView(monitor: monitor, notifyDriver: notifyDriver) { enabled in
+                SettingsWindowView(monitor: monitor, notifyDriver: notifyDriver, leaderboard: leaderboard) { enabled in
                     if enabled { startHookServer() } else { stopHookServer() }
                 }
                 .appThemeProvider(themeModeId: settings.themeMode)
                 #endif
             }
+            .environment(newSessions)
+            .environment(quotaAlerts)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 980, height: 660)

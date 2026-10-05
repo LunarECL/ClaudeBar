@@ -57,7 +57,7 @@ struct AccountFormTests {
     // MARK: - The form, from the definition
 
     @Test
-    func `an API someone added asks a second account for its own key`() throws {
+    func `should ask a second account for its own key when the API is one someone added`() throws {
         let accounts = try #require(try openRouter().accounts)
 
         #expect(accounts.ways == [.form])
@@ -66,7 +66,7 @@ struct AccountFormTests {
     }
 
     @Test
-    func `a key read from an environment variable is the default login's; an added one types its own`() throws {
+    func `should give an added login a key field of its own when the default login's key comes from an environment variable`() throws {
         var draft = ProviderDraft(start: .api)
         draft.url = "https://example.test/usage"
         draft.key = .environment("EXAMPLE_API_KEY")
@@ -84,13 +84,13 @@ struct AccountFormTests {
     // MARK: - Each account, its own key
 
     @Test
-    func `an account added by its form reads its own key`() async throws {
+    func `should show each account the money left on its own key`() async throws {
         let vault = MemoryVault(["custom-openrouter.apiKey": "sk-mine"])
         let openRouter = provider(try openRouter(), vault: vault, network: network(["sk-mine": 40, "sk-work": 7]))
 
-        let work = try openRouter.addAccount(filling: ["apiKey": "sk-work"])
-        let theirs = try await work.refresh()
-        let mine = try await openRouter.defaultAccount.refresh()
+        let work = try openRouter.accounts.add(filling: ["apiKey": "sk-work"])
+        let theirs = try await openRouter.refresh(work)
+        let mine = try await openRouter.refreshPlain()
 
         #expect(theirs.quotas.first?.left == .money(Money(7, currency: "USD"), of: Money(50, currency: "USD")))
         #expect(mine.quotas.first?.left == .money(Money(40, currency: "USD"), of: Money(50, currency: "USD")))
@@ -98,57 +98,68 @@ struct AccountFormTests {
     }
 
     @Test
-    func `a key is kept in the vault, never in the saved account`() throws {
+    func `should turn the provider on and put the account in the lineup when an account is added with its key`() throws {
+        let openRouter = provider(try openRouter(), vault: MemoryVault(), network: network([:]))
+        openRouter.isEnabled = false
+
+        let work = try openRouter.accounts.add(filling: ["apiKey": "sk-work"])
+
+        #expect(openRouter.isEnabled)
+        #expect(openRouter.isInLineup(work))
+    }
+
+    @Test
+    func `should keep an account's key in the vault, never in the saved account`() throws {
         let vault = MemoryVault()
         let settings = InMemoryProviderSettings()
         let openRouter = provider(try openRouter(), vault: vault, network: network([:]), settings: settings)
 
-        let work = try openRouter.addAccount(filling: ["apiKey": "sk-work"])
+        let work = try openRouter.accounts.add(filling: ["apiKey": "sk-work"])
 
         #expect(vault.secrets["\(work.id).apiKey"] == "sk-work")
         #expect(settings.accounts(forProvider: "custom-openrouter").first?.probeConfig["apiKey"] == nil)
     }
 
     @Test
-    func `an account without its own key never borrows the default's`() async throws {
+    func `should fail at the lookup step, never borrowing the default's key, when an account has no key of its own`() async throws {
         let vault = MemoryVault(["custom-openrouter.apiKey": "sk-mine"])
         let openRouter = provider(try openRouter(), vault: vault, network: network(["sk-mine": 40]))
-        let work = try openRouter.addAccount(filling: ["apiKey": "sk-work"])
+        let work = try openRouter.accounts.add(filling: ["apiKey": "sk-work"])
         vault.secrets["\(work.id).apiKey"] = nil
 
-        await #expect(throws: (any Error).self) { try await work.refresh() }
+        await #expect(throws: (any Error).self) { try await openRouter.refresh(work) }
 
         #expect(work.lastFailedStep == .lookup)
     }
 
     @Test
-    func `a field left empty is refused, and nothing is added`() throws {
+    func `should refuse a field left empty and add nothing`() throws {
         let openRouter = provider(try openRouter(), vault: MemoryVault(), network: network([:]))
 
-        #expect(throws: UsageError.self) { try openRouter.addAccount(filling: ["apiKey": "  "]) }
+        #expect(throws: UsageError.self) { try openRouter.accounts.add(filling: ["apiKey": "  "]) }
         #expect(openRouter.accounts.count == 1)
     }
 
     @Test
-    func `removing an account forgets its keys`() throws {
+    func `should forget an account's keys when it is removed`() throws {
         let vault = MemoryVault()
         let openRouter = provider(try openRouter(), vault: vault, network: network([:]))
-        let work = try openRouter.addAccount(filling: ["apiKey": "sk-work"])
+        let work = try openRouter.accounts.add(filling: ["apiKey": "sk-work"])
 
-        openRouter.remove(work)
+        openRouter.accounts.remove(work)
 
         #expect(vault.secrets["\(work.id).apiKey"] == nil)
     }
 
     @Test
-    func `a saved form account comes back with its key after a relaunch`() async throws {
+    func `should bring back a saved form account with its key after a relaunch`() async throws {
         let vault = MemoryVault()
         let settings = InMemoryProviderSettings()
         let first = provider(try openRouter(), vault: vault, network: network(["sk-work": 7]), settings: settings)
-        try first.addAccount(filling: ["apiKey": "sk-work"])
+        try first.accounts.add(filling: ["apiKey": "sk-work"])
 
         let relaunched = provider(try openRouter(), vault: vault, network: network(["sk-work": 7]), settings: settings)
-        let usage = try await relaunched.accounts[1].refresh()
+        let usage = try await relaunched.refresh(relaunched.accounts[1])
 
         #expect(usage.quotas.first?.left == .money(Money(7, currency: "USD"), of: Money(50, currency: "USD")))
     }

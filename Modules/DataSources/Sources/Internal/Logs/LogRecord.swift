@@ -93,15 +93,21 @@ struct RecordShape: Sendable {
             model = name
         }
         let tokens = records.tokens
-        let counts = [tokens.input, tokens.output, tokens.cacheWrite, tokens.cacheRead, tokens.total, tokens.cacheWrite1h]
-            .map { path in path.flatMap { scope.number($0) }.map { Int($0) } }
+        let read = [tokens.input, tokens.output, tokens.cacheWrite, tokens.cacheRead, tokens.total, tokens.cacheWrite1h]
+            .map { path in path.flatMap { scope.number($0) } }
+        // A count is a whole number of tokens: a negative or a fraction is a
+        // log that changed shape, not usage.
+        guard read.allSatisfy({ $0.map { $0 >= 0 && $0.rounded() == $0 } ?? true }) else { return nil }
+        let counts = read.map { $0.map { Int($0) } }
         let cost = records.cost.flatMap { Self.decimal(scope.value($0)) }
         // A record that says nothing about usage isn't usage.
         guard counts.prefix(5).contains(where: { $0 != nil }) || cost != nil else { return nil }
         let parts = records.id.map { scope.string($0) }
         let id = parts.isEmpty || parts.contains(nil) ? nil : parts.compactMap { $0 }.joined(separator: "\u{1F}")
+        var input = counts[0] ?? 0
+        if tokens.inputIncludesCacheRead == true { input = max(0, input - (counts[3] ?? 0)) }
         return LogRecord(at: at, id: id, model: model,
-                         input: counts[0] ?? 0, output: counts[1] ?? 0, cacheWrite: counts[2] ?? 0,
+                         input: input, output: counts[1] ?? 0, cacheWrite: counts[2] ?? 0,
                          cacheWrite1h: counts[5] ?? 0, cacheRead: counts[3] ?? 0, total: counts[4], cost: cost)
     }
 
@@ -109,6 +115,7 @@ struct RecordShape: Sendable {
         switch records.at {
         case .field(let field): Self.date(scope.value(field))
         case .fromPath(let rule): Self.date(inPath: path, rule)
+        case .formatted(let rule): scope.string(rule.field).flatMap { Self.date($0, format: rule.format, timeZone: rule.timeZone) }
         }
     }
 
@@ -117,11 +124,19 @@ struct RecordShape: Sendable {
         guard let regex = try? NSRegularExpression(pattern: rule.pattern),
               let match = regex.firstMatch(in: path, range: NSRange(path.startIndex..., in: path)),
               match.numberOfRanges > 1, let range = Range(match.range(at: 1), in: path) else { return nil }
+        return date(String(path[range]), format: rule.format, timeZone: rule.timeZone)
+    }
+
+    /// `text` read with `format` in `timeZone`, the user's own when `nil`.
+    /// Text the format doesn't give back unchanged — `2026-02-30`, or a time
+    /// after a bare day — has no time.
+    static func date(_ text: String, format: String, timeZone: String?) -> Date? {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = rule.format
-        formatter.timeZone = rule.timeZone.flatMap(TimeZone.init(identifier:)) ?? .current
-        return formatter.date(from: String(path[range]))
+        formatter.dateFormat = format
+        formatter.timeZone = timeZone.flatMap(TimeZone.init(identifier:)) ?? .current
+        guard let date = formatter.date(from: text), formatter.string(from: date) == text else { return nil }
+        return date
     }
 
     /// ISO 8601 text, or epoch seconds.

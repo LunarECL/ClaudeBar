@@ -4,7 +4,7 @@ Contributor notes for the Antigravity provider. For setup, see the [README](READ
 
 ## As data
 
-Antigravity is `Modules/Providers/Resources/Providers/antigravity.json` and `antigravity-usage.js`, run by the generic engine (TARGET_ARCHITECTURE §8.2); no Swift names it. Ported from #396. The sections below are the research; the requests are unchanged.
+Antigravity is `Modules/Providers/Resources/Providers/antigravity.json` and `antigravity-usage.js`, run by the generic [engine](../../architecture/ENGINE_DESIGN.md); no Swift names it. Ported from #396. The sections below are the research; the requests are unchanged.
 
 - **`local` is a `localServer` fetch**: the process found by name and command-line pattern (`pgrep -lf`), `csrfToken` and `extensionPort` read from its arguments, its listening ports from `lsof`, then the three language-server paths on each port over HTTPS (self-signed accepted on 127.0.0.1 only), the extension port over plain HTTP last. Readiness reads running executables' paths from the kernel, without starting a process.
 - **`cloud` is `http.steps`** over the daily and production Cloud Code hosts: the quota summary, then the per-model list unless a summary answered, then `loadCodeAssist` for the plan. Its key is the Keychain item `gemini` / `antigravity` (`encoding: goKeyringBase64`, `$.token.access_token`); a refused one is the `agy` hint.
@@ -57,6 +57,8 @@ Antigravity is `Modules/Providers/Resources/Providers/antigravity.json` and `ant
 - `menuBarTitle` was added so the Gemini pool reads "Gemini / Gemini Weekly" in the menu bar like the Claude pool, instead of `5h` / `7d` (#278). The quota types and saved keys didn't change.
 
 ## Known limits
+
+- The local server is reached on `localhost` / `127.0.0.1` only, and a redirect must keep its scheme, host and port; anything else is refused before the server's token could leave the Mac.
 
 - `pgrep` matches on `language_server`, so an `agy` process is only found if its command line contains that string. The `agy` name check only runs on lines `pgrep` has already matched.
 - If the keychain item's service or account changes in a future Antigravity build, the app-closed fallback stops working without any error beyond "not running and no stored credentials".

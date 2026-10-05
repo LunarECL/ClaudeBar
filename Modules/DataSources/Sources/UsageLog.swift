@@ -7,7 +7,7 @@ import Quotas
 /// provider. Built from a definition's `usageHistory` block, filled with the
 /// login's values: where its tool's logs are, how a record reads, what a
 /// token costs. `days(in:)` reads and prices them into one stat per day
-/// (TARGET_ARCHITECTURE §10).
+/// (docs/features/daily-usage/design.md).
 ///
 /// Every reader yields the same record, so deduplication, days, sessions and
 /// prices never learn which tool wrote the log.
@@ -30,6 +30,10 @@ public struct UsageLog: Sendable {
 
     /// Now, as this log's clock tells it.
     public var currentTime: Date { now() }
+
+    /// Whether these logs can say what a day cost: a price list, or a cost
+    /// the log writes itself. Without either every cost reads zero.
+    public var knowsCost: Bool { prices != nil || definition.records.cost != nil }
 
     /// One stat per day of `range`, every date present; a day with nothing
     /// is an empty day. Unreadable files are skipped.
@@ -68,13 +72,37 @@ extension UsageLog {
         /// A pause longer than this many seconds starts a working session;
         /// without one, each record is a session and no working time is known.
         public let sessionGap: Double?
+        /// Other apps on this Mac that use the same plan and keep their own
+        /// count — each read on its own, never added to these records. An
+        /// added login's patch sets it to `null`: the apps belong to the Mac.
+        public let otherApps: [OtherApp]?
 
-        public init(records: Records, prices: Prices? = nil, freeWhen: FreeWhen? = nil, sessionGap: Double? = nil) {
+        public init(records: Records, prices: Prices? = nil, freeWhen: FreeWhen? = nil, sessionGap: Double? = nil,
+                    otherApps: [OtherApp]? = nil) {
             self.records = records
             self.prices = prices
             self.freeWhen = freeWhen
             self.sessionGap = sessionGap
+            self.otherApps = otherApps
         }
+    }
+
+    /// Another app's usage — `{label, records, prices?}`, read like a login's
+    /// own logs and shown under its own name. Without prices it has tokens
+    /// and no cost.
+    public struct OtherApp: Sendable, Equatable, Codable {
+        public let label: String
+        public let records: Records
+        public let prices: Prices?
+
+        public init(label: String, records: Records, prices: Prices? = nil) {
+            self.label = label
+            self.records = records
+            self.prices = prices
+        }
+
+        /// How its days are read: its own records and prices, nothing of the login's.
+        public var definition: Definition { Definition(records: records, prices: prices) }
     }
 
     /// Where the records are and how one reads, in the mapping's path language.
@@ -136,6 +164,23 @@ extension UsageLog {
         /// A path to ISO 8601 text or epoch seconds.
         case field(String)
         case fromPath(FromPath)
+        /// A field written in a format of its own, such as a bare day.
+        case formatted(Formatted)
+
+        /// A field's text read with `format` in `timeZone` — the user's own
+        /// zone unless it says otherwise, so `2026-05-28` is that local day.
+        /// Text the format doesn't give back exactly (`2026-02-30`) has no time.
+        public struct Formatted: Sendable, Equatable, Codable {
+            public let field: String
+            public let format: String
+            public let timeZone: String?
+
+            public init(field: String, format: String, timeZone: String? = nil) {
+                self.field = field
+                self.format = format
+                self.timeZone = timeZone
+            }
+        }
 
         /// The time in a file's path: the first capture of `pattern`, read
         /// with `format` in `timeZone` — never as local time unless it says so.
@@ -163,6 +208,8 @@ extension UsageLog {
             let container = try decoder.singleValueContainer()
             if let path = try? container.decode(String.self) {
                 self = .field(path)
+            } else if let rule = try? container.decode(Formatted.self) {
+                self = .formatted(rule)
             } else {
                 self = .fromPath(try container.decode(FromPath.self))
             }
@@ -173,6 +220,7 @@ extension UsageLog {
             switch self {
             case .field(let path): try container.encode(path)
             case .fromPath(let rule): try container.encode(rule)
+            case .formatted(let rule): try container.encode(rule)
             }
         }
     }
@@ -188,15 +236,19 @@ extension UsageLog {
         public let cacheWrite1h: String?
         public let cacheRead: String?
         public let total: String?
+        /// The log's input count already holds its cache reads, so they are
+        /// taken out of it: input then means what it means everywhere else.
+        public let inputIncludesCacheRead: Bool?
 
         public init(input: String? = nil, output: String? = nil, cacheWrite: String? = nil, cacheWrite1h: String? = nil,
-                    cacheRead: String? = nil, total: String? = nil) {
+                    cacheRead: String? = nil, total: String? = nil, inputIncludesCacheRead: Bool? = nil) {
             self.input = input
             self.output = output
             self.cacheWrite = cacheWrite
             self.cacheWrite1h = cacheWrite1h
             self.cacheRead = cacheRead
             self.total = total
+            self.inputIncludesCacheRead = inputIncludesCacheRead
         }
     }
 
@@ -272,7 +324,10 @@ extension DataSources {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         var hash = SHA256()
-        hash.update(data: (try? encoder.encode(definition)) ?? Data())
+        // Other apps are read on their own, so they never change how these days were summed.
+        let own = UsageLog.Definition(records: definition.records, prices: definition.prices,
+                                      freeWhen: definition.freeWhen, sessionGap: definition.sessionGap)
+        hash.update(data: (try? encoder.encode(own)) ?? Data())
         hash.update(data: Data(expand(definition.records.files).utf8))
         hash.update(data: Data((definition.prices.flatMap { scripts($0.file) } ?? "").utf8))
         let fingerprint = hash.finalize().map { String(format: "%02x", $0) }.joined()

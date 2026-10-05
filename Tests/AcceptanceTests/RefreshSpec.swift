@@ -40,7 +40,7 @@ struct RefreshSpec {
         }
 
         @Test
-        func `refresh updates snapshot with fresh data`() async {
+        func `should show Claude's latest quotas after the person clicks Refresh`() async {
             // Given
             let settings = RefreshSpec.makeSettings()
             let probe = MockUsageProbe()
@@ -51,9 +51,10 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -68,7 +69,7 @@ struct RefreshSpec {
         }
 
         @Test
-        func `failed refresh stores error without affecting other providers`() async {
+        func `should show Codex's error and still show Claude's quotas when only Codex times out`() async {
             // Given
             let settings = RefreshSpec.makeSettings()
 
@@ -84,10 +85,12 @@ struct RefreshSpec {
             given(codexProbe).isAvailable().willReturn(true)
             given(codexProbe).probe().willThrow(UsageError.timeout)
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -112,7 +115,7 @@ struct RefreshSpec {
         }
 
         @Test
-        func `continuous monitoring emits refresh events`() async throws {
+        func `should keep refreshing in the background while monitoring runs`() async throws {
             // Given
             let settings = RefreshSpec.makeSettings()
             let probe = MockUsageProbe()
@@ -123,9 +126,10 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -145,7 +149,7 @@ struct RefreshSpec {
         }
 
         @Test
-        func `monitoring stops when requested`() async throws {
+        func `should stop refreshing in the background once monitoring is stopped`() async throws {
             // Given
             let settings = RefreshSpec.makeSettings()
             let probe = MockUsageProbe()
@@ -156,9 +160,10 @@ struct RefreshSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -228,7 +233,7 @@ struct RefreshSpec {
         }
 
         @Test
-        func `CLI mode keeps auto-refreshing in the background`() async {
+        func `should keep showing the CLI's quotas when Claude refreshes in the background in CLI mode`() async {
             // Given — a CLI-mode Claude provider (base settings → CLI).
             let settings = RefreshSpec.makeSettings()
             let probe = MockUsageProbe()
@@ -238,9 +243,10 @@ struct RefreshSpec {
                 quotas: [UsageQuota(percentRemaining: 42, quotaType: .session, providerId: "claude")],
                 capturedAt: Date()
             ))
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claudeProduct]),
                 clock: TestClock()
             )
 
@@ -254,7 +260,7 @@ struct RefreshSpec {
         }
 
         @Test
-        func `API mode background cadence is at least 15 minutes`() async {
+        func `should refresh Claude in the background no more than every 15 minutes in API mode, even when the person picked 1 minute (#204)`() async {
             // Given — API-mode Claude and a user who picked the 1-minute option.
             let settings = ClaudeModeSettings(mode: .api)
             let snapshot = UsageSnapshot(
@@ -269,9 +275,10 @@ struct RefreshSpec {
             given(apiProbe).isAvailable().willReturn(true)
             given(apiProbe).probe().willReturn(snapshot)
             _ = cliProbe
-            let claude = StubClaudeProvider(probe: apiProbe, settingsRepository: settings, backgroundRefreshFloor: .seconds(900))
+            let claudeProduct = stubbedProduct("claude", probe: apiProbe, settings: settings, backgroundRefreshFloor: .seconds(900))
+            let claude = claudeProduct.defaultAccount
             let clock = RecordingClock()
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: clock)
+            let monitor = QuotaMonitor(providers: kept([claudeProduct]), clock: clock)
 
             // When — background sync runs one tick.
             let stream = monitor.startMonitoring(interval: .seconds(60), providerIds: ["claude"])
@@ -282,7 +289,7 @@ struct RefreshSpec {
         }
 
         @Test
-        func `interactive refresh is not throttled by the API background floor`() async {
+        func `should show fresh quotas on every Refresh click in API mode, despite the 15-minute background floor (#204)`() async {
             // Given — an API-mode Claude provider (which imposes a 15-min background
             // floor) returning a different snapshot on each probe.
             let settings = ClaudeModeSettings(mode: .api)
@@ -298,12 +305,15 @@ struct RefreshSpec {
                     capturedAt: Date()
                 ),
             ])
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings, backgroundRefreshFloor: .seconds(900))
-            let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), clock: TestClock())
+            // No cache here: Claude's API keeps its usage 15 min, and that is
+            // the data source's own law (ClaudeAPITests), not the Monitor's.
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let monitor = QuotaMonitor(providers: kept([claudeProduct]), clock: TestClock())
 
             // When/Then — two back-to-back user-initiated refreshes both update the
-            // snapshot. The 15-min floor governs only the background loop, never the
-            // interactive path (#204), so neither call is gated.
+            // snapshot. The Monitor's floor governs only the background loop, never
+            // the interactive path (#204), so neither call is gated.
             await monitor.refresh(providerId: "claude")
             #expect(claude.snapshot?.quotas.first?.percentRemaining == 80)
             await monitor.refresh(providerId: "claude")

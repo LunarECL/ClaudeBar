@@ -24,6 +24,7 @@ extension Fetch {
         case .localServer(let call): call
         case .cloudWatch(let call): call
         case .directory(let call): call
+        case .script(let call): call
         }
     }
 
@@ -63,6 +64,12 @@ extension CloudWatchCall: Connection {
     public var commands: [[String]] { [] }
 }
 
+extension ScriptCall: Connection {
+    public var urls: [String] { [] }
+    /// The person's own script — *Import* shows it before anything runs.
+    public var commands: [[String]] { [["/bin/sh", "-c", run]] }
+}
+
 extension DirectoryCall: Connection {
     public var urls: [String] { [] }
     public var commands: [[String]] { [] }
@@ -99,6 +106,21 @@ extension CLICall: Connection {
     func running(_ binary: String) -> CLICall {
         CLICall(cli: binary, args: args, input: input, timeout: timeout, workingDirectory: workingDirectory,
                         autoResponses: autoResponses, environment: environment, readyWhen: readyWhen,
-                        screen: screen, session: session)
+                        screen: screen, session: session, inputDelay: inputDelay)
+    }
+}
+
+extension CredentialLookup {
+    /// Repoints a credential refresh that runs `cli` at `binary`, through
+    /// the lookups that wrap it — the same move `Fetch.runningCLI` makes.
+    public func runningCLI(_ cli: String, at binary: String) -> CredentialLookup {
+        switch self {
+        case .firstOf(let lookups): .firstOf(lookups.map { $0.runningCLI(cli, at: binary) })
+        case .refined(let base, let rules): .refined(base.runningCLI(cli, at: binary), rules)
+        case .refreshing(let base, .cli(let call)):
+            .refreshing(base.runningCLI(cli, at: binary), .cli(call.cli == cli ? call.running(binary) : call))
+        case .refreshing(let base, let refresh): .refreshing(base.runningCLI(cli, at: binary), refresh)
+        default: self
+        }
     }
 }

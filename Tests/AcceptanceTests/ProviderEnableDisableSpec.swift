@@ -40,7 +40,7 @@ struct ProviderEnableDisableSpec {
         }
 
         @Test
-        func `disabled provider is skipped during refreshAll`() async {
+        func `should not read a turned-off provider's quotas when every provider refreshes`() async {
             // Given — Claude enabled, Codex disabled
             let settings = ProviderEnableDisableSpec.makeSettings()
 
@@ -55,12 +55,14 @@ struct ProviderEnableDisableSpec {
             let codexProbe = MockUsageProbe()
             // No setup — Codex should never be called
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -73,7 +75,7 @@ struct ProviderEnableDisableSpec {
         }
 
         @Test
-        func `disabled provider excluded from overall status`() async {
+        func `should turn the menu bar healthy when the person turns off the only critical provider`() async {
             // Given — Claude healthy, Codex critical but disabled
             let settings = ProviderEnableDisableSpec.makeSettings()
 
@@ -93,10 +95,12 @@ struct ProviderEnableDisableSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
@@ -122,15 +126,17 @@ struct ProviderEnableDisableSpec {
         }
 
         @Test
-        func `enabling Codex does not change Claude selection`() {
+        func `should add Codex to the lineup and keep Claude selected when the person turns Codex on`() {
             // Given — Claude selected, Codex disabled
             let settings = ProviderEnableDisableSpec.makeSettings()
-            let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: MockUsageProbe(), settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: MockUsageProbe(), settings: settings)
+            let codex = codexProduct.defaultAccount
             codex.isEnabled = false
 
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
             #expect(monitor.selectedProviderId == "claude")
@@ -140,7 +146,7 @@ struct ProviderEnableDisableSpec {
 
             // Then — Codex appears, Claude still selected
             #expect(codex.isEnabled == true)
-            #expect(monitor.enabledProviders.count == 2)
+            #expect(monitor.lineup.count == 2)
             #expect(monitor.selectedProviderId == "claude")
         }
     }
@@ -152,7 +158,7 @@ struct ProviderEnableDisableSpec {
     struct PersistEnabledState {
 
         @Test
-        func `enabled state is stored in UserDefaults`() {
+        func `should remember whether the person turned a provider on or off`() {
             // Given — isolated UserDefaults
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!

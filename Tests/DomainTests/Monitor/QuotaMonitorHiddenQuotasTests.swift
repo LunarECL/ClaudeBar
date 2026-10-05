@@ -58,9 +58,10 @@ struct QuotaMonitorHiddenQuotasTests {
         alerter: (any QuotaAlerter)? = nil
     ) async -> (QuotaMonitor, MockProviderSettingsRepository) {
         let settings = makeSettings(hiddenKeys: hiddenKeys)
-        let provider = StubGeminiProvider(probe: makeGeminiProbe(), settingsRepository: settings)
+        let providerProduct = stubbedProduct("gemini", probe: makeGeminiProbe(), settings: settings)
+        let provider = providerProduct.defaultAccount
         let monitor = QuotaMonitor(
-            providers: AIProviders(providers: [provider]),
+            providers: kept([providerProduct]),
             alerter: alerter,
             clock: TestClock(),
             settingsRepository: settings
@@ -72,7 +73,7 @@ struct QuotaMonitorHiddenQuotasTests {
     // MARK: - Lowest Quota
 
     @Test
-    func `lowest quota comes from visible quotas only`() async {
+    func `should headline the lowest quota the person can see, not a hidden one (#140)`() async {
         // Given — the hidden flash model is the lowest of all
         let (monitor, _) = await makeRefreshedGeminiMonitor(hiddenKeys: ["model:gemini-2.0-flash"])
 
@@ -85,7 +86,7 @@ struct QuotaMonitorHiddenQuotasTests {
     }
 
     @Test
-    func `settings that hide every quota show them all rather than nothing`() async {
+    func `should show every quota rather than nothing when settings hide them all`() async {
         let (monitor, _) = await makeRefreshedGeminiMonitor(
             hiddenKeys: ["session", "weekly", "model:gemini-2.0-flash"]
         )
@@ -96,9 +97,9 @@ struct QuotaMonitorHiddenQuotasTests {
     // MARK: - One usage for every surface
 
     @Test
-    func `the usage every surface reads leaves the hidden quota out`() async throws {
+    func `should leave a hidden quota out of the usage everywhere shows, while keeping it read`() async throws {
         let (monitor, _) = await makeRefreshedGeminiMonitor(hiddenKeys: ["model:gemini-2.0-flash"])
-        let gemini = try #require(monitor.provider(for: "gemini"))
+        let gemini = try #require(monitor.login(id: "gemini"))
 
         let usage = try #require(monitor.usage(of: gemini))
 
@@ -107,10 +108,10 @@ struct QuotaMonitorHiddenQuotasTests {
     }
 
     @Test
-    func `hiding a quota is saved and takes effect at once`() async throws {
+    func `should leave a quota out and stop it colouring the status at once when the person hides it`() async throws {
         let (monitor, settings) = await makeRefreshedGeminiMonitor(hiddenKeys: [])
         given(settings).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
-        let gemini = try #require(monitor.provider(for: "gemini"))
+        let gemini = try #require(monitor.login(id: "gemini"))
 
         #expect(monitor.setQuota("model:gemini-2.0-flash", hidden: true, for: gemini))
 
@@ -120,10 +121,10 @@ struct QuotaMonitorHiddenQuotasTests {
     }
 
     @Test
-    func `the last visible quota can't be hidden`() async throws {
+    func `should refuse to hide the last quota the person can see`() async throws {
         let (monitor, settings) = await makeRefreshedGeminiMonitor(hiddenKeys: ["session", "weekly"])
         given(settings).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
-        let gemini = try #require(monitor.provider(for: "gemini"))
+        let gemini = try #require(monitor.login(id: "gemini"))
 
         #expect(monitor.setQuota("model:gemini-2.0-flash", hidden: true, for: gemini) == false)
 
@@ -132,10 +133,10 @@ struct QuotaMonitorHiddenQuotasTests {
     }
 
     @Test
-    func `showing a quota again brings it back`() async throws {
+    func `should bring a quota back, status and all, when the person shows it again`() async throws {
         let (monitor, settings) = await makeRefreshedGeminiMonitor(hiddenKeys: ["model:gemini-2.0-flash"])
         given(settings).setHiddenQuotaKeys(.any, forProvider: .any).willReturn()
-        let gemini = try #require(monitor.provider(for: "gemini"))
+        let gemini = try #require(monitor.login(id: "gemini"))
 
         #expect(monitor.setQuota("model:gemini-2.0-flash", hidden: false, for: gemini))
 
@@ -144,12 +145,13 @@ struct QuotaMonitorHiddenQuotasTests {
     }
 
     @Test
-    func `monitor without settings treats nothing as hidden`() async {
+    func `should count every quota when there are no saved settings`() async {
         // Given — no settings repository wired (existing call sites)
         let settings = makeSettings(hiddenKeys: [])
-        let provider = StubGeminiProvider(probe: makeGeminiProbe(), settingsRepository: settings)
+        let providerProduct = stubbedProduct("gemini", probe: makeGeminiProbe(), settings: settings)
+        let provider = providerProduct.defaultAccount
         let monitor = QuotaMonitor(
-            providers: AIProviders(providers: [provider]),
+            providers: kept([providerProduct]),
             clock: TestClock()
         )
         await monitor.refresh(providerId: "gemini")
@@ -162,7 +164,7 @@ struct QuotaMonitorHiddenQuotasTests {
     // MARK: - Overall Status
 
     @Test
-    func `overall status ignores hidden quotas`() async {
+    func `should keep the menu bar healthy when only a hidden quota is critical`() async {
         // Given & When & Then — a hidden critical quota must not color the status
         let (hidden, _) = await makeRefreshedGeminiMonitor(hiddenKeys: ["model:gemini-2.0-flash"])
         #expect(hidden.overallStatus == .healthy)
@@ -172,7 +174,7 @@ struct QuotaMonitorHiddenQuotasTests {
     }
 
     @Test
-    func `selected provider status ignores hidden quotas`() async {
+    func `should keep the selected provider healthy when only a hidden quota is critical`() async {
         let (monitor, _) = await makeRefreshedGeminiMonitor(hiddenKeys: ["model:gemini-2.0-flash"])
 
         #expect(monitor.selectedProviderId == "gemini")
@@ -182,7 +184,7 @@ struct QuotaMonitorHiddenQuotasTests {
     // MARK: - Alerts
 
     @Test
-    func `hidden quota status change does not alert`() async {
+    func `should not alert the person when only a hidden quota turns critical`() async {
         // Given — the critical flash model is hidden
         let alerter = RecordingAlerter()
         let (monitor, _) = await makeRefreshedGeminiMonitor(
@@ -197,7 +199,7 @@ struct QuotaMonitorHiddenQuotasTests {
     }
 
     @Test
-    func `visible quota status change still alerts`() async {
+    func `should alert the person when a quota they can see turns critical`() async {
         // Given — nothing hidden, so the snapshot is critical
         let alerter = RecordingAlerter()
         let (monitor, _) = await makeRefreshedGeminiMonitor(hiddenKeys: [], alerter: alerter)

@@ -35,17 +35,19 @@ struct ThemesSpec {
         }
 
         @Test
-        func `each provider has unique id and display name`() {
+        func `should give Claude and Codex their own id and lineup name`() {
             // Given — all providers
             let settings = Self.makeSettings()
-            let claude = StubClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
-            let codex = StubCodexProvider(probe: MockUsageProbe(), settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: MockUsageProbe(), settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: MockUsageProbe(), settings: settings)
+            let codex = codexProduct.defaultAccount
 
             // Then — unique identities for theme mapping
             #expect(claude.id == "claude")
-            #expect(claude.name == "Claude")
+            #expect(claudeProduct.lineupName(of: claude) == "Claude")
             #expect(codex.id == "codex")
-            #expect(codex.name == "Codex")
+            #expect(codexProduct.lineupName(of: codex) == "Codex")
             #expect(claude.id != codex.id)
         }
     }

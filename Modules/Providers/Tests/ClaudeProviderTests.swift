@@ -46,67 +46,67 @@ struct ClaudeProviderTests {
     // MARK: - Identity
 
     @Test
-    func `claude is identified and enabled by default`() throws {
+    func `should be Claude, on by default, run from the CLI, with no usage or error yet`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         let provider = try claude.provider()
 
         #expect(provider.id == "claude")
-        #expect(provider.name == "Claude")
-        #expect(provider.cliCommand == "claude")
-        #expect(provider.dashboardURL == URL(string: "https://claude.ai/new#settings/usage"))
-        #expect(provider.statusPageURL == URL(string: "https://status.anthropic.com"))
+        #expect(provider.lineupName(of: provider.defaultAccount) == "Claude")
+        #expect(provider.defaultAccount.cliCommand == "claude")
+        #expect(provider.plainDashboardURL == URL(string: "https://claude.ai/new#settings/usage"))
+        #expect(provider.defaultAccount.statusPageURL == URL(string: "https://status.anthropic.com"))
         #expect(provider.isEnabled)
-        #expect(provider.provider.activeKind == "cli")
-        #expect(provider.snapshot == nil)
-        #expect(provider.lastError == nil)
+        #expect(provider.configuration.activeKind == "cli")
+        #expect(provider.defaultAccount.snapshot == nil)
+        #expect(provider.defaultAccount.lastError == nil)
     }
 
     // MARK: - CLI mode
 
     @Test
-    func `cli mode reads the usage screen`() async throws {
+    func `should show the usage screen when Claude reads from the CLI`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         answerCLI(claude, Self.usageScreen)
         let provider = try claude.provider()
 
-        let usage = try await provider.refresh()
+        let usage = try await provider.refreshPlain()
 
         #expect(usage.sessionQuota?.percentRemaining == 65)
-        #expect(provider.answeredBy == "cli")
-        #expect(provider.isSyncing == false)
+        #expect(provider.defaultAccount.answeredBy == "cli")
+        #expect(provider.defaultAccount.isSyncing == false)
     }
 
     @Test
-    func `cli mode falls back to the api when the cli fails`() async throws {
+    func `should show the usage API's quotas when the CLI fails`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         failCLI(claude)
         try answerAPI(claude)
         let provider = try claude.provider()
 
-        let usage = try await provider.refresh()
+        let usage = try await provider.refreshPlain()
 
         #expect(usage.sessionQuota?.percentRemaining == 55)
-        #expect(provider.answeredBy == "api")
-        #expect(provider.lastError == nil)
+        #expect(provider.defaultAccount.answeredBy == "api")
+        #expect(provider.defaultAccount.lastError == nil)
     }
 
     @Test
-    func `when the cli and the api both fail the cli failure is reported`() async throws {
+    func `should report the CLI's failure when the CLI and the API both fail`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         failCLI(claude, .executionFailed("claude is not running"))
         try answerAPI(claude, "", status: 500)
         let provider = try claude.provider()
 
-        await #expect(throws: UsageError.executionFailed("claude is not running")) { try await provider.refresh() }
-        #expect(provider.lastError as? UsageError == .executionFailed("claude is not running"))
+        await #expect(throws: UsageError.executionFailed("claude is not running")) { try await provider.refreshPlain() }
+        #expect(provider.defaultAccount.lastError as? UsageError == .executionFailed("claude is not running"))
     }
 
     @Test
-    func `an api billed account hands off to cost before the api`() async throws {
+    func `should show the cost screen before trying the API when the account is billed by API`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         given(claude.cli).locate(.any).willReturn("/usr/local/bin/claude")
@@ -116,9 +116,9 @@ struct ClaudeProviderTests {
             .willReturn(CLIResult(output: "Total cost:            $1.23\nTotal duration (API):  1m 30s"))
         let provider = try claude.provider()
 
-        let usage = try await provider.refresh()
+        let usage = try await provider.refreshPlain()
 
-        #expect(provider.answeredBy == "cliCost")
+        #expect(provider.defaultAccount.answeredBy == "cliCost")
         #expect(usage.accountTier == .claudeApi)
         #expect(usage.costUsage?.totalCost == Decimal(string: "1.23"))
         #expect(usage.costUsage?.apiDuration == 90)
@@ -127,7 +127,7 @@ struct ClaudeProviderTests {
     // MARK: - API mode
 
     @Test
-    func `api mode falls back to the cli unless the setting turns it off`() async throws {
+    func `should fall back from the API to the CLI unless the person turns the fallback off`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         answerCLI(claude, Self.usageScreen)
@@ -138,42 +138,42 @@ struct ClaudeProviderTests {
         let withFallback = try claude.provider(settings: allowed)
         let withoutFallback = try claude.provider(settings: refused)
 
-        #expect(await withFallback.isAvailable())
-        #expect(await withoutFallback.isAvailable() == false)
-        #expect(try await withFallback.refresh().sessionQuota?.percentRemaining == 65)
-        await #expect(throws: UsageError.authenticationRequired) { try await withoutFallback.refresh() }
+        #expect(await withFallback.isPlainAvailable())
+        #expect(await withoutFallback.isPlainAvailable() == false)
+        #expect(try await withFallback.refreshPlain().sessionQuota?.percentRemaining == 65)
+        await #expect(throws: UsageError.authenticationRequired) { try await withoutFallback.refreshPlain() }
     }
 
     @Test
-    func `a rate limited api does not fall back to the cli`() async throws {
+    func `should report the rate limit and not fall back to the CLI when the API is rate-limited`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         answerCLI(claude, Self.usageScreen)
         try answerAPI(claude, "", status: 429, headers: ["Retry-After": "120"])
         let provider = try claude.provider(settings: InMemoryProviderSettings(dataSourceKinds: ["claude": "api"]))
 
-        await #expect(throws: UsageError.self) { try await provider.refresh() }
+        await #expect(throws: UsageError.self) { try await provider.refreshPlain() }
 
-        guard case .rateLimited? = provider.lastError as? UsageError else {
-            Issue.record("expected rateLimited, got \(String(describing: provider.lastError))")
+        guard case .rateLimited? = provider.defaultAccount.lastError as? UsageError else {
+            Issue.record("expected rateLimited, got \(String(describing: provider.defaultAccount.lastError))")
             return
         }
-        #expect(provider.snapshot == nil)
+        #expect(provider.defaultAccount.snapshot == nil)
     }
 
     @Test
-    func `when the api and the cli both fail the api failure is reported`() async throws {
+    func `should report the API's failure when the API and the CLI both fail`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         failCLI(claude)
         try answerAPI(claude, "", status: 500)
         let provider = try claude.provider(settings: InMemoryProviderSettings(dataSourceKinds: ["claude": "api"]))
 
-        await #expect(throws: UsageError.executionFailed("HTTP error: 500")) { try await provider.refresh() }
+        await #expect(throws: UsageError.executionFailed("HTTP error: 500")) { try await provider.refreshPlain() }
     }
 
     @Test
-    func `the api sets a fifteen minute background floor and the cli none`() throws {
+    func `should refresh in the background no more than every fifteen minutes on the API, with no floor on the CLI`() throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
 
@@ -184,7 +184,7 @@ struct ClaudeProviderTests {
     // MARK: - Guest passes
 
     @Test
-    func `guest passes are offered to max and not to pro or before a refresh`() async throws {
+    func `should offer guest passes to Max, not to Pro or API, nor before a refresh`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         let passes = GuestPasses(source: MockGuestPassSource())
@@ -196,7 +196,7 @@ struct ClaudeProviderTests {
     }
 
     @Test
-    func `a fetched pass is kept`() async throws {
+    func `should keep a guest pass once it is fetched`() async throws {
         let source = MockGuestPassSource()
         let pass = GuestPass(passesRemaining: 3, referralURL: URL(string: "https://claude.ai/referral/abc")!)
         given(source).fetch().willReturn(pass)
@@ -210,7 +210,7 @@ struct ClaudeProviderTests {
     }
 
     @Test
-    func `a failed pass fetch is kept apart from usage and can be dismissed`() async throws {
+    func `should keep a failed guest pass fetch apart from usage and let it be dismissed`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
         answerCLI(claude, Self.usageScreen)
@@ -218,13 +218,13 @@ struct ClaudeProviderTests {
         given(source).fetch().willThrow(UsageError.parseFailed("Could not find referral URL"))
         let passes = GuestPasses(source: source)
         let provider = try claude.provider(guestPasses: passes)
-        try await provider.refresh()
+        try await provider.refreshPlain()
 
         await #expect(throws: UsageError.self) { try await passes.fetch() }
 
         #expect(passes.error != nil)
-        #expect(provider.lastError == nil)
-        #expect(provider.guestPasses === passes)
+        #expect(provider.defaultAccount.lastError == nil)
+        #expect(provider.defaultAccount.guestPasses === passes)
         passes.clearError()
         #expect(passes.error == nil)
     }

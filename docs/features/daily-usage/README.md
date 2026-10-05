@@ -24,7 +24,7 @@ They appear for providers that keep local session logs:
 
 | Provider | Reads |
 |---|---|
-| Claude | Claude Code transcripts in `~/.claude/projects/**/*.jsonl`; an added account, its own folder's `projects/` |
+| Claude | Claude Code transcripts in `~/.claude/projects/**/*.jsonl`; an added account, its own folder's `projects/`. Your usual login also gets a **Claude Desktop · Token Usage** card from `~/Library/Application Support/Claude/buddy-tokens.json`, with tokens only and no cost |
 | Mistral | Vibe session metadata in `~/.vibe/logs/session/` |
 | Extensions | Whatever the extension's `dailyUsage` section returns; see [extensions](../extensions/README.md) |
 
@@ -52,4 +52,4 @@ Nothing is sent anywhere; ClaudeBar only reads the files.
 
 ## See also
 
-[design.md](design.md) — how duplicates are found and why totals used to be ~4× too high · [extensions](../extensions/README.md) · [Claude](../../providers/claude/README.md)
+[design.md](design.md) — how a login's logs become days · [dedup.md](dedup.md) — how duplicates are found and why totals used to be ~4× too high · [extensions](../extensions/README.md) · [Claude](../../providers/claude/README.md)

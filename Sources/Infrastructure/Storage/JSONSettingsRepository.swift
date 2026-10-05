@@ -14,6 +14,7 @@ public final class JSONSettingsRepository:
     CodexSettingsRepository,
     HookSettingsRepository,
     NotifySettingsRepository,
+    QuotaAlertSettingsRepository,
     @unchecked Sendable
 {
     /// Shared instance using the default settings file
@@ -178,6 +179,22 @@ public final class JSONSettingsRepository:
 
     public func setHideAccountEmail(_ hide: Bool) {
         store.write(value: hide, key: "app.hideAccountEmail")
+    }
+
+    public func hideLeaderboardCountry() -> Bool {
+        store.read(key: "app.hideLeaderboardCountry") ?? false
+    }
+
+    public func setHideLeaderboardCountry(_ hide: Bool) {
+        store.write(value: hide, key: "app.hideLeaderboardCountry")
+    }
+
+    public func hideLeaderboardName() -> Bool {
+        store.read(key: "app.hideLeaderboardName") ?? false
+    }
+
+    public func setHideLeaderboardName(_ hide: Bool) {
+        store.write(value: hide, key: "app.hideLeaderboardName")
     }
 
     public func notchEnabled() -> Bool {
@@ -449,6 +466,16 @@ public final class JSONSettingsRepository:
 
     public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
         store.write(value: verified, key: "codex.verifiedAtLeastOnce")
+    }
+
+    // MARK: - QuotaAlertSettingsRepository
+
+    public func quotaAlertPercents() -> [Int] {
+        store.read(key: "alerts.thresholds") ?? []
+    }
+
+    public func setQuotaAlertPercents(_ percents: [Int]) {
+        store.write(value: percents, key: "alerts.thresholds")
     }
 
     // MARK: - HookSettingsRepository
@@ -739,5 +766,38 @@ extension JSONSettingsRepository: MultiAccountSettingsRepository {
             return nil
         }
         return config
+    }
+}
+
+// MARK: - LeaderboardSettingsRepository
+
+// A destination's own namespace, `leaderboard.*`, beside `notify.*`. The
+// private key is not here: it lives in `CredentialSigningKeyStore`.
+extension JSONSettingsRepository: LeaderboardSettingsRepository {
+    public func leaderboardRecord() -> LeaderboardRecord? {
+        guard let username: String = store.read(key: "leaderboard.username") else { return nil }
+        let lastUpload: Double? = store.read(key: "leaderboard.lastUpload")
+        return LeaderboardRecord(
+            username: username,
+            sharing: store.read(key: "leaderboard.sharing") ?? [],
+            visible: store.read(key: "leaderboard.visible") ?? true,
+            lastUpload: lastUpload.map(Date.init(timeIntervalSince1970:)),
+            sharesCountry: store.read(key: "leaderboard.sharesCountry") ?? false,
+            globeHintDismissed: store.read(key: "leaderboard.globeHintDismissed") ?? false,
+            link: (store.read(key: "leaderboard.linkPlatform") as String?)
+                .flatMap(ProfileLink.Platform.init(rawValue:))
+                .flatMap { platform in (store.read(key: "leaderboard.linkHandle") as String?).flatMap { ProfileLink(platform: platform, handle: $0) } }
+        )
+    }
+
+    public func saveLeaderboardRecord(_ record: LeaderboardRecord?) {
+        store.write(value: record?.username, key: "leaderboard.username")
+        store.write(value: record?.sharing, key: "leaderboard.sharing")
+        store.write(value: record?.visible, key: "leaderboard.visible")
+        store.write(value: record?.lastUpload?.timeIntervalSince1970, key: "leaderboard.lastUpload")
+        store.write(value: record?.sharesCountry, key: "leaderboard.sharesCountry")
+        store.write(value: record?.globeHintDismissed, key: "leaderboard.globeHintDismissed")
+        store.write(value: record?.link?.platform.rawValue, key: "leaderboard.linkPlatform")
+        store.write(value: record?.link?.handle, key: "leaderboard.linkHandle")
     }
 }

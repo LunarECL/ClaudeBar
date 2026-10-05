@@ -6,7 +6,7 @@ description: Contributor research behind the notch Live Activity. Covers why the
 
 User guide: [README.md](README.md). Mockup: [notch-live-activity.html](../../../design-concept/notch-live-activity.html).
 
-The notch is a **view**, not a new source of truth. `QuotaMonitor` and `SessionMonitor` stay authoritative, per the single-source-of-truth rule in [ARCHITECTURE.md](../../architecture/ARCHITECTURE.md).
+The notch is a **view**, not a new source of truth. `QuotaMonitor` and `SessionMonitor` stay authoritative, per [the canonical model](../../architecture/CANONICAL_MODEL.md#1--the-tree): one tree, read by every surface, none adding a rule to it.
 
 ## The problem
 
@@ -47,7 +47,7 @@ Rules that follow (the resolver's are pinned by `NotchActivityResolverTests`):
 
 ### Scoped to the selected provider
 
-Since [10381ca](https://github.com/tddworks/ClaudeBar/commit/10381ca), the glance, the threshold check, the panel's quota cards and today's usage all come from `monitor.selectedProvider`. Before that, the notch reported the menu bar's chosen quota and the panel mixed the most depleted quotas of every provider, and switching provider in the popover changed nothing. The cost: a quota past its threshold on a provider that isn't selected no longer takes over the notch. The menu bar and notifications still cover that case. **Refresh quotas** refreshes the selected provider only, because refreshing all of them to update one reading was work nobody asked for, and the loader stopped while others were still fetching.
+Since [10381ca](https://github.com/tddworks/ClaudeBar/commit/10381ca), the glance, the threshold check, the panel's quota cards and today's usage all come from `monitor.selectedLogin`. Before that, the notch reported the menu bar's chosen quota and the panel mixed the most depleted quotas of every provider, and switching provider in the popover changed nothing. The cost: a quota past its threshold on a provider that isn't selected no longer takes over the notch. The menu bar and notifications still cover that case. **Refresh quotas** refreshes the selected provider only, because refreshing all of them to update one reading was work nobody asked for, and the loader stopped while others were still fetching.
 
 ### Driver-level rules
 

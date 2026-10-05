@@ -7,8 +7,8 @@ import Testing
 @Suite
 struct ProviderProfileTests {
     @Test
-    func `claude's profile is its name, links and face`() throws {
-        let profile = try Providers.builtIn("claude").profile
+    func `should show Claude with its name, status page, symbol, icon and colours`() throws {
+        let profile = try ProviderFactory.builtIn("claude").profile
 
         #expect(profile.id == "claude")
         #expect(profile.name == "Claude")
@@ -21,8 +21,8 @@ struct ProviderProfileTests {
     }
 
     @Test
-    func `codex's profile is its name, links and face`() throws {
-        let profile = try Providers.builtIn("codex").profile
+    func `should show Codex with its name, symbol, icon and colours`() throws {
+        let profile = try ProviderFactory.builtIn("codex").profile
 
         #expect(profile.name == "Codex")
         #expect(profile.look.symbol == "chevron.left.forwardslash.chevron.right")
@@ -32,15 +32,15 @@ struct ProviderProfileTests {
     }
 
     @Test
-    func `an added login's id finds its product's definition`() {
-        #expect(Providers.builtInDefinition(forLineupId: "codex.4f2a")?.id == "codex")
-        #expect(Providers.builtInDefinition(forLineupId: "claude")?.id == "claude")
-        #expect(Providers.builtInDefinition(forLineupId: "acme-not-built-in") == nil)
+    func `should find a login's provider from the login's lineup id, and none for an unknown provider`() {
+        #expect(ProviderFactory.builtInDefinition(forLineupId: "codex.4f2a")?.id == "codex")
+        #expect(ProviderFactory.builtInDefinition(forLineupId: "claude")?.id == "claude")
+        #expect(ProviderFactory.builtInDefinition(forLineupId: "acme-not-built-in") == nil)
     }
 
     @Test
-    func `the origin is where the file came from, never what it says`() throws {
-        let data = try Providers.builtInData("codex")
+    func `should mark a provider as custom when its file is the person's own, whatever the file says`() throws {
+        let data = try ProviderFactory.builtInData("codex")
 
         #expect(try ProviderDefinition.parse(data, origin: .custom).profile.origin == .custom)
     }

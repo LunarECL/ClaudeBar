@@ -41,6 +41,7 @@ Kimi runs two separate platforms: **kimi.com** (China) and **kimi.ai** (internat
 - **"No quota data found in Kimi CLI output"** means `/usage` didn't print a quota line within 15 seconds. Run `kimi` in a terminal and check that you're signed in and `/usage` works there. The `/usage` layout changed twice since the probe shipped (kimi CLI 0.36, then 2.x); current ClaudeBar reads all three layouts, and runs the CLI in its own folder so the one-time "Trust this folder?" prompt can't eat the typed `/usage` — update ClaudeBar if you're on an older version.
 - **A newly installed CLI can take up to two minutes to be noticed**, because ClaudeBar caches a "not found" result for that long.
 - **"Key needed" on the API** means the platform rejected the cookie (HTTP 401/403). Sign in to the matching platform again in your browser (kimi.com or kimi.ai, per your Region setting).
+- **An added login needs a folder of its own.** The default login's folder and another listed login's are refused, `~` included. A path you type with `~` is saved as the full folder, because the CLI can't expand it.
 
 ## See also
 

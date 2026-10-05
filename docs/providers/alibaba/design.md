@@ -4,7 +4,7 @@ Research notes for the Alibaba Coding Plan probe. Written 2026-09 from the code,
 
 ## As data
 
-Alibaba is `Modules/Providers/Resources/Providers/alibaba.json` and `alibaba-quota.js`, run by the generic engine (TARGET_ARCHITECTURE §8.2); no Swift names it. Ported from #394. The sections below are the research the old probe was built on; the requests are unchanged.
+Alibaba is `Modules/Providers/Resources/Providers/alibaba.json` and `alibaba-quota.js`, run by the generic [engine](../../architecture/ENGINE_DESIGN.md); no Swift names it. Ported from #394. The sections below are the research the old probe was built on; the requests are unchanged.
 
 - **Region is one choice setting** whose options carry the gateway, console host, console action, commodity code, region id and dashboard (`alibaba.region`, `intl` / `cn`, as before).
 - **Two data sources.** `api` (the key) hands over to `cookie` when no key is saved (`fallbackOn.authenticationRequired`), which is what the old probe did by checking for a key first.
@@ -73,3 +73,5 @@ The payload is wrapped in varying envelopes, so the parser is deliberately loose
 | Monthly | `perBillMonthUsedQuota` / `perBillMonthTotalQuota` (also `perMonth…`) | `perBillMonthQuotaNextRefreshTime` |
 
 Reset times are accepted as ISO 8601 with offset (`2026-03-12T19:17:15+08:00`), with or without fractional seconds, or as epoch seconds (number or string). Plan name comes from `planName`, `instanceName` or `packageName`. A window with total 0 is skipped; no windows at all → "No quota windows found in payload".
+
+The monthly window's length is the calendar month that ends on its reset, counted in UTC: leap years count, and a reset on the 31st starts from the last day of a shorter previous month. The Mac's timezone and daylight saving don't change it.

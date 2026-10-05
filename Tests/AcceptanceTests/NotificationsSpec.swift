@@ -42,7 +42,7 @@ struct NotificationsSpec {
         }
 
         @Test
-        func `quota drops from healthy to critical triggers alert`() async {
+        func `should alert the person that Claude went from healthy to critical when its quota drops to 15%`() async {
             // Given — Claude was previously healthy (no snapshot = healthy default)
             let settings = MockProviderSettingsRepository()
             given(settings).isEnabled(forProvider: .any, defaultValue: .any).willReturn(true)
@@ -60,9 +60,10 @@ struct NotificationsSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claudeProduct]),
                 alerter: mockAlerter,
                 clock: TestClock()
             )
@@ -91,7 +92,7 @@ struct NotificationsSpec {
         }
 
         @Test
-        func `repeated healthy refreshes do not trigger alert`() async {
+        func `should not alert the person when the quota stays healthy`() async {
             // Given
             let settings = MockProviderSettingsRepository()
             given(settings).isEnabled(forProvider: .any, defaultValue: .any).willReturn(true)
@@ -109,9 +110,10 @@ struct NotificationsSpec {
                 capturedAt: Date()
             ))
 
-            let claude = StubClaudeProvider(probe: probe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: probe, settings: settings)
+            let claude = claudeProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude]),
+                providers: kept([claudeProduct]),
                 alerter: mockAlerter,
                 clock: TestClock()
             )
@@ -141,7 +143,7 @@ struct NotificationsSpec {
         }
 
         @Test
-        func `one provider failure does not block others from refreshing`() async {
+        func `should still show Claude's quotas when Codex times out`() async {
             // Given
             let settings = MockProviderSettingsRepository()
             given(settings).isEnabled(forProvider: .any, defaultValue: .any).willReturn(true)
@@ -160,10 +162,12 @@ struct NotificationsSpec {
             given(codexProbe).isAvailable().willReturn(true)
             given(codexProbe).probe().willThrow(UsageError.timeout)
 
-            let claude = StubClaudeProvider(probe: claudeProbe, settingsRepository: settings)
-            let codex = StubCodexProvider(probe: codexProbe, settingsRepository: settings)
+            let claudeProduct = stubbedProduct("claude", probe: claudeProbe, settings: settings)
+            let claude = claudeProduct.defaultAccount
+            let codexProduct = stubbedProduct("codex", probe: codexProbe, settings: settings)
+            let codex = codexProduct.defaultAccount
             let monitor = QuotaMonitor(
-                providers: AIProviders(providers: [claude, codex]),
+                providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
 
