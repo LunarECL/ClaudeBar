@@ -14,7 +14,7 @@ Grok is `Modules/Providers/Resources/Providers/grok.json` and `grok-billing.js`,
 
 ## Source
 
-`GET https://cli-chat-proxy.grok.com/v1/billing?format=credits`, the billing endpoint the `grok` CLI itself calls. Headers: `Authorization: Bearer <access token>`, `Accept: application/json`, and `x-grok-client-mode: build`. 401/403 → `authenticationRequired`, which triggers one refresh-and-retry.
+Two `http.steps`, both with the same headers. `billing`: `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits`, the billing endpoint the `grok` CLI itself calls. `settings` (optional, 5 s): `GET https://cli-chat-proxy.grok.com/v1/settings`, read only for the plan name; when it fails the usage still shows, but a 401/403 there is the login's, as for billing. The script receives `{ "billing": …, "settings": … }`. Headers: `Authorization: Bearer <access token>`, `Accept: application/json`, and `x-grok-client-mode: build`. 401/403 → `authenticationRequired`, which triggers one refresh-and-retry.
 
 ## Credentials: `~/.grok/auth.json`
 
@@ -64,4 +64,7 @@ A dictionary keyed by `"<issuer>::<client-id>"` (OIDC login) or a plain scope UR
 - Period `type` → quota type: contains `MONTHLY` → Monthly, `DAILY` → Daily, otherwise weekly. `end - start` becomes the window duration for pace math; `end` is the reset for every quota.
 - `productUsage[].product` is shown without the `Grok` prefix and with camelCase split (`GrokBuild` → "Build").
 - Amounts come wrapped as `{"val": N}`. On-demand is only emitted when `onDemandCap.val > 0`.
+- When there is no `currentPeriod`, `billingPeriodStart`/`billingPeriodEnd` give the reset and window; a start is never paired with the other period's end.
+- `prepaidBalance.val` is USD cents (`{}` means zero). A balance above zero shows as a **Prepaid** money quota; an empty wallet is left out, so it never reads as depleted.
+- The plan badge is `subscription_tier_display` from the settings step, else `subscriptionTier` from billing; `SUPERGROK_HEAVY`/`supergrok` read as SuperGrok Heavy / SuperGrok.
 - **Empty but valid** (99cb779): billing can return 200 with a `currentPeriod` and no percentages (fresh period, unmetered plan). That yields one 100%-remaining quota for the period instead of an empty grid. A response with no period at all still yields no quotas.

@@ -4,7 +4,7 @@ description: Track Grok (xAI Grok Build) credit usage for the current billing pe
 
 # Grok
 
-Shows how much of your xAI credit allowance is left in the current billing period (weekly on most plans), how much each product has used (Build, Imagine, Voice), and on-demand overflow once you've set an on-demand cap. All share the period's reset countdown.
+Shows how much of your xAI credit allowance is left in the current billing period (weekly on most plans), how much each product has used (Build, Imagine, Voice), and on-demand overflow once you've set an on-demand cap. All share the period's reset countdown. It also shows your plan (SuperGrok, SuperGrok Heavy, …) and any prepaid balance.
 
 ## Setup
 
@@ -21,6 +21,7 @@ The `grok` binary doesn't need to be on your PATH; ClaudeBar only needs the sign
 - **Several sign-ins in `auth.json`:** ClaudeBar uses one that can be refreshed, and among those the one that expires last.
 - **100% at the start of a period** is expected: when xAI reports a billing period but no usage figures yet, ClaudeBar shows the whole period as remaining rather than an empty card.
 - **The On-Demand card only appears once you've set an on-demand cap** on your xAI account.
+- **The Prepaid card only appears while your prepaid balance is above zero.**
 - **Nothing shows and there's no error:** `~/.grok/auth.json` is missing or holds no token, so ClaudeBar skips the provider.
 - **An added login needs a folder of its own.** The default login's folder and another listed login's are refused, `~` included. A path you type with `~` is saved as the full folder, because the CLI can't expand it.
 

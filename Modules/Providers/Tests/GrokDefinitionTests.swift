@@ -10,7 +10,8 @@ import Mockable
 @MainActor @Suite("Grok billing")
 struct GrokDefinitionTests {
 
-    private func parse(_ data: Data, providerId: String = "grok", accountEmail: String? = nil) async throws -> UsageSnapshot {
+    private func parse(_ data: Data, providerId: String = "grok", accountEmail: String? = nil,
+                       settings: String = "{}", settingsStatus: Int = 200) async throws -> UsageSnapshot {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at:root) }
         let folder=root.appendingPathComponent(".grok")
@@ -20,8 +21,11 @@ struct GrokDefinitionTests {
         try JSONSerialization.data(withJSONObject:["fixture-entry":entry]).write(to:folder.appendingPathComponent("auth.json"))
         let network=MockNetworkClient()
         given(network).request(.any).willProduce { @Sendable request in
-            #expect(request.url?.absoluteString == "https://cli-chat-proxy.grok.com/v1/billing?format=credits")
             #expect(request.value(forHTTPHeaderField:"Authorization") == "Bearer fixture-token")
+            if request.url?.absoluteString == "https://cli-chat-proxy.grok.com/v1/settings" {
+                return (Data(settings.utf8),HTTPURLResponse(url:request.url!,statusCode:settingsStatus,httpVersion:nil,headerFields:nil)!)
+            }
+            #expect(request.url?.absoluteString == "https://cli-chat-proxy.grok.com/v1/billing?format=credits")
             return (data,HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:nil,headerFields:nil)!)
         }
         let provider=Provider(definition:try ProviderFactory.builtIn("grok"),settings:InMemoryProviderSettings(),makeDataSource:{source,_ in
@@ -62,14 +66,15 @@ struct GrokDefinitionTests {
     """
 
     @Test
-    func `should show the weekly credits and each product, and no on-demand while its cap is zero`() async throws {
+    func `should show the weekly credits, each product and the prepaid balance, and no on-demand while its cap is zero`() async throws {
         let data = Data(Self.sampleResponse.utf8)
 
         let snapshot = try await parse(data, providerId: "grok")
 
         #expect(snapshot.providerId == "grok")
-        // Weekly credits + 3 products; on-demand skipped while its cap is 0
-        #expect(snapshot.quotas.count == 4)
+        // Weekly credits + 3 products + prepaid $2.49; on-demand skipped while its cap is 0
+        #expect(snapshot.quotas.count == 5)
+        #expect(snapshot.quotas.last?.left == .money(Money(Decimal(string: "2.49")!, currency: "USD"), of: nil))
     }
 
     @Test
@@ -230,5 +235,53 @@ struct GrokDefinitionTests {
     @Test
     func `should name a product called just Grok as Grok`() async throws {
         #expect(try await productName("Grok") == "Grok")
+    }
+
+    // MARK: - Plan, prepaid balance and billing period
+
+    private func billing(_ config: [String: Any]) throws -> Data {
+        try JSONSerialization.data(withJSONObject: ["config": config])
+    }
+
+    @Test
+    func `should show the plan Grok's settings name`() async throws {
+        let usage = try await parse(try billing(["creditUsagePercent": 10]), settings: #"{"subscription_tier_display":"SuperGrok Heavy"}"#)
+        #expect(usage.accountTier == .custom("SuperGrok Heavy"))
+    }
+
+    @Test(arguments: [("SUPERGROK_HEAVY", "SuperGrok Heavy"), ("supergrok", "SuperGrok"), ("Grok Team", "Grok Team")])
+    func `should name the plan from billing when Grok's settings don't`(_ tier: String, _ plan: String) async throws {
+        let usage = try await parse(try billing(["creditUsagePercent": 10, "subscriptionTier": tier]))
+        #expect(usage.accountTier == .custom(plan))
+    }
+
+    @Test
+    func `should still show the credits when Grok's settings can't be read`() async throws {
+        let usage = try await parse(try billing(["creditUsagePercent": 10]), settings: "oops", settingsStatus: 500)
+        #expect(usage.quotas.first?.percentRemaining == 90)
+        #expect(usage.accountTier == nil)
+    }
+
+    @Test
+    func `should show the prepaid balance in dollars`() async throws {
+        let usage = try await parse(try billing(["creditUsagePercent": 10, "prepaidBalance": ["val": "2490"]]))
+        let prepaid = try #require(usage.quotas.first { $0.quotaType == .modelSpecific("Prepaid") })
+        #expect(prepaid.left == .money(Money(Decimal(string: "24.9")!, currency: "USD"), of: nil))
+    }
+
+    @Test(arguments: [#"{}"#, #"{"val":0}"#])
+    func `should leave out an empty prepaid balance rather than show it depleted`(_ balance: String) async throws {
+        let usage = try await parse(Data(#"{"config":{"creditUsagePercent":10,"prepaidBalance":\#(balance)}}"#.utf8))
+        #expect(!usage.quotas.contains { $0.quotaType == .modelSpecific("Prepaid") })
+    }
+
+    @Test
+    func `should reset at the billing period's end when Grok names no current period`() async throws {
+        let usage = try await parse(try billing(["creditUsagePercent": 10,
+                                                 "billingPeriodStart": "2026-07-01T00:00:00+00:00",
+                                                 "billingPeriodEnd": "2026-08-01T00:00:00+00:00"]))
+        let credits = try #require(usage.quotas.first)
+        #expect(credits.resetsAt == ISO8601DateFormatter().date(from: "2026-08-01T00:00:00Z"))
+        #expect((credits.windowDuration ?? -1) == 31 * 86400)
     }
 }

@@ -20,7 +20,7 @@
     {
       "kind": "api",
       "label": "API",
-      "summary": "Reads your Grok credits with the `grok` CLI's login",
+      "summary": "Reads your Grok credits and plan with the `grok` CLI's login",
       "credential": {
         "jsonFile": {
           "path": "~/.grok/auth.json",
@@ -45,10 +45,27 @@
       },
       "fetch": {
         "http": {
-          "url": "https://cli-chat-proxy.grok.com/v1/billing?format=credits",
-          "headers": { "Authorization": "Bearer {{token}}", "Accept": "application/json", "x-grok-client-mode": "build" },
-          "timeout": 15,
-          "acceptedStatuses": [200]
+          "steps": [
+            {
+              "name": "billing",
+              "request": {
+                "url": "https://cli-chat-proxy.grok.com/v1/billing?format=credits",
+                "headers": { "Authorization": "Bearer {{token}}", "Accept": "application/json", "x-grok-client-mode": "build" },
+                "timeout": 15,
+                "acceptedStatuses": [200]
+              }
+            },
+            {
+              "name": "settings",
+              "optional": true,
+              "request": {
+                "url": "https://cli-chat-proxy.grok.com/v1/settings",
+                "headers": { "Authorization": "Bearer {{token}}", "Accept": "application/json", "x-grok-client-mode": "build" },
+                "timeout": 5,
+                "acceptedStatuses": [200]
+              }
+            }
+          ]
         }
       },
       "mapping": { "script": { "file": "grok-billing.js", "credential": ["email"] } },
