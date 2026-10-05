@@ -213,6 +213,16 @@ public extension AppThemeProvider {
         }
         return LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing)
     }
+
+    /// Progress gradient for a status, so the bar follows the person's
+    /// status policy rather than the raw percentage.
+    func progressGradient(for status: QuotaStatus) -> LinearGradient {
+        switch status {
+        case .healthy: progressGradient(for: 100)
+        case .warning: progressGradient(for: 35)
+        case .critical, .depleted: progressGradient(for: 0)
+        }
+    }
 }
 
 // MARK: - Theme Font Helper

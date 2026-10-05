@@ -1565,7 +1565,7 @@ struct WrappedStatCard: View {
             VStack(spacing: 1) {
                 QuotaProgressBar(
                     percent: quota.displayProgressPercent(mode: effectiveDisplayMode),
-                    fill: theme.progressGradient(for: quota.percentRemaining),
+                    fill: theme.progressGradient(for: quota.status(under: settings.statusPolicy)),
                     animate: animateProgress,
                     delay: delay
                 )
@@ -1580,7 +1580,7 @@ struct WrappedStatCard: View {
                             path.addLine(to: CGPoint(x: tickX, y: 0))
                             path.closeSubpath()
                         }
-                        .fill(theme.textTertiary)
+                        .fill(quota.paceLevel?.displayColor ?? theme.textTertiary)
                         .opacity(animateProgress ? 1 : 0)
                         .animation(.easeIn(duration: 0.3).delay(delay + 0.5), value: animateProgress)
                     }

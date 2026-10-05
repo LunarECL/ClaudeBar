@@ -126,67 +126,73 @@ struct QuotaStatusTests {
         #expect(statuses.count == 2)
     }
 
-    // MARK: - Burn Rate (Pace-Aware) Tests
+    // MARK: - Projected (Pace-Aware) Tests
+    //
+    // Pace-aware projects end-of-window usage as used / elapsed and colors by
+    // the projection: under 70% healthy, 70-90% warning, 90%+ critical. Before
+    // 15% of the window has elapsed, or once it is over, it uses fixed used%
+    // thresholds: under 70% healthy, 70-90% warning, 90%+ critical.
 
     @Test
-    func `should call a quota healthy when it burns slower than the threshold under pace-aware`() {
-        // 57% used, 85% time elapsed → burn rate 0.67 → HEALTHY (issue example: Claude SESSION)
-        let status = QuotaStatus.from(percentRemaining: 43, percentTimeElapsed: 85, burnRateThreshold: 1.5)
-        #expect(status == .healthy)
+    func `should call a quota healthy under pace-aware when it projects under 70 percent`() {
+        // 57% used, 85% elapsed → projects 67%
+        #expect(QuotaStatus.from(percentRemaining: 43, percentTimeElapsed: 85, burnRateThreshold: 1.5) == .healthy)
+        // 20% used, 50% elapsed → projects 40%
+        #expect(QuotaStatus.from(percentRemaining: 80, percentTimeElapsed: 50, burnRateThreshold: 1.5) == .healthy)
     }
 
     @Test
-    func `should warn when the quota burns faster than the threshold under pace-aware`() {
-        // 53% used, 8.5% time elapsed → burn rate 6.2 → WARNING (issue example: Codex WEEKLY)
-        let status = QuotaStatus.from(percentRemaining: 47, percentTimeElapsed: 8.5, burnRateThreshold: 1.5)
-        #expect(status == .warning)
+    func `should warn under pace-aware when it projects 70 to 90 percent`() {
+        // 60% used, 80% elapsed → projects 75%
+        #expect(QuotaStatus.from(percentRemaining: 40, percentTimeElapsed: 80, burnRateThreshold: 1.5) == .warning)
+        // 35% used, 50% elapsed → projects exactly 70%
+        #expect(QuotaStatus.from(percentRemaining: 65, percentTimeElapsed: 50, burnRateThreshold: 1.5) == .warning)
+    }
+
+    @Test
+    func `should call a quota critical under pace-aware when it projects 90 percent or more`() {
+        // 30% used, 15% elapsed → projects 200%
+        #expect(QuotaStatus.from(percentRemaining: 70, percentTimeElapsed: 15, burnRateThreshold: 1.5) == .critical)
+        // 45% used, 50% elapsed → projects exactly 90%
+        #expect(QuotaStatus.from(percentRemaining: 55, percentTimeElapsed: 50, burnRateThreshold: 1.5) == .critical)
+    }
+
+    @Test
+    func `should judge a nearly spent quota by its projection under pace-aware`() {
+        // 85% used, 99% elapsed → projects 86%: a warning, not critical
+        #expect(QuotaStatus.from(percentRemaining: 15, percentTimeElapsed: 99, burnRateThreshold: 1.5) == .warning)
+        // 90% used two minutes before a weekly reset → projects 90%: critical
+        let twoMinutesLeft = 100 - (2.0 / (7 * 24 * 60)) * 100
+        #expect(QuotaStatus.from(percentRemaining: 10, percentTimeElapsed: twoMinutesLeft, burnRateThreshold: 1.5) == .critical)
+    }
+
+    @Test
+    func `should use fixed used thresholds under pace-aware before 15 percent of the window`() {
+        #expect(QuotaStatus.from(percentRemaining: 50, percentTimeElapsed: 10, burnRateThreshold: 1.5) == .healthy)
+        #expect(QuotaStatus.from(percentRemaining: 25, percentTimeElapsed: 10, burnRateThreshold: 1.5) == .warning)
+        #expect(QuotaStatus.from(percentRemaining: 5, percentTimeElapsed: 14.9, burnRateThreshold: 1.5) == .critical)
+        #expect(QuotaStatus.from(percentRemaining: 43, percentTimeElapsed: 0, burnRateThreshold: 1.5) == .healthy)
+    }
+
+    @Test
+    func `should use fixed used thresholds under pace-aware once the window is over`() {
+        #expect(QuotaStatus.from(percentRemaining: 20, percentTimeElapsed: 100, burnRateThreshold: 1.5) == .warning)
+    }
+
+    @Test
+    func `should call an unused quota healthy under pace-aware`() {
+        #expect(QuotaStatus.from(percentRemaining: 100, percentTimeElapsed: 50, burnRateThreshold: 1.5) == .healthy)
     }
 
     @Test
     func `should call an empty quota depleted under pace-aware however slowly it burned`() {
-        // Depleted is always depleted, even if burn rate is low
-        let status = QuotaStatus.from(percentRemaining: 0, percentTimeElapsed: 99, burnRateThreshold: 1.5)
-        #expect(status == .depleted)
+        #expect(QuotaStatus.from(percentRemaining: 0, percentTimeElapsed: 99, burnRateThreshold: 1.5) == .depleted)
     }
 
     @Test
-    func `should call a quota with under 20 percent left critical under pace-aware however slowly it burns`() {
-        // Below 20% remaining is always critical (absolute safety net)
-        let status = QuotaStatus.from(percentRemaining: 15, percentTimeElapsed: 90, burnRateThreshold: 1.5)
-        #expect(status == .critical)
-    }
-
-    @Test
-    func `should call a quota healthy under pace-aware when 90 percent is left despite a fast burn`() {
-        // 10% used, 5% elapsed → burn rate 2.0, but 90% remaining — no warning yet
-        let status = QuotaStatus.from(percentRemaining: 90, percentTimeElapsed: 5, burnRateThreshold: 1.5)
-        #expect(status == .healthy)
-    }
-
-    @Test
-    func `should fall back to absolute thresholds under pace-aware when the window has just started`() {
-        // At the very start of a period, fall back to absolute thresholds
-        let status = QuotaStatus.from(percentRemaining: 43, percentTimeElapsed: 0, burnRateThreshold: 1.5)
-        #expect(status == .warning) // 43% remaining → absolute threshold says warning
-    }
-
-    @Test
-    func `should warn or stay healthy under pace-aware depending on the threshold the person picks`() {
-        // 55% used, 30% elapsed → burn rate ~1.83, remaining = 45% < 50
-        // With threshold 1.5 → warning (1.83 > 1.5)
-        let warningStatus = QuotaStatus.from(percentRemaining: 45, percentTimeElapsed: 30, burnRateThreshold: 1.5)
-        #expect(warningStatus == .warning)
-
-        // With threshold 2.5 → healthy (1.83 < 2.5)
-        let healthyStatus = QuotaStatus.from(percentRemaining: 45, percentTimeElapsed: 30, burnRateThreshold: 2.5)
-        #expect(healthyStatus == .healthy)
-    }
-
-    @Test
-    func `should warn under pace-aware when 45 percent is left and the quota burns faster than the threshold`() {
-        // Burn rate matters only when remaining < 50% (meaningful warning zone)
-        // 55% used, 30% elapsed → burn rate ~1.83 > 1.5, remaining = 45% < 50 → warning
-        let status = QuotaStatus.from(percentRemaining: 45, percentTimeElapsed: 30, burnRateThreshold: 1.5)
-        #expect(status == .warning)
+    func `should ignore the burn rate threshold under pace-aware`() {
+        // 55% used, 30% elapsed → projects 183% under any threshold
+        #expect(QuotaStatus.from(percentRemaining: 45, percentTimeElapsed: 30, burnRateThreshold: 1.5) == .critical)
+        #expect(QuotaStatus.from(percentRemaining: 45, percentTimeElapsed: 30, burnRateThreshold: 2.5) == .critical)
     }
 }

@@ -3,10 +3,10 @@ import Testing
 @testable import Domain
 
 /// One status per quota: every surface reads `status(under:)` with the
-/// person's policy — absolute thresholds, or pace-aware with a burn rate.
+/// person's policy — absolute thresholds, or pace-aware by projected usage.
 @Suite
 struct StatusPolicyTests {
-    /// 40% left with 90% of a 5-hour window gone — on pace (burn rate 0.67).
+    /// 40% left with 90% of a 5-hour window gone — on pace (projects 67%).
     private func onPace() -> UsageQuota {
         UsageQuota(
             percentRemaining: 40, quotaType: .session, providerId: "claude",
@@ -14,7 +14,7 @@ struct StatusPolicyTests {
         )
     }
 
-    /// 40% left with 20% of the window gone — burning fast (burn rate 3).
+    /// 40% left with 20% of the window gone — burning fast (projects 300%).
     private func burningFast() -> UsageQuota {
         UsageQuota(
             percentRemaining: 40, quotaType: .session, providerId: "claude",
@@ -29,11 +29,11 @@ struct StatusPolicyTests {
     }
 
     @Test
-    func `should call an on-pace quota healthy and a fast-burning one a warning when the person picks pace-aware`() {
+    func `should call an on-pace quota healthy and a fast-burning one critical when the person picks pace-aware`() {
         let policy = StatusPolicy.paceAware(burnRateThreshold: 1.5)
 
         #expect(onPace().status(under: policy) == .healthy)
-        #expect(burningFast().status(under: policy) == .warning)
+        #expect(burningFast().status(under: policy) == .critical)
     }
 
     @Test
@@ -51,7 +51,7 @@ struct StatusPolicyTests {
         let usage = UsageSnapshot(providerId: "claude", quotas: [onPace(), burningFast()], capturedAt: Date())
         let calm = UsageSnapshot(providerId: "claude", quotas: [onPace()], capturedAt: Date())
 
-        #expect(usage.overallStatus(under: .paceAware(burnRateThreshold: 1.5)) == .warning)
+        #expect(usage.overallStatus(under: .paceAware(burnRateThreshold: 1.5)) == .critical)
         #expect(calm.overallStatus(under: .paceAware(burnRateThreshold: 1.5)) == .healthy)
         #expect(calm.overallStatus(under: .absolute) == .warning)
     }
