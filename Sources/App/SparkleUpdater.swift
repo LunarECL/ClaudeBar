@@ -1,6 +1,7 @@
 #if ENABLE_SPARKLE
 import Sparkle
 import SwiftUI
+import Infrastructure
 
 /// Delegate to receive update notifications from Sparkle
 private class SparkleUpdaterDelegate: NSObject, SPUUpdaterDelegate, @unchecked Sendable {
@@ -18,10 +19,24 @@ private class SparkleUpdaterDelegate: NSObject, SPUUpdaterDelegate, @unchecked S
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
-        let wrapper = self.wrapper
-        Task { @MainActor in
-            wrapper?.clearUpdateAvailable()
-        }
+        // Sparkle only ever routes its benign "no update found" sentinel
+        // (SUNoUpdateError) here; a check that genuinely failed arrives via
+        // `updater(_:didAbortWithError:)` instead. This is the healthy
+        // outcome, so nothing is logged.
+    }
+
+    /// The update cycle was aborted. Sparkle routes healthy outcomes through
+    /// here too — "no update found" and the user declining an install — so
+    /// only the real failures are logged.
+    func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
+        guard SparkleUpdater.isUpdateFailure(error) else { return }
+        SparkleUpdater.logFailure("Update aborted: \(error.localizedDescription)")
+    }
+
+    func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: any Error) {
+        SparkleUpdater.logFailure(
+            "Update v\(item.displayVersionString) download failed: \(error.localizedDescription)"
+        )
     }
 
     /// Return the set of allowed channels for updates
@@ -167,6 +182,25 @@ final class SparkleUpdater {
     fileprivate func clearUpdateAvailable() {
         isUpdateAvailable = false
         availableVersion = nil
+    }
+
+    /// Logs why an update check or install failed. Sparkle alerts are
+    /// transient; until now a failure left no trace in ClaudeBar's own logs
+    /// at all, so "it said failed but it updated" was undiagnosable.
+    fileprivate static func logFailure(_ message: String) {
+        AppLog.updates.error(message)
+    }
+
+    /// Whether an error the updater reports is a real failure. Sparkle
+    /// reports a healthy "no update found" (`SUNoUpdateError`) and the user
+    /// declining an install (`SUInstallationCanceledError`) as errors too —
+    /// `updater(_:didAbortWithError:)` receives both on every routine check —
+    /// and neither may be logged as a failure.
+    static func isUpdateFailure(_ error: any Error) -> Bool {
+        let nsError = error as NSError
+        guard nsError.domain == SUSparkleErrorDomain else { return true }
+        return nsError.code != Int(SUError.noUpdateError.rawValue)
+            && nsError.code != Int(SUError.installationCanceledError.rawValue)
     }
 
     /// Check if running from a proper .app bundle
