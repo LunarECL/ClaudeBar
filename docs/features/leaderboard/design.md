@@ -177,7 +177,7 @@ let days = membership.dailyTokens(from: usageHistories, in: range)
 | A member's period ends on their own date, the one their Mac sent with its last upload, while it is within a day of UTC's | Server |
 | A hidden member is absent from the public board and still sees their own standing | Server |
 | Your own upload shows on the board you read at once, the same place *Your rank* says; everyone else's within two minutes | Server (an upload drops the boards it changes from the edge cache) |
-| The globe shows only countries, only for members who opted in; numbers only where at least three are | Server |
+| The globe shows only countries, only for members who opted in; tokens only where at least three are | Server |
 | A member who hasn't opted in sees the globe offered once, until they opt in or dismiss it | `LeaderboardMembership.showsGlobeHint` |
 | A profile link is a platform and a handle that fits its rules, never a URL | `ProfileLink` (the app, as you type) and the server (the authority); one `vectors.json` |
 | Leaving deletes the member and every row, on the server | Server — the app forgets the key only after a 2xx |
@@ -192,7 +192,7 @@ Host: `https://claudebar-api.tddworks.com`; the public board page is `https://cl
 | `PUT /usage` `{today, days: [DailyTokens]}` | signed | upserts each day; `today` is the Mac's date, refused when more than a day from UTC's |
 | `GET /me` | signed | the member, their standing in a view, every row they uploaded |
 | `GET /me/export` | signed | the same, as a downloadable JSON file |
-| `PATCH /me` `{username?, visible?, shareCountry?, link?}` | signed | rename, hide or show; opt in to the globe (the server then keeps the country Cloudflare's edge reports) or out (it forgets it at once); set the profile link as `{platform, handle}` (`x`, `instagram` or `github`, each with its own username rule, pinned by `vectors.json`) or remove it with `null` |
+| `PATCH /me` `{username?, visible?, shareCountry?, link?}` | signed | rename, hide or show; opt in to the globe (the server then keeps the country Cloudflare's edge reports for that request, and never updates it) or out (it forgets it at once); set the profile link as `{platform, handle}` (`x`, `instagram` or `github`, each with its own username rule, pinned by `vectors.json`) or remove it with `null` |
 | `DELETE /me` | signed | deletes the member and every row |
 | `GET /globe?period=30d` | none | every country opted-in members share; members and tokens (`countries`) only where at least 3 are, the rest named without a number (`present`, A–Z) |
 | `GET /board?period=7d&provider=claude` | none | standings of visible members, up to 100, cached at the edge for two minutes, dropped from the uploader's data centre by each `PUT /usage`; the app reads it without its local HTTP cache |
@@ -218,7 +218,7 @@ The second destination after Notify! that sends ClaudeBar's own state outward, s
 - **Where it goes:** a Cloudflare Worker run by tddworks, and from there to a public page if visible.
 - **Off by default.** Nothing is sent until the user joins, and only for providers they tick.
 - **A profile link is optional, and only a handle.** A member may add one X, Instagram or GitHub handle; the address is always built from the platform's own base, never typed. It is not verified, and every place it shows says so.
-- **The globe is opt-in, and only a country.** With *Show my country on the globe* on, the server keeps the two-letter country Cloudflare's edge sees the request come from; the Mac sends no location and asks for none. Never a city, coordinates or the IP. Publicly a country is named from its first member; its members and tokens are totalled only where at least three are. Turning it off forgets the country at once.
+- **The globe is opt-in, and only a country.** With *Show my country on the globe* on, the server keeps the two-letter country Cloudflare's edge sees the request that turned it on come from, once: later requests don't change it, or a VPN's exit would move the member from call to call; the Mac sends no location and asks for none. Never a city, coordinates or the IP. Publicly a country is named from its first member; its members and tokens are totalled only where at least three are. Turning it off forgets the country at once.
 - **Leaving is deletion,** on the server, not hiding.
 - **The Worker logs no IP addresses and no request bodies.** Cloudflare itself still sees IPs to serve the request.
 

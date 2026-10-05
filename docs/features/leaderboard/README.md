@@ -47,7 +47,7 @@ The tab then shows your rank (the eye next to your name shows it as `@i•••
 | **Username → Rename** | Takes a new name if it's free |
 | **Show me on the web board** | Off keeps you ranked only in your own ClaudeBar |
 | **Profile link** | One handle on X, Instagram or GitHub, shown as an icon after your name on the board. Not verified. **Remove** takes it off |
-| **Show my country on the globe** | Puts your country on the web board's globe. Its numbers show once three members there opt in. Off forgets it at once |
+| **Show my country on the globe** | Puts your country on the web board's globe. Its tokens show once three members there opt in. Off forgets it at once |
 | **Shared providers** | Stops or starts uploads per provider. Days already uploaded stay until you leave |
 | **Export my data** | Saves everything the server holds about you as JSON |
 | **Leave and delete my data** | Deletes your username and every uploaded day from the server, then this Mac's key |
@@ -62,7 +62,7 @@ The web board's globe shows where ClaudeBar is used, by country, from members wh
 
 ## Gotchas
 
-- **On a VPN?** The globe counts the country your VPN connects from.
+- **On a VPN?** Your country is taken once, when you turn the globe on, so a VPN's country then is the one kept. To change it, turn **Show my country on the globe** off and on again without the VPN.
 
 - **"That username is taken."** Names are unique ignoring case, and names that would read as official (`admin`, `claudebar`, `anthropic`…) are reserved.
 - **"This Mac's clock is more than five minutes off."** Uploads are signed with the time. Fix the clock in System Settings → General → Date & Time.
