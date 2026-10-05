@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Codex** works with only the Codex desktop app installed: ClaudeBar runs the `codex` inside it, and a `codex` on your PATH still comes first. ([#476](https://github.com/tddworks/ClaudeBar/pull/476))
+- **Gemini, Kiro, Grok and Kimi**: an added account can't reuse your usual login's folder, and a folder typed with `~` now reaches the CLI. ([#476](https://github.com/tddworks/ClaudeBar/pull/476))
+- **Bedrock** reads a named AWS profile with static keys, a role or a credential process, not only SSO; **Alibaba**'s monthly window and **Claude**'s cost panel read correctly. ([#476](https://github.com/tddworks/ClaudeBar/pull/476))
 - **Settings → Updates** now says which version is ready ("Version 0.5.4 is ready to install") and its button reads Install Update; the sidebar footer names the new version too, instead of only "update available". ([#473](https://github.com/tddworks/ClaudeBar/pull/473))
 
 ---
