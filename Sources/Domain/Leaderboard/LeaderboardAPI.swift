@@ -148,8 +148,9 @@ public struct MemberChange: Sendable, Equatable, Encodable {
     }
 }
 
-/// *WHERE CLAUDEBAR IS USED* — opted-in members per country, only where at
-/// least three are; the rest are counted, never named.
+/// *WHERE CLAUDEBAR IS USED* — every country opted-in members share. Members
+/// and tokens only where at least three are (`countries`); the rest are named
+/// without a number (`present`), so no number is one person's own.
 public struct GlobeSummary: Sendable, Equatable, Decodable {
     public struct Country: Sendable, Equatable, Decodable {
         public let country: String
@@ -164,11 +165,23 @@ public struct GlobeSummary: Sendable, Equatable, Decodable {
     }
 
     public let countries: [Country]
-    public let hiddenCountries: Int
+    public let present: [String]
 
-    public init(countries: [Country], hiddenCountries: Int) {
+    public init(countries: [Country], present: [String]) {
         self.countries = countries
-        self.hiddenCountries = hiddenCountries
+        self.present = present
+    }
+
+    /// Every country on the globe, with numbers or without.
+    public var countryCount: Int { countries.count + present.count }
+
+    private enum CodingKeys: String, CodingKey { case countries, present }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        countries = try container.decode([Country].self, forKey: .countries)
+        // A server from before named countries sends none.
+        present = try container.decodeIfPresent([String].self, forKey: .present) ?? []
     }
 }
 

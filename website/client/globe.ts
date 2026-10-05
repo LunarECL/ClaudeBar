@@ -1,5 +1,6 @@
 // The board page's globe: where opted-in members are, by country, from the
-// API's GET /globe. Bundled by `npm run build` into public/leaderboard/globe.js.
+// API's GET /globe. Every shared country gets a pin; only countries with three
+// or more members carry numbers, the rest are "a few". Bundled by `npm run build` into public/leaderboard/globe.js.
 // Every value from the server is written with textContent, never as HTML.
 
 import * as THREE from "three/webgpu";
@@ -15,13 +16,19 @@ interface CountryTotal {
   tokens: number;
 }
 
-interface Placed extends CountryTotal {
+/** A country on the globe; members and tokens only when the API totals it. */
+interface Placed extends Partial<CountryTotal> {
+  country: string;
   centre: [number, number];
 }
+type Totalled = Placed & CountryTotal;
+const totalled = (c: Placed): c is Totalled => c.members !== undefined;
 
 const R = 1;
 // No mint: it would vanish on green land.
 const CANDY = [0xFFD84D, 0xFFB3C7, 0xA9D8FF, 0xC9B8FF, 0xFFC98A, 0xFF8A8A];
+// A country with one or two members: a short cream pin, the same for all.
+const FEW = { height: 0.04, color: 0xFFF8EC };
 const names = new Intl.DisplayNames(["en"], { type: "region" });
 
 const $ = (id: string) => document.getElementById(id);
@@ -84,8 +91,6 @@ async function start(): Promise<void> {
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
   host.append(renderer.domElement);
   await renderer.init();
-  const backend = $("globe-backend");
-  if (backend) backend.textContent = (renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend ? "WebGPU" : "WebGL 2";
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
@@ -118,38 +123,44 @@ async function start(): Promise<void> {
   const where = centres();
   let placed: Placed[] = [];
 
+  function pin(c: Placed, h: number, color: number): THREE.Group {
+    const g = new THREE.Group();
+    const parts: [THREE.BufferGeometry, number, THREE.Side, number][] = [
+      [new THREE.CylinderGeometry(0.018, 0.018, h, 12), color, THREE.FrontSide, h / 2],
+      [new THREE.CylinderGeometry(0.026, 0.026, h + 0.012, 12), 0x1E1B2E, THREE.BackSide, h / 2],
+      [new THREE.SphereGeometry(0.034, 16, 16), color, THREE.FrontSide, h],
+      [new THREE.SphereGeometry(0.044, 16, 16), 0x1E1B2E, THREE.BackSide, h],
+    ];
+    for (const [geometry, partColor, side, y] of parts) {
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: partColor, side }));
+      mesh.position.y = y; g.add(mesh);
+    }
+    const base = toVec(c.centre[0], c.centre[1], R);
+    g.position.copy(base);
+    g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), base.clone().normalize());
+    g.userData = c;
+    return g;
+  }
+
   function draw(): void {
     markers.clear();
-    const shown = [...placed].sort((a, b) => b[metric] - a[metric]);
+    const shown = placed.filter(totalled).sort((a, b) => b[metric] - a[metric]);
+    const few = placed.filter((c) => !totalled(c));
     const max = Math.max(1, ...shown.map((c) => c[metric]));
-    shown.forEach((c, i) => {
-      const h = 0.04 + 0.26 * (c[metric] / max);
-      const color = CANDY[i % CANDY.length];
-      const g = new THREE.Group();
-      const parts: [THREE.BufferGeometry, number, THREE.Side, number][] = [
-        [new THREE.CylinderGeometry(0.018, 0.018, h, 12), color, THREE.FrontSide, h / 2],
-        [new THREE.CylinderGeometry(0.026, 0.026, h + 0.012, 12), 0x1E1B2E, THREE.BackSide, h / 2],
-        [new THREE.SphereGeometry(0.034, 16, 16), color, THREE.FrontSide, h],
-        [new THREE.SphereGeometry(0.044, 16, 16), 0x1E1B2E, THREE.BackSide, h],
-      ];
-      for (const [geometry, partColor, side, y] of parts) {
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: partColor, side }));
-        mesh.position.y = y; g.add(mesh);
-      }
-      const base = toVec(c.centre[0], c.centre[1], R);
-      g.position.copy(base);
-      g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), base.clone().normalize());
-      g.userData = c;
-      markers.add(g);
-    });
-    const list = $("globe-list");
-    list?.replaceChildren(...shown.slice(0, 8).map((c) => el("li", {},
-      el("span", { class: "fill", style: `width:${(c[metric] / max) * 100}%` }),
+    shown.forEach((c, i) => markers.add(pin(c, 0.04 + 0.26 * (c[metric] / max), CANDY[i % CANDY.length])));
+    few.forEach((c) => markers.add(pin(c, FEW.height, FEW.color)));
+    const row = (c: Placed, width: number, num: string) => el("li", {},
+      el("span", { class: "fill", style: `width:${width}%` }),
       el("span", { text: flag(c.country) }),
       el("span", { text: nameOf(c.country) }),
-      el("span", { class: "num", text: metric === "members" ? String(c.members) : fmt(c.tokens) }))));
+      el("span", { class: "num", text: num }));
+    const list = $("globe-list");
+    list?.replaceChildren(
+      ...shown.map((c) => row(c, (c[metric] / max) * 100, metric === "members" ? String(c.members) : fmt(c.tokens))),
+      ...few.map((c) => row(c, 0, "a few")),
+    );
     const title = $("globe-list-title");
-    if (title) title.textContent = `Top countries · ${metric}`;
+    if (title) title.textContent = `Countries · ${metric}`;
   }
 
   document.querySelectorAll<HTMLButtonElement>("[data-globe-metric]").forEach((button) => button.addEventListener("click", () => {
@@ -169,7 +180,7 @@ async function start(): Promise<void> {
       while (group.parent !== markers) group = group.parent!;
       const c = group.userData as Placed;
       tip.replaceChildren(el("b", { text: `${flag(c.country)} ${nameOf(c.country)}` }), el("br"),
-        `${c.members} members · ${fmt(c.tokens)} tokens · 30 days`);
+        totalled(c) ? `${c.members} members · ${fmt(c.tokens)} tokens · 30 days` : "A few members · numbers show from 3");
       tip.style.left = `${event.clientX - box.left}px`; tip.style.top = `${event.clientY - box.top}px`; tip.style.opacity = "1";
       controls.autoRotate = false;
     } else { tip.style.opacity = "0"; controls.autoRotate = true; }
@@ -188,18 +199,20 @@ async function start(): Promise<void> {
   try {
     const response = await fetch("https://claudebar-api.tddworks.com/globe?period=30d");
     if (!response.ok) throw new Error(String(response.status));
-    const body = (await response.json()) as { countries: CountryTotal[]; hiddenCountries: number };
-    placed = body.countries.flatMap((c) => {
-      const centre = where.get(c.country);
-      return centre ? [{ ...c, centre }] : [];
+    const body = (await response.json()) as { countries: CountryTotal[]; present?: string[]; hiddenCountries?: number };
+    const all: Partial<CountryTotal>[] = [...body.countries, ...(body.present ?? []).map((country) => ({ country }))];
+    placed = all.flatMap((c) => {
+      const centre = c.country ? where.get(c.country) : undefined;
+      return c.country && centre ? [{ ...c, country: c.country, centre }] : [];
     });
     const count = $("globe-count");
     if (count) count.textContent = String(placed.length);
-    const hidden = $("globe-hidden");
-    if (hidden) hidden.textContent = String(body.hiddenCountries);
     loading?.remove();
-    if (placed.length === 0) {
-      $("globe-empty")?.removeAttribute("hidden");
+    const empty = $("globe-empty");
+    if (placed.length === 0 && empty) {
+      // An API from before `present` hides small countries rather than naming them.
+      if (body.present === undefined && body.hiddenCountries) empty.textContent = "No country has three members on the globe yet.";
+      empty.removeAttribute("hidden");
     }
     draw();
   } catch {

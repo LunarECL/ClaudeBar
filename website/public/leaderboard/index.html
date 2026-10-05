@@ -59,7 +59,7 @@ a{color:var(--violet)}
 .globe-side .card{background:var(--card);border:var(--line);border-radius:18px;box-shadow:var(--shadow);padding:14px}
 .globe-side .label{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .globe-side .big{font-size:40px;font-weight:800;line-height:1;margin-top:4px}
-#globe-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+#globe-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto}
 #globe-list li{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border:2px solid var(--ink);border-radius:12px;position:relative;overflow:hidden;font-size:13px}
 #globe-list li .fill{position:absolute;inset:0 auto 0 0;background:var(--sky);opacity:.55}
 #globe-list li>*:not(.fill){position:relative}
@@ -96,7 +96,7 @@ a.plink svg{width:14px;height:14px}
     <div class="globe-card">
       <div id="globe" role="img" aria-label="Globe of ClaudeBar members by country"></div>
       <div class="globe-msg" id="globe-loading">Loading the globe…</div>
-      <div class="globe-msg" id="globe-empty" hidden>No country has three members on the globe yet.</div>
+      <div class="globe-msg" id="globe-empty" hidden>No one has shared their country yet.</div>
       <div class="globe-head">
         <h2 id="globe-title">Where ClaudeBar is used</h2>
         <div class="globe-seg" role="group" aria-label="Size markers by">
@@ -105,15 +105,15 @@ a.plink svg{width:14px;height:14px}
         </div>
       </div>
       <div class="globe-legend">
-        <span class="gchip">Country only</span><span class="gchip">Opt-in</span><span class="gchip">≥ 3 members per country</span>
-        <span>Last 30 days · drag to turn</span><span class="gchip" id="globe-backend">…</span>
+        <span class="gchip">Country only</span><span class="gchip">Opt-in</span><span class="gchip">Numbers from 3 members</span>
+        <span>Last 30 days · drag to turn</span>
       </div>
       <div class="globe-tip" id="globe-tip"></div>
     </div>
     <div class="globe-side">
       <div class="card"><div class="label">Countries on the globe</div><div class="big" id="globe-count">0</div></div>
-      <div class="card"><div class="label" id="globe-list-title">Top countries · members</div><ol id="globe-list"></ol></div>
-      <p class="note"><b><span id="globe-hidden">0</span> more countries</b> have fewer than 3 members on the globe, so they aren't shown. <b>Add or remove your country:</b> ClaudeBar → Settings → Leaderboard → Show my country on the globe. Only your country is kept, never your city or IP, and turning it off removes it at once.</p>
+      <div class="card"><div class="label" id="globe-list-title">Countries · members</div><ol id="globe-list"></ol></div>
+      <p class="note"><b>A country shows from its first member.</b> Its numbers show once 3 members there share it, so no number is one person's own. <b>Add or remove your country:</b> ClaudeBar → Settings → Leaderboard → Show my country on the globe. Only your country is kept, never your city or IP, and turning it off removes it at once.</p>
     </div>
   </section>
 

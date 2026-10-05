@@ -333,15 +333,11 @@ struct LeaderboardStandingsView: View {
     }
 
     private var globeText: String {
-        let count = globe?.countries.count ?? 0
+        let count = globe?.countryCount ?? 0
         let countries = count == 0 ? "See where ClaudeBar is used" : count == 1 ? "Members in 1 country" : "Members in \(count) countries"
         guard membership.sharesCountry else { return count == 0 ? countries : countries + " · see the globe" }
         let me = mine?.country.map { "You're on the globe as \(leaderboardCountryLabel($0, hidden: settings.hideLeaderboardCountry))" }
             ?? "You're on the globe"
-        // Below the threshold your country isn't drawn yet; say why, without saying how many others there are.
-        if let country = mine?.country, globe?.countries.contains(where: { $0.country == country }) == false {
-            return "\(me) · shows once 3 members there opt in"
-        }
         return count == 0 ? me : "\(me) · \(countries)"
     }
 
