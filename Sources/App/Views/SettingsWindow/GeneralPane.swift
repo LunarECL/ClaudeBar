@@ -67,32 +67,11 @@ struct GeneralPane: View {
             SettingsCard {
                 SettingsRow(
                     title: "Burn Rate Warnings",
-                    subtitle: "Warn based on consumption pace, not fixed thresholds."
+                    subtitle: "Color by projected usage at reset, not fixed thresholds."
                 ) {
                     SettingsSwitch(isOn: $settings.burnRateWarningEnabled)
                 }
 
-                if settings.burnRateWarningEnabled {
-                    SettingsRowDivider()
-
-                    SettingsRow(
-                        title: "Threshold",
-                        subtitle: "How far above the sustainable pace triggers a warning."
-                    ) {
-                        SettingsSegmentedControl(
-                            options: [1.2, 1.5, 2.0, 3.0],
-                            label: { threshold in
-                                switch threshold {
-                                case 1.2: "1.2x"
-                                case 1.5: "1.5x"
-                                case 2.0: "2.0x"
-                                default: "3.0x"
-                                }
-                            },
-                            selection: $settings.burnRateThreshold
-                        )
-                    }
-                }
             }
         }
     }
