@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Grok** shows your plan (SuperGrok, SuperGrok Heavy, …) and your prepaid balance, and a reset time when xAI names only the billing period. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/grok/README.md)
+- **Six new providers**, off until you turn them on: Cline and Warp limits and credits, Devin's quota from your browser sign-in, Windsurf and JetBrains AI from their apps on your Mac, and OpenAI API spend over 30 days. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/README.md)
+
 ---
 
 ## [0.5.5] - 2026-10-05

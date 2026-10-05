@@ -48,7 +48,7 @@ struct MenuBarNativeIconsTests {
     }
 
     @Test func `should draw every bundled menu bar icon as a mark with see-through space, not an opaque tile`() throws {
-        for name in ["Claude", "Codex", "Copilot", "Cursor", "Gemini", "Antigravity", "Zai", "Bedrock", "AmpCode", "Kimi", "MiniMax", "Mistral", "OpenCode", "Omp", "Grok", "CommandCode", "Vercel"] {
+        for name in ["Claude", "Codex", "Copilot", "Cursor", "Gemini", "Antigravity", "Zai", "Bedrock", "AmpCode", "Kimi", "MiniMax", "Mistral", "OpenCode", "Omp", "Grok", "CommandCode", "Vercel", "Cline", "Warp", "Devin", "Windsurf"] {
             let mask = try #require(NSImage(named: name + "IconMenuBar"), "Missing bundled template for \(name)")
             let image = StatusItemLabelDriver.fittedProviderIcon(mask, ink: .black)
             let bitmap = try pixels(image)
@@ -62,7 +62,7 @@ struct MenuBarNativeIconsTests {
 
     @Test(arguments: [false, true])
     func `should draw every provider's native icon in neutral ink, including added accounts and unknown providers`(dark: Bool) throws {
-        for id in ["claude", "codex", "codex.work", "gemini", "copilot", "antigravity", "zai", "bedrock", "ampcode", "kimi", "kiro", "minimax", "deepseek", "cursor", "mistral", "opencode-go", "omp", "grok", "commandcode", "vercel-gateway", "extension.unknown"] {
+        for id in ["claude", "codex", "codex.work", "gemini", "copilot", "antigravity", "zai", "bedrock", "ampcode", "kimi", "kiro", "minimax", "deepseek", "cursor", "mistral", "opencode-go", "omp", "grok", "commandcode", "vercel-gateway", "cline", "warp", "devin", "windsurf", "jetbrains", "openai", "extension.unknown"] {
             let colors = try visibleColors(StatusItemLabelDriver.providerIcon(for: id, native: true, dark: dark))
             #expect(!colors.isEmpty, "Missing icon for \(id)")
             #expect(colors.allSatisfy { abs($0.redComponent-$0.greenComponent) < 0.01 && abs($0.greenComponent-$0.blueComponent) < 0.01 }, "Colored pixels for \(id)")

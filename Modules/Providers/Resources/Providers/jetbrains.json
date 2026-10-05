@@ -1,0 +1,30 @@
+{
+  "profile": {
+    "id": "jetbrains",
+    "name": "JetBrains AI",
+    "links": { "dashboard": "https://account.jetbrains.com/licenses" },
+    "look": {
+      "symbol": "j.square.fill",
+      "color": { "light": [0.95, 0.2, 0.55], "dark": [1.0, 0.35, 0.65] },
+      "gradientEnd": { "light": [0.45, 0.2, 0.9], "dark": [0.6, 0.35, 1.0] }
+    }
+  },
+  "enabledByDefault": false,
+  "defaultDataSource": "local",
+  "dataSources": [
+    {
+      "kind": "local",
+      "label": "IDE",
+      "summary": "Reads the AI quota your JetBrains IDE saves on this Mac, from the IDE you used last",
+      "fetch": {
+        "file": {
+          "path": [
+            "~/Library/Application Support/JetBrains/*/options/AIAssistantQuotaManager2.xml",
+            "~/Library/Application Support/Google/*/options/AIAssistantQuotaManager2.xml"
+          ]
+        }
+      },
+      "mapping": { "script": { "file": "jetbrains-quota.js" } }
+    }
+  ]
+}

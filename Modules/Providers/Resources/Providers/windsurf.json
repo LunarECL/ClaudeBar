@@ -1,0 +1,29 @@
+{
+  "profile": {
+    "id": "windsurf",
+    "name": "Windsurf",
+    "links": { "dashboard": "https://windsurf.com/subscription/usage" },
+    "look": {
+      "symbol": "wind",
+      "icon": "WindsurfIcon",
+      "color": { "light": [0.0, 0.55, 0.5], "dark": [0.2, 0.8, 0.72] },
+      "gradientEnd": { "light": [0.0, 0.38, 0.36], "dark": [0.1, 0.6, 0.55] }
+    }
+  },
+  "enabledByDefault": false,
+  "defaultDataSource": "local",
+  "dataSources": [
+    {
+      "kind": "local",
+      "label": "Windsurf app",
+      "summary": "Reads the plan Windsurf saves on this Mac, read-only. It updates while Windsurf runs.",
+      "fetch": {
+        "sqlite": {
+          "path": "~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb",
+          "query": "SELECT value FROM ItemTable WHERE key = 'windsurf.settings.cachedPlanInfo' LIMIT 1"
+        }
+      },
+      "mapping": { "script": { "file": "windsurf-plan.js" } }
+    }
+  ]
+}

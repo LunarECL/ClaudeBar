@@ -51,6 +51,12 @@ Or download the signed and notarized DMG from [Releases](https://github.com/tddw
 | Grok | xAI credit allowance per billing period, per product | [docs](docs/providers/grok/README.md) |
 | Command Code | 5-hour and weekly windows, credit balance | [docs](docs/providers/commandcode/README.md) |
 | Vercel Gateway | AI Gateway credit balance | [docs](docs/providers/vercel-gateway/README.md) |
+| Cline | Five-hour, weekly and monthly plan limits | [docs](docs/providers/cline/README.md) |
+| Warp | Monthly AI credits and add-on credits | [docs](docs/providers/warp/README.md) |
+| Devin | Daily and weekly organization quota | [docs](docs/providers/devin/README.md) |
+| Windsurf | Daily and weekly quota, or message and flow-action allowances | [docs](docs/providers/windsurf/README.md) |
+| JetBrains AI | Monthly AI credits from your IDE | [docs](docs/providers/jetbrains/README.md) |
+| OpenAI API | Organization spend over the last 30 days, per line item | [docs](docs/providers/openai/README.md) |
 | Your own | Anything a script can print, via `~/.claudebar/extensions/` | [docs](docs/features/extensions/README.md) |
 
 ## What It Covers
