@@ -14,7 +14,7 @@ struct JSONMapper: Reading {
         if let reason = mapping.notAnObject, !(document is [String: Any]) {
             throw UsageError.parseFailed(reason)
         }
-        let scope = JSONScope(root: document, headers: response.headers, credential: facts.credential)
+        let scope = JSONScope(root: document, headers: response.headers, credential: facts.credential, context: facts.context)
 
         var quotas: [UsageQuota] = []
         for rule in mapping.quotas {

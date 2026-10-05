@@ -6,6 +6,8 @@ import Foundation
 /// - `$.a.b` — from the root of the document
 /// - `a.b` — from the current object (inside `at` or `each`)
 /// - `$header.name` — a response header
+/// - `$credential.name` — a non-secret credential value
+/// - `$context.file.field` — a field of a context file the data source reads
 /// - `$key` — the current key while repeating over a map
 /// - a numeric component indexes an array; a trailing `[*]` is ignored
 struct JSONScope {
@@ -15,30 +17,39 @@ struct JSONScope {
     let key: String?
     /// Non-secret credential values — `$credential.email`.
     let credential: [String: String]
+    /// Each context file's fields — `$context.account.email`.
+    let context: [String: [String: String]]
 
     /// A scope at the root of a document.
-    init(root: Any?, headers: [String: String] = [:], credential: [String: String] = [:]) {
-        self.init(root: root, current: root, headers: headers, key: nil, credential: credential)
+    init(root: Any?, headers: [String: String] = [:], credential: [String: String] = [:],
+         context: [String: [String: String]] = [:]) {
+        self.init(root: root, current: root, headers: headers, key: nil, credential: credential, context: context)
     }
 
-    private init(root: Any?, current: Any?, headers: [String: String], key: String?, credential: [String: String]) {
+    private init(root: Any?, current: Any?, headers: [String: String], key: String?, credential: [String: String],
+                 context: [String: [String: String]]) {
         self.root = root
         self.current = current
         self.headers = headers
         self.key = key
         self.credential = credential
+        self.context = context
     }
 
     /// The same document, reading relative paths from `current` — which may
     /// be missing, and then every relative path reads nothing.
     func moved(to current: Any?, key: String? = nil) -> JSONScope {
-        JSONScope(root: root, current: current, headers: headers, key: key ?? self.key, credential: credential)
+        JSONScope(root: root, current: current, headers: headers, key: key ?? self.key, credential: credential, context: context)
     }
 
     func value(_ path: String) -> Any? {
         if path == "$key" { return key }
         if path.hasPrefix("$credential.") {
             return credential[String(path.dropFirst("$credential.".count))]
+        }
+        if path.hasPrefix("$context.") {
+            let parts = path.dropFirst("$context.".count).split(separator: ".", maxSplits: 1).map(String.init)
+            return parts.count == 2 ? context[parts[0]]?[parts[1]] : nil
         }
         if path.hasPrefix("$header.") {
             return headers[String(path.dropFirst("$header.".count)).lowercased()]
