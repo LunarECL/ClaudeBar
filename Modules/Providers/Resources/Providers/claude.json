@@ -209,9 +209,18 @@
       "cache": {
         "ttl": 900
       },
+      "context": {
+        "account": {
+          "path": "${CLAUDE_CONFIG_DIR:-~}/.claude.json",
+          "email": "$.oauthAccount.emailAddress",
+          "organization": "$.oauthAccount.displayName",
+          "billingType": "$.oauthAccount.billingType"
+        }
+      },
       "mapping": {
         "json": {
           "notAnObject": "Failed to parse usage response",
+          "email": ["$context.account.email"],
           "plan": {
             "path": "$credential.subscriptionType",
             "plans": {

@@ -31,7 +31,7 @@ still hold — they are now lines in `claude.json`, pinned by
 | CLI, pay-as-you-go | `claude /cost` | Used only when `/usage` says it's "only available for subscription plans", or shows the API-billing panel for an account that isn't a subscription |
 | API | `GET https://api.anthropic.com/api/oauth/usage`, header `anthropic-beta: oauth-2025-04-20` | Uses the Claude Code OAuth token |
 | Token refresh | `POST https://platform.claude.com/v1/oauth/token` with Claude Code's public `client_id` | Scopes: `user:profile user:inference user:sessions:claude_code` only. Asking for more scopes (e.g. `user:mcp_servers`) makes the refresh fail |
-| Account identity | `~/.claude.json` → `oauthAccount` (email, display name, `billingType`) | CLI v2.1.79+ moved account details to a separate Status tab |
+| Account identity | `~/.claude.json` → `oauthAccount` (email, display name, `billingType`) — read by every data source as the `account` context file, so the email shows whether the CLI or the API answered | CLI v2.1.79+ moved account details to a separate Status tab |
 | Guest passes | `claude /passes`, which copies the link to the clipboard | Max only (#243) |
 | Daily usage | `~/.claude/projects/*/*.jsonl` | Deduplicated by `(message.id, requestId)`, because Claude Code writes the same usage more than once |
 
