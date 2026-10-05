@@ -67,7 +67,7 @@ struct GeneralPane: View {
             SettingsCard {
                 SettingsRow(
                     title: "Burn Rate Warnings",
-                    subtitle: "Color by projected usage at reset, not fixed thresholds."
+                    subtitle: "Color by projected usage at reset instead of current usage."
                 ) {
                     SettingsSwitch(isOn: $settings.burnRateWarningEnabled)
                 }
