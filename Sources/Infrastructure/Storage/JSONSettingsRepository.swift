@@ -14,6 +14,7 @@ public final class JSONSettingsRepository:
     CodexSettingsRepository,
     HookSettingsRepository,
     NotifySettingsRepository,
+    QuotaAlertSettingsRepository,
     @unchecked Sendable
 {
     /// Shared instance using the default settings file
@@ -465,6 +466,16 @@ public final class JSONSettingsRepository:
 
     public func setCodexVerifiedAtLeastOnce(_ verified: Bool) {
         store.write(value: verified, key: "codex.verifiedAtLeastOnce")
+    }
+
+    // MARK: - QuotaAlertSettingsRepository
+
+    public func quotaAlertPercents() -> [Int] {
+        store.read(key: "alerts.thresholds") ?? []
+    }
+
+    public func setQuotaAlertPercents(_ percents: [Int]) {
+        store.write(value: percents, key: "alerts.thresholds")
     }
 
     // MARK: - HookSettingsRepository

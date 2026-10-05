@@ -48,6 +48,9 @@ struct ClaudeBarApp: App {
     /// *New terminal sessions* — which login `claude` / `codex` start with.
     @State private var newSessions: NewSessions
 
+    /// *Quota alerts* — the person's own percentages (#68).
+    @State private var quotaAlerts: QuotaAlerts
+
     /// Monitors Claude Code sessions via hook events
     @State private var sessionMonitor: SessionMonitor
 
@@ -236,6 +239,13 @@ struct ClaudeBarApp: App {
         self.monitor = monitor
         // *In use* follows every refresh: Switch when low, or a login worth moving to.
         monitor.onRefreshed { refreshed in await newSessions.review(refreshed) }
+        // *Quota alerts* follow every refresh too, on what the person sees.
+        let quotaAlerts = QuotaAlerts(settings: settingsRepository, announcer: QuotaAlertNotifications())
+        self.quotaAlerts = quotaAlerts
+        monitor.onRefreshed { [weak monitor] refreshed in
+            guard let monitor else { return }
+            await quotaAlerts.review(refreshed.id, named: monitor.lineupName(of: refreshed), usage: monitor.usage(of: refreshed))
+        }
         AppLog.monitor.info("QuotaMonitor initialized")
 
         let sessionMonitor = SessionMonitor()
@@ -417,6 +427,7 @@ struct ClaudeBarApp: App {
                 #endif
             }
             .environment(newSessions)
+            .environment(quotaAlerts)
             // Opening/closing the dropdown flips `isMenuPresented`, which makes
             // SwiftUI re-evaluate the scene and wipe the AppKit-drawn button
             // image. The dropdown's lifecycle maps 1:1 to those flips, so
@@ -463,6 +474,7 @@ struct ClaudeBarApp: App {
                 #endif
             }
             .environment(newSessions)
+            .environment(quotaAlerts)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 980, height: 660)

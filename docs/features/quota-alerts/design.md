@@ -7,7 +7,7 @@
 > this says which piece keeps them. Issue [#68](https://github.com/tddworks/ClaudeBar/issues/68),
 > first built in [#447](https://github.com/tddworks/ClaudeBar/pull/447).
 >
-> **Status: PROPOSED.** Mockup: [design-concept/quota-alerts](../../../design-concept/quota-alerts/index.html).
+> **Status: BUILT.** Mockup: [design-concept/quota-alerts](../../../design-concept/quota-alerts/index.html).
 
 ## The question, and who already answers part of it
 

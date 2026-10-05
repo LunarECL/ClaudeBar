@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bedrock** reads a named AWS profile with static keys, a role or a credential process, not only SSO; **Alibaba**'s monthly window and **Claude**'s cost panel read correctly. ([#476](https://github.com/tddworks/ClaudeBar/pull/476))
 - **Settings → Updates** now says which version is ready ("Version 0.5.4 is ready to install") and its button reads Install Update; the sidebar footer names the new version too, instead of only "update available". ([#473](https://github.com/tddworks/ClaudeBar/pull/473))
 
+### Added
+- **Quota alerts**: pick your own percentages in Settings → Sync & Alerts, and get a notification when a login's quota falls below one, once per crossing, by the account's name. ([#479](https://github.com/tddworks/ClaudeBar/pull/479)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/quota-alerts/README.md)
+
 ---
 
 ## [0.5.4] - 2026-10-04
