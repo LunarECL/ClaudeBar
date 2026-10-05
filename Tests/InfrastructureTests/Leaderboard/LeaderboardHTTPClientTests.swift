@@ -158,16 +158,24 @@ struct LeaderboardHTTPClientTests {
         #expect(standings.map(\.link?.handle) == ["jack", nil, nil])
     }
 
-    @Test func `should read the globe's countries and hidden count, unsigned`() async throws {
+    @Test func `should read every country on the globe, unsigned`() async throws {
         var sent: URLRequest?
-        let body = #"{"period":"30d","provider":null,"countries":[{"country":"NL","members":3,"tokens":300}],"hiddenCountries":2}"#
+        let body = #"{"period":"30d","provider":null,"countries":[{"country":"NL","members":3,"tokens":300}],"present":["GR","VN"],"hiddenCountries":2}"#
 
         let globe = try await client(body: body, sent: { sent = $0 }).globe(in: BoardView(period: .thirtyDays))
 
         #expect(sent?.url?.path == "/globe")
         #expect(sent?.url?.query == "period=30d")
         #expect(sent?.value(forHTTPHeaderField: "X-Signature") == nil)
-        #expect(globe == GlobeSummary(countries: [.init(country: "NL", members: 3, tokens: 300)], hiddenCountries: 2))
+        #expect(globe == GlobeSummary(countries: [.init(country: "NL", members: 3, tokens: 300)], present: ["GR", "VN"]))
+    }
+
+    @Test func `should show only the countries with numbers when the server doesn't name the others`() async throws {
+        let body = #"{"period":"30d","provider":null,"countries":[{"country":"NL","members":3,"tokens":300}],"hiddenCountries":2}"#
+
+        let globe = try await client(body: body).globe(in: BoardView(period: .thirtyDays))
+
+        #expect(globe == GlobeSummary(countries: [.init(country: "NL", members: 3, tokens: 300)], present: []))
     }
 
     @Test func `should tell the member whether their country is on the globe`() async throws {
