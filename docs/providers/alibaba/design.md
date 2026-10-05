@@ -73,3 +73,5 @@ The payload is wrapped in varying envelopes, so the parser is deliberately loose
 | Monthly | `perBillMonthUsedQuota` / `perBillMonthTotalQuota` (also `perMonth…`) | `perBillMonthQuotaNextRefreshTime` |
 
 Reset times are accepted as ISO 8601 with offset (`2026-03-12T19:17:15+08:00`), with or without fractional seconds, or as epoch seconds (number or string). Plan name comes from `planName`, `instanceName` or `packageName`. A window with total 0 is skipped; no windows at all → "No quota windows found in payload".
+
+The monthly window's length is the calendar month that ends on its reset, counted in UTC: leap years count, and a reset on the 31st starts from the last day of a shorter previous month. The Mac's timezone and daylight saving don't change it.
