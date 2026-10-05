@@ -88,6 +88,11 @@ jobs:
                       # Skip App layer, Infrastructure/Adapters, Preview files and generated files
                       if '/App/' in file_path or '/Infrastructure/Adapters/' in file_path or 'Preview' in file_path or '/Derived/' in file_path:
                           continue
+                      # Only our own code: the dependencies (Tuist/.build) and the
+                      # build products (.derivedData) are instrumented too, and
+                      # Codecov rejects a report of files it can't find in the repo.
+                      if '/Tuist/.build/' in file_path or '/.derivedData/' in file_path:
+                          continue
 
                       lcov.write(f"SF:{file_path}\n")
 
