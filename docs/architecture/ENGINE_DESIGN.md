@@ -34,6 +34,10 @@ needs; each became a generic piece, never a vendor type:
 | the usage API's model limits, plan and money | JSON mapping rules, not a script: `each` + `where`, names by `firstWord`/`lowercase`, `unique` (first wins), `overLimit` (negative left), `countdown: "hours"`, `plan.plans` from `$credential.`, and a list of `cost` shapes with `when` and exact `{amount, decimals}` minor units |
 | today's usage and guest passes | `UsageHistory` beside the providers (read with the popover open, never in the background; keyed by the login whose logs it reads) and the `GuestPasses` capability |
 | Claude logins in their own config folders | `accounts.folder` with `email` and `accountId.field` as an `IdentityField` (`$context.account.email`), `derived` values (the Keychain service, from a sha256 of the folder), `identity` read from a context file; today's usage and guest passes stay with the default login |
+| a date in a request: "the last 30 days" (OpenAI) | `{{system.day±N.<format>}}` from `SystemValues`, made with the fetch's `now` |
+| a file in a folder named by version, across several apps (JetBrains IDEs) | a `*` in any path, a path as a list, the most recently changed match — `Paths` |
+| a row of an app's own database as the answer (Windsurf) | `fetch.sqlite` over `ReadOnlyQuery`, shared with the `sqlite` key lookup |
+| a sign-in a browser keeps in local storage (Devin) | `browserStorage`, every value from one profile, behind `BrowserStorageReading` |
 
 ## 2 · The engine
 
@@ -290,3 +294,344 @@ which now also makes a source not *Configured* while its files are missing.
   and Kimi pick by data source, not by account.
 - **One-provider escape hatches:** `script` credentials, a mapping that writes
   settings, page fields in script output, `bedrockUsage`.
+
+### 2.9 · What a new provider still can't say
+
+> **Status: BUILT** (2026-10-05). Found while adding Cline,
+> Warp, Devin, Windsurf and Grok's plan; each gap blocked a provider or
+> forced a work-around. None names a vendor.
+
+| Person | Wants | Before |
+|---|---|---|
+| uses an OpenAI Admin key | "what I spent in the last 30 days" | the request needs a start date; a definition can't compute one |
+| uses a JetBrains IDE | "my AI quota, whichever IDE and version" | each IDE version keeps its own folder; a path names one |
+| uses Windsurf | "what the app saved on this Mac, without a shell" | `/bin/sh` + `sqlite3` |
+| signed in to Devin in Chrome | "use my browser sign-in" | a token copied from the browser's developer tools |
+
+Four pieces, each with one owner and one reason to change. Two of them serve
+both sides of a data source, the key and the fetch:
+
+```text
+                 ┌──────────────── <id>.json ─────────────────┐
+                 │  credential   │      fetch       │ mapping │
+                 └──────┬────────┴────────┬─────────┴────┬────┘
+                        ▼                 ▼              ▼
+              CredentialLookup          Fetch       JSON rules / <id>.js
+    environment · setting · keychain    http · steps · jsonRpc · cli · command
+    browserCookies · ★ browserStorage   localServer · cloudWatch
+    jsonFile · sqlite                   file · directory · ★ sqlite
+          │       │                       │            │        │
+          │       │                       │            │        └─► Template.fill ─► ★ SystemValues(now)
+          │       │                       │            │            (http: url · headers · body)
+          │       └─────────┬─────────────┴────────────┘
+          │                 ▼
+          │      ★ Paths.resolve — both sides
+          │        key: jsonFile · sqlite      answer: file · directory · sqlite
+          │
+          └── sqlite (key) ───┐        ┌── ★ sqlite (answer)
+                              ▼        ▼
+                         ★ ReadOnlyQuery — both sides
+                 SQLiteReader (first row → key)   SQLiteFetcher (rows → answer)
+
+★ BrowserStorageReader → @Mockable BrowserStorageReading → SweetCookieKit   (key side only)
+```
+
+#### `SystemValues` (built)
+
+Values the engine computes, made with the fetch's `now`, one row per name:
+`system.timeZone`, `system.osVersion`, `system.now.<format>`,
+`system.day±N.<format>` (UTC midnight, N days away); formats `epoch` ·
+`iso8601` · `date` (`yyyy-MM-dd`). `Template` looks a `system.` name up; a
+new value is a new row, never a branch. HTTP fills them in its URL, headers
+and body; elsewhere a `system.` name stays unfilled.
+
+```text
+DataSources.make(now:) ──► HTTPFetcher ──► SystemValues(now)
+                                              one row per name
+                                              system.timeZone      → "Asia/Shanghai"
+                                              system.osVersion     → "27.0.0"
+                                              system.now.epoch     → 1791210600
+                                              system.day-29.epoch  → UTC midnight 29 days ago
+                                              system.day-29.date   → "2026-09-06"
+Template.fill("start_time={{system.day-29.epoch}}")
+   ├─ system.* ? ──► SystemValues[name]       (never taken from the credential)
+   └─ otherwise ──► credential[name]          (unchanged)
+```
+
+#### `Paths` (built)
+
+The one owner of *which file on disk*, on both sides of a data source: the
+key (`jsonFile`, `sqlite`) and the answer (`file`, `directory`, `sqlite`).
+`PathPattern` is one path or a list, written back the way it was given. A
+`*` stands for part of one folder or file name; of every match the most
+recently changed is used; none is a missing file. A path without `*` means
+what it did.
+
+```text
+"path": ["~/Library/Application Support/JetBrains/*/options/AIAssistantQuotaManager2.xml",
+         "~/Library/Application Support/Google/*/options/AIAssistantQuotaManager2.xml"]
+        │
+        ▼  ~ and ${VAR} expand                  (as before)
+        ▼  * matches within one name
+   IntelliJIdea2025.3/options/…xml   changed 2026-10-05 09:12  ◄─ newest
+   PyCharm2025.2/options/…xml        changed 2026-09-30 17:40
+   AndroidStudio2025.1/options/…xml  changed 2026-08-02 11:03
+        │
+        ▼
+one path → file · directory · jsonFile · sqlite
+no match → a missing file → the source is not Configured
+```
+
+#### `fetch.sqlite` and `ReadOnlyQuery` (built)
+
+A row of an app's own database as the answer: one case, one worker,
+`SQLiteFetcher`. `ReadOnlyQuery`, taken out of `SQLiteReader`, opens
+read-only, refuses a statement that would write, and reads text and UTF-8
+or UTF-16LE BLOBs; the key lookup and the fetch both use it. The answer is
+the rows, `[{column: text}]`. *Configured* while the file exists; its
+`Connection` names no URL and runs nothing.
+
+```text
+"sqlite": { "path": "…/state.vscdb", "query": "SELECT value FROM ItemTable WHERE key = '…'" }
+        │
+        ▼
+SQLiteFetcher ── is the file there? ──► no → not Configured
+        │
+        ▼
+ReadOnlyQuery   (shared with the sqlite key lookup)
+   open read-only, busy timeout 1 s
+   a statement that would write ──► refused, never run
+   each column: TEXT · BLOB as UTF-8 · BLOB as UTF-16LE → text
+        │
+        ▼
+answer: [ { "value": "{\"planName\":\"Pro\",…}" } ]  ──► mapping
+```
+
+#### `browserStorage` (built)
+
+A value a browser keeps for a site, beside `browserCookies`:
+`BrowserStorageReader` behind the `@Mockable` `BrowserStorageReading` port,
+over SweetCookieKit's Chromium localStorage. *Key lookup order* shows
+*Browser storage · app.devin.ai*. Each value names a key (`*` matches any
+part) and, when its value is JSON, a path in it.
+
+```text
+"browserStorage": { "origin": "https://app.devin.ai", "values": { token, organization } }
+        │
+        ▼
+BrowserStorageReader
+   stores = port.stores(origin:)    one per browser profile, in import order
+            Chrome/Default · Chrome/Profile 1 · Arc/Default · …
+        │
+        ▼  for each store:
+           token        = key matching "*auth1_session", then "$.token" in its JSON
+           organization = key matching "last-internal-org-for-external-org-v1-*"
+           has a token? → every value from THIS store → Credential   (never mixed)
+        │
+        ▼
+Credential { token, organization } ──► {{token}} {{organization}}
+                                       never logged · sent only to app.devin.ai
+```
+
+| Law | Owner |
+|---|---|
+| a computed value comes from the fetch's `now`, never the wall clock; days are UTC midnights | `SystemValues` |
+| `*` matches within one folder name; of every match, the most recently changed file; none is a missing file | `Paths` |
+| no database is written: a statement that would change it is refused, for a lookup and a fetch alike | `ReadOnlyQuery` |
+| a database fetch is *Configured* only while its file exists | `SQLiteFetcher` |
+| a credential's values all come from one browser profile, never mixed; the first profile with a `token` wins | `BrowserStorageReader` |
+| a value read from a browser is a credential like a cookie: never logged, sent only to the hosts the definition names | `BrowserStorageReader`, `Connection` |
+
+#### The definitions it makes possible
+
+Each is data only: the definition, its mapping script, one golden test file
+and one registration line.
+
+**Windsurf** — the plan from Windsurf's own database, no shell:
+
+```json
+{
+  "profile": { "id": "windsurf", "name": "Windsurf", "…": "as before" },
+  "enabledByDefault": false,
+  "defaultDataSource": "local",
+  "dataSources": [
+    {
+      "kind": "local",
+      "label": "Windsurf app",
+      "summary": "Reads the plan Windsurf saves on this Mac, read-only. It updates while Windsurf runs.",
+      "fetch": {
+        "sqlite": {
+          "path": "~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb",
+          "query": "SELECT value FROM ItemTable WHERE key = 'windsurf.settings.cachedPlanInfo' LIMIT 1"
+        }
+      },
+      "mapping": { "script": { "file": "windsurf-plan.js" } }
+    }
+  ]
+}
+```
+
+**JetBrains AI** — the newest quota file across every IDE:
+
+```json
+{
+  "profile": {
+    "id": "jetbrains", "name": "JetBrains AI",
+    "links": { "dashboard": "https://account.jetbrains.com/licenses" },
+    "look": { "symbol": "j.square.fill", "icon": "JetBrainsIcon",
+              "color": { "light": [0.95, 0.2, 0.55], "dark": [1.0, 0.35, 0.65] },
+              "gradientEnd": { "light": [0.45, 0.2, 0.9], "dark": [0.6, 0.35, 1.0] } }
+  },
+  "enabledByDefault": false,
+  "defaultDataSource": "local",
+  "dataSources": [
+    {
+      "kind": "local",
+      "label": "IDE",
+      "summary": "Reads the AI quota your JetBrains IDE saves on this Mac, from the IDE you used last",
+      "fetch": {
+        "file": {
+          "path": [
+            "~/Library/Application Support/JetBrains/*/options/AIAssistantQuotaManager2.xml",
+            "~/Library/Application Support/Google/*/options/AIAssistantQuotaManager2.xml"
+          ]
+        }
+      },
+      "mapping": { "script": { "file": "jetbrains-quota.js" } }
+    }
+  ]
+}
+```
+
+`jetbrains-quota.js` finds the `quotaInfo` and `nextRefill` attributes,
+decodes their HTML entities and reads the JSON inside: a monthly *AI
+credits* quota, `current` of `maximum`, resetting at `nextRefill.next`.
+
+**OpenAI API** — the last 30 days of spend, a date the engine computes:
+
+```json
+{
+  "profile": {
+    "id": "openai", "name": "OpenAI API",
+    "links": { "dashboard": "https://platform.openai.com/usage", "status": "https://status.openai.com" },
+    "look": { "symbol": "sparkle", "icon": "OpenAIIcon",
+              "color": { "light": [0.06, 0.64, 0.5], "dark": [0.25, 0.82, 0.66] },
+              "gradientEnd": { "light": [0.04, 0.45, 0.36], "dark": [0.14, 0.62, 0.5] } }
+  },
+  "enabledByDefault": false,
+  "settings": [ { "id": "apiKey", "label": "Admin API key", "kind": "secret", "scope": "account" } ],
+  "defaultDataSource": "api",
+  "dataSources": [
+    {
+      "kind": "api",
+      "label": "Admin API",
+      "summary": "Reads your organization's spend for the last 30 days with an Admin API key",
+      "credential": { "firstOf": [ { "environment": "OPENAI_ADMIN_KEY" }, { "setting": "apiKey" } ] },
+      "fetch": {
+        "http": {
+          "url": "https://api.openai.com/v1/organization/costs?start_time={{system.day-29.epoch}}&bucket_width=1d&limit=30&group_by=line_item",
+          "headers": { "Authorization": "Bearer {{token}}", "Accept": "application/json" },
+          "timeout": 20
+        }
+      },
+      "mapping": { "script": { "file": "openai-costs.js" } },
+      "errors": {
+        "http.401": { "sessionExpired": "Use an organization Admin API key; project keys can't read spend." },
+        "http.403": { "sessionExpired": "Use an organization Admin API key; project keys can't read spend." }
+      }
+    }
+  ],
+  "accounts": { "patch": { "api": { "credential": { "firstOf": null, "setting": "apiKey" } } } }
+}
+```
+
+`openai-costs.js` adds `data[].results[].amount.value` into one `cost`, a
+line per `line_item`, for "Last 30 days".
+
+**Devin** — the browser sign-in first, the pasted token after:
+
+```json
+{
+  "profile": { "id": "devin", "name": "Devin", "…": "as before" },
+  "enabledByDefault": false,
+  "settings": [
+    { "id": "token", "label": "Session token", "kind": "secret", "scope": "account" },
+    { "id": "organization", "label": "Organization ID", "scope": "account",
+      "kind": { "text": { "pattern": "^org[-_][A-Za-z0-9_-]+$" } } }
+  ],
+  "defaultDataSource": "web",
+  "dataSources": [
+    {
+      "kind": "web",
+      "label": "Web",
+      "summary": "Reads your organization's daily and weekly Devin quota with your app.devin.ai sign-in",
+      "credential": {
+        "firstOf": [
+          {
+            "browserStorage": {
+              "origin": "https://app.devin.ai",
+              "values": {
+                "token":        { "key": "*auth1_session", "path": "$.token" },
+                "organization": { "key": "last-internal-org-for-external-org-v1-*" }
+              }
+            }
+          },
+          { "environment": "DEVIN_BEARER_TOKEN", "with": { "organization": "{{setting.organization}}" } },
+          { "setting": "token", "with": { "organization": "{{setting.organization}}" } }
+        ]
+      },
+      "fetch": {
+        "http": {
+          "url": "https://app.devin.ai/api/{{organization}}/billing/quota/usage",
+          "headers": { "Authorization": "Bearer {{token}}", "x-cog-org-id": "{{organization}}", "Accept": "application/json" },
+          "timeout": 15
+        }
+      },
+      "mapping": { "script": { "file": "devin-quota.js" } },
+      "errors": {
+        "http.401": { "sessionExpired": "Sign in to app.devin.ai again, or paste a new session token." },
+        "http.403": { "sessionExpired": "Sign in to app.devin.ai again, or paste a new session token." }
+      }
+    }
+  ],
+  "accounts": {
+    "patch": { "web": { "credential": { "firstOf": null, "setting": "token",
+                                        "with": { "organization": "{{setting.organization}}" } } } }
+  }
+}
+```
+
+`firstOf` tries each lookup in order and the first that finds a token wins;
+each brings its own values, so a browser token never travels with a pasted
+organization. `"firstOf": null` in `accounts.patch` drops that list for an
+added login, which uses only its own pasted token.
+
+What the person sees:
+
+```text
+Settings → Providers → Devin
+┌────────────────────────────────────────────────────────┐
+│ DATA SOURCE      Web                                   │
+│ KEY LOOKUP ORDER 1. Browser storage · app.devin.ai  ✓  │
+│                  2. DEVIN_BEARER_TOKEN                 │
+│                  3. Session token (pasted)             │
+│ SESSION TOKEN    ••••••••            (only if needed)  │
+│ ORGANIZATION ID  org_…               (only if needed)  │
+└────────────────────────────────────────────────────────┘
+
+Settings → Providers → JetBrains AI
+┌────────────────────────────────────────────────────────┐
+│ DATA SOURCE  IDE — reads the quota your JetBrains IDE  │
+│              saves on this Mac, from the IDE used last │
+│ Nothing to paste.                                      │
+└────────────────────────────────────────────────────────┘
+```
+
+**Built** in that order, each test first: `SystemValues` → `Paths` →
+`ReadOnlyQuery` + `fetch.sqlite` → `browserStorage`. Windsurf moved to
+`fetch.sqlite`, Devin reads the browser first, and JetBrains AI and OpenAI
+arrived as definitions — no vendor-named Swift.
+
+**Left for later, each its own design:** paging (a list over several pages,
+a piece around a request, not another `HTTPStep` field) and binary answers
+(protobuf, gRPC-web: `Response`, `ScriptMapper` and `ErrorFact` together).

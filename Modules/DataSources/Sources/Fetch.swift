@@ -24,6 +24,9 @@ public enum Fetch: Sendable, Equatable {
     case cloudWatch(CloudWatchCall)
     /// A folder some tool fills — the names in it.
     case directory(DirectoryCall)
+    /// `"sqlite": { "path": "~/…/state.vscdb", "query": "SELECT …" }` — rows
+    /// of an app's own database, read-only.
+    case sqlite(SQLiteCall)
     /// A script of the person's, run from its own folder with every setting
     /// in its environment — what an extension's section runs.
     case script(ScriptCall)
@@ -75,13 +78,26 @@ public struct ScriptCall: Sendable, Equatable, Codable {
 /// `"directory": { "path": "~/.tool/logs", "match": "^session_" }` — the
 /// names of the entries in a folder, sorted; ready while the folder exists.
 public struct DirectoryCall: Sendable, Equatable, Codable {
-    public let path: String
+    public let path: PathPattern
     /// A pattern an entry's name must match; every entry when absent.
     public let match: String?
 
-    public init(path: String, match: String? = nil) {
+    public init(path: PathPattern, match: String? = nil) {
         self.path = path
         self.match = match
+    }
+}
+
+/// `"sqlite": { "path": "~/…/state.vscdb", "query": "SELECT value FROM …" }`
+/// — the rows an app's own database answers, each column as text. Opened
+/// read-only; a query that would change it is refused.
+public struct SQLiteCall: Sendable, Equatable, Codable {
+    public let path: PathPattern
+    public let query: String
+
+    public init(path: PathPattern, query: String) {
+        self.path = path
+        self.query = query
     }
 }
 
@@ -207,11 +223,12 @@ public struct LocalServerCall: Sendable, Equatable, Codable {
     }
 }
 
-/// `{ "path": "~/.tool/usage.json" }` — `~` and `${VAR:-default}` expand.
+/// `{ "path": "~/.tool/usage.json" }` — `~` and `${VAR:-default}` expand; a
+/// `*` or a list of paths reads the most recently changed file.
 public struct FileCall: Sendable, Equatable, Codable {
-    public let path: String
+    public let path: PathPattern
 
-    public init(path: String) {
+    public init(path: PathPattern) {
         self.path = path
     }
 }
@@ -659,7 +676,7 @@ extension CLICall {
 // MARK: - JSON
 
 extension Fetch: Codable {
-    private static let tags = ["http", "jsonRpc", "cli", "command", "file", "localServer", "cloudWatch", "directory", "script"]
+    private static let tags = ["http", "jsonRpc", "cli", "command", "file", "localServer", "cloudWatch", "directory", "sqlite", "script"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
@@ -675,6 +692,7 @@ extension Fetch: Codable {
         case "localServer": self = .localServer(try container.decode(LocalServerCall.self, forKey: TagKey("localServer")))
         case "cloudWatch": self = .cloudWatch(try container.decode(CloudWatchCall.self, forKey: TagKey("cloudWatch")))
         case "directory": self = .directory(try container.decode(DirectoryCall.self, forKey: TagKey("directory")))
+        case "sqlite": self = .sqlite(try container.decode(SQLiteCall.self, forKey: TagKey("sqlite")))
         case "script": self = .script(try container.decode(ScriptCall.self, forKey: TagKey("script")))
         default: self = .cli(try container.decode(CLICall.self, forKey: TagKey("cli")))
         }
@@ -692,6 +710,7 @@ extension Fetch: Codable {
         case .localServer(let call): try container.encode(call, forKey: TagKey("localServer"))
         case .cloudWatch(let call): try container.encode(call, forKey: TagKey("cloudWatch"))
         case .directory(let call): try container.encode(call, forKey: TagKey("directory"))
+        case .sqlite(let call): try container.encode(call, forKey: TagKey("sqlite"))
         case .script(let call): try container.encode(call, forKey: TagKey("script"))
         }
     }

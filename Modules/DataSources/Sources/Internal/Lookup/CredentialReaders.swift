@@ -22,7 +22,7 @@ struct JSONFileReader: CredentialFinding {
     let environment: @Sendable (String) -> String?
 
     var url: URL {
-        URL(fileURLWithPath: Paths.expand(file.path, homeDirectory: homeDirectory, environment: environment))
+        URL(fileURLWithPath: Paths.resolve(file.path, homeDirectory: homeDirectory, environment: environment))
     }
 
     func find() throws -> FoundCredential? {
@@ -255,24 +255,6 @@ enum CredentialDocument {
             }
         }
         return updated
-    }
-}
-
-/// `~/…` and `${VARIABLE:-default}/…` in a file path.
-enum Paths {
-    static func expand(_ path: String, homeDirectory: URL, environment: @Sendable (String) -> String?) -> String {
-        var path = path
-        if path.hasPrefix("${"), let close = path.firstIndex(of: "}") {
-            let inner = path[path.index(path.startIndex, offsetBy: 2)..<close]
-            let parts = inner.components(separatedBy: ":-")
-            let value = environment(parts[0]).flatMap { $0.isEmpty ? nil : $0 } ?? (parts.count > 1 ? parts[1] : "")
-            path = value + path[path.index(after: close)...]
-        }
-        if path == "~" { return homeDirectory.path }
-        if path.hasPrefix("~/") {
-            return homeDirectory.appendingPathComponent(String(path.dropFirst(2))).path
-        }
-        return path
     }
 }
 
