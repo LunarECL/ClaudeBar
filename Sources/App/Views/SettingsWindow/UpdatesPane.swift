@@ -108,9 +108,9 @@ struct UpdatesPane: View {
             return failure
         }
         if let lastCheck = sparkleUpdater?.lastUpdateCheckDate {
-            "Last checked: \(lastCheck.formatted(date: .abbreviated, time: .shortened))"
+            return "Last checked: \(lastCheck.formatted(date: .abbreviated, time: .shortened))"
         } else {
-            "Not checked yet"
+            return "Not checked yet"
         }
     }
     #endif
