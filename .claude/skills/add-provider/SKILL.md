@@ -237,6 +237,7 @@ example `fallback.enabledBySetting`) is `isOn(_:forProvider:)`.
 ### 6 · Docs and release note
 - `docs/providers/<id>/README.md` (what users see, setup, errors) and `design.md` (sources, fields, gotchas).
 - A row in the **Providers** table of the root `README.md` — name, what it tracks, a link to its `docs/providers/<id>/README.md` — placed by its `"order"`, so the table follows the default lineup.
+- A tile in the landing page's providers grid (`website/public/index.html`, `<div class="pv" data-id="<id>" …>`), in lineup order, and every count on the page raised by one — `npm test` in `website/` reads the definitions and fails until both match.
 - One line under `## [Unreleased]` in `CHANGELOG.md`.
 - `python3 scripts/gen-docs.py && python3 scripts/check-docs.py --strict`.
 
@@ -261,5 +262,5 @@ Each moves to its new place the first time it's saved, and each needs a test.
 - [ ] Any new mapping/fetch/lookup ability added generically to `DataSources`, test-first, and listed in ENGINE_DESIGN §1
 - [ ] `"order"` set if it has a place in the default lineup, and its id in `DetectionTests`
 - [ ] `profile.look` filled in and the icon added to the asset catalog
-- [ ] Provider docs, its row in the root `README.md` Providers table, and the CHANGELOG line written; docs check passes
+- [ ] Provider docs, its row in the root `README.md` Providers table, its landing-page tile and counts (`npm test` in `website/`), and the CHANGELOG line written; docs check passes
 - [ ] `tuist test` green
