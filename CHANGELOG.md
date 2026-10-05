@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.6] - 2026-10-05
+
 ### Changed
 - **Leaderboard globe**: the globe on the web board opens facing where members are, marks each country with a labelled glowing dot, and shows a country's details on a tap as well as a hover, so phones get them too. ([#493](https://github.com/tddworks/ClaudeBar/pull/493)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md)
 - **License**: ClaudeBar is now licensed under Apache 2.0 instead of MIT. It stays free and open source, and the license now also grants patent rights. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/LICENSE)
@@ -127,7 +131,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/tddworks/ClaudeBar/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/tddworks/ClaudeBar/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/tddworks/ClaudeBar/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/tddworks/ClaudeBar/compare/v0.5.2...v0.5.3
