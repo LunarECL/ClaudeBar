@@ -260,9 +260,15 @@ let project = Project(
                     "ENABLE_PREVIEWS": "YES",
                     "CODE_SIGN_IDENTITY": "-",
                     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+                    "PRODUCT_BUNDLE_IDENTIFIER": "com.tddworks.claudebar",
                 ],
                 debug: [
                     "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG ENABLE_SPARKLE",
+                    // A dev or test copy must never share the installed app's
+                    // bundle ID: Sparkle's installer watches only the first
+                    // running app with it, so a running debug build can break
+                    // the installed app's update handshake (issue #450).
+                    "PRODUCT_BUNDLE_IDENTIFIER": "com.tddworks.claudebar.debug",
                 ],
                 release: [
                     "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "ENABLE_SPARKLE",
@@ -336,7 +342,6 @@ let project = Project(
                 .target(name: "ClaudeBar"),
                 .target(name: "Domain"),
                 .target(name: "Infrastructure"),
-                .external(name: "Sparkle"),
             ]
         ),
 

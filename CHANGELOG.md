@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Leaderboard globe**: your country shows on the globe from the first member there who shares it, so the globe is no longer empty while members are spread out. Members and tokens for a country still show only once three members there share it, so no number is one person's own. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md) ([#480](https://github.com/tddworks/ClaudeBar/pull/480))
 
 ### Fixed
+- **Updating** works while a debug or test copy of ClaudeBar is running: debug builds now have their own bundle ID. Update failures are logged again, without counting "no update found" as one. ([#450](https://github.com/tddworks/ClaudeBar/issues/450))
 - **Leaderboard**: your row no longer shows twice. The copy under the board appears only while your place is scrolled out of sight. ([#477](https://github.com/tddworks/ClaudeBar/pull/477))
 - **Codex** works with only the Codex desktop app installed: ClaudeBar runs the `codex` inside it, and a `codex` on your PATH still comes first. ([#476](https://github.com/tddworks/ClaudeBar/pull/476))
 - **Gemini, Kiro, Grok and Kimi**: an added account can't reuse your usual login's folder, and a folder typed with `~` now reaches the CLI. ([#476](https://github.com/tddworks/ClaudeBar/pull/476))
@@ -80,7 +81,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Appearance → Native menu bar icons gives every provider account a monochrome mark that follows light and dark menu bars, while keeping quota colors. Off by default. ([#380](https://github.com/tddworks/ClaudeBar/pull/380))
 
 ### Changed
-- A failed update check or install is no longer shown as "up to date": Settings → Updates says what failed, update errors land in the log under `updates`, and a warning tells you when a second ClaudeBar instance could break the install. ([#450](https://github.com/tddworks/ClaudeBar/issues/450))
 - Menu bar: Show Names for Multiple Accounts now explains that names appear only when the same provider has multiple enabled accounts, and no longer promises account details on hover. ([#390](https://github.com/tddworks/ClaudeBar/pull/390))
 - Claude's daily usage cost now prices cache writes kept for an hour at the 1-hour rate instead of the 5-minute one. Claude Code writes most of its cache that way, so estimates were about 10% low. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
 - Claude's daily usage cost uses current list prices for the newest models (Opus 5.5, Sonnet 5.5, Fable 5.1, Opus 4.5–4.7, Sonnet 4.5), and Claude's prices now live in a data file. ([#331](https://github.com/tddworks/ClaudeBar/issues/331))
