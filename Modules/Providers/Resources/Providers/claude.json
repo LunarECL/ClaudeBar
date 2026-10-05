@@ -61,8 +61,10 @@
             "Yes, I trust this folder": "\r"
           },
           "session": {
+            "id": { "stable": "ClaudeBar Probe" },
             "create": ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"],
             "resume": ["--resume", "{{id}}"],
+            "resumeOn": ["already in use"],
             "recreateOn": ["no conversation found", "no session found"],
             "unsupportedOn": [
               "unknown option '--session-id'",
@@ -128,8 +130,10 @@
             "Yes, I trust this folder": "\r"
           },
           "session": {
+            "id": { "stable": "ClaudeBar Probe" },
             "create": ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"],
             "resume": ["--resume", "{{id}}"],
+            "resumeOn": ["already in use"],
             "recreateOn": ["no conversation found", "no session found"],
             "unsupportedOn": [
               "unknown option '--session-id'",

@@ -642,10 +642,35 @@ extension CLICall {
     /// back to the call's plain args. Which session a login is in is the
     /// worker's own memory, never part of a definition.
     public struct Session: Sendable, Equatable, Codable {
+        /// How the session's id is chosen. Without one, a random id the worker
+        /// remembers for its lifetime.
+        public enum ID: Sendable, Equatable, Codable {
+            /// `{ "stable": "ClaudeBar Probe" }` — a UUID derived from this text
+            /// and the call's environment: one per login, the same forever.
+            case stable(String)
+
+            private enum CodingKeys: String, CodingKey { case stable }
+
+            public init(from decoder: Decoder) throws {
+                self = .stable(try decoder.container(keyedBy: CodingKeys.self).decode(String.self, forKey: .stable))
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                switch self {
+                case .stable(let text): try container.encode(text, forKey: .stable)
+                }
+            }
+        }
+
+        public let id: ID?
         /// Args appended to the call that creates the session.
         public let create: [String]
         /// Args appended to a run that resumes the session.
         public let resume: [String]
+        /// Output meaning a stable session's id is already taken — the same id
+        /// is resumed.
+        public let resumeOn: [String]
         /// Output meaning the session no longer exists — it is created again
         /// under a fresh id.
         public let recreateOn: [String]
@@ -654,19 +679,24 @@ extension CLICall {
         /// prompt or a hook's transcript.
         public let unsupportedOn: [String]
 
-        public init(create: [String], resume: [String], recreateOn: [String] = [], unsupportedOn: [String] = []) {
+        public init(id: ID? = nil, create: [String], resume: [String], resumeOn: [String] = [],
+                    recreateOn: [String] = [], unsupportedOn: [String] = []) {
+            self.id = id
             self.create = create
             self.resume = resume
+            self.resumeOn = resumeOn
             self.recreateOn = recreateOn
             self.unsupportedOn = unsupportedOn
         }
 
-        private enum CodingKeys: String, CodingKey { case create, resume, recreateOn, unsupportedOn }
+        private enum CodingKeys: String, CodingKey { case id, create, resume, resumeOn, recreateOn, unsupportedOn }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decodeIfPresent(ID.self, forKey: .id)
             create = try container.decode([String].self, forKey: .create)
             resume = try container.decode([String].self, forKey: .resume)
+            resumeOn = try container.decodeIfPresent([String].self, forKey: .resumeOn) ?? []
             recreateOn = try container.decodeIfPresent([String].self, forKey: .recreateOn) ?? []
             unsupportedOn = try container.decodeIfPresent([String].self, forKey: .unsupportedOn) ?? []
         }

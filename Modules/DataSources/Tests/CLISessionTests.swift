@@ -413,4 +413,126 @@ struct CLISessionTests {
         #expect(launches.recorded[0] == ["/usage", "--allowed-tools", ""])
         #expect(response.text.contains("65% left"))
     }
+
+    // MARK: - A stable session: one id per login, the same forever
+
+    private func stableSession() -> CLICall.Session {
+        CLICall.Session(
+            id: .stable("ClaudeBar Probe"),
+            create: ["--session-id", "{{id}}", "--name", "ClaudeBar Probe"],
+            resume: ["--resume", "{{id}}"],
+            resumeOn: ["already in use"],
+            unsupportedOn: ["unknown option '--session-id'"]
+        )
+    }
+
+    private func stableCall(folder: String? = nil) -> CLICall {
+        CLICall(cli: "claude", args: ["/usage", "--allowed-tools", ""], timeout: 20,
+                environment: ProcessEnvironment(set: folder.map { ["CLAUDE_CONFIG_DIR": $0] } ?? [:]),
+                session: stableSession())
+    }
+
+    /// The id a run was given, from its `--session-id` or `--resume` argument.
+    private func sessionID(_ args: [String]) -> String? {
+        for flag in ["--session-id", "--resume"] {
+            if let at = args.firstIndex(of: flag), at + 1 < args.count { return args[at + 1] }
+        }
+        return nil
+    }
+
+    @Test
+    func `should create the session under the same id on every run, without a resume first`() async throws {
+        let launches = Launches()
+        let executor = MockCLIExecutor()
+        screen(usageScreen, executor: executor, launches: launches)
+        let runner = self.runner(stableCall(), executor: executor)
+
+        _ = try await runner.run()
+        _ = try await runner.run()
+
+        #expect(launches.recorded.count == 2)
+        #expect(launches.recorded.allSatisfy { !$0.contains("--resume") && $0.contains("--session-id") })
+        let ids = launches.recorded.compactMap(sessionID)
+        #expect(ids.count == 2 && ids[0] == ids[1])
+        #expect(UUID(uuidString: ids[0]) != nil)
+    }
+
+    @Test
+    func `should keep a login's session id across restarts`() async throws {
+        let first = Launches(), second = Launches()
+        let before = MockCLIExecutor(), after = MockCLIExecutor()
+        screen(usageScreen, executor: before, launches: first)
+        screen(usageScreen, executor: after, launches: second)
+
+        _ = try await runner(stableCall(folder: "/Users/me/.claude"), executor: before).run()
+        _ = try await runner(stableCall(folder: "/Users/me/.claude"), executor: after, memory: SessionMemory()).run()
+
+        #expect(first.recorded.first.flatMap(sessionID) == second.recorded.first.flatMap(sessionID))
+    }
+
+    @Test
+    func `should give a login in another folder its own session id`() async throws {
+        let personal = Launches(), work = Launches()
+        let one = MockCLIExecutor(), two = MockCLIExecutor()
+        screen(usageScreen, executor: one, launches: personal)
+        screen(usageScreen, executor: two, launches: work)
+
+        _ = try await runner(stableCall(), executor: one).run()
+        _ = try await runner(stableCall(folder: "/Users/me/work-claude"), executor: two).run()
+
+        #expect(personal.recorded.first.flatMap(sessionID) != work.recorded.first.flatMap(sessionID))
+    }
+
+    @Test
+    func `should resume the same id when the CLI says the session is already in use`() async throws {
+        let launches = Launches()
+        let executor = MockCLIExecutor()
+        let taken = "Error: Session\u{1B}[8GID\u{1B}[11Gis\u{1B}[14Galready\u{1B}[22Gin\u{1B}[25Guse"
+        given(executor).execute(
+            binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any
+        ).willProduce { @Sendable _, args, _, _, _, _ in
+            launches.record(args)
+            return args.contains("--resume") ? CLIResult(output: usageScreen, exitCode: 0) : CLIResult(output: taken, exitCode: 1)
+        }
+
+        let result = try await runner(stableCall(), executor: executor).run()
+
+        #expect(result.output == usageScreen)
+        #expect(launches.recorded.count == 2)
+        #expect(launches.recorded[1].contains("--resume"))
+        #expect(sessionID(launches.recorded[0]) == sessionID(launches.recorded[1]))
+    }
+
+    @Test
+    func `should run the CLI plainly for good when it refuses the stable session's flags`() async throws {
+        let launches = Launches()
+        let executor = MockCLIExecutor()
+        given(executor).execute(
+            binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any
+        ).willProduce { @Sendable _, args, _, _, _, _ in
+            launches.record(args)
+            return args.contains("--session-id")
+                ? CLIResult(output: "error: unknown option '--session-id'", exitCode: 1)
+                : CLIResult(output: usageScreen, exitCode: 0)
+        }
+        let runner = self.runner(stableCall(), executor: executor)
+
+        _ = try await runner.run()
+        _ = try await runner.run()
+
+        #expect(launches.recorded.map { $0 } == [
+            ["/usage", "--allowed-tools", "", "--session-id", sessionID(launches.recorded[0]) ?? "", "--name", "ClaudeBar Probe"],
+            ["/usage", "--allowed-tools", ""],
+            ["/usage", "--allowed-tools", ""],
+        ])
+    }
+
+    @Test
+    func `should read a stable session's id and resume phrases from the definition and write them back`() throws {
+        let json = #"{"cli":"claude","session":{"id":{"stable":"ClaudeBar Probe"},"create":["--session-id","{{id}}"],"resume":["--resume","{{id}}"],"resumeOn":["already in use"]}}"#
+        let call = try JSONDecoder().decode(CLICall.self, from: Data(json.utf8))
+        #expect(call.session?.id == .stable("ClaudeBar Probe"))
+        #expect(call.session?.resumeOn == ["already in use"])
+        #expect(try JSONDecoder().decode(CLICall.self, from: try JSONEncoder().encode(call)) == call)
+    }
 }
