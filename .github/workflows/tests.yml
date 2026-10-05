@@ -63,68 +63,64 @@ jobs:
             -skipMacroValidation \
             -resultBundlePath TestResults.xcresult
 
+      # Codecov counts covered lines from lcov's DA records, so the report
+      # needs every line's count, not each function's totals (those uploads
+      # processed to 0 files). Only our own code: the dependencies
+      # (Tuist/.build) and build products are instrumented too.
       - name: Generate Coverage Report
         run: |
-          # Convert xcresult to JSON
-          xcrun xccov view --report --json TestResults.xcresult > coverage_report.json
-
-          # Convert to lcov format
           python3 << 'EOF'
-          import json
+          import json, os, subprocess, sys
 
-          with open('coverage_report.json', 'r') as f:
-              data = json.load(f)
+          root = os.getcwd() + '/'
+          bundle = 'TestResults.xcresult'
 
+          def xccov(*args):
+              return subprocess.run(['xcrun', 'xccov', 'view', '--archive', *args, bundle],
+                                    check=True, capture_output=True, text=True).stdout
+
+          def ours(path):
+              if not path.startswith(root):
+                  return False
+              rel = path[len(root):]
+              if rel.startswith(('Tuist/', '.derivedData/', 'Derived/')) or '/Derived/' in rel:
+                  return False
+              if '/Tests/' in rel or rel.startswith('Tests/') or 'Preview' in rel:
+                  return False
+              if rel.startswith('Sources/App/') or '/Infrastructure/Adapters/' in rel:
+                  return False
+              return rel.endswith('.swift')
+
+          files = [p for p in xccov('--file-list').splitlines() if ours(p.strip())]
+          written = covered = total = 0
           with open('coverage.lcov', 'w') as lcov:
-              for target in data.get('targets', []):
-                  target_name = target.get('name', '')
-                  # Skip test targets and external dependencies
-                  if 'Tests' in target_name or 'Mockable' in target_name:
+              for path in files:
+                  report = json.loads(xccov('--json', '--file', path))
+                  lines = report.get(path) if isinstance(report, dict) else None
+                  if lines is None and isinstance(report, dict) and len(report) == 1:
+                      lines = next(iter(report.values()))
+                  lines = [l for l in (lines or []) if l.get('isExecutable')]
+                  if not lines:
                       continue
+                  lcov.write(f"SF:{path[len(root):]}\n")
+                  hit = 0
+                  for l in lines:
+                      count = l.get('executionCount') or 0
+                      lcov.write(f"DA:{l['line']},{count}\n")
+                      hit += count > 0
+                  lcov.write(f"LF:{len(lines)}\nLH:{hit}\nend_of_record\n")
+                  written += 1; covered += hit; total += len(lines)
 
-                  for file_info in target.get('files', []):
-                      file_path = file_info.get('path', '')
-
-                      # Skip App layer, Infrastructure/Adapters, Preview files and generated files
-                      if '/App/' in file_path or '/Infrastructure/Adapters/' in file_path or 'Preview' in file_path or '/Derived/' in file_path:
-                          continue
-
-                      lcov.write(f"SF:{file_path}\n")
-
-                      fn_found = 0
-                      fn_hit = 0
-                      lines_found = 0
-                      lines_hit = 0
-
-                      for function in file_info.get('functions', []):
-                          name = function.get('name', 'unknown')
-                          line = function.get('lineNumber', 0)
-                          count = function.get('executionCount', 0)
-                          exec_lines = function.get('executableLines', 0)
-                          covered_lines = function.get('coveredLines', 0)
-
-                          lcov.write(f"FN:{line},{name}\n")
-                          lcov.write(f"FNDA:{count},{name}\n")
-                          fn_found += 1
-                          if count > 0:
-                              fn_hit += 1
-
-                          lines_found += exec_lines
-                          lines_hit += covered_lines
-
-                      lcov.write(f"FNF:{fn_found}\n")
-                      lcov.write(f"FNH:{fn_hit}\n")
-                      lcov.write(f"LF:{lines_found}\n")
-                      lcov.write(f"LH:{lines_hit}\n")
-                      lcov.write("end_of_record\n")
-
-          print("Generated coverage.lcov")
+          print(f"coverage.lcov: {written} files, {covered}/{total} lines")
+          if written == 0:
+              sys.exit("No coverage lines found for our own sources")
           EOF
 
       - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v6
         with:
           files: coverage.lcov
+          disable_search: true
           fail_ci_if_error: false
           verbose: true
         env:
