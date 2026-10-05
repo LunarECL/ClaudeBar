@@ -244,27 +244,32 @@ extension Fetch {
 
 ### 2.7 · Where a provider's CLI is
 
-> **Status: DECIDED** (2026-10-05, for #458; journey moment 3a) — not built:
-> today only sign-in looks beyond the PATH, through `signIn.alsoAt`.
+> **Status: DECIDED** (2026-10-05, for #458; journey moment 3a) — not built.
 
-*Where is this product's program on this Mac?* is one question per product, so
-the definition answers it once, beside the name — a place its own app installs
-the CLI when it isn't on the PATH:
+*Where is this product's program on this Mac?* already has one answer per
+product: the **CLI location**, which `runningCLI` applies to every call that
+starts the CLI — each fetch, a credential refresh, Add Account's sign-in.
+What is missing is only its **default** when the person chose none and the
+program isn't on the PATH, but the product's own app carries one. So `cli`
+says every place the program may be, in order:
 
 ```json
-"cli": "acme",
-"cliAlsoAt": ["/Applications/Acme.app/Contents/Resources/acme"]
+"cli": ["acme", "/Applications/Acme.app/Contents/Resources/acme"]
 ```
+
+A bare name is looked for on the PATH, a path is taken as it is. The first
+entry is the name every call runs; `"cli": "acme"` is the same as `["acme"]`,
+so no definition changes unless its app carries the program.
 
 | Law | Owner |
 |---|---|
-| a chosen *CLI location* is the only answer: missing means *CLI not found*, never another copy | `ProviderDefinition.runningCLI` |
-| otherwise the PATH, then the first `cliAlsoAt` place that is an executable; asked each time the program starts | the locator in `DataSources` |
-| both answers reach every call that starts the CLI: each fetch, a credential `refresh.cli`, Add Account's `signIn` | `ProviderDefinition.runningCLI`, the locator |
+| the CLI location is the one the person chose; else the first entry of `cli` that is found. A chosen one that is missing is *CLI not found*, never another copy | `Configuration` |
+| found when the provider is configured — at launch and when the CLI location changes; the PATH is asked only when a later entry exists on this Mac | `Configuration` |
+| every call that starts the CLI follows the location; no call carries places of its own | `ProviderDefinition.runningCLI` |
 
-`cliAlsoAt` replaces `signIn.alsoAt`, which only sign-in read. Which places a
-product uses, and since which version, is that provider's research: its
-`design.md` ([Codex](../providers/codex/design.md#desktop-app-cli)).
+`signIn.alsoAt`, which only sign-in read, becomes entries of `cli`; nothing
+in `DataSources` changes. Which places a product uses is that provider's
+research: its `design.md` ([Codex](../providers/codex/design.md#desktop-app-cli)).
 
 ### 2.8 · Kept as they were, and left out
 

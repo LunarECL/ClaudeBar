@@ -239,8 +239,8 @@ Full email remains in menu-bar tooltips when a visible label is shortened.
 
 The Codex desktop app ships its own `codex` inside its bundle, so a person with
 only the app has no `codex` on the PATH. Today only Add Account's sign-in
-looks there (`signIn.alsoAt`); every call will, once `codex.json` declares them in
-`cliAlsoAt` ([where a provider's CLI is](../../architecture/ENGINE_DESIGN.md#27--where-a-providers-cli-is)).
+looks there (`signIn.alsoAt`); every call will, once `codex.json` lists them in
+`cli` ([where a provider's CLI is](../../architecture/ENGINE_DESIGN.md#27--where-a-providers-cli-is)).
 A ChatGPT-bundled copy under `ChatGPT.app/Contents/Resources/codex-cli/` was
 reported in [#458](https://github.com/tddworks/ClaudeBar/pull/458), not yet
 confirmed in a shipping build; add it once it is.
