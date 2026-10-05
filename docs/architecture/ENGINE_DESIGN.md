@@ -233,7 +233,8 @@ extension Fetch {
 
 - **Nothing else switches over the cases but the factory.**
   `ProviderSharing` (*Import*'s "sends your key to" and "runs") and
-  `ProviderDefinition.runningCLI` read the case's own answer; the Add Provider
+  `ProviderDefinition.runningCLI` read the case's own answer (where the CLI
+  is found: §2.7); the Add Provider
   sheet asks the definition (`neededSettings`), not the lookup's cases.
 - **Adding a case is:**
   - the enum line
@@ -241,7 +242,31 @@ extension Fetch {
   - its worker
   - one factory line
 
-### 2.7 · Kept as they were, and left out
+### 2.7 · Where a provider's CLI is
+
+> **Status: PROPOSED** (for #458) — not built: today only sign-in looks
+> beyond the PATH, through `signIn.alsoAt`.
+
+*Where is this product's program on this Mac?* is one question per product, so
+the definition answers it once, beside the name — a place its own app installs
+the CLI when it isn't on the PATH:
+
+```json
+"cli": "acme",
+"cliAlsoAt": ["/Applications/Acme.app/Contents/Resources/acme"]
+```
+
+| Law | Owner |
+|---|---|
+| a chosen *CLI location* is the only answer: missing means *CLI not found*, never another copy | `ProviderDefinition.runningCLI` |
+| otherwise the PATH, then the first `cliAlsoAt` place that is an executable; asked each time the program starts | the locator in `DataSources` |
+| both answers reach every call that starts the CLI: each fetch, a credential `refresh.cli`, Add Account's `signIn` | `ProviderDefinition.runningCLI`, the locator |
+
+`cliAlsoAt` replaces `signIn.alsoAt`, which only sign-in read. Which places a
+product uses, and since which version, is that provider's research: its
+`design.md` ([Codex](../providers/codex/design.md#desktop-app-cli)).
+
+### 2.8 · Kept as they were, and left out
 
 **Kept as built in the PRs:**
 - `browserCookies` + `BrowserCookieReader` (SweetCookieKit, behind a
