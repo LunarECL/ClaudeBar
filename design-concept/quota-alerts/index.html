@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quota Alerts — Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FFF8EC;--dot:#E9DCC4;--ink:#1E1B2E;--muted:#5E5873;--card:#fff;--lav:#EDE6FF;--mint:#9FE3B8;--sun:#FFD84D;--violet:#7C5CFF;--red:#FF8A8A;--line:2.5px solid var(--ink);--shadow:3px 3px 0 var(--ink)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#1B1926;--dot:#2C2940;--ink:#F4EEE2;--muted:#B7B0C8;--card:#26233A;--lav:#332D52}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);background-image:radial-gradient(var(--dot) 1.4px,transparent 1.4px);background-size:18px 18px;color:var(--ink);font:500 15px/1.45 "Bricolage Grotesque",system-ui,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:36px 16px 64px;display:flex;flex-direction:column;gap:24px}
+h1{margin:0;font-size:clamp(28px,5vw,40px);font-weight:800;letter-spacing:-.02em;line-height:1}
+.sub{margin:6px 0 0;color:var(--muted);max-width:760px}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:12px;flex:1 1 380px;min-width:0}
+.section-title{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0}
+.card{background:var(--card);border:var(--line);border-radius:18px;box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:12px}
+.label{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted)}
+.mono{font-family:"JetBrains Mono",monospace}
+.title{font-weight:800;font-size:15px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--ink);border-radius:999px;padding:3px 6px 3px 12px;font-weight:800;font-size:13px;background:var(--sun);color:#1E1B2E}
+.chip.builtin{background:transparent;color:var(--muted);border-style:dashed;padding:3px 12px}
+.chip button{border:0;background:transparent;font:800 14px system-ui;cursor:pointer;color:#1E1B2E;padding:0 4px;line-height:1}
+.add{display:flex;gap:8px;align-items:center}
+.add input{width:76px;border:2px solid var(--ink);border-radius:10px;padding:5px 8px;font:700 13px "JetBrains Mono",monospace;background:var(--card);color:var(--ink)}
+.btn{border:2px solid var(--ink);border-radius:10px;padding:5px 12px;font:800 13px "Bricolage Grotesque";background:var(--lav);color:var(--ink);cursor:pointer;box-shadow:2px 2px 0 var(--ink)}
+.btn:disabled{opacity:.5;cursor:default}
+.refuse{font-size:12px;font-weight:700;color:#C2410C;min-height:18px}
+.login{display:grid;grid-template-columns:120px 1fr 52px;gap:10px;align-items:center}
+.login input{accent-color:var(--violet);width:100%}
+.note{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:var(--line);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow);animation:in .25s ease-out}
+.note .icon{width:30px;height:30px;border-radius:8px;background:var(--violet);color:#fff;display:grid;place-items:center;font-weight:800;flex:none}
+.note b{display:block;font-size:13px}
+.note span{font-size:13px;color:var(--muted)}
+@keyframes in{from{transform:translateY(-6px);opacity:0}}
+.log{display:flex;flex-direction:column;gap:8px;min-height:60px}
+.rules li{margin:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Quota alerts</h1>
+    <p class="sub">Journey moment 19 — Mia wants a warning sooner than the built-in 20%. Add a percentage, then drag a login's quota down and watch when a notification comes, and when it doesn't.</p>
+  </header>
+
+  <div class="row">
+    <div class="col">
+      <p class="section-title">Settings → Sync &amp; Alerts</p>
+      <div class="card">
+        <div>
+          <div class="title">Quota alerts</div>
+          <div class="hint">Tell me when a login's quota falls below a percentage I pick — once, and again only after it climbs back.</div>
+        </div>
+        <div class="label">Alert me below</div>
+        <div class="chips" id="chips"></div>
+        <div class="add">
+          <input id="pct" class="mono" placeholder="35" inputmode="numeric" aria-label="Percentage">
+          <span class="hint">%</span>
+          <button class="btn" id="addBtn">Add</button>
+          <span class="hint" id="count"></span>
+        </div>
+        <div class="refuse" id="refuse" role="status"></div>
+        <div class="hint">ClaudeBar already alerts at 20% and when a quota is empty.</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <p class="section-title">After a refresh</p>
+      <div class="card">
+        <div class="label">Lowest quota left, per login (hidden quotas left out)</div>
+        <div class="login"><b>Claude · me</b><input type="range" min="0" max="100" value="80" data-login="Claude · me"><span class="mono" data-out="Claude · me">80%</span></div>
+        <div class="login"><b>Claude · work</b><input type="range" min="0" max="100" value="62" data-login="Claude · work"><span class="mono" data-out="Claude · work">62%</span></div>
+        <div class="label">Notifications</div>
+        <div class="log" id="log"><span class="hint">None yet.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">The rules this shows</div>
+    <ul class="rules">
+      <li>Once below a percentage — quiet while below — again only after climbing to it + 1.</li>
+      <li>Per login, named as the lineup names it: <i>Claude · work</i>.</li>
+      <li>Whole percents 1–99, at most five; 20% and 0% are refused (<i>Already alerted</i>).</li>
+      <li>The status alerts and the menu bar colours don't change.</li>
+    </ul>
+  </div>
+</div>
+<script>
+const MAX = 5, BUILTIN = [20, 0];
+let percents = [35];
+const below = {};      // login -> Set of percents already told
+const chips = document.getElementById('chips'), refuse = document.getElementById('refuse');
+const input = document.getElementById('pct'), log = document.getElementById('log');
+
+function render() {
+  chips.innerHTML = '';
+  [...percents].sort((a, b) => b - a).forEach(p => {
+    const c = document.createElement('span'); c.className = 'chip'; c.textContent = p + '%';
+    const x = document.createElement('button'); x.textContent = '×'; x.title = 'Remove ' + p + '%';
+    x.onclick = () => { percents = percents.filter(q => q !== p); refuse.textContent = ''; render(); };
+    c.appendChild(x); chips.appendChild(c);
+  });
+  BUILTIN.forEach(p => { const c = document.createElement('span'); c.className = 'chip builtin'; c.textContent = p + '% · built in'; chips.appendChild(c); });
+  document.getElementById('count').textContent = percents.length + ' / ' + MAX;
+  document.getElementById('addBtn').disabled = percents.length >= MAX;
+}
+
+function add() {
+  const v = Number(input.value.replace('%', '').trim());
+  if (!Number.isInteger(v) || v < 1 || v > 99) { refuse.textContent = 'Enter a whole percent from 1 to 99.'; return; }
+  if (BUILTIN.includes(v)) { refuse.textContent = 'Already alerted — ClaudeBar tells you at ' + v + '%.'; return; }
+  if (percents.includes(v)) { refuse.textContent = v + '% is already on the list.'; return; }
+  if (percents.length >= MAX) { refuse.textContent = 'Up to five.'; return; }
+  percents.push(v); input.value = ''; refuse.textContent = ''; render();
+}
+document.getElementById('addBtn').onclick = add;
+input.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+
+function review(login, left) {
+  const told = below[login] || (below[login] = new Set());
+  [...percents].sort((a, b) => b - a).forEach(p => {
+    if (left < p && !told.has(p)) { told.add(p); notify(login, p, left); }
+    else if (left >= p + 1) told.delete(p);
+  });
+}
+
+function notify(login, p, left) {
+  if (log.querySelector('.hint')) log.innerHTML = '';
+  const n = document.createElement('div'); n.className = 'note';
+  n.innerHTML = '<div class="icon">C</div><div><b>' + login + ' is below ' + p + '%</b><span>' + left + '% left</span></div>';
+  log.prepend(n);
+}
+
+document.querySelectorAll('input[type=range]').forEach(r => r.addEventListener('input', () => {
+  document.querySelector('[data-out="' + r.dataset.login + '"]').textContent = r.value + '%';
+  review(r.dataset.login, Number(r.value));
+}));
+render();
+</script>
+</body>
+</html>
