@@ -28,7 +28,7 @@ jobs:
   check-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Check docs
         run: python3 scripts/check-docs.py --strict
       # A release must keep [Unreleased] + the current minor, and lose nothing.

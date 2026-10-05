@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0  # Full history for accurate build number
 
@@ -51,7 +51,7 @@ jobs:
         run: brew install tuist
 
       - name: Cache Tuist
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Library/Caches/tuist
@@ -350,7 +350,7 @@ jobs:
           ls -lh "$DMG_FILE"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: ClaudeBar v${{ steps.version.outputs.version }}
@@ -488,18 +488,18 @@ jobs:
 
       - name: Setup Pages
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_appcast) || github.event_name == 'push' }}
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v6
 
       - name: Upload appcast to Pages
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_appcast) || github.event_name == 'push' }}
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs
 
       - name: Deploy to GitHub Pages
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_appcast) || github.event_name == 'push' }}
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
       - name: Cleanup
         if: always()

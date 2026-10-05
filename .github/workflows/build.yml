@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # No explicit Swift toolchain setup: use the runner's bundled Xcode, the
       # same toolchain Tuist builds its macro prebuilts (SwiftSyntax) against.
@@ -35,7 +35,7 @@ jobs:
       # discard a poisoned cache. tests.yml uses the same keys and shares
       # these caches.
       - name: Cache Tuist dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Library/Caches/tuist
@@ -45,7 +45,7 @@ jobs:
             tuist-v1-${{ runner.os }}-
 
       - name: Cache DerivedData
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .derivedData
           key: derived-data-v1-${{ runner.os }}-${{ hashFiles('Tuist/Package.swift', 'Tuist.swift', 'Project.swift') }}
