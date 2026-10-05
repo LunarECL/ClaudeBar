@@ -4,11 +4,10 @@ description: How ClaudeBar's code is cut into modules — one module per bounded
 
 # ClaudeBar — the modular design
 
-> [CANONICAL_MODEL.md](CANONICAL_MODEL.md) is the tree.
-> [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) is how a provider runs —
-> a JSON definition fetched by one `DataSource` type. **This document is the
-> cut**: which module a file goes in, what a module shows and hides, and what
-> it may import.
+> **#4 of 5** in [the design](ARCHITECTURE.md) · **Answers:** where the code
+> lives — which module a file goes in, what a module shows and hides, and what
+> it may import · **Builds on:** [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) ·
+> **Next:** [ENGINE_DESIGN.md](ENGINE_DESIGN.md)
 >
 > **Status: IN PROGRESS.** `Quotas`, `Diagnostics`, `DataSources`,
 > `Providers` and `AWSClients` are built, and every built-in provider runs

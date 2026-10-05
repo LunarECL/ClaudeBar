@@ -37,13 +37,13 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 - **Settings**: a provider's settings are its definition's `settings`, read with the generic `value`/`dataSourceKind`/`isOn` of `ProviderSettingsRepository`; a value an old card saved elsewhere is read through the compatibility tables in `JSONSettingsRepository` and `ProviderVault`. All settings persist through `JSONSettingsRepository` to `~/.claudebar/settings.json` → [docs/settings.md](docs/settings.md).
 - **Notify! and session hooks are destinations, not providers**: they get standalone repositories beside `HookSettingsRepository`, never under `ProviderSettingsRepository` → [features/notify/design.md](docs/features/notify/design.md).
 - **Themes** implement `AppThemeProvider` and register in `ThemeRegistry` → [THEME_DESIGN.md](docs/architecture/THEME_DESIGN.md). Card backgrounds use `theme.cardGradient` / `theme.glassBorder`.
-- Details and data flow: [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) (the legacy layers) and [CANONICAL_MODEL.md](docs/architecture/CANONICAL_MODEL.md) (the words).
+- The design is five documents read in order, journeys first: [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) maps them.
 
 ## Design docs are the source of truth
 
 The design leads; code follows it. Before any change, in this order:
 
-1. **Read the design.** [CANONICAL_MODEL.md](docs/architecture/CANONICAL_MODEL.md) (the tree, the words the screen prints, each law and its one owner, owned vs offered abilities), [TARGET_ARCHITECTURE.md](docs/architecture/TARGET_ARCHITECTURE.md) (the pieces, their one job, the flows) and the feature's or provider's own `design.md`.
+1. **Read the design, in order** ([the map](docs/architecture/ARCHITECTURE.md)): the person and the moment ([USER_JOURNEYS.md](docs/architecture/USER_JOURNEYS.md)), the words and each law's one owner ([CANONICAL_MODEL.md](docs/architecture/CANONICAL_MODEL.md)), the pieces and flows ([TARGET_ARCHITECTURE.md](docs/architecture/TARGET_ARCHITECTURE.md)), then the feature's or provider's own `design.md`.
 2. **Place the change in it.** Which node owns it? Is it the product's lifecycle, or another question (a **capability**: declared in the definition, reached through a handle that is `nil` when not declared, never a flag or a provider's name)? Does it follow something the Monitor does (an extension point, never an edit to the Monitor)?
 3. **Write the design change first** when the docs don't say it or say otherwise: the tree, the law and its owner, the pieces table. Code that disagrees with the docs is behind; never quietly bend the design to match the code.
 4. **Ask the person to confirm the design** (the doc change, a diagram, the laws and owners) before writing code. No implementation until they approve.

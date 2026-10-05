@@ -9,19 +9,10 @@ description: THE normative tree ClaudeBar binds to — every node from the Monit
 > here because a user can point at it on screen, and a rule lives on **the node
 > that holds the data it needs** (tell, don't ask).
 >
-> **Status: PROPOSED — design, not build truth.** Written 2026-10-01 from the
-> code as it stands (`Sources/Domain`, 20 providers, the extension system) and
-> from the words the interface prints. Where the code and this tree disagree,
-> §8 says which way the code moves. Nothing here has been migrated yet.
->
-> | Question | Document |
-> |---|---|
-> | *What is the tree, node by node, and who owns which law?* | **this one** |
-> | *Which module, which file, which order?* | [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) |
-> | *How are the layers and data flow wired today?* | [ARCHITECTURE.md](ARCHITECTURE.md) |
-> | *Who uses it, and what do the new screens say?* | [USER_JOURNEYS.md](USER_JOURNEYS.md) — the outside-in walk this tree was revised against |
-> | *What does a user DO with the app today?* | [USER_BEHAVIORS.md](USER_BEHAVIORS.md) |
-> | *How does one provider fetch its data?* | `docs/providers/<id>/design.md` |
+> **#2 of 5** in [the design](ARCHITECTURE.md) · **Answers:** what is true —
+> the nodes, the words, the laws and their owners · **Builds on:**
+> [USER_JOURNEYS.md](USER_JOURNEYS.md) · **Next:**
+> [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md)
 
 ---
 

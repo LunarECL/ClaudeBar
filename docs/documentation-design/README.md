@@ -53,7 +53,7 @@ CHANGELOG.md                    tier 1: [Unreleased] + current minor only, one l
 docs/
 ├── README.md                   tier 1: index, GENERATED from descriptions
 ├── documentation-design/       this design (README.md) + layout.md
-├── architecture/               ARCHITECTURE, THEME_DESIGN, REPORT_DESIGN, USER_BEHAVIORS (the one home for layers and patterns)
+├── architecture/               the design, five documents read in order; ARCHITECTURE.md is their map
 ├── troubleshooting.md          tier 3: logs, Console filters, common probe errors (moved from CLAUDE.md)
 ├── settings.md                 tier 3: settings.json namespaces and where credentials live (moved from CLAUDE.md)
 ├── release/                    maintainer-only: RELEASE_SETUP, SPARKLE_SETUP (unchanged)
@@ -182,10 +182,28 @@ No type lists, no file maps, no test snippets, no settings-key tables (those are
 
 - **`docs/providers/<id>/design.md`**: contributor-facing research for one provider. The endpoints or CLI invocations, the response fields that matter (with the CLI/API version they were seen in), the screen-scraping rules, the fallback chain and why each step exists, what was tried and failed. Today's `docs/plans/2026-01-22-bedrock-provider-design.md` and `2026-02-04-codex-api-probe-design.md` move here; so does future research like the Codex `resetsAt` and Antigravity empty-`pgrep` findings.
 - **`docs/features/<x>/design.md`**: the same for app features (notch, notify, reports). Today's `docs/plans/2026-06-09-daily-usage-dedup-design.md` becomes `features/daily-usage/design.md`.
-- **`docs/architecture/`**: the one home for layers, patterns, data flow, the theme and report systems.
+- **`docs/architecture/`**: the design, as a chain read in order — see [Design docs: an order, not a pile](#design-docs-an-order-not-a-pile).
 - **`docs/troubleshooting.md`**: log files, OSLog filters, what each common probe error means. Provider-specific errors stay in that provider's Gotchas and are linked from here.
 - **`docs/settings.md`**: `settings.json` namespaces and where secrets live (Keychain vs settings file). One home, linked from provider docs.
 - **Deleted, not moved**: file trees, protocol trees, type lists, dependency lists.
+
+## Design docs: an order, not a pile
+
+The design is five documents, and each answers a question that only exists once the one before it is answered:
+
+| # | Document | Answers |
+|---|---|---|
+| 1 | `USER_JOURNEYS.md` | who is asking, and what |
+| 2 | `CANONICAL_MODEL.md` | what is true: the words, each law and its one owner |
+| 3 | `TARGET_ARCHITECTURE.md` | how it runs: the pieces and the flows |
+| 4 | `MODULAR_DESIGN.md` | where the code lives |
+| 5 | `ENGINE_DESIGN.md` | how each case works |
+
+- **A later document cites an earlier one, never the reverse** — the same rule as module dependencies. A fact in two of them is a bug.
+- **Change flows downhill.** People's questions change least, cases most; a change can only move the documents after it. A later one that needs a new word or law changes the earlier one first.
+- **Every design document opens with one line**: its number, what it answers, what it builds on, what to read next. `architecture/ARCHITECTURE.md` is the map of the five, not a sixth design.
+- **A feature or a provider is not in `architecture/`.** Its design applies the chain to one thing and lives in its own folder's `design.md`.
+- **A finished plan is not a design.** Slices, build-truth tables and migration orders are deleted once built — git and the PRs keep them; a law they introduced moves to the document that owns it first.
 
 ## Reader paths
 
@@ -199,7 +217,7 @@ No type lists, no file maps, no test snippets, no settings-key tables (those are
 | Contributor | CONTRIBUTING → `docs/architecture/ARCHITECTURE.md` → provider `design.md` → code |
 | Agent fixing a bug | AGENTS.md → `fix-bug` skill → provider `design.md` |
 | Agent adding a provider | AGENTS.md → `add-provider` skill → a similar provider's `design.md` |
-| Changing the domain | AGENTS.md *Design docs are the source of truth* → `docs/architecture/CANONICAL_MODEL.md` (the tree, laws and owners) → `TARGET_ARCHITECTURE.md` (pieces, slices) → the feature's `design.md` |
+| Changing the domain | AGENTS.md *Design docs are the source of truth* → `docs/architecture/ARCHITECTURE.md` (the five, in order) → from the moment that breaks, down → the feature's `design.md` |
 | Reporting a problem or opening a PR | the issue / PR template — the problem first, then the design |
 
 ## Update rules

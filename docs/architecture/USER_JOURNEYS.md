@@ -1,25 +1,17 @@
 ---
-description: The provider redesign seen from outside in — four people, twelve moments from glancing at the menu bar to adding and sharing a custom provider, the words each screen prints, the command each lands on, and the twelve findings that changed the canonical model; read before designing a provider screen or changing a provider-facing type.
+description: Who uses ClaudeBar and what they ask — four people, the moments from glancing at the menu bar to adding and sharing a provider, the words each screen prints and the command each lands on; read first, before any design change.
 ---
 
-# Provider journeys — outside in
+# ClaudeBar — user journeys
 
-> The canonical model was harvested from the screens ClaudeBar has. The
-> redesign adds screens it does not have yet — *Add Provider*, *Import*,
-> *Export* — so this document walks them FIRST, as the people who will use
-> them, and only then says what the model must be. Where a journey and the
-> model disagree, the journey wins and the model moves.
+> **#1 of 5** in [the design](ARCHITECTURE.md) · **Answers:** who is asking,
+> and what · **Builds on:** nothing — every other document answers this one ·
+> **Next:** [CANONICAL_MODEL.md](CANONICAL_MODEL.md)
+>
+> Where a journey and the model disagree, the journey wins and the model moves.
 >
 > **The mockup:** [provider-user-journeys.html](../../design-concept/provider-user-journeys.html)
 > — open it in a browser; ← → step through the moments, `#7` jumps to one.
->
-> | Question | Document |
-> |---|---|
-> | *What does a person do, and what does the screen say?* | **this one** |
-> | *What are the nodes, the words, the laws?* | [CANONICAL_MODEL.md](CANONICAL_MODEL.md) |
-> | *How does a provider run?* | [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) |
-> | *Which module holds it?* | [MODULAR_DESIGN.md](MODULAR_DESIGN.md) |
-> | *Every behaviour the app has today, as BDD scenarios* | [USER_BEHAVIORS.md](USER_BEHAVIORS.md) |
 
 ---
 
