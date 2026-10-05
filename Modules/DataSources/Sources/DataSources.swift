@@ -27,6 +27,7 @@ public enum DataSources {
         scripts: @escaping ScriptSource = { _ in nil },
         secrets: (any SecretStore)? = nil,
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        loginShell: (@Sendable (String) -> String?)? = nil,
         cloudWatch: (any CloudWatchClient)? = nil,
         priceCatalog: (any PriceCatalog)? = nil
     ) -> DataSource {
@@ -46,6 +47,7 @@ public enum DataSources {
             secrets: secrets,
             browserCookies: SystemBrowserCookies(),
             browserStorage: SystemBrowserStorage(),
+            loginShell: loginShell,
             environment: environment,
             homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
             now: { Date() }
@@ -66,6 +68,7 @@ public enum DataSources {
         secrets: (any SecretStore)? = nil,
         browserCookies: any BrowserCookieReading = SystemBrowserCookies(),
         browserStorage: any BrowserStorageReading = SystemBrowserStorage(),
+        loginShell: (@Sendable (String) -> String?)? = nil,
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         processPaths: @escaping @Sendable () -> [String] = { [] },
@@ -89,6 +92,7 @@ public enum DataSources {
             secrets: secrets,
             browserCookies: browserCookies,
             browserStorage: browserStorage,
+            loginShell: loginShell,
             environment: environment,
             homeDirectory: homeDirectory,
             now: now
@@ -111,6 +115,7 @@ public enum DataSources {
         secrets: (any SecretStore)?,
         browserCookies: any BrowserCookieReading,
         browserStorage: any BrowserStorageReading = SystemBrowserStorage(),
+        loginShell: (@Sendable (String) -> String?)? = nil,
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         now: @escaping @Sendable () -> Date
@@ -160,7 +165,7 @@ public enum DataSources {
 
         let readers = Readers(environment: environment, homeDirectory: homeDirectory, security: security,
                               secrets: secrets, providerId: providerId, browserCookies: browserCookies,
-                              browserStorage: browserStorage)
+                              browserStorage: browserStorage, loginShell: loginShell)
         return DataSource(
             definition: definition,
             providerId: providerId,
@@ -192,11 +197,12 @@ public enum DataSources {
         let providerId: String
         let browserCookies: any BrowserCookieReading
         let browserStorage: any BrowserStorageReading
+        let loginShell: (@Sendable (String) -> String?)?
 
         func reader(for lookup: CredentialLookup) -> any CredentialFinding {
             switch lookup {
-            case .environment(let name):
-                EnvironmentReader(name: name, environment: environment)
+            case .environment(let name, let asksShell):
+                EnvironmentReader(name: name, environment: environment, loginShell: asksShell ? loginShell : nil)
             case .jsonFile(let file):
                 JSONFileReader(file: file, homeDirectory: homeDirectory, environment: environment)
             case .keychain(let item):

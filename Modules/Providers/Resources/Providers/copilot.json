@@ -36,6 +36,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 60,
   "settings": [
     {
       "id": "token",

@@ -33,6 +33,7 @@
     }
   },
   "enabledByDefault": true,
+  "order": 40,
   "defaultDataSource": "local",
   "dataSources": [
     {

@@ -1,14 +1,37 @@
 import Diagnostics
 import Foundation
 
-/// Where the providers people make live: `~/.claudebar/providers/<id>.json`,
-/// one definition per file, origin **custom**. Keys never live here — a
-/// definition names a key (`"setting": "apiKey"`), the vault holds it.
+/// Where definitions live, and the one place they are found
+/// (TARGET_ARCHITECTURE §10): the app bundle, the providers people make in
+/// `~/.claudebar/providers/<id>.json` (origin **custom**), and extensions in
+/// `~/.claudebar/extensions`. A definition on disk is a provider; no Swift
+/// lists one. Keys never live here — a definition names a key
+/// (`"setting": "apiKey"`), the vault holds it.
 public struct ProviderCatalog: Sendable {
     public let directory: URL
+    public let extensions: URL
 
-    public init(directory: URL = ProviderCatalog.userDirectory) {
+    public init(directory: URL = ProviderCatalog.userDirectory, extensions: URL = Extensions.folder) {
         self.directory = directory
+        self.extensions = extensions
+    }
+
+    /// Every definition, built-in, custom and extension, in lineup order:
+    /// by each one's `order`, then by name. A built-in's id is the
+    /// built-in's — another file using it is left out. A file that doesn't
+    /// parse is logged and left out; the rest load.
+    public func detect() -> [ProviderDefinition] {
+        let builtIns = Array(ProviderFactory.builtInDefinitions.values)
+        let reserved = Set(builtIns.map(\.id))
+        let others = (custom() + Extensions.catalog(in: extensions)).filter { definition in
+            guard reserved.contains(definition.id) else { return true }
+            AppLog.providers.error("Skipping \(definition.id) from \(definition.profile.origin.rawValue): a built-in has that id")
+            return false
+        }
+        var seen = Set<String>()
+        return (builtIns + others)
+            .filter { seen.insert($0.id).inserted }
+            .sorted { ($0.order ?? .max, $0.profile.name.lowercased(), $0.id) < ($1.order ?? .max, $1.profile.name.lowercased(), $1.id) }
     }
 
     /// `~/.claudebar/providers`.

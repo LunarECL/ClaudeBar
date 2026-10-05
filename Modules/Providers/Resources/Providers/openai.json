@@ -10,6 +10,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 270,
   "settings": [
     { "id": "apiKey", "label": "Admin API key", "kind": "secret", "scope": "account" }
   ],

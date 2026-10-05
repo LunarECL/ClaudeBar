@@ -12,6 +12,7 @@
   },
   "cli": "cmd",
   "enabledByDefault": true,
+  "order": 210,
   "settings": [
     { "id": "apiKey", "label": "API Key", "kind": "secret", "scope": "account" }
   ],

@@ -12,6 +12,7 @@
   },
   "cli": "kiro-cli",
   "enabledByDefault": true,
+  "order": 100,
   "settings": [
     { "id": "home", "default": "~", "label": "Signed-in Home Folder", "scope": "account", "kind": { "path": { "mustExist": true } } }
   ],

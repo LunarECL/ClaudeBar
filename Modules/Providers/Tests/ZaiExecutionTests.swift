@@ -15,7 +15,7 @@ struct ZaiExecutionTests {
     /// Answers on `host` for the key `key` only; anything else is a 400.
     private func make(config: [String: Any]? = nil, platform: String? = nil, envVar: String? = nil,
                       vault: MemoryVault = MemoryVault(), environment: [String: String] = [:],
-                      status: Int = 200, seen: Seen = Seen()) throws -> Provider {
+                      loginShell: [String: String] = [:], status: Int = 200, seen: Seen = Seen()) throws -> Provider {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         if let config {
             let folder = home.appendingPathComponent(".claude")
@@ -38,8 +38,8 @@ struct ZaiExecutionTests {
         return Provider(definition: definition, settings: settings, makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: network,
                              makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
-                             secrets: vault.scoped(to: login), environment: { environment[$0] },
-                             homeDirectory: home, now: { Date() })
+                             secrets: vault.scoped(to: login), loginShell: { loginShell[$0] },
+                             environment: { environment[$0] }, homeDirectory: home, now: { Date() })
         }, vault: vault)
     }
 
@@ -109,6 +109,18 @@ struct ZaiExecutionTests {
         _ = try await make(envVar: "MY_GLM_KEY", environment: ["MY_GLM_KEY": "from-env"], seen: seen).refreshPlain()
         #expect(seen.key == "Bearer from-env")
         #expect(seen.host == "api.z.ai")
+    }
+
+    @Test func `should find the key the person exported only in their login shell (#170)`() async throws {
+        let seen = Seen()
+        _ = try await make(envVar: "MY_GLM_KEY", loginShell: ["MY_GLM_KEY": "from-shell"], seen: seen).refreshPlain()
+        #expect(seen.key == "Bearer from-shell")
+    }
+
+    @Test func `should prefer the app's own environment to the login shell`() async throws {
+        let seen = Seen()
+        _ = try await make(environment: ["ZAI_API_KEY": "from-env"], loginShell: ["ZAI_API_KEY": "from-shell"], seen: seen).refreshPlain()
+        #expect(seen.key == "Bearer from-env")
     }
 
     @Test func `should use ZAI_API_KEY when the person named no variable`() async throws {

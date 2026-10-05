@@ -11,6 +11,7 @@
     }
   },
   "enabledByDefault": true,
+  "order": 50,
   "settings": [
     { "id": "apiKey", "label": "API Key", "kind": "secret", "scope": "account" },
     { "id": "platform", "label": "Platform", "scope": "account", "default": "zai",
@@ -39,7 +40,7 @@
             },
             "match": { "baseURL": "^https?://(api\\.z\\.ai|open\\.bigmodel\\.cn|dev\\.bigmodel\\.cn)(/|:|$)" }
           },
-          { "environment": "{{setting.glmAuthEnvVar}}", "with": { "baseURL": "https://{{setting.platform.host}}" } }
+          { "environment": "{{setting.glmAuthEnvVar}}", "loginShell": true, "with": { "baseURL": "https://{{setting.platform.host}}" } }
         ]
       },
       "fetch": {

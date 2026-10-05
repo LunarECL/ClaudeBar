@@ -11,6 +11,10 @@
     }
   },
   "enabledByDefault": false,
+  "order": 130,
+  "settings": [
+    { "id": "authEnvVar", "label": "API key environment variable", "default": "DEEPSEEK_API_KEY" }
+  ],
   "defaultDataSource": "api",
   "dataSources": [
     {
@@ -18,7 +22,7 @@
       "label": "API",
       "summary": "Reads the primary billing-currency balance, including paid and granted credit.",
       "credential": {
-        "firstOf": [ { "environment": "DEEPSEEK_API_KEY" }, { "setting": "apiKey" } ]
+        "firstOf": [ { "environment": "{{setting.authEnvVar}}" }, { "setting": "apiKey" } ]
       },
       "fetch": {
         "http": {

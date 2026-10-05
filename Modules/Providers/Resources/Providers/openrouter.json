@@ -14,6 +14,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 140,
   "settings": [
     { "id": "apiKey", "label": "API key", "kind": "secret", "scope": "account" },
     { "id": "authEnvVar", "label": "Environment variable", "default": "OPENROUTER_API_KEY" }

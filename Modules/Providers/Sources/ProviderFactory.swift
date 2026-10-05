@@ -74,6 +74,7 @@ public enum ProviderFactory {
         guestPasses: GuestPasses? = nil,
         usageHistory: UsageHistory? = nil,
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        loginShell: (@Sendable (String) -> String?)? = nil,
         cloudWatch: (any CloudWatchClient)? = nil,
         priceCatalog: (any PriceCatalog)? = nil,
         loginsInUse: (any LoginsInUse)? = nil
@@ -84,7 +85,7 @@ public enum ProviderFactory {
             accounts: accounts,
             makeDataSource: { source, login in
                 DataSources.make(source, providerId: definition.id, scripts: builtInScripts, secrets: secrets?.scoped(to: login),
-                                 environment: environment, cloudWatch: cloudWatch, priceCatalog: priceCatalog)
+                                 environment: environment, loginShell: loginShell, cloudWatch: cloudWatch, priceCatalog: priceCatalog)
             },
             guestPasses: guestPasses,
             // The definition says how to read each login's logs.

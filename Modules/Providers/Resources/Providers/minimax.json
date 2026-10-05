@@ -13,6 +13,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 120,
   "settings": [
     { "id": "apiKey", "label": "API Key", "kind": "secret", "scope": "account" },
     { "id": "region", "label": "Region", "scope": "account", "default": "china",

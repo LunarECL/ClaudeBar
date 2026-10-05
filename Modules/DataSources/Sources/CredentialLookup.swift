@@ -11,8 +11,10 @@ import Foundation
 /// }
 /// ```
 public indirect enum CredentialLookup: Sendable, Equatable {
-    /// An environment variable holds the token.
-    case environment(String)
+    /// An environment variable holds the token. `loginShell`: when the app's
+    /// own environment lacks it, ask the person's login shell too (#170) —
+    /// only a lookup that says so waits for the shell.
+    case environment(String, loginShell: Bool = false)
     /// A JSON file on this Mac holds the token and its companions.
     case jsonFile(JSONFileCredential)
     /// A generic-password Keychain item whose password is JSON (or the token
@@ -410,7 +412,8 @@ extension CredentialLookup: Codable {
         let base: CredentialLookup
         switch try container.singleTag(of: Self.tags, in: "credential") {
         case "environment":
-            base = .environment(try container.decode(String.self, forKey: TagKey("environment")))
+            base = .environment(try container.decode(String.self, forKey: TagKey("environment")),
+                                loginShell: try container.decodeIfPresent(Bool.self, forKey: TagKey("loginShell")) ?? false)
         case "jsonFile":
             base = .jsonFile(try container.decode(JSONFileCredential.self, forKey: TagKey("jsonFile")))
         case "keychain":
@@ -452,8 +455,9 @@ extension CredentialLookup: Codable {
 
     private func encodeBase(into container: inout KeyedEncodingContainer<TagKey>) throws {
         switch self {
-        case .environment(let name):
+        case .environment(let name, let loginShell):
             try container.encode(name, forKey: TagKey("environment"))
+            if loginShell { try container.encode(true, forKey: TagKey("loginShell")) }
         case .jsonFile(let file):
             try container.encode(file, forKey: TagKey("jsonFile"))
         case .keychain(let item):
@@ -489,7 +493,7 @@ extension CredentialLookup {
     /// would find it: a file path, a Keychain item, `$VARIABLE`. Never a value.
     public var lookupOrder: [String] {
         switch self {
-        case .environment(let name): ["$\(name)"]
+        case .environment(let name, let loginShell): [loginShell ? "$\(name) (also your login shell)" : "$\(name)"]
         case .jsonFile(let file): file.path.places
         case .keychain(let item): ["Keychain “\(item.service)”"]
         case .setting: ["API key saved in ClaudeBar"]

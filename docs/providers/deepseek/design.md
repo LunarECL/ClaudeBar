@@ -65,11 +65,12 @@ migration preserves and returns the old key. Secure deletion must succeed
 before the legacy copy is removed. No secret enters `settings.json`.
 
 The existing Default Account card uses that same vault. Its configurable
-environment-variable name is preserved by the App's injected environment
-lookup, read at lookup time so an edit takes effect without restarting. An
-empty name means `DEEPSEEK_API_KEY`; a nonempty variable wins over the saved
-default key. This outer compatibility boundary and the settings sub-protocol
-remain until the generic settings-form migration (architecture slice 3).
+environment-variable name is the definition's `authEnvVar` setting — the card
+already saved it as `deepseek.authEnvVar` — read by `{{setting.authEnvVar}}`
+at lookup time, so an edit takes effect without restarting. An empty name
+means the default, `DEEPSEEK_API_KEY`; a nonempty variable wins over the saved
+default key. The card and its settings sub-protocol remain until the generic
+settings-form migration (architecture slice 3); nothing in the App is DeepSeek's.
 
 An added login changes the credential rule to `setting: apiKey` and reads
 `provider.deepseek.<UUID>.apiKey`. It never reads a process environment key or
