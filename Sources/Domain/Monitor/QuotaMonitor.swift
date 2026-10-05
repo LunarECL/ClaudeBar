@@ -26,7 +26,7 @@ public enum MonitoringEvent: Sendable {
 public final class QuotaMonitor {
     /// The providers you keep — each with its logins, in the pane's order
     /// (CANONICAL §1). The Monitor reads them and watches; adding,
-    /// deleting and ordering them is `Providers`' (TARGET §12, slice 3).
+    /// deleting and ordering them is `Providers`' (TARGET §2.1).
     public let providers: Providers
 
     /// Optional alerter for quota changes (e.g., system notifications)
@@ -138,7 +138,7 @@ public final class QuotaMonitor {
     public func login(id: String) -> Account? { providers.login(id: id) }
 
     /// A login's product — found through the root, by the id the login names
-    /// (TARGET §12, slice 7). Ask it anything product-level about the login.
+    /// (TARGET §2.1). Ask it anything product-level about the login.
     public func product(of login: Account) -> Provider? { providers.provider(of: login) }
 
     /// *The name the lineup prints* for a login — its product's to say.
@@ -484,7 +484,7 @@ public final class QuotaMonitor {
     public var tabs: [ProductTab] { ProductTab.tabs(of: lineup, in: providers) }
 
     /// Settings → Providers: every product, on or off, each with all its
-    /// logins, in the pane's order (TARGET §12, slice 1).
+    /// logins, in the pane's order (CANONICAL §1: the product's switch).
     public var productTabs: [ProductTab] { ProductTab.tabs(of: logins, in: providers) }
 
     /// A product's switch — off hides every login of it and keeps them; the

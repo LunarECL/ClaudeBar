@@ -12,8 +12,8 @@ import Quotas
 @MainActor
 @Observable
 public final class InUse {
-    /// Its product's logins — below it; never the product itself (TARGET §12,
-    /// slice 7: anything public holds no back-reference).
+    /// Its product's logins — below it; never the product itself (TARGET §2.1:
+    /// anything public holds no back-reference).
     @ObservationIgnored private let accounts: Accounts
     /// Its product, by name — for what it says.
     @ObservationIgnored private let productId: String

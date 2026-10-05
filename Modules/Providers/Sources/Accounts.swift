@@ -6,7 +6,7 @@ import Quotas
 
 /// *The Accounts card* — a provider's logins, in the order the person put
 /// them, and what you tell them: add one (by its form, a signed-in folder or
-/// signing in), remove, rename, move, sign in again (TARGET §12, slice 6).
+/// signing in), remove, rename, move, sign in again (TARGET §2.1).
 ///
 /// It owns the logins and knows no one above it. What its provider must
 /// follow — a login kept or let go — it reports through `onChange`, the one

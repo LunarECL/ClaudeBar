@@ -1,5 +1,5 @@
 ---
-description: THE normative tree ClaudeBar binds to — every node from the Monitor down, the word the screen prints for it, its laws and their owners, the bounded contexts and the modules that implement them; read before adding or changing any domain type or provider.
+description: THE normative tree ClaudeBar binds to — every node from the Monitor down, the word the screen prints for it, its laws and their owners, and the bounded contexts; read before adding or changing any domain type or provider.
 ---
 
 # ClaudeBar — the canonical model
@@ -9,19 +9,10 @@ description: THE normative tree ClaudeBar binds to — every node from the Monit
 > here because a user can point at it on screen, and a rule lives on **the node
 > that holds the data it needs** (tell, don't ask).
 >
-> **Status: PROPOSED — design, not build truth.** Written 2026-10-01 from the
-> code as it stands (`Sources/Domain`, 20 providers, the extension system) and
-> from the words the interface prints. Where the code and this tree disagree,
-> §8 says which way the code moves. Nothing here has been migrated yet.
->
-> | Question | Document |
-> |---|---|
-> | *What is the tree, node by node, and who owns which law?* | **this one** |
-> | *Which module, which file, which order?* | [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) |
-> | *How are the layers and data flow wired today?* | [ARCHITECTURE.md](ARCHITECTURE.md) |
-> | *Who uses it, and what do the new screens say?* | [USER_JOURNEYS.md](USER_JOURNEYS.md) — the outside-in walk this tree was revised against |
-> | *What does a user DO with the app today?* | [USER_BEHAVIORS.md](USER_BEHAVIORS.md) |
-> | *How does one provider fetch its data?* | `docs/providers/<id>/design.md` |
+> **#2 of 5** in [the design](ARCHITECTURE.md) · **Answers:** what is true —
+> the nodes, the words, the laws and their owners · **Builds on:**
+> [USER_JOURNEYS.md](USER_JOURNEYS.md) · **Next:**
+> [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md)
 
 ---
 
@@ -79,7 +70,7 @@ connect · Couldn't find the numbers*, *via API*. Those are the words below.
 ```text
 Monitor  ◆                                  THE ROOT — what the menu bar is watching. One per app
 ├── providers: Providers  ◆                THE PROVIDERS YOU KEEP — the Providers pane: add a custom
-│                                           one, delete it, their order (TARGET §12, slice 3)
+│                                           one, delete it, their order
 ├── lineup → [Account]                      DERIVED — the enabled accounts of the enabled providers,
 │                                           in that order: the pills, the menu bar, the notifications
 ├── selection: Provider.ID                  which provider the popover opens on; it shows every enabled
@@ -118,7 +109,7 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │                       json(paths, each, used|left, resets) · text(patterns) ·
 │       │       │   │                       script(file) — JavaScript in JavaScriptCore, no I/O,
 │       │       │   │                       for a format no rule can say (a TUI screen)
-│       │       │   │                       · usage — ClaudeBar's own documented output (TARGET §12)
+│       │       │   │                       · usage — ClaudeBar's own documented output (extensions)
 │       │       │   └── fallback: kind?     the data source to try when this one fails — Codex's
 │       │       │                           RPC falls back to its terminal
 │       │       ├── fetchResponse(for: Account) → Response   "Test Connection" — looks up the key and fetches;
@@ -135,7 +126,7 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       ├── accounts: [Account]  ◆          NEVER EMPTY. One account is the "default" — the plain login
 │       │   └── Account  ◆                  A LOGIN YOU PAY FOR — who, and what we last saw. No behaviour
 │       │       ├── id: Account.ID          `<provider>` for the default, `<provider>.<acct>` for an added one
-│       │       ├── providerId          its product, by id — a value, never a reference (TARGET §12, slice 7)
+│       │       ├── providerId          its product, by id — a value, never a reference
 │       │       ├── label · email           what you gave, or the login file holds — names the pill
 │       │       ├── values                  its account-scope settings — the Codex folder, the login's
 │       │       │                           account id; a secret as a reference
@@ -265,15 +256,9 @@ Codex logic**:
 
 So every provider is ONE KIND OF THING — a definition — and ONE `DataSource`
 type does the fetching for all of them: `dataSource.fetchUsage()` looks up
-the key, fetches, maps. Behind it, each CASE of the three closed sums is
-carried out by one internal worker with one job, named for its protocol or
-format, never for a vendor:
-
-| Closed sum | Its cases' workers (`internal`) |
-|---|---|
-| `CredentialLookup` | `EnvironmentReader` · `SettingReader` · `JSONFileReader` · `KeychainReader` · `BrowserCookieReader` · `OAuth2Refresher` |
-| `Fetch` | `HTTPFetcher` · `HTTPStepsFetcher` · `JSONRPCFetcher` · `CLIFetcher` (a TUI in a terminal) · `CommandFetcher` (pipes) · `FileFetcher` · `ScriptFetcher` |
-| `Mapping` | `JSONMapper` · `TextMapper` · `ScriptMapper` (JavaScriptCore; host `humanDate()`) |
+the key, fetches, maps. Each CASE of the three closed sums (`CredentialLookup`
+· `Fetch` · `Mapping`) is carried out by one worker with one job, named for its
+protocol or format, never for a vendor.
 
 **Why closed sums.** The JSON decoder must know every tag, and the *Add
 Provider* sheet offers a fixed list. A new provider is a JSON file — open, no
@@ -403,7 +388,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a provider's face is DATA — its symbol and colours ride on the profile, so adding one never edits a `switch id` | `ProviderLook` |
 | a provider has at least one account; the `default` account's id equals the provider id, an added one's is `<provider>.<acct>` — the ids today's settings and menu-bar pins are keyed by | `Provider.accounts` |
 | a provider is the PRODUCT and an account a LOGIN: how to fetch, the data source choice, the look and the provider-scope settings are the provider's, once; who, its values, what we saw and whether the last fetch worked are the account's | `Provider` · `Account` |
-| a login knows only itself: it names its product by id and never refers to it; anything product-level about a login is asked of its provider, found through `Providers.provider(of:)` — a stale login never crashes, nothing leaks (TARGET §12, slice 7) | `Account` · `Providers` |
+| a login knows only itself: it names its product by id and never refers to it; anything product-level about a login is asked of its provider, found through `Providers.provider(of:)` — a stale login never crashes, nothing leaks | `Account` · `Providers` |
 | accounts are SIMULTANEOUS — every enabled login is fetched and shown side by side under its provider; the popover shows the selected provider's. (A vendor that allows one live login at a time would add an `active` account; none does today) | `Monitor.selection` |
 | one definition serves every account: the account's values fill `{{account.x}}` when the fetch runs; a data source is never copied per login | `DataSource` |
 | status is QUOTA health, derived from usage; a failed fetch is FETCH health, in `sync` — a key that expired never turns the menu bar red | `Account.status` · `Account.sync` |
@@ -486,100 +471,35 @@ Each is a **fence**: inside it every word has one meaning and one model
 enforces it. Across a fence the same word may mean something else, as long as
 **no type crosses** — a reference does.
 
-| Context | Subdomain | Owns the question | Module |
-|---|---|---|---|
-| **Quota** | **shared kernel** | *how much is left, when does it refill, and is that OK?* | `Modules/Quotas` |
-| **Providers** | **core** | *who do I pay, under which accounts, and what did they last say?* | `Modules/Providers` |
-| **Data Sources** | supporting | *how do we find out?* — DataSource, DataSourceDefinition, CredentialLookup, Fetch, Mapping, Setting, DataSourceError, and every worker | `Modules/DataSources` |
-| **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* | `Modules/Monitoring` |
-| **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export | `Modules/Alerting` |
-| **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch | `Modules/Activity` |
-| **Usage History** | supporting | *what did I use, day by day?* | no module of its own: `UsageHistory` in `Modules/Providers` (the login owns it), `UsageLog` in `Modules/DataSources` (how it is extracted), `Day` in `Modules/Quotas` |
-| **In use** | supporting | *which login does my next terminal session start with?* | no module of its own: `InUse`, `SwitchWhenLow`, `LoginsInUse` in `Modules/Providers` (the product owns the choice); `NewSessions`, `ShellLines`, `InUseAnnouncer` in `Domain`; `ShellSetup`, `InUseNotifications` in `Infrastructure`. Wired onto Monitoring by the App, never the other way |
-| **Vault & Settings** | generic | *where is it kept?* — `settings.json`, secrets | `Modules/Storage` |
-| SDK clients | — (anti-corruption layers) | *what does this SDK say?* — a client that needs a heavy SDK gets its own module, behind a port, so only it links the SDK | `Modules/AWSClients` |
-
-```text
-                      Quota                    the shared kernel — knows nobody
-                    ▲            ▲
-          ┌─────────┘            └───────────┐
-    DataSources                           Alerting ◀──┐
-          ▲                                           │
-          │◀── AWSClients (the SDK)                    │
-          │                                           │
-    Providers ◀─────────────── Monitoring ────────────┘   Activity
-          ▲                      ▲                      (on its own:
-          │                      │                       no Quota, no Provider)
-          └──────── App ─────────┘
-          the composition root: hands the SDK clients in,
-          loads the definitions (built-in JSON ships here), draws the tree
-```
-
-Arrows point at the **supplier**. Nothing points back: the kernel cannot name a
-provider, Data Sources cannot name the Monitor, no module names a vendor, and
-the AWS SDK links into `AWSClients` and nowhere else.
-
-**Usage History has no module of its own** — it splits along the line every
-provider already has. What the person asks for is the login's: `Account`
-owns its `UsageHistory` (in `Providers`), which answers `days(in:)` from its
-ledger of closed days. What differs per provider is only **how to extract
-it** — where the logs are, how a record reads, what a token costs — and that
-is data, run by the same machinery as a data source: the definition's
-`usageHistory` block is a `UsageLog.Definition`, `DataSources` builds a
-`UsageLog` from it (filled with the login's values) and reads days with its
-path language, its file access and its prices (`PriceList`; a cloud's
-through `PriceCatalog`). `Day` is a value in the
-kernel, beside `Cost`. No new arrow: `Providers → DataSources → Quota`
-already exists. A module is carved when something needs its own SDK or a
-second consumer — usage history has neither.
-
-**Packaging.** One Tuist framework target per context under `Modules/`, each
-with `Sources/` and `Tests/`. The `**` globs keep working per module; a context's tests link only that
-context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
-
-## 8 · Build truth, node by node
-
-| Node | Today | Moves to |
+| Context | Subdomain | Owns the question |
 |---|---|---|
-| `Provider` lifecycle | copied into 20 `XxxProvider` classes (`isSyncing`, `snapshot`, `lastError`, `isEnabled`, `refresh`) | one `Provider` in `Providers`; built-ins become JSON definitions |
-| `Provider.accounts` · `Account` | **built** (#356): one `Provider` per product owns `[Account]`; an added login runs the same data sources with `accounts.patch` (RFC 7396) merged in and its values filling `{{account.x}}` — bound once per login, so each keeps its own cache and rate-limit memory. `Account` conforms to `AIProvider` as a shim; `provider.add` / `remove` / `rename` / `move`, `status`, `bestAccount`, `worstAccount`. **Selection by provider** (multi-account slice 6): the popover's pills are `ProductTab`s (`monitor.tabs`, `selectedTab`), while `selectedProviderId` stays the lineup id of the tab's first login. Ids and settings keys unchanged | the shim goes when `AIProvider` folds into `Provider` (TARGET §12). **Built** (§12 slice 1): `Provider.isEnabled` hides every login, each login's *Pause* is its own, and Settings lists one row per product |
-| `ExtensionProvider` | a generic provider over scripted sections | the same `Provider`, with `script` fetches — the proof that one lifecycle fits. Its sections map into the account's own model: daily usage → `usageHistory`, metrics → `usage.cost` + history, health check → fetch health; free-form metrics and the status banner are retired (TARGET §12) |
-| `ProviderProfile` · `look` | **built** (#353) for definition-driven providers: `profile { id, name, links, look, origin }` in the JSON, `look` as plain RGB data; `Account` and the id-only lookups read it, `origin` is set by whoever loads the file. The `switch id` tables (`ProviderVisualIdentity`, `ProviderIcons`, `NotificationAlerter`) keep only the legacy providers; `Theme.swift`'s unused copy is deleted | the tables empty as #331 lands |
-| `SettingsForm` | **started** (#352): Claude's and Codex's PROBE MODE cards are one generic *Data source* section read from the definition (choices, key lookup order, fallback sentence and switch, cache note, *Test Connection*); a provider's own inputs (REGION, API KEY, ENV VAR) are not a form yet. Before: 11 settings sub-protocols in `ProviderSettingsRepository.swift`, mirrored in two repositories and 11 config cards; extensions already use `ConfigField` | `ConfigField` generalised; one form renderer; custom cards only where a form cannot say it (Claude's account management) |
-| `DataSource` (+ `DataSourceDefinition` = `CredentialLookup` + `Fetch` + `Mapping`) | ~30 vendor-named probes, clients and credential loaders, each doing several jobs | one definition per data source in JSON, one `DataSource` type and ~15 internal workers; every `XxxUsageProbe` is deleted |
-| `Quota.left` | **built** (slice 4): `Left` = `share` · `money(Money, of: Money?)` on every `UsageQuota`; status, pace, the lowest quota and the menu bar follow it, so a balance shows its money and has no pace. Legacy probes still write `100` + `dollarRemaining`, which reads as a balance; a JSON mapping writes `left: { money, of }` | `percentRemaining` leaves the call sites as providers migrate |
-| `Window` | **built** (slice 4): the kernel no longer guesses — pace uses only a stated `window.length`. Legacy probes state what the guess used to give (`conventionalWindow`, named as a convention; Bedrock's daily budget now 1 day; Cursor's monthly card none, as it chose); Claude's script and JSON and Codex's JSON state their windows, the response's word first | the conventions become each definition's word as providers migrate |
-| `Usage` | `UsageSnapshot` with `bedrockUsage`, `extensionMetrics`, `dailyUsageReport` | kernel fields only; the rest moves to their contexts — `extensionMetrics` and `dailyUsageReport` go with `ExtensionProvider` (TARGET §12) |
-| `UsageHistory` · `UsageLog` · `Day` · `DayLedger` | **built** (UH1–UH6): `account.usageHistory` on every login (an added one's from `accounts.patch.usageHistory`) over a `UsageLog` from `claude.json`'s and `mistral.json`'s `usageHistory`, closed days in a `DayLedger`, the 30-day chart, other apps beside a login's own (`usageHistory.otherApps`: Claude Desktop's `buddy-tokens.json`, #198); still to come: the `Day` word and cost lines per model. Before: `UsageHistory` in `Domain` keyed by login, fed by two vendor-named analyzers in `Infrastructure` — `ClaudeDailyUsageAnalyzer` (JSONL under `~/.claude/projects`, `ModelPricing` as a Swift table, `ClaudeLocalInferenceDetector`, `SessionLogCache`) and `VibeSessionLogAnalyzer` (`meta.json` per session folder); the report types (`DailyUsageReport`/`Stat`) sit in `Quotas`; only today and yesterday exist, re-read from the logs on every popover open | `UsageHistory` + `DayLedger` in `Providers`, reached as `account.usageHistory`; `UsageLog` in `DataSources`, built from each definition's `usageHistory`, one reader per format, prices through a `PriceList`, one aggregator; `Day` in `Quotas`; both analyzers and `Infrastructure/Claude`, `Infrastructure/Mistral` deleted (TARGET_ARCHITECTURE §10) |
-| capabilities | guest passes chosen in Swift by name (`builtIn("claude", guestPasses: GuestPasses(source: ClaudeGuestPassSource()))`); usage history **built** as `account.usageHistory` (UH1, the default login's), still fed by an analyzer handed in by id in the App | usage history declared in the definition (built, UH1–UH6); guest passes stay a Swift source the App hands in — Claude's alone, so not definition data (TARGET_ARCHITECTURE §10.6) — both reached as `account.usageHistory` / `account.guestPasses` |
-| `Plan` | `AccountTier` with Claude cases | a name and a badge |
-| `StatusPolicy` | **built** (#357): `StatusPolicy` in `Quotas` with `quota.status(under:)` / `usage.overallStatus(under:)`; `QuotaMonitor.statusPolicy` read live from the burn-rate settings; alerts, pills, cards, Touch Bars, status export and Notify! all read under it. Left: `menuBarLabel(…)` still takes the two burn-rate values instead of the policy, and pace falls back to `quotaType.duration` when no window is known | the menu-bar label takes the policy; the `Window` law removes the guess; `StatusColorPolicy` (colours, high contrast) moves to the App |
-| `Account.budget` | two one-off settings: `app.claudeApiBudget` (+ `…Enabled`, edited in Claude's card) and `bedrock.dailyBudget`; Bedrock turns its budget into a fake `Daily Budget` quota | a `Budget` beside the account's `Cost`, judged as `BudgetStatus`, never a quota; the old keys read as the default account's budget |
+| **Quota** | **shared kernel** | *how much is left, when does it refill, and is that OK?* |
+| **Providers** | **core** | *who do I pay, under which accounts, and what did they last say?* |
+| **Data Sources** | supporting | *how do we find out?* — DataSource, DataSourceDefinition, CredentialLookup, Fetch, Mapping, Setting, DataSourceError, and every worker |
+| **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* |
+| **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export |
+| **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch |
+| **Usage History** | supporting | *what did I use, day by day?* |
+| **In use** | supporting | *which login does my next terminal session start with?* |
+| **Vault & Settings** | generic | *where is it kept?* — `settings.json`, secrets |
+| SDK clients | — (anti-corruption layers) | *what does this SDK say?* — a client that needs a heavy SDK gets its own module, behind a port, so only it links the SDK |
+
+## 8 · Where the code is still behind
+
+The tree above is the design; where the code disagrees, the code moves. What
+is built is not listed — the code is its record. What isn't yet:
+
+| Node | The code today | Moves to |
+|---|---|---|
+| the words | `UsageSnapshot`, `UsageQuota`, `CostUsage`, `AccountTier`, `capturedAt` | `Usage`, `Quota`, `Cost`, `Plan`, `updatedAt` — one rename per PR; the popover's *No quota data* becomes *No usage data* |
+| `Plan` | `AccountTier` with Claude's cases | a name and a badge |
+| `Usage` | carries `extensionMetrics` and `dailyUsageReport` | kernel fields only — usage history is read from `account.usageHistory` |
+| `Account.budget` | `app.claudeApiBudget` (Claude's card) and Bedrock's `dailyBudget` as a quota | a `Budget` beside the login's `Cost`, judged as `BudgetStatus`; the old keys read as the default login's budget |
+| `StatusPolicy` | `menuBarLabel(…)` takes the two burn-rate values; `StatusColorPolicy` is in `Domain` | the label takes the policy; colours move to the App |
 | page state | `MenuBarLabel`, `CountdownColon`, `PopoverContentHeight`, `MenuBarStackedSize` in `Domain/Provider`; `menuBarLabel(…)` on `QuotaMonitor` | the App |
-| In use | **built** (`feat/in-use`): `provider.inUse` from `accounts.signIn`, `LoginsInUse` (`~/.claudebar/in-use/<command>`, one per CLI), `SwitchWhenLow`, `NewSessions` + `ShellSetup` (zsh, bash, fish), `QuotaMonitor.onRefreshed`, `InUseAnnouncer` → `InUseNotifications`, `claudebar://use` — [in-use design](../features/in-use/design.md) | an env-variable record for API-key providers |
-| `ProviderDefinition` · *Add Provider* | **built** (#354): *Start from API · CLI · File · Copy a provider* → *Connect* (*Test Connection*) → *Map fields* (click a value, live card; money, % used/left, a balance; a CLI's text by its line) → *Look* → *Save*; `ProviderDraft` → `ProviderCatalog` (`~/.claudebar/providers/<id>.json`, origin custom, minted id) and the key in the vault (`setting`); *Delete*. Not yet: *Edit*, several quotas from one response. **Export/Import built** (#355): `exported()` names keys, never holds them; `review(file)` shows where a key goes, every command (Add waits for *I trust this command*), the keys needed; a taken id is re-minted | Edit |
-
-### The order of the work
-
-Each step ships green and changes no behaviour a user can see, until the last.
-
-1. **Carve the modules** — move files into `Modules/<Context>` with no
-   renames; page state leaves the domain. Typealiases keep call sites
-   compiling.
-2. **One `Provider` and one `DataSource`** — the generic lifecycle, and the
-   workers Codex needs; Codex becomes `codex.json` first, because its five
-   jobs exercise the most workers with the least account logic.
-3. **Profile and form as data** — remove the `switch id` tables and the
-   per-vendor settings protocols.
-4. **`Left` and `Window`** — the two kernel laws; the eight balance definitions
-   map money only.
-5. **Every other provider becomes JSON** — each one may add a case and a worker,
-   never a vendor type; extensions become definitions with a `script` fetch; *PROBE
-   MODE* becomes *DATA SOURCE*.
-6. **Add Provider** — the sheet, Test, Save.
-7. **The words** — `Usage` (`updatedAt`), `Plan`, `Cost`, and remove the
-   typealiases. The popover's *No quota data* · *Waiting for quota data* become
-   *usage data*: a balance-only provider has no quota, but it has usage.
+| `Day` | `DailyUsageReport` / `DailyUsageStat` | `Day`, with a cost line per model |
+| *Add Provider* | no *Edit*; one quota per response from the sheet | *Edit*; several quotas from one response |
+| In use | folder logins only | an environment-variable record for API-key providers |
 
 ## 9 · Open
 
@@ -599,7 +519,7 @@ Each step ships green and changes no behaviour a user can see, until the last.
   each, as a reference), and *Add Account* is that form. One definition
   serves every account (§1, §5).
 - ~~**`command` fetches from the UI.**~~ — **answered by the journey**
-  ([USER_JOURNEYS F10](USER_JOURNEYS.md#3--what-the-journeys-changed)): the
+  ([USER_JOURNEYS F10](USER_JOURNEYS.md#3--what-the-journeys-found)): the
   picker offers *CLI*, because a person typing their own command runs it with
   their own rights, as an extension does; a CLI provider that arrives by
   *Import* shows its command and asks before anything is saved or run.

@@ -3,7 +3,7 @@ import Testing
 @testable import Domain
 @testable import Infrastructure
 
-/// Settings → Providers, by product (TARGET §12, slice 1): one row per
+/// Settings → Providers, by product (CANONICAL §1: the product's switch): one row per
 /// product, its switch hiding every login, its logins moving together.
 @MainActor
 @Suite

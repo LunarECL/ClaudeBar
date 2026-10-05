@@ -10,7 +10,7 @@ This document owns **joining the board, what a member shares, how a member's upl
 
 | For | Read |
 |---|---|
-| How a day's tokens are read from a tool's logs, and deduplicated | [daily-usage/design.md](../daily-usage/design.md) |
+| How a day's tokens are read from a tool's logs, and deduplicated | [daily-usage/design.md](../daily-usage/design.md) · [dedup.md](../daily-usage/dedup.md) |
 | `UsageHistory`, the login that owns it, and the 30-day ledger | [CANONICAL_MODEL.md](../../architecture/CANONICAL_MODEL.md) |
 | Where settings persist | [docs/settings.md](../../settings.md) |
 | The other destination ClaudeBar sends its own state to, and its Keychain fallback | [notify/design.md](../notify/design.md) |

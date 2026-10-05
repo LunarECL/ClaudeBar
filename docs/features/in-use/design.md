@@ -17,7 +17,7 @@ User guide: [README.md](README.md). Mockup: `design-concept/in-use/index.html`.
 
 **New sessions of a CLI start on the login whose folder is recorded for it; ClaudeBar records it, the shell reads it, and nothing else moves.**
 
-In use is a **capability** ([CANONICAL §2.1](../../architecture/CANONICAL_MODEL.md#21--what-a-provider-owns-what-it-offers-and-what-it-isnt)): declared by `accounts.signIn`, reached as `provider.inUse` (`nil` when not declared), never a flag on `Provider`. Pieces and flows: [TARGET §11](../../architecture/TARGET_ARCHITECTURE.md#11--in-use-as-a-capability).
+In use is a **capability** ([CANONICAL §2.1](../../architecture/CANONICAL_MODEL.md#21--what-a-provider-owns-what-it-offers-and-what-it-isnt)): declared by `accounts.signIn`, reached as `provider.inUse` (`nil` when not declared), never a flag on `Provider`. Pieces and flows: [TARGET §9](../../architecture/TARGET_ARCHITECTURE.md#9--in-use-as-a-capability).
 
 ```
  views · claudebar://use · notification button          (render and tell — decide nothing)

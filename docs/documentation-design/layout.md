@@ -266,9 +266,10 @@ It covers the namespaces (`app.*`, `providers.<id>.*`, `<provider>.*`, `hook.*`,
 
 ## `docs/architecture/`
 
-**Who:** a contributor asking *how does a refresh become a menu bar update?*
+**Who:** a contributor or an agent about to change the design.
+**Their question:** *Who is this for, what must hold, and where does it go?*
 
-It's unchanged, and it's the one home for layers, the ISP repository design, data flow, and the theme and report systems. `AGENTS.md` and `CONTRIBUTING.md` link here instead of redrawing it.
+Five documents read in order — journeys, canonical model, target architecture, modular design, engine — mapped by `ARCHITECTURE.md` ([why that order](README.md#design-docs-an-order-not-a-pile)). `AGENTS.md` and `CONTRIBUTING.md` link to the map instead of redrawing it.
 
 ## `CONTRIBUTING.md`
 

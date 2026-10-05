@@ -4,7 +4,7 @@ description: Vercel AI Gateway as data — its definition, credits mapping, sett
 
 # Vercel Gateway: design
 
-`Modules/Providers/Resources/Providers/vercel-gateway.json` runs on the generic engine (TARGET_ARCHITECTURE §8.2); no Swift names Vercel.
+`Modules/Providers/Resources/Providers/vercel-gateway.json` runs on the generic [engine](../../architecture/ENGINE_DESIGN.md); no Swift names Vercel.
 
 ## Source
 

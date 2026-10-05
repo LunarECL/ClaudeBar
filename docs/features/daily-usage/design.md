@@ -1,456 +1,326 @@
-# Daily Usage Token/Cost Deduplication — Calculation Logic Design
+# Daily usage — design
 
-**Status:** Implemented
-**Date:** 2026-06-09
-**Issue:** [#207](https://github.com/tddworks/ClaudeBar/issues/207) — Daily Usage cost & token cards overcount ~4×
-**Follow-up:** [#190](https://github.com/tddworks/ClaudeBar/issues/190) — locally served models billed at Anthropic rates (§11)
-**Affected code:** written for `Sources/Infrastructure/Claude/`, which is now data (UH2,
-[TARGET_ARCHITECTURE §10](../../architecture/TARGET_ARCHITECTURE.md#10--usage-history-as-data)).
-The rules below hold unchanged; their homes moved:
+> Applies [the design](../../architecture/ARCHITECTURE.md) to Usage History:
+> the words and laws are the model's ([CANONICAL §1, §5](../../architecture/CANONICAL_MODEL.md#5--the-laws-on-the-node-that-owns-them));
+> this says how it runs. Users: [README.md](README.md). How duplicates are
+> found: [dedup.md](dedup.md). Claude Desktop beside a login:
+> [other-apps-design.md](other-apps-design.md).
 
-| Named below | Now |
-|---|---|
-| `SessionJSONLParser` + `SessionLogCache` | `JSONLinesReader` (`Modules/DataSources/Sources/Internal/Logs`) |
-| the dedup in `ClaudeDailyUsageAnalyzer` | `LogRecord.deduplicated`, keyed by `claude.json`'s `id` paths |
-| `ClaudeDailyUsageAnalyzer.aggregate` | `DayAggregator` |
-| `ModelPricing` | `PriceList` + `claude-prices.json` |
-| `ClaudeLocalInferenceDetector` | `LocalEndpoint`, `claude.json`'s `freeWhen.localEndpoint` |
+## 1 · What a person asks, and what is true
 
----
-
-## 1. Problem
-
-The Daily Usage cards (Cost Usage / Token Usage) sum **every** usage-bearing line in
-`~/.claude/projects/**/*.jsonl`. Claude Code writes the **same** `message.usage` block
-multiple times:
-
-1. **Streaming** — one assistant line per content block as the response streams
-   (thinking / text / tool_use). Each repeats the full `usage`; `output_tokens` grows
-   across the snapshots until the final, complete value.
-2. **Parallel tool calls** — multiple assistant messages in one turn share the same
-   `message.id` with byte-identical `usage`.
-3. **Resume / branch** — when a session is resumed or branched, prior entries are copied
-   into the new session file, so identical lines recur across different `.jsonl` files.
-
-Today's pipeline (`SessionJSONLParser` → `ClaudeDailyUsageAnalyzer.aggregate`) creates one
-`TokenUsageRecord` per line and adds them all together, with **no deduplication**. Result:
-the displayed cost and token totals are inflated.
-
-### Measured impact (this machine, all history)
-
-| Metric | Value |
-|---|---|
-| distinct `(message.id, requestId)` groups | 12,297 |
-| groups appearing more than once | 6,780 (55%) |
-| duplicate groups with **byte-identical** usage | 6,437 |
-| duplicate groups with **varying** `output_tokens` (streaming) | 343 |
-| naive sum (current app) | 5,357,322,061 tokens |
-| deduped (last-wins) | 3,027,710,023 tokens → **1.77× reduction** |
-
-Cache-heavy days reach ~4× (per the issue), because duplication multiplies the
-already-dominant cache-read figure.
-
-### Confirmed against Anthropic's own guidance
-
-[Agent SDK — Track cost and usage](https://code.claude.com/docs/en/agent-sdk/cost-tracking):
-
-> "When Claude uses multiple tools in one turn, all messages in that turn share the same
-> ID, so **deduplicate by ID to avoid double-counting**."
->
-> "**Use the highest value: the final message in a group typically contains the accurate
-> total.**" (output-token discrepancy resolution)
-
-The doc's own example keeps a `seenIds` set and counts each message ID once — exactly the
-step we are missing.
-
----
-
-## 2. Goals & Non-Goals
-
-**Goals**
-- Eliminate over-counting so Cost/Token cards align with Claude Code's own `/cost`.
-- Handle all three duplication sources (streaming, parallel tools, resume/branch copies).
-- Preserve correctness for the streaming case: never under-count `output_tokens`.
-- Keep the change localized to the parse → aggregate path; no UI/domain-model churn.
-
-**Non-Goals**
-- Authoritative billing. The cost figure remains a **client-side estimate** built from a
-  local price table; it can drift from the real bill (pricing changes, unknown models).
-  This matches the SDK's own warning. We target parity with `/cost`, not the invoice.
-- Changing the 2-day scan window, working-time estimation, or per-model pricing tables.
-
----
-
-## 3. Deduplication Key
-
-**Chosen key:** `(message.id, requestId)` — composite.
-
-| Option | Behavior | Decision |
-|---|---|---|
-| `message.id` alone | What the SDK doc documents as the minimum. | Sufficient in practice. |
-| `(message.id, requestId)` | What ccusage uses; collapses only when **both** match. | **Chosen** — superset-safe. |
-
-On real data the two are **identical**: no `message.id` maps to more than one `requestId`
-(verified: 12,300 distinct under either key). We choose the composite because:
-
-- It matches the established reference implementation (ccusage), easing cross-checking.
-- It is strictly safer: if a future Claude Code format ever reused an ID across requests,
-  the composite keeps them separate rather than silently merging.
-
-**Both fields are top-level/nested-present** in real logs:
-- `requestId` — top-level line field (e.g. `req_011Cax…`)
-- `message.id` — nested in `message` (e.g. `msg_01Dso…`)
-
-### Missing-key fallback
-
-A line lacking **either** key cannot be safely grouped. Such a record is treated as
-**its own unique group** (keyed by a per-record sentinel) and counted as-is. This is
-conservative: it never merges records that might be distinct, at the cost of possibly
-retaining a genuine duplicate that happens to lack keys (not observed in practice).
-
----
-
-## 4. Collapse Rule: Last-Wins
-
-Within a `(message.id, requestId)` group, keep **one** record:
-
-> **Last occurrence in file order wins.**
-
-Rationale, from the data and the SDK doc:
-
-- Streaming snapshots accumulate `output_tokens` (`1 → 248`), so the **final** line holds
-  the complete, billed value.
-- Empirically, `last-wins == max-wins` on this machine (both 3,027,710,023). Last-wins is
-  the simpler rule and matches the doc's "final message in a group."
-- `first-wins` would **under-count** the 343 streaming groups → rejected.
-
-Because input / cache_creation / cache_read are stable across a group's snapshots while
-only `output_tokens` grows, taking the whole last record (not a field-wise max) is correct
-and simplest.
-
-### Ordering guarantee
-
-Records are emitted in file-read order, and files are processed deterministically. Last-wins
-relies only on per-file line order, which preserves streaming sequence (the final snapshot
-is physically last in the file). Cross-file copies (resume/branch) are byte-identical for
-the stable fields, so which file "wins" is immaterial.
-
----
-
-## 5. Algorithm
-
-```
-parse:   for each assistant line with usage:
-             emit TokenUsageRecord{ messageId, requestId, model,
-                                    input, output, cacheCreation, cacheRead, timestamp }
-
-analyze: allRecords = parse(all recent jsonl files)        // unchanged
-         deduped    = collapseLastWins(allRecords)          // NEW
-         partition deduped into today / yesterday by timestamp
-         aggregate(today), aggregate(yesterday)             // unchanged math
-```
-
-### `collapseLastWins`
+A person asks **"how much did I use, day by day?"** *TODAY'S USAGE* (today
+against yesterday) and a *Daily token usage — last 30 days* chart (input,
+output, cache read and cache write per day, two axes) are **two views of that
+one answer**: the last two days, and the last thirty. So the model is a
+**series of days**, and a view is a range the page asks for:
 
 ```swift
-// Keep the last record seen per (messageId, requestId).
-// Records missing either key are kept as-is (unique sentinel key).
-func collapseLastWins(_ records: [TokenUsageRecord]) -> [TokenUsageRecord] {
-    var lastByKey: [DedupKey: TokenUsageRecord] = [:]
-    var order: [DedupKey] = []          // preserve first-seen order for stable output
-    var sentinel = 0
-
-    for record in records {
-        let key: DedupKey
-        if let id = record.messageId, let req = record.requestId {
-            key = .composite(id, req)
-        } else {
-            key = .unkeyed(sentinel); sentinel += 1
-        }
-        if lastByKey[key] == nil { order.append(key) }
-        lastByKey[key] = record       // last-wins overwrite
-    }
-    return order.map { lastByKey[$0]! }
-}
-
-enum DedupKey: Hashable {
-    case composite(String, String)
-    case unkeyed(Int)
-}
+account.usageHistory?.days(in: .last(2))    // TODAY'S USAGE
+account.usageHistory?.days(in: .last(30))   // the chart; every date present, empty days included
 ```
 
-**Where it runs:** in `ClaudeDailyUsageAnalyzer.analyzeToday()`, on the combined
-`allRecords` array **before** today/yesterday partitioning — so duplicates split across
-files (resume/branch) collapse globally, not just within one file.
+A `Day` holds what every view needs: tokens by kind, a `Cost` with a line per
+model (so a chart can stack by model too), sessions, working time and cache
+savings. Nothing about "today and yesterday" is a type.
 
-**Complexity:** O(n) time, O(n) space over assistant lines in the 2-day window. Negligible
-vs. existing file I/O.
+Today two vendor-named analyzers answer only the last two days, and each one
+hard-codes the same five jobs:
 
----
-
-## 6. Data Model Change
-
-`TokenUsageRecord` gains two optional identity fields:
-
-```swift
-struct TokenUsageRecord: Sendable, Equatable {
-    let messageId: String?      // NEW — message.id  (e.g. "msg_01Dso…")
-    let requestId: String?      // NEW — top-level requestId (e.g. "req_011Cax…")
-    let model: String
-    let inputTokens: Int
-    let outputTokens: Int
-    let cacheCreationTokens: Int
-    let cacheReadTokens: Int
-    let timestamp: Date
-    var totalTokens: Int { inputTokens + outputTokens }
-}
-```
-
-`SessionJSONLParser` reads `json["requestId"]` and `message["id"]` (both `as? String`),
-defaulting to `nil` when absent. Both `parse(fileURL:)` and `parse(content:)` paths are
-updated identically.
-
-> The aggregation math in `aggregate(records:date:)` is **unchanged**. It simply receives a
-> deduplicated array. Working-time / session-count estimation also benefits, since it no
-> longer sees repeated timestamps.
-
----
-
-## 7. Worked Example
-
-Input lines for one response (streaming), plus one resume-copy in another file:
-
-```
-file A: msg_01X / req_9  in=7 out=1   cc=2499 cr=46316   t=10:00:00.1
-file A: msg_01X / req_9  in=7 out=1   cc=2499 cr=46316   t=10:00:00.2
-file A: msg_01X / req_9  in=7 out=248 cc=2499 cr=46316   t=10:00:00.9   ← final
-file B: msg_01X / req_9  in=7 out=248 cc=2499 cr=46316   t=10:00:00.9   ← resume copy
-```
-
-- **Today (naive):** counts all 4 → output 1+1+248+248 = 498, totals ~4× inflated.
-- **Today (last-wins):** one record kept → `in=7 out=248 cc=2499 cr=46316`. Correct,
-  matches `/cost`.
-
----
-
-## 8. Test Plan (Chicago-School, state-based)
-
-Fixtures live as inline JSONL strings fed to `SessionJSONLParser.parse(content:)` and a
-`ClaudeDailyUsageAnalyzer` with injected `now` and a temp `claudeDir`.
-
-| # | Scenario | Assert |
-|---|---|---|
-| 1 | Parser captures `messageId` + `requestId` from a real-shaped line | fields populated |
-| 2 | 3 byte-identical lines, same `(id,req)` | aggregate counts once |
-| 3 | Streaming: output grows `1 → 248`, same `(id,req)` | keeps `output=248` (last/max) |
-| 4 | Same `(id,req)` duplicated across **two files** (resume) | counts once globally |
-| 5 | Two **distinct** responses (different ids) | both counted, no merge |
-| 6 | Line missing `requestId` (or `id`) | kept as-is, not merged with others |
-| 7 | Regression: known fixture → expected deduped cost/token totals | exact match |
-| 8 | Working-time/session-count unaffected by dedup of same-timestamp dups | stable value |
-
-Run: `xcodebuild test -scheme ClaudeBar-Workspace -workspace ClaudeBar.xcworkspace
--destination 'platform=macOS,arch=arm64'` (bypass Tuist test caching).
-
----
-
-## 9. Rollout & Risk
-
-- **Backward compatible:** new fields are optional; older lines without IDs still parse
-  (counted as-is via the fallback).
-- **User-visible effect:** Cost/Token cards drop to ~1/1.8–4× of prior values. This is the
-  *correct* number, but it is a visible decrease — note it in the CHANGELOG so users don't
-  read it as data loss. Frame as "Daily Usage now deduplicates streamed/duplicate session
-  entries to match `claude /cost`."
-- **No migration:** stateless recompute on next scan.
-- **Estimate caveat:** cost remains a local estimate (price table); keep any "≈"/estimate
-  affordance in the card copy if present.
-
----
-
-## 10. Alternatives Considered
-
-| Alternative | Why not |
-|---|---|
-| Dedup by `message.id` only | Equivalent on current data; composite is safer and matches ccusage. Acceptable fallback if `requestId` is ever absent project-wide. |
-| First-wins / first-seen | Under-counts streaming groups' `output_tokens`. |
-| Field-wise max across group | Equivalent to last-wins here but more code; only needed if stable fields ever varied (they don't). |
-| Dedup inside each file only | Misses resume/branch copies that span files. Must dedup on the combined set. |
-| Switch to an authoritative usage source (à la tokemon's OAuth path) | Larger, orthogonal change; doesn't block fixing the inflation. Possible future work. |
-
----
-
-## 11. Locally Served Models Cost Nothing (#190)
-
-### Problem
-
-`ModelPricing.price(for:)` ends in `return defaultPrice` — Sonnet-level $3/$15 per 1M —
-for **any** name the table does not know. `SessionJSONLParser` accepts every
-`type:"assistant"` line's `message.model`, including the model names a local server
-reports when `ANTHROPIC_BASE_URL` points at ollama or LM Studio. So a user who
-switched Claude Code to a local model watched the Cost Usage card keep climbing in
-dollars, while the session/weekly quotas — which come from the Anthropic account and
-were correctly flat — told them nothing was being spent.
-
-`cachedSavings` had the same defect: cache savings priced at Anthropic rates for a
-model nobody bills per token are a fabricated number, not an estimate.
-
-The default exists for a narrow reason: it hedges **Anthropic** models released after
-the table was written. Applied to `qwen3-coder` it is not a hedge, it is a wrong
-number.
-
-### Design: two free signals, one table, one order of precedence
-
-`price(for:servedLocally:)` resolves in this order:
-
-| # | Case | Price | Why |
+| Job | Claude (`ClaudeDailyUsageAnalyzer` + 5 helpers) | Mistral (`VibeSessionLogAnalyzer`) | What it really is |
 |---|---|---|---|
-| 1 | Known Anthropic model — exact, prefix, `opus`/`haiku` inference | table | Authoritative, and never overridden |
-| 2 | Open-weight family name (`qwen`, `llama`, `gemma`, `mistral`, …) | **free** | In the shapes that occur — ollama, LM Studio, llama.cpp — nothing bills per token |
-| 3 | Anything else, when the session was **served locally** | **free** | A loopback endpoint proves nobody can bill for the tokens |
-| 4 | Anything else, no local provenance | `defaultPrice` | The hedge for a new Anthropic model, kept intact |
+| where the records are | `~/.claude/projects/**/*.jsonl`, changed since yesterday | `~/.vibe/logs/session/session_*/meta.json` | a glob |
+| how to read one | an assistant line: `message.model`, `message.usage.*`, `timestamp` | `stats.session_total_llm_tokens`, `stats.session_cost`; the time from the folder name, in UTC | a format and field paths |
+| which copy counts | `message.id` + `requestId`, the last wins | each file once | an identity |
+| what it cost | `ModelPricing` — a Swift table; a local model, or a base URL on this Mac, is free | the log says | a price catalog, or the record's own cost |
+| the day | local midnight; a 30-minute pause starts a session | local midnight; a file is a session | one aggregator |
 
-**Why both signals, and why this order.** Name alone needs a list that is always
-behind: `phi4`, `granite` or a private fine-tune served over ollama still billed at
-Sonnet rates. Provenance alone needs a config file to be present and correct, and
-`ANTHROPIC_BASE_URL` is unset for most people — including everyone who reaches a
-local runner some other way. Provenance settles what the name cannot: a local server
-may serve a model we have never heard of, under any name. The name list settles what
-the config cannot: it keeps a local model's cost at $0 even after the user has
-switched back to the API, when the loopback signal is gone.
+None of these is a vendor's behaviour; each is a value. So, as for usage
+(§2), **a tool's usage history is a definition and one engine runs it**: a new
+tool's logs, a new model's price or a new view never edit a vendor's Swift
+(OCP).
 
-**Why rule 1 is not overridden by provenance.** `ANTHROPIC_BASE_URL` is a global,
-current setting, but records are per-moment and the scan window is two days wide.
-Zeroing `claude-sonnet-4-6` whenever a loopback URL happens to be configured would
-retroactively erase real spend from before the switch. The loopback fact is evidence
-about *unpriced* names only; for names the table knows, the table wins.
+## 2 · The definition: `usageHistory` beside `dataSources`
 
-**Why provenance stops at midnight.** The same reasoning bounds *when* the signal
-applies, not only to which names. Today is priced with it; yesterday's unpriced names
-keep the Sonnet estimate. Applying it across the whole window would erase yesterday's
-gateway estimate by precisely the mechanism rule 1 refuses — a current setting
-reaching back over records written before it was true. The asymmetry is deliberate and
-it is one-directional: the bound can *over*-report (a user who ran locally all of
-yesterday sees Sonnet-rate dollars for a day nobody billed), never under-report. A
-real z.ai bill quietly becoming $0 is the error this design will not make.
+Record fields use **the mapping's path language** (§3: `$.a.b`, a list is the
+first that answers, `where`), so there is one way to point into JSON.
 
-**A brand-new Anthropic model released tomorrow** lands in rule 4 and is estimated at
-Sonnet rates, exactly as today. Anthropic model IDs contain `claude`, so none of the
-local-family substrings can swallow one; and no Anthropic release is served from a
-loopback endpoint, so provenance cannot quietly zero it. The failure mode of this fix
-is the *opposite* of the old one: we never invent a price for an unrecognised
-Anthropic model.
+```jsonc
+// claude.json
+"usageHistory": {
+  "records": {
+    "files": "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
+    "format": "jsonLines",                       // jsonLines (append-only, read incrementally) · json (one record per file)
+    "where": { "path": "$.type", "equals": "assistant" },
+    "at": "$.timestamp",                          // ISO 8601
+    "id": ["$.message.id", "$.requestId"],        // together its identity: written twice, it counts once — the last wins
+    "model": "$.message.model",
+    "tokens": {
+      "input": "$.message.usage.input_tokens",
+      "output": "$.message.usage.output_tokens",
+      "cacheWrite": "$.message.usage.cache_creation_input_tokens",
+      "cacheWrite1h": "$.message.usage.cache_creation.ephemeral_1h_input_tokens",   // the part kept an hour, priced apart
+      "cacheRead": "$.message.usage.cache_read_input_tokens"
+    }
+  },
+  "prices": { "file": "claude-prices.json" },    // a PriceList — or { "service": "AmazonBedrock" }, through PriceCatalog
+  "freeWhen": { "localEndpoint": { "file": "${CLAUDE_CONFIG_DIR:-~}/.claude.json",
+                                   // the first entry that answers decides; a list is one entry
+                                   "url": ["$.env.ANTHROPIC_BASE_URL",
+                                           ["$.providers[*].base_url", "$.providers[*].env.ANTHROPIC_BASE_URL"]] } },
+  "sessionGap": 1800
+},
+"accounts": { "patch": { "usageHistory": { "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" } } } }
+```
 
-**Deliberately absent from the name list:** `glm-4`, `deepseek`, and friends. Those
-names are also served by paid gateways (z.ai, DeepSeek, OpenRouter) through the same
-`ANTHROPIC_BASE_URL` mechanism, so a name alone cannot say whether they cost anything.
-They stay on the Sonnet estimate unless rule 3 proves the run was local — which is
-the case that would otherwise have been guessed wrong in both directions.
+```jsonc
+// mistral.json
+"usageHistory": {
+  "records": {
+    "files": "~/.vibe/logs/session/session_*/meta.json",
+    "format": "json",
+    "at": { "fromPath": "session_(\\d{8}_\\d{6})", "format": "yyyyMMdd_HHmmss", "timeZone": "UTC" },
+    "tokens": { "total": "$.stats.session_total_llm_tokens" },
+    "cost": "$.stats.session_cost"               // the log's own cost wins over any price
+  }
+}
+```
 
-### Provenance plumbing
+```jsonc
+// claude-prices.json — beside the definition; a price change edits this, never Swift
+{
+  "currency": "USD", "per": 1000000,
+  "models": [                                     // exact id first, then the longest prefix
+    { "id": "claude-opus-5",   "name": "Claude Opus 5",   "input": "5", "output": "25", "cacheWrite": "6.25", "cacheRead": "0.50" },
+    { "id": "claude-sonnet-5", "name": "Claude Sonnet 5", "input": "2", "output": "10", "cacheWrite": "2.50", "cacheRead": "0.20" }
+  ],
+  "families": [ { "contains": "opus", "as": "claude-opus-4-6" }, { "contains": "haiku", "as": "claude-haiku-4-5-20251001" } ],
+  "free": [ "qwen", "llama", "gemma", "mistral", "gpt-oss", "ollama" ],   // a model of a local family costs nothing
+  "otherwise": { "input": "3", "output": "15", "cacheWrite": "3.75", "cacheRead": "0.30" }
+}
+```
 
-`ClaudeLocalInferenceDetector` reads `~/.claude.json` — `env.ANTHROPIC_BASE_URL`, or the
-`providers` array when that key is absent — and reports whether the active base URL resolves to a loopback host
-(`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `*.localhost`). `ClaudeBarApp` passes
-`isLocallyServed: { ClaudeLocalInferenceDetector.isLocallyServed() }` into
-`ClaudeDailyUsageAnalyzer`; the analyzer's default is `{ false }` so tests never read
-the developer's own config, matching `ClaudeUsageProbe`'s no-op resolver.
+- **One price shape, two origins.** A price file is data, decoded into a
+  `PriceList` that holds the rules: exact id → the longest prefix (either
+  way round) → a family → a free family → `freeWhen` → `otherwise`. A cloud's
+  price list (`{ "service": … }`) is fetched through the `PriceCatalog` port
+  Bedrock uses (#417) into the same `PriceList`. A tool that writes its own
+  cost needs neither.
+- **Per login, like data sources.** The default login reads `usageHistory`; an
+  added login gets `accounts.patch.usageHistory` merged in and its values filled
+  (`{{account.configDirectory}}`), so an added Claude login has its own
+  usage history for the first time. A definition without `usageHistory` has none.
+- **Money stays exact.** Prices are decimal texts; cost is
+  tokens × price ÷ `per` in `Decimal`, shown as an estimate unless the record
+  gave its own `cost`.
+- **`freeWhen.localEndpoint`** replaces `ClaudeLocalInferenceDetector`: a
+  base URL in that file on a loopback host (`localhost`, `127.0.0.1`, `::1`,
+  `0.0.0.0`, `*.localhost`) makes an unpriced model free. It describes the
+  route **now**, so it prices only the day that holds now; an earlier day
+  keeps its estimate — over-reporting is the safe direction.
 
-- **Resolved per scan, not at init**, so pointing the CLI at a local server takes
-  effect on the next popover open without an app restart.
-- **Applied to today only.** The signal describes the route as it is now, so yesterday's
-  records stay on the estimate — see *Why provenance stops at midnight* above.
-- **`env` outranks `providers`.** `providers` is the menu of gateways a user *may*
-  switch between; `env.ANTHROPIC_BASE_URL` is the one Claude Code is routed at. A
-  config listing `api.z.ai` alongside a leftover `localhost:11434` is the ordinary
-  shape of a machine that tries both, and OR-ing the two would mark the window local
-  and zero a real GLM/DeepSeek estimate for a machine running no local inference at
-  all. `providers` is consulted only when `env` names no route.
-- **Loopback only.** A remote `ANTHROPIC_BASE_URL` (z.ai, a corporate proxy) is
-  still billed by somebody, so it proves nothing. An unparseable URL counts as
-  remote: zeroing a cost because parsing failed would silently under-report spend.
+#### When logs differ: one record, three tiers
 
-### Known limitations
+Tools write their logs differently. The difference stays at the edge: every
+reader turns its file into the same **`LogRecord`** — `at`, `id`, `model`,
+`tokens` (input · output · cache write · cache read, or a `total`), `cost` —
+and everything after it (dedupe, days, sessions, prices, the ledger, the
+screens) never learns which tool wrote it.
 
-- A local server asked to serve `sonnet` (so the log says `claude-sonnet-4-6`) is
-  still priced at list rates: the name is in the table, and a loopback URL says
-  nothing about which Anthropic model would have been billed.
-- **A hosted open-weight endpoint reads as $0, and nothing can re-price it.** A model
-  whose name says open weights but which is metered by somebody else's cloud —
-  `qwen3-max` on Alibaba, `mistral-large-2411` on La Plateforme, `gemma-3-27b-it`, or any
-  `*/llama-*` id from OpenRouter, Together, Fireworks, DeepInfra or Groq — is reported
-  free. The loopback signal is **not** an escape hatch here: rules 2 and 3 are OR'd on
-  one line, so the name alone is enough to make the price free and no configuration can
-  put it back. The name is the only signal available, and it is wrong for this case.
-- **A local proxy in front of a paid upstream reads as $0.** LiteLLM on
-  `localhost:4000` forwarding to z.ai, OpenRouter or a corporate model gateway satisfies
-  rule 3 for every unpriced name, because loopback proves the *client* is on this
-  machine, not that the *tokens* were. Same failure as the case above, and the more
-  common shape in a team that fronts its providers through one router. The detector
-  cannot tell a runner from a router: both answer on loopback.
-- Cost remains a client-side estimate either way; §2's non-goals still stand.
+| How a tool's logs differ | What a contributor changes | Swift? |
+|---|---|---|
+| where the files are, what a field is called (Claude's `message.usage.input_tokens`, Vibe's `stats.session_total_llm_tokens`) | `files` and the field paths | no |
+| the same idea, said another way: the time in a folder's name, the log's own cost, a session per file, a running total | an option: `at.fromPath`, `cost`, no `sessionGap`, `"cumulative": true` | no |
+| a record no path can say (a field to compute, a list to add up) | `"script": "x-log.js"` — `read(record, context)` returns one `LogRecord`, the escape hatch a mapping already has (built when a tool first needs it) | no |
+| a file of another kind (SQLite, binary) | a new `format` case and its reader, named for the format, with a test that names no tool | once |
 
-### Tests
+**A script, by example.** Say a tool logs one line per turn, in an
+OpenAI-style shape no path can turn into a record: the time in epoch
+milliseconds, cached tokens *included* in the input count, and one usage
+entry per model in a list.
 
-| Scenario | Assert |
+```jsonc
+// a line of ~/.example/history/2026-10-03.jsonl
+{"kind":"turn","ts":1759500000123,"turn":"t_81","usage":[
+  {"model":"gpt-5","prompt_tokens":12000,"cached_tokens":9000,"completion_tokens":800},
+  {"model":"gpt-5-mini","prompt_tokens":3000,"cached_tokens":0,"completion_tokens":200}]}
+```
+
+The definition keeps what paths can say — the files, the format, the
+filter — and hands each record to a script instead of naming its fields:
+
+```jsonc
+// example.json
+"usageHistory": {
+  "records": {
+    "files": "~/.example/history/*.jsonl",
+    "format": "jsonLines",
+    "where": { "path": "$.kind", "equals": "turn" },   // still the byte prefilter: the script sees only these
+    "script": "example-log.js"                         // in place of at · id · model · tokens · cost
+  },
+  "prices": { "file": "example-prices.json" },
+  "sessionGap": 1800
+}
+```
+
+```js
+// example-log.js — read(record, context) → a LogRecord, a list of them, or null to skip
+function read(record, context) {
+  if (!Array.isArray(record.usage)) return null;
+  return record.usage.map(function (u, i) {
+    return {
+      at: record.ts / 1000,                          // epoch seconds
+      id: record.turn + "#" + i,                     // one record per model in the turn
+      model: u.model,
+      tokens: {
+        input: u.prompt_tokens - u.cached_tokens,    // the log counts cached tokens as input
+        cacheRead: u.cached_tokens,
+        output: u.completion_tokens
+      }
+      // cost: "0.0123" — when the log states it; a decimal text stays exact
+    };
+  });
+}
+```
+
+That line becomes two records — `gpt-5` with 3,000 input, 9,000 cache read
+and 800 output tokens, `gpt-5-mini` with 3,000 and 200 — priced, deduped and
+summed into days exactly like Claude's. The rules are a mapping script's
+(§2): it runs in JavaScriptCore with no file, network or process access;
+`context` holds `now`, `timeZone`, the file's `path` and the definition's
+`values`; money helpers (`jsonDecimal`, `decimalAdd`) keep a stated cost
+exact; and it turns one record into records, nothing else. A script is
+slower than paths, so `where` filters first, and a tool whose fields paths
+*can* reach never needs one.
+
+**Neither Claude nor Mistral uses a script**, and the script tier is not
+built with them. Claude's logs are paths plus options (`where`, a composite
+`id`, `sessionGap`, `freeWhen`), and they run to gigabytes: a JavaScriptCore
+call per line would undo the incremental reader and the byte prefilter.
+Mistral's one tool-shaped fact — the time in the folder's name — is a
+common one (logs rotated by date), so it is an option, `at.fromPath`, that
+any tool can use. The rule for choosing: **an idea several tools share is
+an option; an idea only one tool has is a script.**
+
+`format` is a closed sum like `Fetch`: the engine stays closed, a new tool is
+data. The reading rules every format shares:
+
+- **`files`** is a glob: `**` any depth, `*` within one name; hidden files
+  are skipped, and only files changed since the range's first day are read.
+- **`where`** keeps the records that match; its text values are also a byte
+  prefilter, so a line without them is never decoded.
+- A record without `at`, or without a declared `model`, is skipped; so is
+  one where no token field and no `cost` answers — it says nothing about
+  usage (Claude's assistant line without `usage`, a Vibe `meta.json`
+  without `stats`). Otherwise a missing token field counts 0.
+- **`id`**'s paths together are a record's identity; a record missing any of
+  them is never merged with another.
+
+**Other apps.** `usageHistory.otherApps` lists apps on this Mac that use
+the same plan and keep their own count, each `{label, records, prices?}`:
+Claude Desktop's `buddy-tokens.json` is `format: json`, `tokens.total`, and
+`at: {"field": "$.tokens-today.date", "format": "yyyy-MM-dd"}` — a field read
+with a format, local unless it names a `timeZone`. Each is its own
+`UsageHistory` with its own ledger key (`<login>/<label>`), shown as its own
+card, never summed with the login's days; without prices it has tokens and
+no cost. An added login's patch sets `otherApps` to `null`. A token count that
+is negative or not whole drops the record. Design:
+[other-apps-design.md](other-apps-design.md).
+
+## 3 · Thirty days without re-reading thirty days: the ledger
+
+Claude's logs run to gigabytes; re-reading thirty days on every popover open
+is not an option, and today's in-memory cache only covers two. The day is the
+natural unit to keep:
+
+- **A day closes** a fixed while after its midnight (late lines from a
+  session that ran past midnight still land). A closed day is summed once
+  and kept in a **`DayLedger`** — per login, one small JSON file under
+  `~/.claudebar/usage-history/`, a few hundred bytes a day.
+- **Open days** (today, and yesterday until it closes) are read from the logs
+  every time — incrementally, as today, so a popover open reads only what
+  was appended.
+- **Dedupe stays exact**: a record's identity only has to be remembered
+  while its day is open.
+- **A ledger is a cache, not a record**: deleting it re-reads the logs; a
+  change to the definition (`usageHistory` or the prices) invalidates it.
+
+## 4 · Where it lives: the login owns it, `DataSources` extracts it
+
+**No new module.** A module earns its place with its own SDK, a second
+consumer, or a boundary the build must enforce; usage history has none —
+`Providers` is its only consumer, and the work it needs (find files, read
+JSON with the path language, expand `~`, price tokens) is what `DataSources`
+already does behind `internal`. So it splits along the line every provider
+already has:
+
+- **The login owns it.** `Account` holds `usageHistory: UsageHistory?` —
+  `nil` when the definition has no `usageHistory` — and `UsageHistory`
+  (in `Providers`) answers `days(in:)` from its `DayLedger` of closed days,
+  asking its log for the open ones. A page reads
+  `account.usageHistory?.days(in:)` (CANONICAL §2.1), never a dictionary
+  keyed by provider ids, and there is no app-wide registry.
+- **`DataSources` extracts it** — the only part that differs per provider.
+  The definition's `usageHistory` decodes as a `UsageLog.Definition` (as
+  `dataSources` decode as `DataSourceDefinition`); `DataSources.makeUsageLog`
+  fills it with the login's values and returns a `UsageLog` whose
+  `days(from:to:)` reads and prices the records. Its readers and aggregator
+  are `internal` workers beside `FileFetcher` and `JSONMapper`.
+- **`Day` is a kernel value** in `Quotas`, beside `Cost` and `CostLine`,
+  replacing `DailyUsageReport`/`Stat`, which already live there.
+
+Not in `Provider`'s refresh: usage history is not a meter and is read on its
+own cadence (popover open, never the background poll).
+
+| Piece | Job | From today's |
+|---|---|---|
+| `UsageLog.Definition` (`DataSources`) | the JSON, `Codable`, no behaviour | the constants in both analyzers |
+| `UsageLog` (`DataSources`) | `days(from:to:)`: the readers, prices and aggregator for one login | both analyzers' entry points |
+| `JSONLinesReader` (`DataSources/Internal`) | one record per matching line; reads only what was appended since the last scan, re-reads a file that changed under it; a byte prefilter derived from `where` | `SessionJSONLParser` + `SessionLogCache`, generalised |
+| `JSONLogReader` (`DataSources/Internal`) | one record per file; `at.fromPath` reads the time from the path | `VibeSessionLogAnalyzer.loadSessions` |
+| `LogRecord` (`DataSources/Internal`) | the one shape every reader produces | `TokenUsageRecord`, `ParsedSession` |
+| `PriceList` (`DataSources/Internal`) | the record's own cost, else the list (exact → longest prefix → family → free → `freeWhen` → otherwise); cache savings | `ModelPricing` |
+| `LocalEndpoint` (`DataSources/Internal`) | `freeWhen.localEndpoint`: is the route in that file on this Mac? | `ClaudeLocalInferenceDetector` |
+| `LogFileFinder` (`DataSources/Internal`) | `files`' glob, changed since a date | `findRecentJSONLFiles` |
+| `DayAggregator` (`DataSources/Internal`) | dedupe by `id` (last wins), split by local day, sessions by `sessionGap` (a record is a session without one), working time, cache savings, a cost line per model | both analyzers' `aggregate` |
+| `DayLedger` (`Providers/Internal`) | closed days kept per login; open days asked of the `UsageLog` | — (new) |
+| `UsageHistory` (`Providers`, @Observable, one per login) | `days(in:)`, every date present | `Domain/UsageHistory` (one object for all logins, two days only) |
+| `Day` (`Quotas`) | the answer; `DailyUsageStat` until the words land | `Quotas` |
+
+Ports: the ledger's store (a `@Mockable` `LedgerStore`) in `Providers`, and
+`PriceCatalog` for a cloud's prices. **The log files are not a port**: the
+readers' whole job is bytes on disk (offsets, inodes, half-written lines), so
+they are tested on files in a temporary folder, as credential files already
+are; a mock would test nothing they do. No module names
+a vendor; the readers are named for formats. The page owns the views:
+*TODAY'S USAGE* cards read `days(in: .last(2))`, a chart reads
+`days(in: .last(30))` and stacks `tokens` by kind (or `cost.lines` by model).
+
+## 5 · Is it easy to change? The checks
+
+| A person or a contributor wants… | They change |
 |---|---|
-| `qwen3-coder`, `qwen3-coder:30b` | cost and cache savings are 0, with cache tokens in the fixture |
-| unpriced name, `servedLocally: true` | cost and cache savings 0 |
-| unpriced name, no provenance | unchanged Sonnet estimate |
-| unpriced name yesterday, `servedLocally: true` | yesterday keeps the Sonnet estimate |
-| `claude-sonnet-4-6`, `servedLocally: true` | list price **and** cache savings kept |
-| `glm-4.6`, `deepseek-r1` | still priced (paid-gateway names stay estimated) |
-| analyzer over a local-model JSONL | `totalCost == 0` while `totalTokens == 1500` |
-| analyzer over a private-fine-tune JSONL, loopback | cost and savings 0; same JSONL remote, both > 0 |
-| detector | loopback hosts true, gateway/LAN/unparseable false, `providers[]` shapes |
-| detector | a `localhost` entry in `providers[]` does not override a remote `env` route, and vice versa |
+| a *Last 30 days* chart, a week view, a month total | the page only: another range of `days` |
+| a new model's price, or a price cut | `claude-prices.json` |
+| *TODAY'S USAGE* for another tool that logs JSON | that tool's definition: a `usageHistory` block |
+| Codex's usage history (`~/.codex/sessions/**/rollout-*.jsonl`, whose `token_count` events carry a session's **running total**) | `codex.json`'s `usageHistory`, plus one reader option, `"cumulative": true` (the last record per session counts), with a neutral test |
+| a binary log format | one new reader, named for the format |
+| an added login's own usage history | nothing: `accounts.patch.usageHistory` |
 
----
+## 6 · Guest passes stay Swift
 
-## 12. Reading Only What Changed
+**Guest passes** (`ClaudeGuestPassSource`: `claude /passes` in a terminal,
+the referral link from the screen or the clipboard, an optional count) are
+**not** a definition block. Only one product has them: a `guestPasses` key
+in the shared definition, with a `clipboard` option on every `cli` fetch,
+would put one vendor's feature into the format every provider uses —
+speculative generality, the opposite of OCP. The rule that decides it is the
+one for log shapes (§2): *an idea several providers share is data; an
+idea only one product has stays at the edge.*
 
-Every popover open scans each JSONL file modified since yesterday. A heavy user
-has hundreds of them (one measured machine: 629 files, 272 MB), and only the files
-of live sessions change between opens, almost always by appending.
-
-`SessionLogCache` (an actor the analyzer owns) keeps each file's parsed records
-with a stamp of `(inode, size, mtime, ctime)` and the byte offset after its last
-complete line:
-
-| On the next scan | Action |
-|---|---|
-| Stamp identical | Reuse the records; the file is not opened |
-| Same inode, larger, prefix guard matches | Parse from the saved offset; append the new records |
-| Anything else (new inode, shrink, guard mismatch, whole-second `ctime`) | Parse the whole file |
-
-- **Prefix guard**: a hash of the first and last 64 KB of the bytes already read.
-  It catches a file truncated and rewritten, or changed at either edge, without
-  re-reading it. It does not catch a same-length edit in the middle of a prefix
-  over 128 KB; the cache relies on Claude Code only appending, and anything else
-  is out of scope.
-- **Unterminated last line**: its record counts, but the offset stays before it and
-  the next read parses it again. Unkeyed records are never deduplicated (§3), so
-  resuming inside the line or counting it twice would both corrupt the totals.
-- **Stamp before parse**: lines written while a file is being parsed change the stamp,
-  so the next scan picks them up instead of matching a stamp taken after them.
-- **Eviction**: files no longer in the two-day window are dropped from the cache.
-- **Overlapping scans** (popover open, refresh, tab refresh) queue on the actor; the
-  later ones find the earlier one's work already cached.
-
-The parser also streams each file in 1 MB reads and skips any line that doesn't
-contain both `"usage"` and `"assistant"` before decoding it. Both strings appear
-unescaped only as JSON tokens, so no usage-bearing line is skipped; most user and
-tool-result lines never reach `JSONSerialization`.
-
-The append-only assumption matches the one in
-[c9watch](https://github.com/minchenlee/c9watch)'s transcript cache, which uses the
-same stamp-plus-guard checks.
-
----
-
-## References
-
-- Issue [#207](https://github.com/tddworks/ClaudeBar/issues/207)
-- [Anthropic Agent SDK — Track cost and usage](https://code.claude.com/docs/en/agent-sdk/cost-tracking)
-- ccusage dedup rationale — [ryoppippi/ccusage#389](https://github.com/ryoppippi/ccusage/issues/389)
-- claude-code [#6805](https://github.com/anthropics/claude-code/issues/6805) (3–8× stream-json over-count)
+So the capability is generic and its one source is Claude's: `GuestPasses`
+and the `@Mockable` `GuestPassSource` port live in `Providers`;
+`ClaudeGuestPassSource` is handed in by the App for Claude and reached as
+`account.guestPasses` (the default login's). It is the last file in
+`Infrastructure/Claude`, and moves to the App when `Infrastructure` is
+carved — the composition root is where a vendor may be named. If a second
+product ever offers passes or referrals, that is the moment to make it data.

@@ -7,7 +7,7 @@ import Testing
 /// The ledger: a day that has closed is summed once and kept, never read
 /// from the logs again; the open days — today, and yesterday until an hour
 /// past midnight — are read every time. A change to how the logs read
-/// starts it over (TARGET_ARCHITECTURE §10.3).
+/// starts it over (daily-usage design §3).
 @MainActor
 @Suite
 struct DayLedgerTests {

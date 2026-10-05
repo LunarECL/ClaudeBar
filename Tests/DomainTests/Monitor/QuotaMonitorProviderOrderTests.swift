@@ -29,7 +29,7 @@ struct QuotaMonitorProviderOrderTests {
     }
 
     /// Registration order [claude, codex, gemini], as ClaudeBarApp registers
-    /// them; the order is `Providers`' (TARGET §12, slice 3) and the
+    /// them; the order is `Providers`' (TARGET §2.1) and the
     /// Monitor shows it.
     private func makeProviders(settings: any ProviderSettingsRepository) -> Providers {
         kept([

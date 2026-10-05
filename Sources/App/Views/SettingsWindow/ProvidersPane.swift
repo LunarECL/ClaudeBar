@@ -102,7 +102,7 @@ struct ProvidersPane: View {
 
 private struct ProviderListRow: View {
     let monitor: QuotaMonitor
-    /// The product — one row, however many logins it has (TARGET §12, slice 1).
+    /// The product — one row, however many logins it has (CANONICAL §1: the product's switch).
     let tab: ProductTab
     let canMoveUp: Bool
     let canMoveDown: Bool
@@ -327,7 +327,7 @@ private struct ProviderDetailView: View {
     }
 
     /// The card a provider has before its settings are a form — gone as each
-    /// one moves to JSON (TARGET_ARCHITECTURE §8 slice 3).
+    /// one moves to JSON (ENGINE_DESIGN §2.2).
     private func legacyCard(for id: String) -> AnyView? {
         switch id {
         case "claude": AnyView(ClaudeBudgetCard())

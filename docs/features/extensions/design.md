@@ -8,7 +8,7 @@ User guide: [README.md](README.md). Field reference: [manifest.md](manifest.md).
 
 ## Flow
 
-An extension is a definition of origin *Extension* ([TARGET_ARCHITECTURE §12](../../architecture/TARGET_ARCHITECTURE.md#12--retiring-aiprovider)):
+An extension is a definition of origin *Extension*, run by the same `Provider` and `DataSource` as every other:
 
 1. At launch `Extensions.catalog()` (Providers) reads each `~/.claudebar/extensions/<id>/manifest.json`; one that doesn't read is logged and left out.
 2. `Extensions.definition(manifest:folder:)` makes the definition, id `ext-<id>`, `"together": true`:
@@ -20,6 +20,11 @@ An extension is a definition of origin *Extension* ([TARGET_ARCHITECTURE §12](.
 4. `ProviderFactory.make` builds it like any custom provider; its logins join the lineup.
 
 With `together`, every section runs on each refresh; the usage is their union in the manifest's order, a failed one is left out and shows as fetch health, and the refresh fails only when all do.
+
+## Why some sections are no longer read
+
+- `dailyUsage` printed ready-made totals; usage history reads raw records. An extension that wants daily usage writes JSON-lines records a `usageHistory` `files` glob reads, as every provider does.
+- `metricsRow` free-form metrics and `statusBanner` free text have no domain meaning; the cost and daily cards every provider draws replace them, and a provider's status page is `profile.links.status`. Either can return as a general rule when an issue asks, problem first.
 
 ## Security
 

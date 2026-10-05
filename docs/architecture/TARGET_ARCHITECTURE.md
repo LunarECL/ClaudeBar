@@ -1,19 +1,13 @@
 ---
-description: The architecture that implements the canonical model — a provider as a JSON definition, one DataSource type that fetches for every provider through single-job internal workers, no vendor-named code, the runtime from definition to popover, settings keys, testing, and the migration slices starting with Codex; read before moving a provider to JSON or adding a fetch, mapping or credential case.
+description: How a provider runs — a provider as a JSON definition, one DataSource type that fetches for every provider through single-job workers, the product and its roles, the runtime from definition to popover, testing; read before changing the lifecycle, a role or a flow.
 ---
 
 # ClaudeBar — the target architecture
 
-> [CANONICAL_MODEL.md](CANONICAL_MODEL.md) says WHAT the domain is.
-> [MODULAR_DESIGN.md](MODULAR_DESIGN.md) says which module each file lives in.
-> [USER_JOURNEYS.md](USER_JOURNEYS.md) walks the screens first; the flows in §4.2
-> are its moments, seen from inside.
-> **This document says how a provider runs**: from a JSON file, through one
-> `DataSource`, to the popover — and in what order today's code gets there.
->
-> **Status: BUILT** for every built-in provider (slices 1–6 below, merged
-> through #419); slice 7 is Claude's renames — `AIProvider` is gone, by
-> [§12](#12--retiring-aiprovider). Today's wiring is [ARCHITECTURE.md](ARCHITECTURE.md).
+> **#3 of 5** in [the design](ARCHITECTURE.md) · **Answers:** how a provider
+> runs — from a JSON file, through one `DataSource`, to the popover ·
+> **Builds on:** [CANONICAL_MODEL.md](CANONICAL_MODEL.md) · **Next:**
+> [MODULAR_DESIGN.md](MODULAR_DESIGN.md)
 
 ---
 
@@ -77,11 +71,56 @@ paths, field names, client ids, CLI arguments — is data.
 | a worker (`HTTPFetcher`, `JSONMapper`, `OAuth2Refresher`, …) | carries out one case | that protocol or format changes |
 | `DataSources.make(_:settings:vault:cloudWatch:)` | the one place a case meets the connection it needs | a connection is added |
 
+## 2.1 · The product and its roles
+
+A product plays a different role in each context — refreshed by the Monitor,
+configured on its Settings page, a set of logins on the Accounts card — and
+each role is its own type that owns what it decides. Dependencies point one
+way, down; nothing refers back up.
+
+```text
+Providers  ◆                    THE PROVIDERS YOU KEEP — the Providers pane: add a custom one,
+│                               delete it, the order (saved), lineup → [Account] (derived);
+│                               provider(of: login) — a login's product, by id
+└── Provider  ◆                 THE LIFECYCLE — refresh(login), isAvailable, the switch, status,
+    │                           testConnection, hasKey; every product-level answer about a login
+    ├── accounts: Accounts  ◆   THE ACCOUNTS CARD — the logins and their order: add (form ·
+    │   │                       folder · sign in), remove, rename, move
+    │   ├── Account  ◆          A LOGIN — knows only itself; names its product by id
+    │   └── depends on ↓ Configuration
+    ├── configuration: Configuration  ◆   THE SETTINGS PAGE — data source and fallback, the form's
+    │                           values, CLI location; answers definitionAsRun(for: login) and
+    │                           revision, which grows on every change. Knows no one
+    └── inUse: InUse?           reads accounts below it, never its provider (§9)
+```
+
+| Question | Answer |
+|---|---|
+| How does a changed setting reach the fetch, with no arrow up? | **pulled, not pushed**: the provider remakes a login's data sources when the configuration's `revision` is newer than the one it made them at |
+| A new or removed login? | the provider makes a login's data sources when first asked, and drops those of a login `accounts` no longer has |
+| Adding a folder reads who is signed in there | `Accounts` is handed the same `makeDataSource` the provider is; it never asks the provider |
+| What the lineup prints for a login | `provider.lineupName(of:)`: the product's name while it is the only login, else the login's own — decided once, never by a page |
+| How a child refers back, if it must | in order: not at all → the parent passed in (or the parent answers) → `weak` → `unowned`, only in a private helper. Anything public — observable, held by views, Tasks or tests — holds no back-reference; a stored callback captures `weak` |
+
+| Rule | Owner |
+|---|---|
+| a role never depends on the lifecycle, nor on a role above it: `Provider → Accounts → Configuration` | each role |
+| a login's data sources are made in one place, from `configuration.definitionAsRun(for:)` at its current revision | `Provider` |
+| a setting is saved where its definition says (vault for a secret); a CLI location must be a program; any change grows `revision` | `Configuration` |
+| the default login is first and can't be removed; an added login's folder or values are checked before it is kept | `Accounts` |
+| adding or removing a login is the product's, never the collection's or the Monitor's | `Provider` |
+
+- **The product's switch is its own setting**; each login's *Pause* is the
+  login's. An older `providers.<id>.isEnabled` was the plain login's switch,
+  so it is read once: off while another login of the product is on means the
+  plain login was paused; otherwise the product was off.
+- `selectedProviderId` keeps its name and value (a login's id): the status
+  export and `claudebar://` links carry it.
+
 ## 3 · Codex, as data
 
-`Resources/Providers/codex.json` — the whole of Codex. The fields below are the
-ones today's two probes hard-code; slice 1 pins every one of them with a test
-against the current probes' fixtures before those probes are deleted.
+`Resources/Providers/codex.json` — the whole of Codex, shown here as the worked
+example of a definition; the file itself is the truth.
 
 ```json
 {
@@ -274,9 +313,9 @@ that case needs: `HTTPFetcher` holds a `NetworkClient`, `CLIFetcher` a
 the settings, `KeychainReader` the vault. No type receives a bag of
 everything.
 
-The Monitor and the views consumed `AIProvider` while the other providers
-moved; it is gone now — they take `Account` or `Provider` (§12). `UsageSnapshot` keeps its name until the renames of
-slice 7 (`Usage`), and gains `source: kind` — *via RPC* — in slice 1.
+The Monitor and the views take `Account` (a login) or `Provider` (the
+product), never a type that could be either. A usage says which data source
+answered (`source: kind` — *via RPC*).
 
 ### 4.2 · Flows
 
@@ -324,24 +363,16 @@ will run, and lists `missingSettings` (*Key needed*) before *Add*.
 
 ## 5 · Settings and secrets
 
-| Key | Means | Status |
-|---|---|---|
-| `providers.<id>.isEnabled` | the Providers pane toggle | unchanged |
-| `<id>.probeMode` | the active data source's `kind` | unchanged — a match name, so no user's setting moves |
-| `providers.<id>.settings.<field>` | a non-secret form value | new |
-| vault `claudebar.<id>.<field>` | a secret form value | new; Keychain with the file fallback Notify! uses for ad-hoc builds |
-
-A credential lookup never writes settings, with one exception the definition
-asks for by name: `OAuth2Refresher` writes the refreshed token **back to where
-the credential came from** (for Codex, `~/.codex/auth.json`, preserving every
-other field), because the CLI that owns that file must keep working.
+Where each value is kept, by key: [docs/settings.md](../settings.md). The laws —
+a secret only in the vault, a refreshed token written back where it was
+found — are [CANONICAL §5](CANONICAL_MODEL.md#5--the-laws-on-the-node-that-owns-them)'s.
 
 ## 6 · Concurrency, errors, logging
 
 - `Provider` is `@MainActor @Observable`; `DataSource` and its workers are
   `Sendable` and `nonisolated`, so CLI, RPC and HTTP work runs off the main actor.
-- At most one refresh per provider is in flight; a second call waits for the
-  first one's result.
+- One refresh per login is in flight; a second call waits for the first
+  one's result ([CANONICAL §5](CANONICAL_MODEL.md#5--the-laws-on-the-node-that-owns-them)).
 - `DefinitionError` (bad JSON, unknown tag, missing default, duplicate kind)
   is a load-time error with the file name. It never crashes the app.
 - Workers log what they did (`AppLog.probes`), never what they carried: no
@@ -364,278 +395,7 @@ other field), because the CLI that owns that file must keep working.
 The golden tests are how deleting `CodexUsageProbe` stays safe: the JSON must
 reproduce its output, quota for quota, before the Swift goes.
 
-## 8 · Migration slices
-
-Each slice is one PR, green, with no change a user can see unless it says so.
-
-| # | Slice | Done when |
-|---|---|---|
-| 1 ✅ | **Codex** — the definition types, `CredentialLookup` · `Fetch` · `Mapping`, `DataSource`, `Provider`; workers `JSONFileReader`, `OAuth2Refresher`, `HTTPFetcher`, `JSONRPCFetcher`, `CLIFetcher` (terminal), `JSONMapper`, `TextMapper`; `codex.json`; golden tests | `CodexProvider`, `CodexUsageProbe`, `CodexAPIUsageProbe`, `DefaultCodexRPCClient`, `CodexCredentialLoader` are deleted; both modes and the fallback work; `codex.probeMode` is read as before |
-| 1a ✅ | **Accounts under one Provider** — `Provider` owns `[Account]`; `{{account.x}}` filled at fetch time; `codex.json`'s `accounts.dataSources` deleted; `AddedAccounts` → `provider.add(account:)` | same ids, pills, pins and settings keys; no visible change |
-| 2a ✅ | **DeepSeek** — `deepseek.json`, balance script, `accounts.form`, scoped keys and verified legacy-key migration | its probe and provider class are deleted; golden tests cover currency, paid/granted details and independent keys |
-| 2 ✅ | the remaining HTTP + API-key providers on the engine of [§8.2](#82--the-engine-the-remaining-migrations-share): MiniMax #401, Vercel #403, Command Code #404, Cursor #407, Grok #408, OpenCode Go #409, Z.ai #410, Copilot #412, #415 | their probes and provider classes are deleted |
-| 3 ✅ | the look (#353), the Data source section (#352) and the settings form (#399) move into the JSON; the `switch id` tables and the config cards go — only Claude's budget card and DeepSeek's card remain | adding a provider edits no Swift |
-| 4 ✅ | the kernel laws: `Left` (no fake 100%), `Window` (no guessed length) | balance definitions map money only |
-| 5 ✅ | the CLI, cookie and local providers on the engine of [§8.2](#82--the-engine-the-remaining-migrations-share): Amp #405, Kiro #406, Kimi #411, Alibaba #413, Gemini #414, Antigravity #416, Oh My Pi #418, Mistral #419; Bedrock via `Fetch.cloudWatch` and the `AWSClients` module #417; *PROBE MODE* → *Data fetching method* | no `XxxUsageProbe` is left |
-| 6 ✅ | *Add Provider* (#354), *Export*, *Import* (#355) — the screens of [USER_JOURNEYS.md](USER_JOURNEYS.md) moments 5–11, outer loop from its §5 scenarios | a person adds, shares and imports a provider without a restart, and no exported file contains a key |
-| 7 | Claude (PTY CLI, multi-account, guest passes, budget); the renames (`Usage`, `Plan`, `Cost`, `DataSourceError`) | ~~`AIProvider` folds into `Provider`~~ — retired instead, by §12 |
-
-## 8.1 · What each provider added
-
-Claude needed more than Codex, and every provider after it brought its own
-needs; each became a generic piece, never a vendor type:
-
-| Need | Generic piece |
-|---|---|
-| a TUI screen and human reset dates no rule can say | `Mapping.script` — a JavaScript file in JavaScriptCore, no I/O, host `humanDate()`; the scripts ship beside the definition. `values` hands it settings (`{{setting.x}}`); a blank one isn't there, and the script never writes one back |
-| Claude Code's Keychain item | `CredentialLookup.keychain(service, fields)` via `security`, hex-decoded, written back as compact JSON |
-| expiry in milliseconds, a JSON refresh body with `scope` | `OAuth2Refresh.dueWhen`, `bodyFormat`, `scope`; values keep their JSON type on write-back; a failed refresh re-reads the store |
-| another CLI's Keychain login (`gh`, go-keyring) | `keychain.account`, `keychain.encoding: goKeyringBase64`; an encoded item is never written back |
-| one report covering many accounts (Oh My Pi) | a script quota's `group`, and `notes` — a row under a group with nothing to measure |
-| a cloud's metrics priced into money (Bedrock) | `cloudWatch` with `prices`: `CloudWatchClient` and `PriceCatalog` ports, implemented in `AWSClients`; a script prices them exactly (`decimalMultiply`) into one `Cost` with lines |
-| an app's own server on this Mac (Antigravity) | `localServer`: the process by name and command line, values from its arguments, its listening ports, declared loopback paths; readiness without starting a process |
-| a login file a CLI renews itself (Gemini) | `refresh: {"cli": …}` beside `oauth2`: on a 401 the CLI runs and the file is read again; the refresher says it doesn't write back |
-| a console session: one cookie read out of the Cookie header (`sec_token`, a CSRF cookie), a header left out when its value is missing | `"cookies"` on a credential lookup; `dropEmpty` covers headers |
-| `env`, ready markers and a rendered screen for the CLI; a TUI that discards input typed during its startup paint | `CLICall.environment`, `readyWhen`, `screen`, `inputDelay` |
-| `/cost` only for API-billed accounts; API→CLI only while a setting allows | `fallbackOn` (hand-off by failure) and `fallback.enabledBySetting`; the provider follows the chain and reports the first real failure |
-| 15-minute cache, a remembered 429 | `cache.ttl` (also the background floor) and rate-limit memory on `DataSource` |
-| the account's email and billing type | `context` files handed to the mapping |
-| the folder-trust prompt | `recover.patchJSONFile`, tried once |
-| Codex logins in their own folders (#326) | `accounts` (`folder`), `{{account.x}}`, `identity` (fail closed when a folder signs in to someone else), `requiresFiles` (#216), `verifyBeforeBackground`, JSON-RPC `then` + `environment`, `#jwt.claim` and `$credential.` paths |
-| the usage API's model limits, plan and money | JSON mapping rules, not a script: `each` + `where`, names by `firstWord`/`lowercase`, `unique` (first wins), `overLimit` (negative left), `countdown: "hours"`, `plan.plans` from `$credential.`, and a list of `cost` shapes with `when` and exact `{amount, decimals}` minor units |
-| today's usage and guest passes | `UsageHistory` beside the providers (read with the popover open, never in the background; keyed by the login whose logs it reads) and the `GuestPasses` capability |
-| Claude logins in their own config folders | `accounts.folder` with `email` and `accountId.field` as an `IdentityField` (`$context.account.email`), `derived` values (the Keychain service, from a sha256 of the folder), `identity` read from a context file; today's usage and guest passes stay with the default login |
-
-## 8.2 · The engine the remaining migrations share
-
-Seventeen migration PRs (#381–#398) were built against slices 2 and 5, and
-every one of them edited the same Swift:
-- `ClaudeBarApp.swift`, `ProvidersPane.swift` and `Provider.swift` in all 17
-- `Fetch.swift` and `Fetchers.swift` in 16
-- `ProviderVisualIdentity.swift` in 14
-
-So §1's OCP promise did not hold. SRP broke in the same places:
-- `HTTPRequest` grew from 5 fields to 13.
-- The account form gained eight flags.
-- `Provider` started checking files.
-
-Every vendor quirk became a field, because nobody asked what the *person*
-sees. This section starts there. Every piece below is something on screen, and
-owns one rule.
-
-**Tell, don't ask.** A caller never reads a piece's state to decide what that
-piece could decide. The `Setting` says what a blank means, whether two values
-are the same folder and where its value is kept. A worker's failure says which
-fact it is. A fetch case says where it sends a key. A data source says which
-one takes over when it has no key. Views may look at a kind only to draw it.
-
-### 8.2.1 · What the person sees, and the one piece behind each
-
-| On screen | The person thinks | The piece | Its rule |
-|---|---|---|---|
-| **API KEY · REGION · CLI DATA FOLDER** in a provider's settings and in *Add Account* | "it needs these from me" | a **`Setting`** of a **kind** (`secret · choice · path · text`) and a **scope** (`provider` · `account`): the `SettingsForm` of CANONICAL §1 | the kind checks the value |
-| **REGION: China · International** | "I'm in China, so it talks to China's site" | each option of a choice setting **carries its values**: `China → site: kimi.com`. A definition says `{{setting.region.site}}` | an account's own region wins over the provider's |
-| **DATA SOURCE: API · CLI** | "where it reads my usage" | `DataSource`, one active per provider | unchanged |
-| **KEY LOOKUP ORDER · COOKIE SOURCE** | "where it finds my key" | `CredentialLookup`, adding **`browserCookies`** | the first that answers wins |
-| *Start from: **API** · **CLI** · File* | "call a URL" · "run a command" | `Fetch.http` (with **steps**) · `Fetch.command` (a command over pipes). A TUI that only draws in a terminal stays `Fetch.cli` | one worker each |
-| ***Test Connection*** → ***Response*** | "show me what came back" | the response of the last step that ran | stops before mapping |
-| *Couldn't read your key · Couldn't connect · Couldn't find the numbers* + what to do | "which step broke, and where do I go" | `DataSourceError(step, reason)`, the reason worded by the definition's **`errors`** | no response body, no secret |
-| *Import:* ***sends your key to …*** · ***runs …*** | "where does my key go, what will it run" | each fetch case's **`Connection`** answers for itself | every host a setting can pick is listed |
-| ***Configured*** | "it will work" | `isReady` of the data source a refresh would end on | follows the no-key hand-off |
-| *Add Account* → saved | "my key is kept" | the vault, read back before the account is kept | nothing half-saved |
-
-### 8.2.2 · Settings: one form, two scopes
-
-```json
-"settings": [
-  { "id": "apiKey", "label": "API key", "kind": "secret", "scope": "account" },
-  { "id": "region", "label": "Region", "scope": "account", "default": "china",
-    "kind": { "choice": [
-      { "id": "china",         "label": "China",         "site": "kimi.com" },
-      { "id": "international", "label": "International", "site": "kimi.ai" } ] } },
-  { "id": "home", "label": "CLI data folder", "scope": "account", "default": "~/.kimi",
-    "kind": { "path": { "mustExist": true } } }
-],
-"fetch": { "http": { "url": "https://www.{{setting.region.site}}/apiv2/…/GetUsages",
-                     "headers": { "Origin": "https://www.{{setting.region.site}}" } } }
-```
-
-**Why one form instead of `choices` plus form flags.** The person sees one
-*REGION* control, not a setting and a separate choice. A choice that carries
-its values replaces the four `…BySetting` fields and the
-`"value": "{{account.x}}"` patches. `{{setting.<id>}}` and
-`{{setting.<id>.<value>}}` fill any string of a definition — a URL, a header,
-a cookie domain, the dashboard link. `Provider` fills them for each login when
-it makes that login's data sources, as it fills `{{account.x}}`;
-`provider.set(_:to:)` saves a value and makes every login's data sources again,
-so a changed *Region* needs no restart. A secret fills nothing: a key reaches
-a fetch only through its credential lookup.
-
-**Scope is the person's model of logins.**
-- **Provider scope.** The value is the same for every login, like *ENV VAR
-  NAME*. It is kept under `<id>.<setting>` — today's `minimax.region` and
-  `kimi.region` — so no setting moves.
-- **Account scope.** Each login has its own value; *Add Account* asks for
-  exactly these. The default login's value is the provider-scope one, which is
-  why it lives under the same key.
-- **A setting only some data sources use says so** (`"for": ["api"]`): Kimi's
-  session token is the API's, its signed-in folder the CLI's. *Add Account*
-  asks only for what the active data source uses (`provider.accountForm`),
-  and a login added without such a value runs only the sources that don't
-  need it.
-
-**The rules sit with whoever holds the data.**
-- **Each kind owns its rule.** `setting.check(value, paths:)` returns the
-  sentence the sheet prints; `setting.value(from:)` says what a blank means
-  (the default, or a choice's first option); `setting.keep(_:in:)` puts a
-  secret with the vault's keys and anything else with the saved values.
-  - A secret has no default.
-  - A choice takes only its options.
-  - A path can be required to exist; `paths` is a `@Mockable` port.
-- **"Two logins never share a path" belongs to `Provider`.** Only `Provider`
-  knows every login's values, the default one included; it asks the setting
-  whether two values are the same place (`isSamePlace`). No `notIn` list is
-  written in the JSON.
-
-**Old files still decode.** Today's `accounts.form` (`"secret": true`,
-`"choices": […]`) reads as account-scope settings.
-
-**This is slice 3's form.** Settings draws it (`ProviderSettingsSection`) for
-every definition-driven provider that has no card of its own yet; the Region
-and API-key cards of the providers that migrate go, and no new Swift card
-comes.
-
-### 8.2.3 · HTTP in steps, instead of a planner script
-
-The PRs needed four shapes, and all of them are *call A, then B with something
-A said*:
-- Command Code: `httpSequence`
-- Gemini: project, then quota
-- Alibaba: dashboard token, then console
-- Antigravity: `workflow`
-
-JSON-RPC already says this with `then`. HTTP says it the same way:
-
-```json
-"http": { "steps": [
-  { "name": "project", "request": { … }, "optional": true, "attempts": 2,
-    "keep": { "project": "$.cloudaicompanionProject" } },
-  { "name": "quota", "request": { "body": "{\"project\": \"{{project}}\"}" },
-    "dropEmpty": ["project"] } ] }
-```
-
-- **What a step can do.** `keep` names values from a step's response, by JSON
-  path — or a list of paths, the first that answers — or by a `pattern` over
-  text. `optional` lets a step fail without ending the fetch, though a
-  refused key or a rate limit still ends it. `unless` skips a step when a
-  value is already known, such as a `sec_token` already in the cookie.
-- **Every step answers.** The response is each step's answer by name —
-  `{ "whoami": {…}, "credits": {…} }`, text where it wasn't JSON — so the
-  mapping reads what any step said and *Test Connection* shows them all.
-- **A kept value never replaces a credential value.** A step's answer cannot
-  swap the key a later step sends. A value filled into a URL is
-  percent-encoded, so it can never add a query item.
-- **`attempts`** (1 to 3) tries a step again after a network failure or a 5xx.
-  **`dropEmpty`** leaves out a JSON body key or URL query item whose value is
-  missing — `?orgId={{orgId}}` goes without `orgId` when no step found one.
-- **Import lists every host.**
-
-This replaces the JS planner (`httpFlow`), as well as `commandPlan` and
-`workflow`. **It reverses the earlier decision to keep `httpFlow`.** A
-planner script is the escape hatch §3 warns about: the person cannot read what
-it will do, and Import cannot show it. If a provider proves a flow these rules
-cannot say, that provider brings the rule in its own PR.
-
-### 8.2.4 · A command, and a terminal
-
-Two protocols, two cases — never one type with a mode flag, where half the
-fields would mean nothing in each mode.
-
-| Tag | Meaning | Worker |
-|---|---|---|
-| `command` | run a command over pipes; read its output; its exit code is a fact | `CommandFetcher` (`PipeCLIExecutor`) |
-| `cli` | drive a TUI that only draws in a terminal — Claude's `/usage`, Codex's `/status` — and capture its screen | `CLIFetcher` (the PTY executor), unchanged |
-
-- **Nothing that exists moves.** `cli` keeps its meaning, so `claude.json`,
-  `codex.json` and the files people made keep working as they are.
-- ***Add Provider*'s *CLI* makes a `command`.** A command a person types is
-  plain output; a TUI needs a definition written for it.
-- **`{{token}}` reaches a command through its environment**, never its
-  arguments, the same way it reaches a header.
-
-### 8.2.5 · A worker reports a fact; the definition words it
-
-A worker's failure is a fact that answers for itself (`ReportedFailure`): its
-key in `errors`, and the reason it gives when the definition says nothing.
-
-| Fact | Key | Without a rule |
-|---|---|---|
-| an HTTP status that is not an answer | `http.<status>`, else `http.default` | today's wording (`HTTP error: 500`, *Key needed* on 401/403) |
-| a command's (or a terminal's) CLI is not on this Mac | `cli.missing` | *CLI not found* — a login with no usage then reads *NOT SET UP* (CANONICAL §5) |
-| a command exited non-zero | `cli.nonzero` | "`acme` exited with code 2" |
-| a command could not start | `cli.failed` | "`acme` could not be started" |
-
-```json
-"errors": { "http.404": "subscriptionRequired",
-            "http.403": { "sessionExpired": "Sign in to the console again." },
-            "cli.missing": { "cliNotFound": "kiro-cli" } }
-```
-
-- **A rule says what a fact means**, in the reasons the screen prints. Nothing
-  from the response fills it: no `{{status}}`, no `{{body}}`, and no flag kept
-  only to reproduce an old probe's sentence; a golden test updates its
-  expected text instead.
-- **Fixed rules.** A 429 is always a rate limit with its `Retry-After`, and
-  `http.429` is refused. A 401 or 403 still gets the one refresh-and-retry
-  first.
-- **What stays on the request.** `acceptedStatuses` stays on the request,
-  because which statuses are an answer is part of the protocol.
-
-### 8.2.6 · A case answers for itself
-
-```swift
-public protocol Connection: Sendable {
-    var urls: [String] { get }        // as written; Import spells out each setting's options
-    var commands: [[String]] { get }  // "runs"
-}
-extension Fetch {
-    public var connection: any Connection                            // the one switch, beside the cases
-    public func runningCLI(_ cli: String, at binary: String) -> Fetch   // CLI LOCATION
-}
-```
-
-- **Nothing else switches over the cases but the factory.**
-  `ProviderSharing` (*Import*'s "sends your key to" and "runs") and
-  `ProviderDefinition.runningCLI` read the case's own answer; the Add Provider
-  sheet asks the definition (`neededSettings`), not the lookup's cases.
-- **Adding a case is:**
-  - the enum line
-  - its payload with its `Connection`
-  - its worker
-  - one factory line
-
-### 8.2.7 · Kept as they were, and left out
-
-**Kept as built in the PRs:**
-- `browserCookies` + `BrowserCookieReader` (SweetCookieKit, behind a
-  `@Mockable` port); its domains may name a setting
-- `DecimalScript` — `jsonDecimal` and `decimalCents` in every mapping script,
-  for exact money
-- the *Configured* hand-off: a source with no key is configured when the one
-  it hands a missing key to is (`dataSource.handOffWithoutKey`)
-- the vault read-back before an added login is kept
-- the Data source and Accounts sections for every JSON provider
-
-**Folded into what exists:** `availability: files` becomes `requiresFiles`,
-which now also makes a source not *Configured* while its files are missing.
-
-**Left out, by decision:**
-- **A data source per account.** One active per provider is the law; Alibaba
-  and Kimi pick by data source, not by account.
-- **One-provider escape hatches:** `script` credentials, a mapping that writes
-  settings, page fields in script output, `bedrockUsage`.
-
-## 9 · Open
+## 8 · Open
 
 - **The mapping language's ceiling.** Slices 1, 2 and 5 will find what it must
   express. If a provider needs real computation (Bedrock prices tokens per
@@ -653,347 +413,7 @@ which now also makes a source not *Configured* while its files are missing.
   [features/multi-account/design.md](../features/multi-account/design.md).
 - **A `command` fetch from the UI** — see [CANONICAL_MODEL §9](CANONICAL_MODEL.md#9--open).
 
-## 10 · Usage History as data
-
-> **Status: PROPOSED.** The model, laws and words are in
-> [CANONICAL_MODEL](CANONICAL_MODEL.md) §1, §5, §8. This section says how it
-> runs and the order of the work.
-
-### 10.1 · What a person asks, and what is true
-
-A person asks **"how much did I use, day by day?"** *TODAY'S USAGE* (today
-against yesterday) and a *Daily token usage — last 30 days* chart (input,
-output, cache read and cache write per day, two axes) are **two views of that
-one answer**: the last two days, and the last thirty. So the model is a
-**series of days**, and a view is a range the page asks for:
-
-```swift
-account.usageHistory?.days(in: .last(2))    // TODAY'S USAGE
-account.usageHistory?.days(in: .last(30))   // the chart; every date present, empty days included
-```
-
-A `Day` holds what every view needs: tokens by kind, a `Cost` with a line per
-model (so a chart can stack by model too), sessions, working time and cache
-savings. Nothing about "today and yesterday" is a type.
-
-Today two vendor-named analyzers answer only the last two days, and each one
-hard-codes the same five jobs:
-
-| Job | Claude (`ClaudeDailyUsageAnalyzer` + 5 helpers) | Mistral (`VibeSessionLogAnalyzer`) | What it really is |
-|---|---|---|---|
-| where the records are | `~/.claude/projects/**/*.jsonl`, changed since yesterday | `~/.vibe/logs/session/session_*/meta.json` | a glob |
-| how to read one | an assistant line: `message.model`, `message.usage.*`, `timestamp` | `stats.session_total_llm_tokens`, `stats.session_cost`; the time from the folder name, in UTC | a format and field paths |
-| which copy counts | `message.id` + `requestId`, the last wins | each file once | an identity |
-| what it cost | `ModelPricing` — a Swift table; a local model, or a base URL on this Mac, is free | the log says | a price catalog, or the record's own cost |
-| the day | local midnight; a 30-minute pause starts a session | local midnight; a file is a session | one aggregator |
-
-None of these is a vendor's behaviour; each is a value. So, as for usage
-(§2), **a tool's usage history is a definition and one engine runs it**: a new
-tool's logs, a new model's price or a new view never edit a vendor's Swift
-(OCP).
-
-### 10.2 · The definition: `usageHistory` beside `dataSources`
-
-Record fields use **the mapping's path language** (§3: `$.a.b`, a list is the
-first that answers, `where`), so there is one way to point into JSON.
-
-```jsonc
-// claude.json
-"usageHistory": {
-  "records": {
-    "files": "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
-    "format": "jsonLines",                       // jsonLines (append-only, read incrementally) · json (one record per file)
-    "where": { "path": "$.type", "equals": "assistant" },
-    "at": "$.timestamp",                          // ISO 8601
-    "id": ["$.message.id", "$.requestId"],        // together its identity: written twice, it counts once — the last wins
-    "model": "$.message.model",
-    "tokens": {
-      "input": "$.message.usage.input_tokens",
-      "output": "$.message.usage.output_tokens",
-      "cacheWrite": "$.message.usage.cache_creation_input_tokens",
-      "cacheWrite1h": "$.message.usage.cache_creation.ephemeral_1h_input_tokens",   // the part kept an hour, priced apart
-      "cacheRead": "$.message.usage.cache_read_input_tokens"
-    }
-  },
-  "prices": { "file": "claude-prices.json" },    // a PriceList — or { "service": "AmazonBedrock" }, through PriceCatalog
-  "freeWhen": { "localEndpoint": { "file": "${CLAUDE_CONFIG_DIR:-~}/.claude.json",
-                                   // the first entry that answers decides; a list is one entry
-                                   "url": ["$.env.ANTHROPIC_BASE_URL",
-                                           ["$.providers[*].base_url", "$.providers[*].env.ANTHROPIC_BASE_URL"]] } },
-  "sessionGap": 1800
-},
-"accounts": { "patch": { "usageHistory": { "records": { "files": "{{account.configDirectory}}/projects/**/*.jsonl" } } } }
-```
-
-```jsonc
-// mistral.json
-"usageHistory": {
-  "records": {
-    "files": "~/.vibe/logs/session/session_*/meta.json",
-    "format": "json",
-    "at": { "fromPath": "session_(\\d{8}_\\d{6})", "format": "yyyyMMdd_HHmmss", "timeZone": "UTC" },
-    "tokens": { "total": "$.stats.session_total_llm_tokens" },
-    "cost": "$.stats.session_cost"               // the log's own cost wins over any price
-  }
-}
-```
-
-```jsonc
-// claude-prices.json — beside the definition; a price change edits this, never Swift
-{
-  "currency": "USD", "per": 1000000,
-  "models": [                                     // exact id first, then the longest prefix
-    { "id": "claude-opus-5",   "name": "Claude Opus 5",   "input": "5", "output": "25", "cacheWrite": "6.25", "cacheRead": "0.50" },
-    { "id": "claude-sonnet-5", "name": "Claude Sonnet 5", "input": "2", "output": "10", "cacheWrite": "2.50", "cacheRead": "0.20" }
-  ],
-  "families": [ { "contains": "opus", "as": "claude-opus-4-6" }, { "contains": "haiku", "as": "claude-haiku-4-5-20251001" } ],
-  "free": [ "qwen", "llama", "gemma", "mistral", "gpt-oss", "ollama" ],   // a model of a local family costs nothing
-  "otherwise": { "input": "3", "output": "15", "cacheWrite": "3.75", "cacheRead": "0.30" }
-}
-```
-
-- **One price shape, two origins.** A price file is data, decoded into a
-  `PriceList` that holds the rules: exact id → the longest prefix (either
-  way round) → a family → a free family → `freeWhen` → `otherwise`. A cloud's
-  price list (`{ "service": … }`) is fetched through the `PriceCatalog` port
-  Bedrock uses (#417) into the same `PriceList`. A tool that writes its own
-  cost needs neither.
-- **Per login, like data sources.** The default login reads `usageHistory`; an
-  added login gets `accounts.patch.usageHistory` merged in and its values filled
-  (`{{account.configDirectory}}`), so an added Claude login has its own
-  usage history for the first time. A definition without `usageHistory` has none.
-- **Money stays exact.** Prices are decimal texts; cost is
-  tokens × price ÷ `per` in `Decimal`, shown as an estimate unless the record
-  gave its own `cost`.
-- **`freeWhen.localEndpoint`** replaces `ClaudeLocalInferenceDetector`: a
-  base URL in that file on a loopback host (`localhost`, `127.0.0.1`, `::1`,
-  `0.0.0.0`, `*.localhost`) makes an unpriced model free. It describes the
-  route **now**, so it prices only the day that holds now; an earlier day
-  keeps its estimate — over-reporting is the safe direction.
-
-#### When logs differ: one record, three tiers
-
-Tools write their logs differently. The difference stays at the edge: every
-reader turns its file into the same **`LogRecord`** — `at`, `id`, `model`,
-`tokens` (input · output · cache write · cache read, or a `total`), `cost` —
-and everything after it (dedupe, days, sessions, prices, the ledger, the
-screens) never learns which tool wrote it.
-
-| How a tool's logs differ | What a contributor changes | Swift? |
-|---|---|---|
-| where the files are, what a field is called (Claude's `message.usage.input_tokens`, Vibe's `stats.session_total_llm_tokens`) | `files` and the field paths | no |
-| the same idea, said another way: the time in a folder's name, the log's own cost, a session per file, a running total | an option: `at.fromPath`, `cost`, no `sessionGap`, `"cumulative": true` | no |
-| a record no path can say (a field to compute, a list to add up) | `"script": "x-log.js"` — `read(record, context)` returns one `LogRecord`, the escape hatch a mapping already has (built when a tool first needs it) | no |
-| a file of another kind (SQLite, binary) | a new `format` case and its reader, named for the format, with a test that names no tool | once |
-
-**A script, by example.** Say a tool logs one line per turn, in an
-OpenAI-style shape no path can turn into a record: the time in epoch
-milliseconds, cached tokens *included* in the input count, and one usage
-entry per model in a list.
-
-```jsonc
-// a line of ~/.example/history/2026-10-03.jsonl
-{"kind":"turn","ts":1759500000123,"turn":"t_81","usage":[
-  {"model":"gpt-5","prompt_tokens":12000,"cached_tokens":9000,"completion_tokens":800},
-  {"model":"gpt-5-mini","prompt_tokens":3000,"cached_tokens":0,"completion_tokens":200}]}
-```
-
-The definition keeps what paths can say — the files, the format, the
-filter — and hands each record to a script instead of naming its fields:
-
-```jsonc
-// example.json
-"usageHistory": {
-  "records": {
-    "files": "~/.example/history/*.jsonl",
-    "format": "jsonLines",
-    "where": { "path": "$.kind", "equals": "turn" },   // still the byte prefilter: the script sees only these
-    "script": "example-log.js"                         // in place of at · id · model · tokens · cost
-  },
-  "prices": { "file": "example-prices.json" },
-  "sessionGap": 1800
-}
-```
-
-```js
-// example-log.js — read(record, context) → a LogRecord, a list of them, or null to skip
-function read(record, context) {
-  if (!Array.isArray(record.usage)) return null;
-  return record.usage.map(function (u, i) {
-    return {
-      at: record.ts / 1000,                          // epoch seconds
-      id: record.turn + "#" + i,                     // one record per model in the turn
-      model: u.model,
-      tokens: {
-        input: u.prompt_tokens - u.cached_tokens,    // the log counts cached tokens as input
-        cacheRead: u.cached_tokens,
-        output: u.completion_tokens
-      }
-      // cost: "0.0123" — when the log states it; a decimal text stays exact
-    };
-  });
-}
-```
-
-That line becomes two records — `gpt-5` with 3,000 input, 9,000 cache read
-and 800 output tokens, `gpt-5-mini` with 3,000 and 200 — priced, deduped and
-summed into days exactly like Claude's. The rules are a mapping script's
-(§2): it runs in JavaScriptCore with no file, network or process access;
-`context` holds `now`, `timeZone`, the file's `path` and the definition's
-`values`; money helpers (`jsonDecimal`, `decimalAdd`) keep a stated cost
-exact; and it turns one record into records, nothing else. A script is
-slower than paths, so `where` filters first, and a tool whose fields paths
-*can* reach never needs one.
-
-**Neither Claude nor Mistral uses a script**, and the script tier is not
-built with them. Claude's logs are paths plus options (`where`, a composite
-`id`, `sessionGap`, `freeWhen`), and they run to gigabytes: a JavaScriptCore
-call per line would undo the incremental reader and the byte prefilter.
-Mistral's one tool-shaped fact — the time in the folder's name — is a
-common one (logs rotated by date), so it is an option, `at.fromPath`, that
-any tool can use. The rule for choosing: **an idea several tools share is
-an option; an idea only one tool has is a script.**
-
-`format` is a closed sum like `Fetch`: the engine stays closed, a new tool is
-data. The reading rules every format shares:
-
-- **`files`** is a glob: `**` any depth, `*` within one name; hidden files
-  are skipped, and only files changed since the range's first day are read.
-- **`where`** keeps the records that match; its text values are also a byte
-  prefilter, so a line without them is never decoded.
-- A record without `at`, or without a declared `model`, is skipped; so is
-  one where no token field and no `cost` answers — it says nothing about
-  usage (Claude's assistant line without `usage`, a Vibe `meta.json`
-  without `stats`). Otherwise a missing token field counts 0.
-- **`id`**'s paths together are a record's identity; a record missing any of
-  them is never merged with another.
-
-**Other apps.** `usageHistory.otherApps` lists apps on this Mac that use
-the same plan and keep their own count, each `{label, records, prices?}`:
-Claude Desktop's `buddy-tokens.json` is `format: json`, `tokens.total`, and
-`at: {"field": "$.tokens-today.date", "format": "yyyy-MM-dd"}` — a field read
-with a format, local unless it names a `timeZone`. Each is its own
-`UsageHistory` with its own ledger key (`<login>/<label>`), shown as its own
-card, never summed with the login's days; without prices it has tokens and
-no cost. An added login's patch sets `otherApps` to `null`. A token count that
-is negative or not whole drops the record. Design:
-[other-apps-design.md](../features/daily-usage/other-apps-design.md).
-
-### 10.3 · Thirty days without re-reading thirty days: the ledger
-
-Claude's logs run to gigabytes; re-reading thirty days on every popover open
-is not an option, and today's in-memory cache only covers two. The day is the
-natural unit to keep:
-
-- **A day closes** a fixed while after its midnight (late lines from a
-  session that ran past midnight still land). A closed day is summed once
-  and kept in a **`DayLedger`** — per login, one small JSON file under
-  `~/.claudebar/usage-history/`, a few hundred bytes a day.
-- **Open days** (today, and yesterday until it closes) are read from the logs
-  every time — incrementally, as today, so a popover open reads only what
-  was appended.
-- **Dedupe stays exact**: a record's identity only has to be remembered
-  while its day is open.
-- **A ledger is a cache, not a record**: deleting it re-reads the logs; a
-  change to the definition (`usageHistory` or the prices) invalidates it.
-
-### 10.4 · Where it lives: the login owns it, `DataSources` extracts it
-
-**No new module.** A module earns its place with its own SDK, a second
-consumer, or a boundary the build must enforce; usage history has none —
-`Providers` is its only consumer, and the work it needs (find files, read
-JSON with the path language, expand `~`, price tokens) is what `DataSources`
-already does behind `internal`. So it splits along the line every provider
-already has:
-
-- **The login owns it.** `Account` holds `usageHistory: UsageHistory?` —
-  `nil` when the definition has no `usageHistory` — and `UsageHistory`
-  (in `Providers`) answers `days(in:)` from its `DayLedger` of closed days,
-  asking its log for the open ones. A page reads
-  `account.usageHistory?.days(in:)` (CANONICAL §2.1), never a dictionary
-  keyed by provider ids, and there is no app-wide registry.
-- **`DataSources` extracts it** — the only part that differs per provider.
-  The definition's `usageHistory` decodes as a `UsageLog.Definition` (as
-  `dataSources` decode as `DataSourceDefinition`); `DataSources.makeUsageLog`
-  fills it with the login's values and returns a `UsageLog` whose
-  `days(from:to:)` reads and prices the records. Its readers and aggregator
-  are `internal` workers beside `FileFetcher` and `JSONMapper`.
-- **`Day` is a kernel value** in `Quotas`, beside `Cost` and `CostLine`,
-  replacing `DailyUsageReport`/`Stat`, which already live there.
-
-Not in `Provider`'s refresh: usage history is not a meter and is read on its
-own cadence (popover open, never the background poll).
-
-| Piece | Job | From today's |
-|---|---|---|
-| `UsageLog.Definition` (`DataSources`) | the JSON, `Codable`, no behaviour | the constants in both analyzers |
-| `UsageLog` (`DataSources`) | `days(from:to:)`: the readers, prices and aggregator for one login | both analyzers' entry points |
-| `JSONLinesReader` (`DataSources/Internal`) | one record per matching line; reads only what was appended since the last scan, re-reads a file that changed under it; a byte prefilter derived from `where` | `SessionJSONLParser` + `SessionLogCache`, generalised |
-| `JSONLogReader` (`DataSources/Internal`) | one record per file; `at.fromPath` reads the time from the path | `VibeSessionLogAnalyzer.loadSessions` |
-| `LogRecord` (`DataSources/Internal`) | the one shape every reader produces | `TokenUsageRecord`, `ParsedSession` |
-| `PriceList` (`DataSources/Internal`) | the record's own cost, else the list (exact → longest prefix → family → free → `freeWhen` → otherwise); cache savings | `ModelPricing` |
-| `LocalEndpoint` (`DataSources/Internal`) | `freeWhen.localEndpoint`: is the route in that file on this Mac? | `ClaudeLocalInferenceDetector` |
-| `LogFileFinder` (`DataSources/Internal`) | `files`' glob, changed since a date | `findRecentJSONLFiles` |
-| `DayAggregator` (`DataSources/Internal`) | dedupe by `id` (last wins), split by local day, sessions by `sessionGap` (a record is a session without one), working time, cache savings, a cost line per model | both analyzers' `aggregate` |
-| `DayLedger` (`Providers/Internal`) | closed days kept per login; open days asked of the `UsageLog` | — (new) |
-| `UsageHistory` (`Providers`, @Observable, one per login) | `days(in:)`, every date present | `Domain/UsageHistory` (one object for all logins, two days only) |
-| `Day` (`Quotas`) | the answer; `DailyUsageStat` until the words land | `Quotas` |
-
-Ports: the ledger's store (a `@Mockable` `LedgerStore`) in `Providers`, and
-`PriceCatalog` for a cloud's prices. **The log files are not a port**: the
-readers' whole job is bytes on disk (offsets, inodes, half-written lines), so
-they are tested on files in a temporary folder, as credential files already
-are; a mock would test nothing they do. No module names
-a vendor; the readers are named for formats. The page owns the views:
-*TODAY'S USAGE* cards read `days(in: .last(2))`, a chart reads
-`days(in: .last(30))` and stacks `tokens` by kind (or `cost.lines` by model).
-
-### 10.5 · Is it easy to change? The checks
-
-| A person or a contributor wants… | They change |
-|---|---|
-| a *Last 30 days* chart, a week view, a month total | the page only: another range of `days` |
-| a new model's price, or a price cut | `claude-prices.json` |
-| *TODAY'S USAGE* for another tool that logs JSON | that tool's definition: a `usageHistory` block |
-| Codex's usage history (`~/.codex/sessions/**/rollout-*.jsonl`, whose `token_count` events carry a session's **running total**) | `codex.json`'s `usageHistory`, plus one reader option, `"cumulative": true` (the last record per session counts), with a neutral test |
-| a binary log format | one new reader, named for the format |
-| an added login's own usage history | nothing: `accounts.patch.usageHistory` |
-
-### 10.6 · Guest passes stay Swift
-
-**Guest passes** (`ClaudeGuestPassSource`: `claude /passes` in a terminal,
-the referral link from the screen or the clipboard, an optional count) are
-**not** a definition block. Only one product has them: a `guestPasses` key
-in the shared definition, with a `clipboard` option on every `cli` fetch,
-would put one vendor's feature into the format every provider uses —
-speculative generality, the opposite of OCP. The rule that decides it is the
-one for log shapes (§10.2): *an idea several providers share is data; an
-idea only one product has stays at the edge.*
-
-So the capability is generic and its one source is Claude's: `GuestPasses`
-and the `@Mockable` `GuestPassSource` port live in `Providers`;
-`ClaudeGuestPassSource` is handed in by the App for Claude and reached as
-`account.guestPasses` (the default login's). It is the last file in
-`Infrastructure/Claude`, and moves to the App when `Infrastructure` is
-carved — the composition root is where a vendor may be named. If a second
-product ever offers passes or referrals, that is the moment to make it data.
-
-### 10.7 · Slices
-
-Each slice is one PR, green, with no change a user can see unless it says so.
-
-| # | Slice | Done when |
-|---|---|---|
-| UH1 ✅ | **Move**: `UsageHistory` into `Providers`, held by each `Account` (`account.usageHistory`), over today's analyzers behind `DailyUsageAnalyzing` | `Domain/UsageHistory` is empty; the App reads `account.usageHistory`; no visible change |
-| UH2 ✅ | **Claude as data**: `UsageLog` + `UsageLog.Definition` in `DataSources`, `JSONLinesReader`, `PriceList` + `claude-prices.json`, `LocalEndpoint`, `DayAggregator`, `days(in:)`; claude.json's `usageHistory`. Golden tests: today's `ClaudeDailyUsageAnalyzerTests`, `SessionJSONLParserTests`, `SessionLogCacheTests`, `ModelPricingTests` fixtures through the definition | `ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector` deleted; the same two-day numbers |
-| UH3 ✅ | **Mistral as data**: `JSONLogReader`, `at.fromPath`; mistral.json's `usageHistory`; `VibeSessionLogAnalyzerTests` fixtures | `Infrastructure/Mistral` deleted |
-| UH4 ✅ | **The ledger**: `DayLedger`, closed days kept, invalidated by a definition change | 30 days read in the time 2 take today |
-| UH5 ✅ | **The chart**: *Daily usage — last 30 days* (tokens by kind, two axes; cost by model) on the provider's page | visible |
-| UH6 ✅ | **Per login**: `accounts.patch.usageHistory`; `account.usageHistory` on every login | an added Claude login shows its own usage history (visible) |
-| GP ✗ | ~~Guest passes as data~~ — dropped: Claude's alone (§10.6) | `ClaudeGuestPassSource` stays Swift, handed in by the App |
-| — | the words: `Day`, `DayLedger`; the typealiases go | with §8 slice 7 |
-
-## 11 · In use as a capability
+## 9 · In use as a capability
 
 *Which login does my next terminal session start with?* is a question the
 monitor doesn't answer — every login is still fetched — so it is a
@@ -1030,278 +450,3 @@ switching, once per low) → `InUseAnnouncer`. *A link* —
 | another shell | one case in `LoginShell`, its lines in `ShellSetup`, a test that runs it |
 | another policy than *Switch when low* | a policy beside `SwitchWhenLow` that `InUse.review` asks |
 | In use for API-key providers | an env-variable record and lines — `InUse` and `NewSessions` unchanged |
-
-
-## 12 · Retiring `AIProvider`
-
-> **Status: BUILT** (2026-10-04), slices 1–7. The build has no `AIProvider`,
-> `Provider` keeps only the lifecycle, and a login refers to nothing above it.
-
-**The problem.** Someone with two Claude logins opens Settings → Providers and
-finds *personal* and *work* listed as two providers. The page is titled
-*personal*, and its *Enabled* toggle pauses that one login while it looks like
-it turns Claude off. The cause is in the code: one protocol stands for a
-product **or** a login, so every screen guesses which it holds. Extensions work,
-and are moved only because they are the last other thing on that protocol.
-
-`AIProvider` is the legacy shape: one protocol for "some provider", from before
-a provider was a definition and a login an `Account`. CANONICAL §1 has no such
-node — `Monitor → providers: [Provider] → accounts: [Account]`, and the lineup
-is `[Account]`. Today only two things conform: `Account` (a shim, whose `name`
-switches between the product's and the login's) and `ExtensionProvider`. Every
-consumer that receives `any AIProvider` has to guess which of product or login
-it holds, and casts to find out.
-
-### 12.1 · What each consumer really means
-
-| Today | Means | Becomes |
-|---|---|---|
-| `QuotaMonitor` · `AIProviderRepository` (`all`, `enabled`, `provider(id:)`) | the products, and the lineup of their logins | `Monitor.providers: [Provider]`; `lineup: [Account]` derived (enabled logins of enabled products) |
-| pills, menu-bar entries, Touch Bar, notch, alerts, `onRefreshed` | **a login** | `Account` |
-| Settings → Providers rows and pages | **a product** | `Provider` — one row per product; its logins in the Accounts card |
-| `ProductTab` (`provider: Provider?` from its first account) | a product | `Provider` itself |
-| `Account.name` (product or login, by count) | two things | `account.lineupName` — *the name the lineup prints*: the product's while it is the only login, else the login's; one owner, never re-decided by a page (corrected 2026-10-04: "the page decides" would copy the rule into every view). `account.displayName` is the login's own; `provider.name` the product's |
-| `isEnabled` on `AIProvider` | a login's pause *and* a product's toggle | `account.isEnabled` (pause) · `provider.isEnabled` (hide every login — CANONICAL §8, ) |
-| `RefreshKind`, `refresh(kind)`, `backgroundRefreshFloor` | the lifecycle | `Provider` (already there) |
-
-### 12.2 · Extensions become definitions
-
-CANONICAL §8: *"the same `Provider`, with script fetches"*. The person's
-`~/.claudebar/extensions/<id>/manifest.json` stays theirs and keeps working;
-`ProviderCatalog` reads it as a definition of origin **extension**:
-
-| Manifest | Definition |
-|---|---|
-| `id`, `name`, `icon` | `profile` (`look.symbol`), origin `extension` |
-| `config` fields | provider-scope `settings` (a `secret` in the vault, as today) |
-| a section's `probe.command` | **`Fetch.script`** — run with `/bin/sh` from the extension's folder, **every** setting as `CLAUDEBAR_<UPPER_SNAKE>` in the environment, secrets read from the vault (a command fetch reaches one key and runs only in the dedicated folder) |
-| `quotaGrid` · `costUsage` output | **`Mapping.usage`** — ClaudeBar's own documented output (`quotas[]` with `type` / `percentRemaining` / `resetsAt`, `costUsage`), which any script provider can print. `Mapping.json` can't take a quota's kind from a field |
-| several sections | one data source per section, and the definition says **`"together": true`**: every data source runs, the usage is their union in definition order, a failed one is left out of it **and shows beside it as fetch health** (a down health check stays visible, as today's DOWN card is), and the refresh fails only when all do. Without it, one data source answers, with its fallback, as today |
-| `dailyUsage` | **retired** with a note — `usageHistory` reads raw records from log files, and this section prints ready-made totals. An extension that wants daily usage writes JSON-lines records a `usageHistory` `files` glob reads, as every provider does |
-| `metricsRow` | **`usage.cost`** and the comparison from `usageHistory` — the cost and daily cards every provider draws. A free-form metric ("Requests: 1,234") has no domain meaning and is **retired** |
-| `healthCheck` | **fetch health**: an `http` data source with no mapping; failing is `account.sync.lastError`, never a quota status (CANONICAL §5) |
-| `statusBanner` | **retired** — free text with no domain meaning (already decoded and dropped today); the provider's status page is `profile.links.status` |
-| `config` fields and their saved values | provider-scope `settings`; on upgrade, once, values move from `extensions.<id>.<field>` and secrets from UserDefaults into the vault (the Keychain). The id stays `ext-<id>`, so its switch and place in the order are kept |
-
-### 12.3 · Slices — the visible problem first, each green
-
-The lineup can only be `[Account]` once every member is one, so extensions
-become definitions before the Monitor changes type (corrected 2026-10-04: the
-first order put the Monitor first, which would have needed `AIProvider` to
-stay for extensions).
-
-| # | Slice | Fixes · pins |
-|---|---|---|
-| 1 ✅ | **Settings by product**: Providers rows and pages take a `Provider` (from `ProductTab`); the page is titled *Claude*, its toggle is `provider.isEnabled` (hides every login), its logins are the Accounts card | the visible problem · one row per product; the toggle hides every login and keeps their settings; extensions keep their own row |
-| 2 ✅ | **Extensions as definitions**: `Fetch.script`; a definition's data sources can **answer together** (each section one, the usage their union, a failed one left out); the manifest → definition reader; sections mapped as 12.2; `ExtensionProvider` goes | every lineup member is an `Account` · golden tests on `docs/features/extensions/example-provider`: quotas and cost read the same; config fields as settings; a failing section left out |
-| 3 ✅ | **`Providers`** (CRUD of the providers you keep, their order and the derived `lineup: [Account]`), held by the Monitor; `AIProviderRepository` and `AIProviders` go; the test stubs become definitions over stubbed connections | the cause, in the domain · every Monitor test |
-| 4 ✅ | Views take `Account` or `Provider`; the casts and `Account.name`'s two meanings go | the cause, in the UI · pills, menu bar, Touch Bar, notch, alerts unchanged on mock-data screenshots |
-| 5 ✅ | Delete `AIProvider` | done · the build has no `AIProvider` |
-| 6 ✅ | **`Provider` by role** (SRP): one product plays different roles in different contexts — refreshed in Monitoring, configured in Settings, a set of logins in Accounts, a terminal choice in In use (already `InUse`), a history in Usage History (already `UsageHistory`). Each role becomes its own type the product hands out, as `inUse` is; `Provider` keeps only the lifecycle (TARGET §1: it changes when the lifecycle changes). designed in *Slice 6 in detail* | `Provider` small again · each role's tests move with it |
-| 7 ✅ | **A login knows only itself**: `Account` names its product by id; `Providers.provider(of:)` resolves it; every product-level answer about a login is its provider's; no back-reference anywhere (`unowned` and `keep()` gone) | the cycle · no `Account.provider`; a stale login never crashes |
-
-#### Slice 1 in detail — Settings by product
-
-Mockup: `design-concept/settings-by-product/index.html`.
-
-| Piece | Rule |
-|---|---|
-| a Providers row | the **product**: its name, "*n* accounts" when there is more than one, **each login's usage** (one meter per login, by name), its switch. An extension keeps its own row until slice 4 |
-| the page | titled by the product; its switch is the product's; its logins are the Accounts card, each with its own *Pause* |
-| `Provider.isEnabled` | **its own setting**: off hides every login — no pill, no menu-bar entry, no refresh, no alert — and keeps every login and its settings. The lineup is the enabled logins **of enabled products** |
-| `Account.isEnabled` | the login's own *Pause*, its own setting — never the product's. A product whose logins are all paused reads as disabled (CANONICAL §5) |
-| upgrade | today `providers.<id>.isEnabled` is the plain login's switch. Read once: **off while another login of it is on** meant *the plain login was paused* — kept as its pause, the product on; **otherwise** it meant *the product was off* — kept as the product's switch. Nobody's setup changes |
-
-#### Slice 3 in detail — `Providers`: the providers you keep
-
-> **Status: BUILT** (2026-10-04, confirmed the same day). `Providers` in
-> `Modules/Providers`; the module's factory is `ProviderFactory` (it was
-> `Providers`). The Monitor's members still take and return `Account` under
-> their old names (`allProviders`, `enabledProviders`); slice 4 renames them
-> with the views.
-
-The Monitor does two jobs today: it **watches** (refresh, alerts, selection,
-status) and it **keeps the person's providers** (add a custom one, delete it,
-order the pane, look one up). They change for different reasons, so the
-keeping becomes its own aggregate in the Providers context, the one the
-Settings → Providers pane shows, and the Monitor holds it.
-
-```text
-Monitor  ◆                      watches: refresh, alerts, selection, status, onRefreshed
-└── providers: Providers  ◆     the providers you keep — the Providers pane
-    ├── all: [Provider]         in the pane's order (persisted; a product's logins move together)
-    ├── lineup → [Account]      DERIVED — enabled logins of enabled products, in that order
-    └── Provider  ◆             the product (unchanged); its logins are its own business
-```
-
-| Tell it | It does |
-|---|---|
-| `providers.add(definition)` | **Create** — a custom provider (Add Provider, Import): saves the definition to the catalog, registers it, makes it live, appends it |
-| `providers.all` · `provider(id:)` · `login(id:)` · `lineup` | **Read** |
-| `providers.move(id, by:)` | **Update** the order — persisted; ids no longer kept are dropped |
-| `providers.remove(id)` | **Delete** — a custom provider: its definition file, its vault keys, its registration. A built-in is never deleted (turn it off instead) |
-
-| Law | Owner |
-|---|---|
-| one provider per id; adding an id already kept is refused | `Providers` |
-| the order is the pane's, saved; a product's logins stay together; unknown ids are dropped | `Providers` |
-| a built-in provider can't be deleted, only turned off | `Providers` |
-| the lineup is derived — enabled logins of enabled products, in the order — never stored | `Providers` |
-| adding or removing a **login** is the product's (`provider.addAccount` / `remove`), never the collection's or the Monitor's | `Provider` |
-| the Monitor never adds, deletes or orders a provider; it reads `providers` and watches | `Monitor` |
-
-It lives in `Modules/Providers` (the Providers context; it needs the catalog,
-the vault and the settings, never the Monitor). `AIProviderRepository` and
-`AIProviders` are what it replaces.
-
-#### Slice 4 in detail — views take `Account` or `Provider`
-
-> **Status: BUILT** (2026-10-04, confirmed the same day). No view casts to
-> `Account` any more; slice 5 then deleted `AIProvider`, which only
-> `Account` still conformed to. The tab rule of the popover header's
-> badge reads `ProviderBadgeState.Login` facts, so it is tested without a login.
-
-| Today | Becomes | Why |
-|---|---|---|
-| `any AIProvider` in views, `ProductTab`, `ProviderBadgeState`, `RefreshReport`, `NewSessions.review`, the Monitor's queries | `Account` | every one of them holds a login |
-| `extension AIProvider` (visual identity) | `extension Account` | the face is the product's, reached from the login |
-| `account.name` | `account.lineupName` | one name, one meaning (12.1) |
-| `monitor.allProviders` · `enabledProviders` · `provider(for:)` · `selectedProvider` · `selectedLogins` | `monitor.logins` · `lineup` · `login(id:)` · `selectedLogin` · `selectedLogins` (`[Account]`) | the words of the tree (CANONICAL §1); a login is never called a provider |
-| `ProductTab.provider: Provider?`, `page: (any AIProvider)?` | `provider: Provider`, `page: Account` | every tab is a product now; nothing is legacy |
-| `MultiAccountProvider`, `AccountPickerView`, `AccountManagementCard` | deleted | nothing conforms or shows them since accounts became the provider's |
-
-`selectedProviderId` keeps its name and value (a lineup id): the status export
-file and `claudebar://` links carry it. Nothing on screen changes; mock-data screenshots
-of the pills, menu bar, Settings → Providers and the overview confirm it.
-
-#### Slice 6 in detail — `Provider` by role
-
-> **Status: BUILT** (2026-10-04, second take, confirmed the same day). The first take —
-> roles as stateless views holding their provider — was **circular**:
-> `Configuration` held `Provider`, `Provider` handed out `Configuration`, and
-> each "role" reached into the provider's state (`settings`, `vault`,
-> `running`, `bind`). That moved code, not responsibility: `Provider` still
-> owned everything. 6a (`Accounts` as a view) shipped that way and is redone here.
-
-**The problem.** `Provider` changes for three reasons: the lifecycle
-(refresh, fallback), the Accounts card (add, sign in, rename, order), and the
-provider's Settings page (data source, setting values, CLI location). One
-product plays a different role in each context — a student at school, a son
-or daughter at home — and each role decides different things.
-
-**The rule: dependencies point one way — down.** Each role *owns* what it
-decides and knows nothing above it; the lifecycle composes them.
-
-```text
-Provider  ◆  THE LIFECYCLE — refresh(login), isAvailable, the switch, status
-│            depends on ↓ both; neither knows it
-├── accounts: Accounts  ◆           THE ACCOUNTS CARD — owns the logins and their order
-│   │                               (saved), adding (form · folder · sign in), remove,
-│   │                               rename, move; each added login's usage history
-│   └── depends on ↓ Configuration  (the form, and the definition a new login runs)
-└── configuration: Configuration ◆  THE SETTINGS PAGE — owns DATA SOURCE (which one,
-                                    fallback on/off), the settings form's values, CLI
-                                    location; answers `definitionAsRun(for: login)` and
-                                    `revision`, which grows on every change. Knows no one
-```
-
-| Question | Answer |
-|---|---|
-| How does a changed setting reach the fetch, with no arrow up? | **pulled, not pushed**: `Configuration.revision` grows on each change; the provider remakes a login's data sources when the revision it made them at is older. No callback, no back-reference |
-| A new or removed login? | the provider makes a login's data sources when first asked (`bound[login]` empty) and drops those of a login `accounts` no longer has |
-| Adding a folder must read who is signed in there — a live data source | `Accounts` gets the same `makeDataSource` the provider gets, injected; it never asks the provider |
-| Test Connection | the lifecycle's (it fetches): `provider.testConnection(login)` |
-| `Account` → `Provider` | ~~`unowned`~~ — reversed by slice 7: a login names its product by id and refers to nothing |
-
-| Law | Owner |
-|---|---|
-| a role never depends on the lifecycle, nor on a role above it: `Provider → Accounts → Configuration`, never back | each role |
-| the provider owns its children — its roles and its logins; none refers back to it (slice 7) | `Provider` |
-| a login's data sources are made in one place, from `configuration.definitionAsRun(for:)` at its current revision | `Provider` |
-| the default login is first and can't be removed; an added login's folder or values are checked before it is kept; the order is yours, saved | `Accounts` |
-| a setting is saved where its definition says (vault for a secret); a CLI location must be a program; the data source is one choice for every login; any change grows `revision` | `Configuration` |
-
-**Built** — `Configuration` and `Accounts` are owning classes in
-`Modules/Providers`; `Provider` composes them and makes data sources at the
-configuration's revision. Test Connection and `hasKey` are the lifecycle's
-(`provider.testConnection`, `provider.hasKey`). The login's `unowned`
-reference back, and the tests' `keep(_:)` it needed, are gone — reversed by
-slice 7.
-
-~~**Open.** Should a login stop pointing at its product (`Account.provider`)?~~
-~~**Answered (2026-10-04): `unowned` — composition.**~~ **Reversed by slice 7
-the same day:** `unowned` turned the leak into a crash for anyone holding a
-login after its provider went. What follows is kept as the record of why it
-was tried. The provider owns its
-children: when it is destroyed, so are they. A login's reference to its
-product is therefore non-owning and never outlives it (`unowned`, not `weak`,
-which would say a login can outlive its product). It breaks the retain cycle
-— a deleted custom provider and its logins were never freed — and keeps
-`account.provider` non-optional. The law it puts on the rest: deleting a
-product removes its logins from every surface (the lineup is derived from
-`Providers`, so nothing keeps one). `Configuration` and `Accounts` hold no
-reference up at all. Not chosen: a reference by id with every call told to
-the root (the type cycle goes too, but most views change).
-
-#### Slice 7 in detail — a login knows only itself
-
-> **Status: BUILT** (2026-10-04, confirmed the same day). Reverses slice
-> 6's `unowned` answer above. No new type: the tree already has the root and
-> the login (CANONICAL §1: `lineup → [Account]`).
-
-**The problem.** Slice 6 made `Account.provider` `unowned`: the leak became
-a crash. Any holder of a login that let its provider go — a view during a
-delete, a test — aborts the process, and the tests needed a global `keep()`
-array to imitate the app's ownership. `InUse` holds its provider the same
-way. The cycle `Provider ↔ Account` is still there, only cheaper.
-
-**The rule: a child knows only itself; outside, you reach it through its
-root** (DDD: an aggregate's entities are reached through the root, and
-another thing is referred to by its id).
-
-```text
-Providers                       resolves a login's product: provider(of: account) — by id
-└── Provider  ◆                 the root — every product-level question about one of its
-    │                           logins: isInLineup(_:), lineupName(of:), refresh(_:),
-    │                           isAvailable(_:), hasKey, dashboardURL(of:), inUse, history…
-    ├── accounts: Accounts ◆    owns the logins
-    │   └── Account  ◆          A LOGIN — knows only itself: id, providerId (a value), label,
-    │                           email, values, its pause, what we last saw; and what its
-    │                           definition alone says (folder, cliCommand, status page,
-    │                           setup notice). Given its definition and settings at birth,
-    │                           never its provider
-    ├── configuration ◆
-    └── inUse: InUse?           reads `accounts` below it — never its provider
-```
-
-**How a child refers back, in order of preference:** no back-reference →
-the parent passed in as a parameter (or the parent answers) → `weak` →
-`unowned`. `unowned` comes last: it is the only one that crashes when the
-assumption is wrong, and it fits only a private helper that can never be
-handed out. Anything public — `@Observable`, held by views, lists, Tasks or
-tests, or awaiting — gets no back-reference; a callback stored in a public
-object captures `weak`.
-
-| Law | Owner |
-|---|---|
-| a login never refers to its provider; it names it by id. Nothing a provider owns refers up — `Account`, `InUse`, `Accounts` are public, so none holds a back-reference; `Accounts.onChange` captures `weak` | `Account` · each role |
-| a login's product is found through the root, `providers.provider(of:)` — `nil` once it is gone, never a crash | `Providers` |
-| each product-level answer about a login has one owner: its provider | `Provider` |
-| deleting a product removes its logins from every surface, because the lineup is rebuilt without it | `Providers` |
-
-**What dies:** `Account.provider` and `unowned` on `InUse`; `keep()` and
-its copies; `Account`'s forwarding members (`refresh`, `isAvailable`,
-`isInLineup`, `lineupName`, `dashboardURL`, `isInUse`, `usageHistory`, …),
-which move to `Provider`.
-
-**What it costs:** surfaces that climbed `account.provider` or called a
-forwarding member ask the root instead — the Monitor for views
-(`monitor.refresh(login)`, `monitor.lineupName(of:)`), the provider in tests.
-
-### 12.4 · Decided
-
-- ~~**The product's switch.**~~ **Answered (2026-10-04): its own setting**, as CANONICAL §1 says (*"off hides every login"*); each login's *Pause* stays its own; the upgrade rule above keeps everyone's setup. Not chosen: a switch that pauses every login, which would also resume logins paused on purpose.
-- ~~**Settings rows lose a login's usage.**~~ **Answered:** the product row shows each login's usage, one meter per login.
-- ~~**Daily usage from an extension's script.**~~ **Answered (2026-10-04): retired** — `usageHistory` reads raw records, the section prints totals; an extension writes records instead.
-- ~~**The engine additions.**~~ **Answered (2026-10-04):** `Fetch.script`, `Mapping.usage` and `"together": true`, each one case of a closed sum or one field (CANONICAL §2).
-- ~~**Extension sections a definition can't say yet.**~~ **Answered (2026-10-04): they map into the account's own model** — metrics → `usage.cost` + history, health check → fetch health. Free-form metrics and `statusBanner` have no domain meaning and are **retired**, announced in the release before they go; either can return as a general rule when an issue asks, problem-first. `Usage.extensionMetrics` and `dailyUsageReport` then leave the kernel (CANONICAL §8).

@@ -81,7 +81,7 @@ Deleting the file resets every setting to its default. Secrets stay where they a
 
 ## See also
 
-[Troubleshooting](troubleshooting.md) · [ARCHITECTURE.md](architecture/ARCHITECTURE.md) for how the settings repositories are split per provider
+[Troubleshooting](troubleshooting.md) · [ENGINE_DESIGN §2.2](architecture/ENGINE_DESIGN.md#22--settings-one-form-two-scopes) for how a provider's settings form is read and kept
 
 
 ## Additional Codex accounts

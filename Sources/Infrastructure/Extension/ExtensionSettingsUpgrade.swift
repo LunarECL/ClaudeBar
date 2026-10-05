@@ -1,7 +1,7 @@
 import Domain
 import Foundation
 
-/// Extensions became definitions (TARGET §12, slice 2). What a person saved
+/// Extensions became definitions (docs/features/extensions/design.md). What a person saved
 /// for one moves once, by the same names: a value from
 /// `extensions.<id>.<field>` into the provider's settings, a secret from
 /// UserDefaults into the vault (the Keychain) — and out of UserDefaults.

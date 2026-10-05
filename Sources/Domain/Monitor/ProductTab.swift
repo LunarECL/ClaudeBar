@@ -21,7 +21,7 @@ public struct ProductTab: Identifiable {
         self.accounts = accounts
     }
 
-    /// The product's own switch (TARGET §12).
+    /// The product's own switch (CANONICAL §1).
     public var isEnabled: Bool { provider.isEnabled }
 
     /// A login's name on the product's row — only when there are several to

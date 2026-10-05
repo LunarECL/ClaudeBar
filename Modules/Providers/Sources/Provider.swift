@@ -18,7 +18,7 @@ public final class Provider {
     public let definition: ProviderDefinition
 
     /// *The provider's Settings page* — data source, settings form, CLI
-    /// location. Owned here; it knows no one above it (TARGET §12, slice 6).
+    /// location. Owned here; it knows no one above it (TARGET §2.1).
     public let configuration: Configuration
     /// *The Accounts card* — its logins, in your order, and adding, removing,
     /// renaming and moving them. Owned here; it reports, never reaches up.
@@ -36,7 +36,7 @@ public final class Provider {
     private let makeDataSource: (DataSourceDefinition, String) -> DataSource
     /// *The product's switch* — Claude on or off. Off hides every login (no
     /// pill, menu-bar entry, refresh or alert) and keeps each login and its
-    /// own *Pause* (TARGET §12, slice 1).
+    /// own *Pause* (CANONICAL §1: the product's switch).
     public var isEnabled: Bool {
         didSet { settings.setEnabled(isEnabled, forProvider: id) }
     }
@@ -80,7 +80,7 @@ public final class Provider {
                                  folders: folders, makeDataSource: makeDataSource, makeUsageHistory: makeUsageHistory)
         self.isEnabled = Self.productSwitch(definition, settings: settings, accounts: saved)
         // `Accounts` is public and can outlive this provider: its callback
-        // holds it weakly (TARGET §12, slice 7).
+        // holds it weakly (TARGET §2.1).
         accounts.start(plainHistory: usageHistory, guestPasses: guestPasses,
                        onChange: { [weak self] change in self?.follow(change) }, saved: saved)
         if let loginsInUse, let call = definition.accounts?.signIn, definition.accounts?.folder != nil {
@@ -182,7 +182,7 @@ public final class Provider {
 
     /// *The name the lineup prints* — on a pill, the menu bar, an alert: the
     /// product's while it has one login to tell apart, else the login's own
-    /// (TARGET §12.1). Pages never re-decide it.
+    /// (TARGET §2.1). Pages never re-decide it.
     public func lineupName(of account: Account) -> String {
         accounts.hasSeveral ? account.displayName : name
     }

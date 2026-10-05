@@ -5,7 +5,7 @@ import Testing
 
 /// `script` — a script run with `/bin/sh` from its own folder, every setting
 /// in its environment and secrets read from the vault: what an extension's
-/// section runs (TARGET §12). Run for real, in a temporary folder.
+/// section runs (docs/features/extensions/design.md). Run for real, in a temporary folder.
 @Suite
 struct ScriptFetchTests {
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("script-fetch-\(UUID().uuidString)", isDirectory: true)

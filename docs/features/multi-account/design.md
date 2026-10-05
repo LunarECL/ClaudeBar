@@ -179,7 +179,7 @@ into JSON, and not before.
 | Case | JSON | Carries | What it does |
 |---|---|---|---|
 | **folder** | `"folder": { savedAs, default, accountId: {field, savedAs}, email?, derived?, notSignedIn }` | where the login lives, which field names it | reads the folder through the definition's own credential/context lookup (filled with that folder), refuses the default folder and duplicates, saves `{savedAs: folder, accountId.savedAs: fact}` |
-| **signIn** | `"signIn": { cli, args, homeVariable, unset, timeout, alsoAt }` | the vendor's login command, and where else its CLI may be | makes `~/.claudebar/accounts/<provider>/<uuid>/` (0700), runs `cli args` with `homeVariable=<folder>` and `unset` removed, waits; on exit 0 the provider checks the folder as **folder** does, recorded `madeBy: .signIn` |
+| **signIn** | `"signIn": { cli, args, homeVariable, unset, timeout }` | the vendor's login command ([where its CLI is](../../architecture/ENGINE_DESIGN.md#27--where-a-providers-cli-is)) | makes `~/.claudebar/accounts/<provider>/<uuid>/` (0700), runs `cli args` with `homeVariable=<folder>` and `unset` removed, waits; on exit 0 the provider checks the folder as **folder** does, recorded `madeBy: .signIn` |
 | **form** | `"form": true` | — | renders the form's account-scope settings; non-secrets → `values`, secrets → the account's vault; then *Test Connection* with them before saving |
 
 `signIn` requires `folder` (it ends in one) — a definition with one and not
@@ -264,7 +264,7 @@ ProviderFactory.make(definition, settings, vault)
 QuotaMonitor(providers) → lineup = provider.accounts.filter(isEnabled), for every enabled provider
 ```
 
-Every provider is a `Provider`: its enabled logins are its pills (TARGET §12).
+Every provider is a `Provider`: its enabled logins are its pills ([TARGET §2.1](../../architecture/TARGET_ARCHITECTURE.md#21--the-product-and-its-roles)).
 
 ### 3.2 · Add Account
 
@@ -481,9 +481,9 @@ Not: `LegacyAccountConnections.shared.recipe(for: provider.id)`,
 | `DataSource.fetchUsage` checks identity before the cache | **built**: checked with the lookup, before and after each fetch; a cached usage is what that login showed when it was fetched |
 | `BrowserAccountLogin` (Infrastructure, Codex defaults) | **built**: `AccountSignIn` in `DataSources`, driven by `accounts.signIn` in `codex.json` / `claude.json` (Claude: `claude auth login --claudeai`); the process behind `SignInProcess`, folders behind `LoginFolders` |
 | `AddedAccounts` (a static namespace) | **gone**: `provider.addAccount(signedInAt:)` and `provider.signIn(…)`; the deletable-folder rule is `SignedInFolder.goesWithAccount` |
-| `BinaryLocator.findInApplicationBundles` | **built** as `signIn.alsoAt: [paths]` — checked only when the CLI isn't on the PATH |
+| `BinaryLocator.findInApplicationBundles` | **built** as `signIn.alsoAt`; moves to [`cliAlsoAt`](../../architecture/ENGINE_DESIGN.md#27--where-a-providers-cli-is) |
 | `Provider.rename`, `ProviderAccountConfig.named` | **built**: `Provider` receives `any MultiAccountSettingsRepository`, so `rename` and `remove` save without a downcast; the default login's name is `setDefaultAccountLabel` (`providers.<id>.defaultAccountLabel`); the unused `activeAccountId` is gone |
-| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | **built**: one `displayName`; `lineupName` (the pill, the menu bar, an alert) is the product's while `provider.hasSeveralAccounts` is false (it was `name`, TARGET §12 slice 4); `nameFromEmail` is gone |
+| `Account.name` / `accountDisplayName` / `accountDescription` / `isNamedByAccount` | **built**: one `displayName`; `lineupName` (the pill, the menu bar, an alert) is the product's while `provider.hasSeveralAccounts` is false (it was `name`); `nameFromEmail` is gone |
 | `AccountMenuBarLabel` (Domain) | **built**: `MenuBarAccountName` in App ([CANONICAL §1](../../architecture/CANONICAL_MODEL.md#1--the-tree): not in the model). Named so, not `MenuBarLabel`, which is already the quota text |
 | `ProviderAccountsCard` | **kept**, rendering `accounts.ways` and the form's account scope; no `switch provider.id` |
 | `CodexAccountsCard` | folded into `ProviderAccountsCard` |

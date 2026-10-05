@@ -1,20 +1,15 @@
 ---
-description: How ClaudeBar's code is cut into modules — one module per bounded context, the domain at each module's root and its implementations in Internal/, no Infrastructure layer and no vendor modules, one factory per module, the dependency rules, naming, testing, and where every folder of today's three targets goes; read before adding a file, a type or a module.
+description: How ClaudeBar's code is cut into modules — one module per bounded context, the domain at each module's root and its implementations in Internal/, no Infrastructure layer and no vendor modules, one factory per module, the dependency rules, naming, testing, and what is left to carve; read before adding a file, a type or a module.
 ---
 
 # ClaudeBar — the modular design
 
-> [CANONICAL_MODEL.md](CANONICAL_MODEL.md) is the tree.
-> [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) is how a provider runs —
-> a JSON definition fetched by one `DataSource` type. **This document is the
-> cut**: which module a file goes in, what a module shows and hides, and what
-> it may import.
+> **#4 of 5** in [the design](ARCHITECTURE.md) · **Answers:** where the code
+> lives — which module a file goes in, what a module shows and hides, and what
+> it may import · **Builds on:** [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) ·
+> **Next:** [ENGINE_DESIGN.md](ENGINE_DESIGN.md)
 >
-> **Status: IN PROGRESS.** `Quotas`, `Diagnostics`, `DataSources`,
-> `Providers` and `AWSClients` are built, and every built-in provider runs
-> from them (M0–M3 below). `Domain` and `Infrastructure` still hold the
-> monitor, alerting, activity, Usage History and storage, which are the next
-> modules to carve.
+> **Status: IN PROGRESS** — what is left is §8.
 
 ---
 
@@ -66,7 +61,7 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 
 | Module | Context ([model §7](CANONICAL_MODEL.md#7--the-contexts-and-the-modules-that-implement-them)) | Public (the domain) | `Internal/` (the implementation) |
 |---|---|---|---|
-| `Quotas` | Quota · shared kernel | `UsageSnapshot`, `UsageQuota`, `QuotaType`, `QuotaStatus`, `UsagePace`, `CostUsage`, `BudgetStatus`, `AccountTier`, `UsageError`, `Day` (a day of usage history — today `DailyUsageReport`/`Stat`) — today's shapes; the final kernel is the model's `Usage`, `Quota`, `Left`, `Window`, `Status`, `Pace`, `Cost`, `Budget`, `Plan` (§9) | — none: pure values, no I/O |
+| `Quotas` | Quota · shared kernel | `UsageSnapshot`, `UsageQuota`, `QuotaType`, `QuotaStatus`, `UsagePace`, `CostUsage`, `BudgetStatus`, `AccountTier`, `UsageError`, `Day` (a day of usage history — today `DailyUsageReport`/`Stat`) — today's shapes; the final kernel is the model's `Usage`, `Quota`, `Left`, `Window`, `Status`, `Pace`, `Cost`, `Budget`, `Plan` | — none: pure values, no I/O |
 | `DataSources` | Data Sources | `DataSource`, `DataSourceDefinition`, `Response`, `DataSourceError`, the closed sums `CredentialLookup` · `Fetch` · `Mapping`, `ConfigField`; `UsageLog` and `UsageLog.Definition` (how a login's usage history is extracted from its logs); the ports `CLIExecutor`, `NetworkClient`, `RPCTransport`, `SecretStore`, `CloudWatchClient`, `PriceCatalog`; the factory `DataSources.make(_:providerId:…)` | the workers — `Lookup/`, `Fetch/`, `Mapping/`, `Logs/` — and the implementations of its own ports — `Process/`, `Network/` (§5) |
 | `AWSClients` | Data Sources (SDK-backed) | `AWSClients.makeCloudWatch()` → `any CloudWatchClient`, `AWSClients.makePriceCatalog()` → `any PriceCatalog` | the CloudWatch client and the AWS Price List reader; the only module that links AWS |
 | `Providers` | Providers · core | `Provider` (the product), `Account` (a login — today `ProviderAccount`) and its capability handles `usageHistory: UsageHistory?` · `guestPasses` (nil when the definition doesn't offer them), `UsageHistory` (`days(in:)`), `Providers` (the providers you keep: add, delete, order, the lineup), `ProviderFactory`, `ProviderDefinition`, `ProviderCatalog`, `ProviderSettingsRepository`, `CredentialRepository` | definition-file reading, `DayLedger` (closed days, under `~/.claudebar/usage-history/`), `Extensions` (a manifest read as a definition) |
@@ -97,7 +92,7 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 2. **Siblings never import across the fence.** `Monitoring` does not import
    `Alerting`; it emits `MonitoringEvent` and `Alerting` subscribes.
 3. **No module names a vendor.** A vendor's name appears in its JSON file,
-   in a test fixture folder, and in the App's visual identity until slice 3 —
+   and in a test fixture folder —
    nowhere in a module's Swift.
 4. **An SDK is linked by exactly one module.** AWS → `AWSClients`;
    SweetCookieKit, SwiftTerm, Subprocess → `DataSources`; Sparkle → the App.
@@ -222,72 +217,35 @@ testability" alone.
 - One test target per module: `QuotasTests`, `DataSourcesTests`, `ProvidersTests` …
   A module's tests link only that module and its suppliers, so `QuotasTests`
   no longer links six AWS SDKs.
-- Workers are tested alone, built with `@testable` and a mocked port.
-  Definitions are tested by **golden fixtures** — the responses today's probes
-  are tested with, run through the JSON, must give today's snapshots.
-- Chicago school, unchanged: stub ports with Mockable, assert on state.
+- What each piece's tests guard: [TARGET §7](TARGET_ARCHITECTURE.md#7--testing).
 - `AcceptanceTests` stays at the App level and composes real modules with
   stubbed ports.
 - `MOCKING` is a project-level compilation condition in `Project.swift`, so
   every new target inherits it.
 
-## 8 · Where today's code goes
+## 8 · Still to carve
+
+`Quotas`, `Diagnostics`, `DataSources`, `AWSClients` and `Providers` are
+built. `Domain` and `Infrastructure` re-export them (`@_exported import`), so
+no call site changes while files move, and each old target is deleted once
+it is empty.
 
 | Today | Goes to |
 |---|---|
-| `Domain/Provider/` kernel files | `Quotas` |
-| `Domain/Provider/` page state (`MenuBarLabel`, `MenuBar*Display`, `MenuBarStackedSize`, `CountdownColon`, `PopoverContentHeight`, `UsageDisplayMode`, `ProviderBadgeState`) | the App |
-| `Domain/Provider/AIProvider.swift`, `AIProviderRepository`, `ProviderAccount`, `MultiAccount*`, `ProviderSettingsRepository`, `CredentialRepository`, `AccountInfo` | `Providers` |
-| `Domain/Provider/<Vendor>/` (`XxxProvider`, `XxxProbeMode`) | **deleted** — the lifecycle is `Provider`, the modes are the definition's `dataSources` |
-| `Infrastructure/<Vendor>/` (`XxxUsageProbe`, `XxxCredentialLoader`, `DefaultXxxRPCClient`, …) | **deleted** — URLs, paths, fields and arguments move into `<vendor>.json`; any reusable mechanism they contain becomes a worker in `DataSources/Internal` |
-| `Infrastructure/Bedrock/` | `AWSClients` (CloudWatch, pricing) behind `CloudWatchClient` |
-| `Infrastructure/Shared/`, `Shell/`, `Network/` | `DataSources/Internal/Process` and `Network` (the ports at its root); `SystemClock`, `SystemPowerStateProvider`, `SingleFlightCache`, `QuotaMonitor+SystemClock` → `Monitoring/Internal`; `SystemAlertSender` → `Alerting/Internal` |
-| `Domain/Extension/`, `Infrastructure/Extension/` | `Providers` (a manifest is read as a definition) and `DataSources` (`Fetch.script`, `SectionData` as a mapping, `HealthCheckProbe` as an `http` fetch) |
 | `Domain/Monitor/` | `Monitoring` (`QuotaAlerter` → `Alerting`) |
 | `Domain/Notify/`, `Infrastructure/Notifications/`, `Notify/` | `Alerting` |
 | `Domain/Session/`, `Domain/Notch/`, `Infrastructure/Hooks/` | `Activity` (`NSScreen+NotchMetrics` → App) |
-| `Domain/UsageHistory/` (`DailyUsageReport`/`Stat`, the view's ranges) | `UsageHistory` → `Providers`; `Day`, `DateRange` → `Quotas` |
-| `Infrastructure/Claude/` (`ClaudeDailyUsageAnalyzer`, `SessionJSONLParser`, `SessionLogCache`, `ModelPricing`, `ClaudeLocalInferenceDetector`) | **deleted** — the paths, fields and `freeWhen` move into `claude.json`'s `usageHistory`, the prices into `claude-prices.json`; parsing, caching and pricing become the readers, aggregator, `PriceList` and `LocalEndpoint` in `DataSources/Internal/Logs`; `DayLedger` goes to `Providers/Internal` |
-| `Infrastructure/Claude/ClaudeGuestPassSource` | the App, when `Infrastructure` is carved — Claude's alone, so a source the composition root hands in behind `GuestPassSource`, not definition data (TARGET §10.6) |
-| `Infrastructure/Mistral/` (`VibeSessionLogAnalyzer`) | **deleted** — `mistral.json`'s `usageHistory` (a `json` log format) |
-| `Domain/Settings/`, `Infrastructure/Storage/` | `Storage` (`StatusColorPolicy`, `MenuBarProviderSettings` → App; `AIProviders` became `Providers`) |
-| `Infrastructure/Logging/` | `Diagnostics` |
+| `Domain/Settings/`, `Infrastructure/Storage/` | `Storage` (`StatusColorPolicy`, `MenuBarProviderSettings` → App) |
+| `Domain/Provider/` page state (`MenuBarLabel`, `MenuBar*Display`, `MenuBarStackedSize`, `CountdownColon`, `PopoverContentHeight`) | the App |
+| `Infrastructure/Claude/ClaudeGuestPassSource` | the App — Claude's alone, a source the composition root hands in behind `GuestPassSource` |
 | `Infrastructure/TerminalImport/` | the App — themes are presentation |
 | `Tests/DomainTests`, `InfrastructureTests` | split per module, following their sources |
 
-## 9 · How we get there without a big bang
+The kernel still holds a few types that belong elsewhere; each carries a
+`- Note: Interim` naming its final shape, and the canonical model lists them
+under *where the code is still behind*.
 
-New modules appear underneath `Domain` and `Infrastructure`, which
-**re-export** them (`@_exported import Quotas`), so no call site changes while
-files move. When an old target is empty it is deleted.
-
-| Step | Moves | Visible change |
-|---|---|---|
-| **M0** ✅ | `Diagnostics` and `Quotas` carved; `Domain` re-exports `Quotas`, `DataSources` and `Providers`, which no longer import `Domain` | none |
-| **M1** ✅ | `DataSources` — the ports and their implementations move in; `DataSource`, the closed sums and the workers Codex needs are written test-first | none |
-| **M2** ✅ | `Providers` — `Provider`, the definition, the catalog; `codex.json` with golden tests; the App builds Codex from it; `CodexProvider` and every `Codex*` type in `Infrastructure/Codex` deleted. **Slice 1 of the target architecture** | none |
-| **M3** ✅ | one group of providers per PR (target §8), through #419; `AWSClients` carved from `Infrastructure/Bedrock` (#417) | none |
-| M4 ✅ | Usage History — no new module: `UsageHistory` into `Providers`, `UsageLog` into `DataSources`, `Day` into `Quotas`; slices UH1–UH6 of [TARGET §10](TARGET_ARCHITECTURE.md#10--usage-history-as-data); `Infrastructure/Mistral` and Claude's log analyzers deleted | the 30-day chart; Mistral's history beside Claude's |
-| M5… | `Monitoring`, `Alerting`, `Activity`, `Storage` | none |
-| last | `Domain` and `Infrastructure` are empty and removed from `Project.swift` | none |
-
-**M0 moved the kernel as it is.** `Quotas` holds today's types unchanged —
-and, because `UsageSnapshot` carries them, a few that belong elsewhere:
-`DailyUsageReport`/`Stat` (→ `Day`, staying in `Quotas`), `UsageDisplayMode` (→ the App),
-`ExtensionMetric` (→ out of the kernel); `BedrockModels` has left (#417: a `Cost` with lines). `RefreshKind` sits in `Providers` until `Monitoring` exists
-(`DailyUsageAnalyzing` left with UH3). Each type carries a `- Note: Interim` naming its final shape; reshaping
-the kernel follows [CANONICAL_MODEL §8](CANONICAL_MODEL.md#8--build-truth-node-by-node)'s
-order of work, one step per PR, because it touches every provider and view:
-**`Left` and `Window` first** (the two kernel laws), **then the words**
-(`UsageSnapshot` → `Usage`, `AccountTier` → `Plan`, `CostUsage` → `Cost`), and
-the non-kernel types leave as their modules are carved.
-
-The order is forced by the imports: `Provider` needs `UsageSnapshot`
-(Quotas), and the workers need the port implementations
-(`DefaultCLIExecutor`, `ProcessRPCTransport`, `URLSessionNetworkClient`) to be
-in `DataSources` before Codex's code can be deleted.
-
-## 10 · Open
+## 9 · Open
 
 - **`Storage` as a module, or each module's settings in its own `Internal/`?**
   `settings.json` is one file many contexts write, so one owner today.
@@ -298,5 +256,3 @@ in `DataSources` before Codex's code can be deleted.
   prices). It earns a module when it needs its own SDK (a binary or
   SQLite log) or a second consumer; keeping `Internal/Logs/` and
   `UsageHistory.swift` in their own files keeps that carve cheap.
-- ~~**`AIProvider` beside `Provider`** until the last provider moves~~ —
-  retired by [TARGET §12](TARGET_ARCHITECTURE.md#12--retiring-aiprovider): the Monitor and the views take `Account` or `Provider`.
