@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Claude**: in CLI mode, your limits are read from Claude Code again instead of switching to the API after the first refresh. ClaudeBar misread Claude Code 2.1.289's usage screen and its "no conversation found" answer. ([#490](https://github.com/tddworks/ClaudeBar/pull/490))
 - **Claude**: your email stays on the account card after a refresh answered by the API. It used to show at first and vanish when the API stood in for the CLI, leaving only "Updated · via API". ([#489](https://github.com/tddworks/ClaudeBar/pull/489))
 
 ### Added

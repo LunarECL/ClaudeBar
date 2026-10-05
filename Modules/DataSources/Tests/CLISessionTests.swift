@@ -209,6 +209,32 @@ struct CLISessionTests {
     }
 
     @Test
+    func `should create a fresh session when the CLI says the remembered one is gone, word by word as a TUI paints it`() async throws {
+        // Claude Code 2.1.289 positions each word with a cursor move, so the
+        // bytes never hold "no conversation found" as one run of text.
+        let gone = "\u{1B}7\u{1B}[r\u{1B}8\u{1B}[?25h\u{1B}[?2031l\u{1B}[?2004lNo\u{1B}[4Gconversation\u{1B}[17Gfound\u{1B}[23Gwith"
+            + "\u{1B}[28Gsession\u{1B}[36GID:\u{1B}[40Gaaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\r\r\n"
+        let launches = Launches()
+        let executor = MockCLIExecutor()
+        given(executor).execute(
+            binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any
+        ).willProduce { @Sendable _, args, _, _, _, _ in
+            launches.record(args)
+            return CLIResult(output: args.contains("--resume") ? gone : usageScreen, exitCode: args.contains("--resume") ? 1 : 0)
+        }
+        let memory = SessionMemory()
+        await memory.remember("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        let runner = self.runner(call(session: session()), executor: executor,
+                                 ids: ["11111111-2222-3333-4444-555555555555"], memory: memory)
+
+        let result = try await runner.run()
+
+        #expect(result.output == usageScreen)
+        #expect(launches.recorded.count == 2)
+        #expect(await memory.id == "11111111-2222-3333-4444-555555555555")
+    }
+
+    @Test
     func `should run the CLI plainly for good when this CLI build rejects the session flags`() async throws {
         let launches = Launches()
         let executor = MockCLIExecutor()

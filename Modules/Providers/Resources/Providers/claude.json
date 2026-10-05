@@ -46,9 +46,6 @@
             }
           },
           "readyWhen": [
-            {
-              "row": "Current session"
-            },
             "% used",
             "% left",
             "rate limited",

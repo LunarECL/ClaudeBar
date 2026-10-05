@@ -126,7 +126,10 @@ struct CLISessionRunner: Sendable {
         matches(output, tokens: tokens)
     }
 
+    /// Matched on the text the screen shows, as a ready marker is: a TUI
+    /// positions each word with a cursor move (`No␛[4Gconversation␛[17Gfound`),
+    /// so the raw bytes never hold the phrase as one run of text.
     private static func matches(_ output: String, tokens: [String]) -> Bool {
-        !tokens.isEmpty && tokens.contains { output.localizedCaseInsensitiveContains($0) }
+        !tokens.isEmpty && CLICompletionRule(readyMarkers: tokens.map { CLICompletionRule.Marker($0) }).isReady(output)
     }
 }
