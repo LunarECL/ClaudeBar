@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Claude**: in CLI mode, your limits are read from Claude Code again instead of quietly switching to the API. Claude Code 2.1.289 draws the usage labels before their numbers, and ClaudeBar sometimes stopped reading in between. ([#490](https://github.com/tddworks/ClaudeBar/pull/490))
+
 ### Added
 - **Grok** shows your plan (SuperGrok, SuperGrok Heavy, …) and your prepaid balance, and a reset time when xAI names only the billing period. ([#485](https://github.com/tddworks/ClaudeBar/pull/485)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/grok/README.md)
 - **Six new providers**, off until you turn them on: Cline and Warp limits and credits, Devin's quota from your browser sign-in, Windsurf and JetBrains AI from their apps on your Mac, and OpenAI API spend over 30 days. ([#485](https://github.com/tddworks/ClaudeBar/pull/485)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/README.md)

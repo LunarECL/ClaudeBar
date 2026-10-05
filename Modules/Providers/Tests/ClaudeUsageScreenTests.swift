@@ -100,6 +100,53 @@ struct ClaudeUsageScreenTests {
         #expect(opusQuota?.status == .healthy)
     }
 
+    /// Claude Code 2.1.289's `/usage`: the session's cost and the plugin
+    /// skill-listing footprint sit above the limits, and an advice section below.
+    static let costAndFootprintAboveTheLimitsOutput = """
+    Settings  Status  Config  Usage  Stats
+
+    Session
+
+    Total cost:            $0.0000
+    Total duration (API):  0s
+    Total duration (wall): 1s
+    Total code changes:    0 lines added, 0 lines removed
+    Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+
+    Plugin skill-listing footprint
+    What each plugin's skill descriptions add to the system prompt (cached input after the first turn).
+
+    feature-dev                 1 skill · ~26 tok/turn
+
+    Total                       ~26 tok/turn
+
+    Current session
+    ██████████████░░░░░░░░░░░░░░░░░░░░░░░░░  37% used
+    Resets 3:59pm (Asia/Shanghai)
+
+    Current week (all models)
+    ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  21% used
+    Resets Oct 11 at 10:59am (Asia/Shanghai)
+
+    Current week (Fable)
+    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  0% used
+    Resets Oct 11 at 11am (Asia/Shanghai)
+
+    What's contributing to your limits usage?
+    Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+    """
+
+    @Test
+    func `should read the limits when the session's cost and the plugin footprint sit above them`() throws {
+        let snapshot = try read(Self.costAndFootprintAboveTheLimitsOutput,
+                                config: #"{"oauthAccount":{"billingType":"stripe_subscription"}}"#)
+
+        #expect(snapshot.sessionQuota?.percentRemaining == 63)
+        #expect(snapshot.weeklyQuota?.percentRemaining == 79)
+        #expect(snapshot.quota(for: .modelSpecific("fable"))?.percentRemaining == 100)
+        #expect(snapshot.quota(for: .modelSpecific("fable"))?.resetText?.contains("11am") == true)
+    }
+
     @Test
     func `should show the Fable weekly window with its own reset time`() throws {
         let snapshot = try read(Self.fableQuotaOutput)

@@ -79,14 +79,45 @@ struct ClaudeCLIDefinitionTests {
 
     @Test
     func `should wait for the usage screen before reading it (#317)`() throws {
+        // The numbers or an error — never the `Current session` label, which
+        // Claude Code paints before a second request fills its bars in.
         #expect(try call("cli").readyWhen == [
-            CLICall.ReadyMarker("Current session", endsRow: true),
             CLICall.ReadyMarker("% used"),
             CLICall.ReadyMarker("% left"),
             CLICall.ReadyMarker("rate limited"),
             CLICall.ReadyMarker("Error:"),
             CLICall.ReadyMarker("/usage is only available"),
         ])
+    }
+
+    /// Claude Code 2.1.289's `/usage`: the session's cost and the plugin
+    /// footprint first, then the limits, whose numbers a second request fills in.
+    private static let usageScreenBeforeTheNumbers = """
+    Settings  Status  Config  Usage  Stats
+
+    Session
+
+    Total cost:            $0.0000
+    Total duration (API):  0s
+    Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+
+    Plugin skill-listing footprint
+    feature-dev                 1 skill · ~26 tok/turn
+
+    Current session
+    ████████████████████████████████████████
+    """
+
+    private func completionRule() throws -> CLICompletionRule {
+        CLICompletionRule(readyMarkers: try call("cli").readyWhen.map { CLICompletionRule.Marker($0.text, endsRow: $0.endsRow) })
+    }
+
+    @Test
+    func `should keep waiting while the usage screen shows the session label but not its numbers yet`() throws {
+        let rule = try completionRule()
+
+        #expect(rule.isPending(Self.usageScreenBeforeTheNumbers))
+        #expect(!rule.isPending(Self.usageScreenBeforeTheNumbers + "  37% used\nResets 3:59pm (Asia/Shanghai)\n"))
     }
 
     @Test
