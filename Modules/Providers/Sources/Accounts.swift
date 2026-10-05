@@ -142,7 +142,7 @@ public final class Accounts {
             if isTaken(value, by: setting) {
                 throw UsageError.executionFailed("Choose a separate folder for \(setting.label) — another \(name) login uses this one.")
             }
-            setting.keep(value, in: &entry)
+            setting.keep(value, in: &entry, paths: configuration.paths)
         }
         guard entry.secrets.isEmpty || configuration.vault != nil else {
             throw UsageError.executionFailed("ClaudeBar can't keep this key securely here.")
@@ -240,14 +240,23 @@ public final class Accounts {
         guard definition.accounts != nil, !login.isDefault, !logins.contains(where: { $0.id == login.id }) else {
             return nil
         }
+        var values = config.probeConfig
+        if let field = definition.accounts?.folder?.savedAs, let value = values[field], !value.isEmpty {
+            values[field] = configuration.paths.canonical(value)
+        }
+        for setting in definition.accountSettings {
+            if case .path = setting.kind, let value = values[setting.id], !value.isEmpty {
+                values[setting.id] = configuration.paths.canonical(value)
+            }
+        }
         do {
-            _ = try configuration.sources(for: config.probeConfig, isDefault: false)
+            _ = try configuration.sources(for: values, isDefault: false)
         } catch {
             AppLog.providers.error("\(self.id): can't run account \(login.id): \(error.localizedDescription)")
             return nil
         }
-        let history = definition.usageHistory(forAccount: config.probeConfig).flatMap { own in makeUsageHistory?(own, login.id) }
-        let account = Account(definition: definition, settings: settings, login: login, values: config.probeConfig,
+        let history = definition.usageHistory(forAccount: values).flatMap { own in makeUsageHistory?(own, login.id) }
+        let account = Account(definition: definition, settings: settings, login: login, values: values,
                               madeBy: config.madeBy, usageHistory: history)
         logins.append(account)
         return account

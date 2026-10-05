@@ -22,6 +22,7 @@ The `grok` binary doesn't need to be on your PATH; ClaudeBar only needs the sign
 - **100% at the start of a period** is expected: when xAI reports a billing period but no usage figures yet, ClaudeBar shows the whole period as remaining rather than an empty card.
 - **The On-Demand card only appears once you've set an on-demand cap** on your xAI account.
 - **Nothing shows and there's no error:** `~/.grok/auth.json` is missing or holds no token, so ClaudeBar skips the provider.
+- **An added login needs a folder of its own.** The default login's folder and another listed login's are refused, `~` included. A path you type with `~` is saved as the full folder, because the CLI can't expand it.
 
 ## See also
 

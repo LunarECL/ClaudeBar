@@ -25,6 +25,7 @@ Sign in to another Google account in a separate folder with `GEMINI_CLI_HOME=<fo
 - **One row per tier, not per model.** Google applies the same quota to several model IDs (e.g. `gemini-2.5-pro`, `gemini-3-pro-preview` and `gemini-3.1-pro-preview` go down together), so ClaudeBar shows them as a single "Pro" row.
 - **Every model at 100%** usually meant ClaudeBar couldn't find your Code Assist project and Google returned placeholder numbers. ClaudeBar now looks the project up the way the Gemini CLI does, which works without a Google Cloud account ([#124](https://github.com/tddworks/ClaudeBar/issues/124)). If you still see it, check the log for the `project` step failing.
 - **Antigravity is a separate provider.** Its Gemini quota is on the [Antigravity](../antigravity/README.md) card.
+- **An added login needs a folder of its own.** The default login's folder and another listed login's are refused, `~` included. A path you type with `~` is saved as the full folder, because the CLI can't expand it.
 
 ## See also
 

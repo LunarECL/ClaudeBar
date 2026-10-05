@@ -1,5 +1,8 @@
 import Foundation
 import Testing
+import DataSources
+import Quotas
+import Mockable
 @testable import Providers
 
 /// A setting's kind owns its rule; a choice's options carry their values.
@@ -62,6 +65,18 @@ struct SettingTests {
         #expect(folder.check("", paths: paths) == "Fill in CLI data folder.")
     }
 
+    @Test func `should expand path defaults before checking their location and existence`() throws {
+        let folder = try decode(#"{"id":"home","label":"Folder","kind":{"path":{"mustExist":true}}}"#)
+        let paths = FakePaths(folders: ["/Users/me/work"], aliases: [
+            "${ACME_HOME:-~/work}": "/Users/me/work", "${MISSING}": "/Users/me/missing",
+            "${RELATIVE}": "relative/work"
+        ])
+        #expect(folder.check("${ACME_HOME:-~/work}", paths: paths) == nil)
+        #expect(folder.check("${MISSING}", paths: paths) == "Choose an existing folder for Folder.")
+        #expect(folder.check("${RELATIVE}", paths: paths) == "Enter a full path for Folder.")
+        #expect(folder.check("${UNSET}", paths: paths) == "Enter a full path for Folder.")
+    }
+
     @Test
     func `should find a login's folder among its values, and no folder for a choice`() throws {
         let folder = try decode(#"{"id":"home","label":"Folder","scope":"account","kind":"path"}"#)
@@ -90,6 +105,66 @@ struct FakePaths: PathChecking {
     var folders: Set<String>
     var aliases: [String: String] = [:]
 
+    func expanded(_ path: String) -> String { aliases[path] ?? path }
     func isFolder(_ path: String) -> Bool { folders.contains(canonical(path)) }
     func canonical(_ path: String) -> String { aliases[path] ?? path }
+}
+
+@MainActor @Suite struct DefaultPathIsolationTests {
+    struct Paths: PathChecking {
+        func isFolder(_ path: String) -> Bool { true }
+        func canonical(_ path: String) -> String { expanded(path) }
+        func expanded(_ path: String) -> String {
+            DataSources.expandPath(path, homeDirectory: URL(fileURLWithPath: "/Users/me"), environment: { _ in nil })
+        }
+    }
+    private func provider(_ id: String, accounts: [ProviderAccountConfig] = []) throws -> Provider {
+        Provider(definition: try ProviderFactory.builtIn(id), settings: InMemoryProviderSettings(), accounts: accounts,
+            makeDataSource: { source, login in
+                DataSources.make(source, providerId: login, cliExecutor: MockCLIExecutor(), network: MockNetworkClient(),
+                    makeTransport: { _, _, _, _ in MockRPCTransport() }, environment: { _ in nil },
+                    homeDirectory: URL(fileURLWithPath: "/Users/me"), now: { Date() })
+            }, paths: Paths())
+    }
+    @Test(arguments: [("gemini", "home", "~"), ("kiro", "home", "~"), ("grok", "directory", "~/.grok"), ("kimi", "home", "~/.kimi")])
+    func `should reject an added login that reuses the default folder`(_ entry: (String, String, String)) throws {
+        let account = try provider(entry.0)
+        #expect(throws: UsageError.self) { try account.accounts.add(filling: [entry.1: entry.2]) }
+        #expect(account.accounts.count == 1)
+    }
+    @Test func `should restore a saved tilde path as an absolute folder`() throws {
+        let owner = try provider("kiro", accounts: [ProviderAccountConfig(
+            accountId: "work", label: "Work", probeConfig: ["home": "~/work"], madeBy: .form)])
+        let account = try #require(owner.accounts.first { $0.accountId == "work" })
+        #expect(account.values["home"] == "/Users/me/work")
+    }
+    @Test func `should restore a signed-in folder as the absolute path its CLI needs`() throws {
+        let owner = try provider("codex", accounts: [ProviderAccountConfig(
+            accountId: "work", label: "Work", probeConfig: ["codexHome": "~/work", "chatgptAccountId": "work-id"], madeBy: .folder)])
+        let account = try #require(owner.accounts.first { $0.accountId == "work" })
+        #expect(account.values["codexHome"] == "/Users/me/work")
+        let rpc = try #require(owner.dataSources(for: account).first { $0.kind == "rpc" })
+        guard case .jsonRpc(let call) = rpc.definition.fetch else {
+            Issue.record("Expected an RPC fetch")
+            return
+        }
+        #expect(call.environment.set["CODEX_HOME"] == "/Users/me/work")
+    }
+    @Test func `should validate a blank path default after expansion`() throws {
+        let owner = try provider("kimi")
+        try owner.configuration.set("home", to: "/Users/me/other")
+        let added = try owner.accounts.add(filling: [:])
+        #expect(added.values["home"] == "/Users/me/.kimi")
+    }
+    @Test func `should reject a blank default that duplicates another login folder`() throws {
+        let owner = try provider("kimi")
+        #expect(throws: UsageError.executionFailed("Choose a separate folder for Signed-in Kimi Folder — another Kimi login uses this one.")) {
+            try owner.accounts.add(filling: [:])
+        }
+    }
+    @Test func `should save a tilde path as the absolute folder the CLI needs`() throws {
+        let owner = try provider("kiro")
+        let account = try owner.accounts.add(filling: ["home": "~/work"])
+        #expect(account.values["home"] == "/Users/me/work")
+    }
 }
