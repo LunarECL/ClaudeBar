@@ -20,6 +20,8 @@ struct LeaderboardBoardCard: View {
 
     @Environment(\.appTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    /// Whether the list shows your own row right now; `nil` until it says.
+    @State private var isYourRowInView: Bool?
 
     /// Rows visible before the list scrolls; the card keeps this height.
     static let visibleRows = 7
@@ -96,8 +98,8 @@ struct LeaderboardBoardCard: View {
 
     // MARK: The list
 
-    /// When your place is below what shows, a pinned row of yours sits under
-    /// the list and scrolls it to you.
+    /// While the list doesn't show your row, a pinned row of yours sits under
+    /// it and scrolls it to you.
     private var standingsList: some View {
         let scrolls = top.count > Self.visibleRows
         let height = CGFloat(min(top.count, Self.visibleRows)) * (Self.rowHeight + Self.rowSpacing) - Self.rowSpacing
@@ -107,13 +109,16 @@ struct LeaderboardBoardCard: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: Self.rowSpacing) {
                         ForEach(top) { standing in
-                            row(standing, isMe: standing.username == myUsername)
+                            let isMe = standing.username == myUsername
+                            row(standing, isMe: isMe)
                                 .id(standing.rank)
+                                .onScrollVisibilityChange(threshold: 0.6) { if isMe { isYourRowInView = $0 } }
                         }
                         // Ranked but outside the hundred shown.
                         if let mine, !top.contains(where: { $0.rank == mine.rank }) {
                             Text("· · ·").font(.system(size: 11, weight: .bold)).foregroundStyle(theme.textTertiary)
                             row(mine, isMe: true).id(mine.rank)
+                                .onScrollVisibilityChange(threshold: 0.6) { isYourRowInView = $0 }
                         }
                     }
                     .padding(Self.inset)
@@ -131,7 +136,8 @@ struct LeaderboardBoardCard: View {
                     }
                 }
 
-                if let mine, scrolls, mine.rank > Self.visibleRows {
+                if let mine, PinnedPlace.shows(isRanked: true, listScrolls: scrolls,
+                                               isYourRowInView: isYourRowInView ?? (mine.rank <= Self.visibleRows)) {
                     Button {
                         withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(mine.rank, anchor: .center) }
                     } label: {
@@ -233,5 +239,14 @@ struct FilterChip: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+/// *Your place* under the board: a row of yours pinned below the list, so
+/// you find yourself without scrolling — only while the list doesn't show
+/// your own row, or you'd see yourself twice.
+enum PinnedPlace {
+    static func shows(isRanked: Bool, listScrolls: Bool, isYourRowInView: Bool) -> Bool {
+        isRanked && listScrolls && !isYourRowInView
     }
 }
