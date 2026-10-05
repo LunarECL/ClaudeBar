@@ -266,7 +266,7 @@ files move. When an old target is empty it is deleted.
 | **M1** ✅ | `DataSources` — the ports and their implementations move in; `DataSource`, the closed sums and the workers Codex needs are written test-first | none |
 | **M2** ✅ | `Providers` — `Provider`, the definition, the catalog; `codex.json` with golden tests; the App builds Codex from it; `CodexProvider` and every `Codex*` type in `Infrastructure/Codex` deleted. **Slice 1 of the target architecture** | none |
 | **M3** ✅ | one group of providers per PR (target §8), through #419; `AWSClients` carved from `Infrastructure/Bedrock` (#417) | none |
-| M4 ✅ | Usage History — no new module: `UsageHistory` into `Providers`, `UsageLog` into `DataSources`, `Day` into `Quotas`; slices UH1–UH6 of [TARGET §10](TARGET_ARCHITECTURE.md#10--usage-history-as-data); `Infrastructure/Mistral` and Claude's log analyzers deleted | the 30-day chart; Mistral's history beside Claude's |
+| M4 ✅ | Usage History — no new module: `UsageHistory` into `Providers`, `UsageLog` into `DataSources`, `Day` into `Quotas`; slices UH1–UH6 of [daily-usage design §10](../features/daily-usage/design.md#10--usage-history-as-data); `Infrastructure/Mistral` and Claude's log analyzers deleted | the 30-day chart; Mistral's history beside Claude's |
 | M5… | `Monitoring`, `Alerting`, `Activity`, `Storage` | none |
 | last | `Domain` and `Infrastructure` are empty and removed from `Project.swift` | none |
 

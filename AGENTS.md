@@ -36,7 +36,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 - **`QuotaMonitor` is the single source of truth** for provider state. No ViewModel or AppState layer; views consume the domain.
 - **Settings**: a provider's settings are its definition's `settings`, read with the generic `value`/`dataSourceKind`/`isOn` of `ProviderSettingsRepository`; a value an old card saved elsewhere is read through the compatibility tables in `JSONSettingsRepository` and `ProviderVault`. All settings persist through `JSONSettingsRepository` to `~/.claudebar/settings.json` → [docs/settings.md](docs/settings.md).
 - **Notify! and session hooks are destinations, not providers**: they get standalone repositories beside `HookSettingsRepository`, never under `ProviderSettingsRepository` → [features/notify/design.md](docs/features/notify/design.md).
-- **Themes** implement `AppThemeProvider` and register in `ThemeRegistry` → [THEME_DESIGN.md](docs/architecture/THEME_DESIGN.md). Card backgrounds use `theme.cardGradient` / `theme.glassBorder`.
+- **Themes** implement `AppThemeProvider` and register in `ThemeRegistry` → [themes design](docs/features/themes/design.md). Card backgrounds use `theme.cardGradient` / `theme.glassBorder`.
 - The design is five documents read in order, journeys first: [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) maps them.
 
 ## Design docs are the source of truth

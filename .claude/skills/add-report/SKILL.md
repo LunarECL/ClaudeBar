@@ -33,7 +33,7 @@ Data Source → Parser → Analyzer → Report Model → UsageSnapshot → Card 
 Mapped to where the code lives today. **First ask: is it usage history for
 another tool?** Then it is no Swift at all — a `usageHistory` block in that
 provider's definition, run by `DataSources`' `UsageLog`
-([TARGET_ARCHITECTURE §10](../../../docs/architecture/TARGET_ARCHITECTURE.md#10--usage-history-as-data)).
+([daily-usage design §10](../../../docs/features/daily-usage/design.md#10--usage-history-as-data)).
 A genuinely new kind of report is a capability a login offers (CANONICAL §2.1):
 
 | Piece | Location | What to Create |
@@ -53,7 +53,7 @@ A new report is a capability the `Provider` holds and a view reads, as
 > DailyUsage feature as a working example of this pattern.
 
 > **Check the design first** — the docs are the source of truth ([AGENTS.md](../../../AGENTS.md#design-docs-are-the-source-of-truth)).
-> Usage history is now data ([TARGET_ARCHITECTURE §10](../../../docs/architecture/TARGET_ARCHITECTURE.md#10--usage-history-as-data)):
+> Usage history is now data ([daily-usage design §10](../../../docs/features/daily-usage/design.md#10--usage-history-as-data)):
 > a report is a range of `account.usageHistory.days(in:)` read by the page, not a
 > `XxxAnalyzer` or a field on the snapshot. Where this skill's steps below disagree with §10,
 > §10 wins; confirm the design with the user before coding.

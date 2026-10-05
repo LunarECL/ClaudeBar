@@ -59,4 +59,4 @@ So you can turn on High Contrast and still override just one level. Custom color
 
 ## See also
 
-[Menu bar](../menu-bar/README.md) · [themes](../themes/README.md) · [settings.md](../../settings.md) for the `app.statusColorOverrides` and `app.highContrastEnabled` keys
+[design.md](design.md) · [Menu bar](../menu-bar/README.md) · [themes](../themes/README.md) · [settings.md](../../settings.md) for the `app.statusColorOverrides` and `app.highContrastEnabled` keys

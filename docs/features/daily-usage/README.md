@@ -52,4 +52,4 @@ Nothing is sent anywhere; ClaudeBar only reads the files.
 
 ## See also
 
-[design.md](design.md) — how duplicates are found and why totals used to be ~4× too high · [extensions](../extensions/README.md) · [Claude](../../providers/claude/README.md)
+[design.md](design.md) — how a login's logs become days · [dedup.md](dedup.md) — how duplicates are found and why totals used to be ~4× too high · [extensions](../extensions/README.md) · [Claude](../../providers/claude/README.md)

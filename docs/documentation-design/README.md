@@ -181,7 +181,7 @@ No type lists, no file maps, no test snippets, no settings-key tables (those are
 ## Tier 3: resources
 
 - **`docs/providers/<id>/design.md`**: contributor-facing research for one provider. The endpoints or CLI invocations, the response fields that matter (with the CLI/API version they were seen in), the screen-scraping rules, the fallback chain and why each step exists, what was tried and failed. Today's `docs/plans/2026-01-22-bedrock-provider-design.md` and `2026-02-04-codex-api-probe-design.md` move here; so does future research like the Codex `resetsAt` and Antigravity empty-`pgrep` findings.
-- **`docs/features/<x>/design.md`**: the same for app features (notch, notify, reports). Today's `docs/plans/2026-06-09-daily-usage-dedup-design.md` becomes `features/daily-usage/design.md`.
+- **`docs/features/<x>/design.md`**: the same for app features (notch, notify, reports). Today's `docs/plans/2026-06-09-daily-usage-dedup-design.md` became `features/daily-usage/dedup.md`, beside the feature's `design.md`.
 - **`docs/architecture/`**: the design, as a chain read in order — see [Design docs: an order, not a pile](#design-docs-an-order-not-a-pile).
 - **`docs/troubleshooting.md`**: log files, OSLog filters, what each common probe error means. Provider-specific errors stay in that provider's Gotchas and are linked from here.
 - **`docs/settings.md`**: `settings.json` namespaces and where secrets live (Keychain vs settings file). One home, linked from provider docs.
