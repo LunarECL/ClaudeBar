@@ -171,7 +171,10 @@ async function start(): Promise<void> {
     // Top to bottom; a label that would sit on one already placed moves down.
     const shown = labels.flatMap(({ at, node }) => {
       const front = inFront(at);
+      // Visibility, not only a fade: a label on the far side is never placed,
+      // so it must not linger where it was made.
       node.style.opacity = front ? "1" : "0";
+      node.style.visibility = front ? "visible" : "hidden";
       if (!front) return [];
       screen.copy(at).project(camera);
       return [{ node, x: (screen.x + 1) / 2 * w, y: (1 - screen.y) / 2 * h }];
@@ -211,7 +214,8 @@ async function start(): Promise<void> {
     shown.forEach((c, i) => markers.add(pin(c, 0.04 + 0.26 * (c.tokens / max), CANDY[i % CANDY.length])));
     few.forEach((c) => markers.add(dot(c)));
     labels = placed.map((c) => {
-      const node = el("span", { class: "globe-label", text: `${flag(c.country)} ${nameOf(c.country)}` });
+      // Hidden until the first frame places it beside its pin.
+      const node = el("span", { class: "globe-label", style: "opacity:0;visibility:hidden", text: `${flag(c.country)} ${nameOf(c.country)}` });
       card.append(node);
       return { at: toVec(c.centre[0], c.centre[1], R * 1.02), node };
     });
