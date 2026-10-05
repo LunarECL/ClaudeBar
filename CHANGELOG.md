@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.5] - 2026-10-05
+
 ### Changed
 - **Leaderboard globe**: your country shows on the globe from the first member there who shares it, so the globe is no longer empty while members are spread out. Members and tokens for a country still show only once three members there share it, so no number is one person's own. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md) ([#480](https://github.com/tddworks/ClaudeBar/pull/480))
 
@@ -109,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/tddworks/ClaudeBar/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/tddworks/ClaudeBar/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/tddworks/ClaudeBar/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/tddworks/ClaudeBar/compare/v0.5.0...v0.5.2
