@@ -221,10 +221,7 @@ testability" alone.
 - One test target per module: `QuotasTests`, `DataSourcesTests`, `ProvidersTests` …
   A module's tests link only that module and its suppliers, so `QuotasTests`
   no longer links six AWS SDKs.
-- Workers are tested alone, built with `@testable` and a mocked port.
-  Definitions are tested by **golden fixtures** — the responses today's probes
-  are tested with, run through the JSON, must give today's snapshots.
-- Chicago school, unchanged: stub ports with Mockable, assert on state.
+- What each piece's tests guard: [TARGET §7](TARGET_ARCHITECTURE.md#7--testing).
 - `AcceptanceTests` stays at the App level and composes real modules with
   stubbed ports.
 - `MOCKING` is a project-level compilation condition in `Project.swift`, so

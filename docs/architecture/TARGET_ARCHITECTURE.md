@@ -322,24 +322,16 @@ will run, and lists `missingSettings` (*Key needed*) before *Add*.
 
 ## 5 · Settings and secrets
 
-| Key | Means | Status |
-|---|---|---|
-| `providers.<id>.isEnabled` | the Providers pane toggle | unchanged |
-| `<id>.probeMode` | the active data source's `kind` | unchanged — a match name, so no user's setting moves |
-| `providers.<id>.settings.<field>` | a non-secret form value | new |
-| vault `claudebar.<id>.<field>` | a secret form value | new; Keychain with the file fallback Notify! uses for ad-hoc builds |
-
-A credential lookup never writes settings, with one exception the definition
-asks for by name: `OAuth2Refresher` writes the refreshed token **back to where
-the credential came from** (for Codex, `~/.codex/auth.json`, preserving every
-other field), because the CLI that owns that file must keep working.
+Where each value is kept, by key: [docs/settings.md](../settings.md). The laws —
+a secret only in the vault, a refreshed token written back where it was
+found — are [CANONICAL §5](CANONICAL_MODEL.md#5--the-laws-on-the-node-that-owns-them)'s.
 
 ## 6 · Concurrency, errors, logging
 
 - `Provider` is `@MainActor @Observable`; `DataSource` and its workers are
   `Sendable` and `nonisolated`, so CLI, RPC and HTTP work runs off the main actor.
-- At most one refresh per provider is in flight; a second call waits for the
-  first one's result.
+- One refresh per login is in flight; a second call waits for the first
+  one's result ([CANONICAL §5](CANONICAL_MODEL.md#5--the-laws-on-the-node-that-owns-them)).
 - `DefinitionError` (bad JSON, unknown tag, missing default, duplicate kind)
   is a load-time error with the file name. It never crashes the app.
 - Workers log what they did (`AppLog.probes`), never what they carried: no

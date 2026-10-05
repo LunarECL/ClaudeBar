@@ -1,5 +1,5 @@
 ---
-description: THE normative tree ClaudeBar binds to — every node from the Monitor down, the word the screen prints for it, its laws and their owners, the bounded contexts and the modules that implement them; read before adding or changing any domain type or provider.
+description: THE normative tree ClaudeBar binds to — every node from the Monitor down, the word the screen prints for it, its laws and their owners, and the bounded contexts; read before adding or changing any domain type or provider.
 ---
 
 # ClaudeBar — the canonical model
@@ -256,15 +256,10 @@ Codex logic**:
 
 So every provider is ONE KIND OF THING — a definition — and ONE `DataSource`
 type does the fetching for all of them: `dataSource.fetchUsage()` looks up
-the key, fetches, maps. Behind it, each CASE of the three closed sums is
-carried out by one internal worker with one job, named for its protocol or
-format, never for a vendor:
-
-| Closed sum | Its cases' workers (`internal`) |
-|---|---|
-| `CredentialLookup` | `EnvironmentReader` · `SettingReader` · `JSONFileReader` · `KeychainReader` · `BrowserCookieReader` · `OAuth2Refresher` |
-| `Fetch` | `HTTPFetcher` · `HTTPStepsFetcher` · `JSONRPCFetcher` · `CLIFetcher` (a TUI in a terminal) · `CommandFetcher` (pipes) · `FileFetcher` · `ScriptFetcher` |
-| `Mapping` | `JSONMapper` · `TextMapper` · `ScriptMapper` (JavaScriptCore; host `humanDate()`) |
+the key, fetches, maps. Each CASE of the three closed sums (`CredentialLookup`
+· `Fetch` · `Mapping`) is carried out by one worker with one job, named for its
+protocol or format, never for a vendor — the pieces are
+[TARGET §2](TARGET_ARCHITECTURE.md#2--the-pieces).
 
 **Why closed sums.** The JSON decoder must know every tag, and the *Add
 Provider* sheet offers a fixed list. A new provider is a JSON file — open, no
@@ -477,56 +472,24 @@ Each is a **fence**: inside it every word has one meaning and one model
 enforces it. Across a fence the same word may mean something else, as long as
 **no type crosses** — a reference does.
 
-| Context | Subdomain | Owns the question | Module |
-|---|---|---|---|
-| **Quota** | **shared kernel** | *how much is left, when does it refill, and is that OK?* | `Modules/Quotas` |
-| **Providers** | **core** | *who do I pay, under which accounts, and what did they last say?* | `Modules/Providers` |
-| **Data Sources** | supporting | *how do we find out?* — DataSource, DataSourceDefinition, CredentialLookup, Fetch, Mapping, Setting, DataSourceError, and every worker | `Modules/DataSources` |
-| **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* | `Modules/Monitoring` |
-| **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export | `Modules/Alerting` |
-| **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch | `Modules/Activity` |
-| **Usage History** | supporting | *what did I use, day by day?* | no module of its own: `UsageHistory` in `Modules/Providers` (the login owns it), `UsageLog` in `Modules/DataSources` (how it is extracted), `Day` in `Modules/Quotas` |
-| **In use** | supporting | *which login does my next terminal session start with?* | no module of its own: `InUse`, `SwitchWhenLow`, `LoginsInUse` in `Modules/Providers` (the product owns the choice); `NewSessions`, `ShellLines`, `InUseAnnouncer` in `Domain`; `ShellSetup`, `InUseNotifications` in `Infrastructure`. Wired onto Monitoring by the App, never the other way |
-| **Vault & Settings** | generic | *where is it kept?* — `settings.json`, secrets | `Modules/Storage` |
-| SDK clients | — (anti-corruption layers) | *what does this SDK say?* — a client that needs a heavy SDK gets its own module, behind a port, so only it links the SDK | `Modules/AWSClients` |
+| Context | Subdomain | Owns the question |
+|---|---|---|
+| **Quota** | **shared kernel** | *how much is left, when does it refill, and is that OK?* |
+| **Providers** | **core** | *who do I pay, under which accounts, and what did they last say?* |
+| **Data Sources** | supporting | *how do we find out?* — DataSource, DataSourceDefinition, CredentialLookup, Fetch, Mapping, Setting, DataSourceError, and every worker |
+| **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* |
+| **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export |
+| **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch |
+| **Usage History** | supporting | *what did I use, day by day?* |
+| **In use** | supporting | *which login does my next terminal session start with?* |
+| **Vault & Settings** | generic | *where is it kept?* — `settings.json`, secrets |
+| SDK clients | — (anti-corruption layers) | *what does this SDK say?* — a client that needs a heavy SDK gets its own module, behind a port, so only it links the SDK |
 
-```text
-                      Quota                    the shared kernel — knows nobody
-                    ▲            ▲
-          ┌─────────┘            └───────────┐
-    DataSources                           Alerting ◀──┐
-          ▲                                           │
-          │◀── AWSClients (the SDK)                    │
-          │                                           │
-    Providers ◀─────────────── Monitoring ────────────┘   Activity
-          ▲                      ▲                      (on its own:
-          │                      │                       no Quota, no Provider)
-          └──────── App ─────────┘
-          the composition root: hands the SDK clients in,
-          loads the definitions (built-in JSON ships here), draws the tree
-```
-
-Arrows point at the **supplier**. Nothing points back: the kernel cannot name a
-provider, Data Sources cannot name the Monitor, no module names a vendor, and
-the AWS SDK links into `AWSClients` and nowhere else.
-
-**Usage History has no module of its own** — it splits along the line every
-provider already has. What the person asks for is the login's: `Account`
-owns its `UsageHistory` (in `Providers`), which answers `days(in:)` from its
-ledger of closed days. What differs per provider is only **how to extract
-it** — where the logs are, how a record reads, what a token costs — and that
-is data, run by the same machinery as a data source: the definition's
-`usageHistory` block is a `UsageLog.Definition`, `DataSources` builds a
-`UsageLog` from it (filled with the login's values) and reads days with its
-path language, its file access and its prices (`PriceList`; a cloud's
-through `PriceCatalog`). `Day` is a value in the
-kernel, beside `Cost`. No new arrow: `Providers → DataSources → Quota`
-already exists. A module is carved when something needs its own SDK or a
-second consumer — usage history has neither.
-
-**Packaging.** One Tuist framework target per context under `Modules/`, each
-with `Sources/` and `Tests/`. The `**` globs keep working per module; a context's tests link only that
-context and what it depends on, so `QuotaTests` stop linking six AWS SDKs.
+Which module implements each context, and what each may import:
+[MODULAR_DESIGN §2–3](MODULAR_DESIGN.md#2--the-modules). Usage History and In
+use have no module of their own; where their pieces live is in
+[the daily-usage design §10.4](../features/daily-usage/design.md#104--where-it-lives-the-login-owns-it-datasources-extracts-it)
+and [TARGET §11](TARGET_ARCHITECTURE.md#11--in-use-as-a-capability).
 
 ## 8 · Build truth, node by node
 
