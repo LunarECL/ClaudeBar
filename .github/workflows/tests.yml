@@ -25,6 +25,29 @@ jobs:
       - name: Get Swift version
         run: swift --version
 
+      # Cold runs re-fetch every external dependency into Tuist/.build (the
+      # aws-sdk-swift checkout alone takes ~3 min), recompile the project
+      # manifests, and rebuild all externals in DerivedData before tests run.
+      # Cache all three so a run only builds what changed. Same keys as
+      # build.yml, so the two jobs share these caches.
+      - name: Cache Tuist dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/tuist
+            Tuist/.build
+          key: tuist-v1-${{ runner.os }}-${{ hashFiles('Tuist/Package.swift', 'Tuist.swift', 'Project.swift') }}
+          restore-keys: |
+            tuist-v1-${{ runner.os }}-
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: .derivedData
+          key: derived-data-v1-${{ runner.os }}-${{ hashFiles('Tuist/Package.swift', 'Tuist.swift', 'Project.swift') }}
+          restore-keys: |
+            derived-data-v1-${{ runner.os }}-
+
       - name: Install Tuist
         run: brew install --cask tuist
 
@@ -42,6 +65,7 @@ jobs:
             -scheme ClaudeBar \
             -workspace ClaudeBar.xcworkspace \
             -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath .derivedData \
             -enableCodeCoverage YES \
             -skipMacroValidation \
             -resultBundlePath TestResults.xcresult
