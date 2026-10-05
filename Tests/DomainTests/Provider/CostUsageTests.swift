@@ -90,6 +90,12 @@ struct CostUsageTests {
     }
 
     @Test
+    func `should print a part of the cost in US dollars with two decimals`() {
+        #expect(CostLine(label: "opus", amount: Decimal(string: "0.5")!).formattedAmount == "$0.50")
+        #expect(CostLine(label: "sonnet", amount: Decimal(string: "1234.567")!).formattedAmount == "$1,234.57")
+    }
+
+    @Test
     func `should print API time of over an hour as hours, minutes and seconds`() {
         // Given
         let cost = CostUsage(

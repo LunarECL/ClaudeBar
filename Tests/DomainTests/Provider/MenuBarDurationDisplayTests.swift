@@ -55,6 +55,32 @@ struct MenuBarDurationDisplayTests {
         #expect(display.text == "—")
     }
 
+    // MARK: - From the provider's reset text, when it gives no date
+
+    private func quota(resetText: String) -> UsageQuota {
+        UsageQuota(percentRemaining: 50, quotaType: .session, providerId: "kimi", resetText: resetText)
+    }
+
+    @Test
+    func `should show the first two parts of the provider's reset text when it gives no reset date`() {
+        #expect(MenuBarDurationDisplay(quota: quota(resetText: "Resets in 2d 5h 30m")).text == "2d 5h")
+    }
+
+    @Test
+    func `should read the provider's reset text whatever its case and spacing`() {
+        #expect(MenuBarDurationDisplay(quota: quota(resetText: "RESETS IN 4 H 12 M")).text == "4h 12m")
+    }
+
+    @Test
+    func `should show a dash when the provider's text is not about a reset`() {
+        #expect(MenuBarDurationDisplay(quota: quota(resetText: "12/50 credits")).text == "—")
+    }
+
+    @Test
+    func `should show a dash when the provider's reset text has no time in it`() {
+        #expect(MenuBarDurationDisplay(quota: quota(resetText: "Resets soon")).text == "—")
+    }
+
     // MARK: - Status threading
 
     @Test

@@ -41,8 +41,8 @@ public enum HookInstaller {
     /// ```json
     /// {"SessionStart": [{"matcher": ".*", "hooks": [{"type": "command", "command": "..."}]}]}
     /// ```
-    public static func install() throws {
-        var settings = try readOrCreateSettings()
+    public static func install(at path: String = settingsPath) throws {
+        var settings = try readOrCreateSettings(at: path)
         var hooks = settings["hooks"] as? [String: Any] ?? [String: Any]()
 
         for event in hookEvents {
@@ -68,13 +68,13 @@ public enum HookInstaller {
         }
 
         settings["hooks"] = hooks
-        try writeSettings(settings)
+        try writeSettings(settings, to: path)
     }
 
     /// Uninstalls ClaudeBar hooks from the Claude settings file.
     /// Preserves hooks from other tools.
-    public static func uninstall() throws {
-        guard var settings = try? readOrCreateSettings() else { return }
+    public static func uninstall(at path: String = settingsPath) throws {
+        guard var settings = try? readOrCreateSettings(at: path) else { return }
         guard var hooks = settings["hooks"] as? [String: Any] else { return }
 
         for event in hookEvents {
@@ -97,12 +97,12 @@ public enum HookInstaller {
             settings["hooks"] = hooks
         }
 
-        try writeSettings(settings)
+        try writeSettings(settings, to: path)
     }
 
     /// Detects whether ClaudeBar hooks are currently installed.
-    public static func isInstalled() -> Bool {
-        guard let settings = readSettings(),
+    public static func isInstalled(at path: String = settingsPath) -> Bool {
+        guard let settings = readSettings(at: path),
               let hooks = settings["hooks"] as? [String: Any] else {
             return false
         }
@@ -132,12 +132,12 @@ public enum HookInstaller {
     }
 
     /// Reads settings, returning empty dict for missing file but throwing on corrupt JSON.
-    static func readOrCreateSettings() throws -> [String: Any] {
-        guard FileManager.default.fileExists(atPath: settingsPath) else {
+    static func readOrCreateSettings(at path: String = settingsPath) throws -> [String: Any] {
+        guard FileManager.default.fileExists(atPath: path) else {
             return [String: Any]()
         }
 
-        guard let data = FileManager.default.contents(atPath: settingsPath) else {
+        guard let data = FileManager.default.contents(atPath: path) else {
             return [String: Any]()
         }
 
@@ -148,7 +148,7 @@ public enum HookInstaller {
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw InstallerError.corruptedSettingsFile(
-                "Failed to parse \(settingsPath) — file may be corrupted. Fix it manually before retrying."
+                "Failed to parse \(path) — file may be corrupted. Fix it manually before retrying."
             )
         }
 
@@ -156,12 +156,12 @@ public enum HookInstaller {
     }
 
     /// For read-only checks (isInstalled) — returns nil on any error.
-    static func readSettings() -> [String: Any]? {
-        try? readOrCreateSettings()
+    static func readSettings(at path: String = settingsPath) -> [String: Any]? {
+        try? readOrCreateSettings(at: path)
     }
 
-    private static func writeSettings(_ settings: [String: Any]) throws {
-        let directory = (settingsPath as NSString).deletingLastPathComponent
+    private static func writeSettings(_ settings: [String: Any], to path: String) throws {
+        let directory = (path as NSString).deletingLastPathComponent
         try FileManager.default.createDirectory(
             atPath: directory,
             withIntermediateDirectories: true
@@ -171,6 +171,6 @@ public enum HookInstaller {
             withJSONObject: settings,
             options: [.prettyPrinted, .sortedKeys]
         )
-        try data.write(to: URL(fileURLWithPath: settingsPath), options: .atomic)
+        try data.write(to: URL(fileURLWithPath: path), options: .atomic)
     }
 }
