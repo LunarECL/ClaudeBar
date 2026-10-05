@@ -9,15 +9,17 @@ Provider, DataSource, Fetch, Mapping, Usage, Quota, Plan, Cost.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ClaudeBar (App) — composition root: ClaudeBarApp, SwiftUI views       │
+│ ClaudeBar (App) — ClaudeBarApp builds the Engine (no provider named),│
+│ SwiftUI views                                                        │
 └──────────┬──────────────────────────────┬────────────────────────────┘
            │                              │
            ▼                              ▼
 ┌──────────────────────┐        ┌──────────────────────────────────────┐
 │ Domain               │        │ Providers                            │
-│ QuotaMonitor,        │──────▶ │ Provider (one lifecycle), Definition,│
-│ extension providers, │        │ AddedAccounts, settings contracts    │
-│ Notify!, sessions    │        │ Resources/Providers/<id>.json (+.js) │
+│ QuotaMonitor,        │──────▶ │ ProviderCatalog.detect(), Engine,    │
+│ Notify!, sessions,   │        │ Provider (one lifecycle), Definition,│
+│ In use               │        │ settings contracts, capabilities     │
+│                      │        │ Resources/Providers/<id>.json (+.js) │
 └──────────────────────┘        └──────────────────┬───────────────────┘
                                                    ▼
                                 ┌──────────────────────────────────────┐
@@ -30,7 +32,7 @@ Provider, DataSource, Fetch, Mapping, Usage, Quota, Plan, Cost.
                                 │ Quotas — UsageSnapshot, UsageQuota,  │
                                 │ UsageError, plans, costs (no I/O)    │
                                 └──────────────────────────────────────┘
-                     (+ Diagnostics: AppLog, importable by anyone)
+      (+ AWSClients behind DataSources' cloud ports · Diagnostics: AppLog, importable by anyone)
 ```
 
 Arrows point at the supplier. A module never imports `Domain`.
@@ -89,7 +91,6 @@ UsageSnapshot ──▶ provider.snapshot ──▶ views
 | acme.json          | Providers   | resource | Creates          | AcmeDefinitionTests.swift          |
 | QuotaRule.where    | DataSources | yes      | Modifies         | DataSourceTests.swift              |
 | JSONMapper         | DataSources | internal | Modifies         | (through the rule's tests)         |
-| ClaudeBarApp       | App         | —        | Modifies         | AcceptanceTests (if user-visible)  |
 ```
 
 ### Files to Create/Modify Table
@@ -100,7 +101,6 @@ UsageSnapshot ──▶ provider.snapshot ──▶ views
 | Modules/Providers/Resources/Providers/acme.json        | Create | The definition                  |
 | Modules/Providers/Tests/AcmeDefinitionTests.swift      | Create | Golden tests, stubbed connections |
 | Modules/DataSources/Sources/Mapping.swift              | Modify | The new rule                    |
-| Sources/App/ClaudeBarApp.swift                         | Modify | `Self.builtIn("acme", …)`       |
 ```
 
 ---

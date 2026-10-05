@@ -12,6 +12,10 @@ description: |
 # Add a Provider to ClaudeBar
 
 A provider is **data**: one file, `Modules/Providers/Resources/Providers/<id>.json`.
+**The app finds it** — `ProviderCatalog.detect()` reads every definition in the
+bundle (and in `~/.claudebar/providers`, `~/.claudebar/extensions`) and makes
+each on one shared `Engine` ([TARGET_ARCHITECTURE §10](../../../docs/architecture/TARGET_ARCHITECTURE.md#10--a-definition-on-disk-is-a-provider)).
+There is no registration step and no Swift line that names it.
 It says where the key is, how to fetch, and how to read the answer. One
 `Provider` class and one `DataSource` type run every definition. **You write
 no Swift for a vendor**: no `XxxProvider`, no `XxxUsageProbe`, no
@@ -41,7 +45,6 @@ the user to confirm before writing code.
 | `<id>-*.js` mapping script | beside the JSON | only when no mapping rule can read the format (a TUI screen) |
 | golden tests | `Modules/Providers/Tests/<Name>DefinitionTests.swift` | always |
 | a generic rule or worker | `Modules/DataSources/` (+ `DataSourcesTests`) | when the definition language can't say what the provider needs |
-| registration | `Sources/App/ClaudeBarApp.swift` → `Self.builtIn("<id>", settings:)` | always |
 | look (name, symbol, colour, icon) | `profile.look` in `<id>.json`; the icon image in the asset catalog | always |
 | research | `docs/providers/<id>/README.md` (users), `design.md` (contributors) | always |
 
@@ -64,6 +67,8 @@ the user to confirm before writing code.
   },
   "cli": "acme",                        // optional
   "enabledByDefault": true,
+  "order": 280,                         // its default place in the lineup; none → after the rest, by name
+  "guestPasses": {},                    // optional: a capability the engine runs (Claude's)
   "defaultDataSource": "api",
   "dataSources": [
     {
@@ -80,8 +85,8 @@ the user to confirm before writing code.
 
 | Sum | Cases |
 |---|---|
-| `credential` | `environment` · `setting` (a key pasted into ClaudeBar, in the Keychain) · `jsonFile` (paths `$.a.b`, or a list — the first that answers; `~` and `${VAR:-default}`; `record`, `defaults`) · `keychain` (`account`, `encoding: "goKeyringBase64"`) · `browserCookies` (`format: "value"\|"header"`) · `sqlite` · `firstOf` — any of them refined with `match` (a value must fit a pattern, or no key), `with` (values added) and `cookies` (named cookies read out of a Cookie header); plus `"refresh": { "oauth2": … }` or `"refresh": { "cli": … }` (the CLI renews its own file) |
-| `fetch` | `http` (`{{token}}`, `{{x#host}}`, `{{x#jwt.claim}}`, `{{system.timeZone}}`) or `"http": { "steps": [ … ] }` (`keep`, `optional`, `unless`, `attempts`, `dropEmpty`) · `jsonRpc` · `cli` — a terminal, for a TUI (`input`, `inputDelay`, `autoResponses`, `readyWhen`, `screen: "rendered"`) · `command` — pipes, exit code reported · `file` · `directory` · `localServer` (an app's server on 127.0.0.1, found through its process) · `cloudWatch` (cloud metrics through a port, priced from a `PriceCatalog`) |
+| `credential` | `environment` (`"loginShell": true` also asks the person's login shell) · `browserStorage` (a site's local storage, one browser profile) · `setting` (a key pasted into ClaudeBar, in the Keychain) · `jsonFile` (paths `$.a.b`, or a list — the first that answers; `~` and `${VAR:-default}`; `record`, `defaults`) · `keychain` (`account`, `encoding: "goKeyringBase64"`) · `browserCookies` (`format: "value"\|"header"`) · `sqlite` · `firstOf` — any of them refined with `match` (a value must fit a pattern, or no key), `with` (values added) and `cookies` (named cookies read out of a Cookie header); plus `"refresh": { "oauth2": … }` or `"refresh": { "cli": … }` (the CLI renews its own file) |
+| `fetch` | `http` (`{{token}}`, `{{x#host}}`, `{{x#jwt.claim}}`, `{{system.timeZone}}`) or `"http": { "steps": [ … ] }` (`keep`, `optional`, `unless`, `attempts`, `dropEmpty`) · `jsonRpc` · `cli` — a terminal, for a TUI (`input`, `inputDelay`, `autoResponses`, `readyWhen`, `screen: "rendered"`) · `command` — pipes, exit code reported · `file` · `directory` · `sqlite` (rows of an app's own database, read-only) · `localServer` (an app's server on 127.0.0.1, found through its process) · `cloudWatch` (cloud metrics through a port, priced from a `PriceCatalog`) |
 | `mapping` | `json` (below) · `text` (error phrases, then label + regex for % left/used) · `script` (a `.js` file in JavaScriptCore, no I/O; host `humanDate()`, `jsonDecimal()`, `decimalCents()`, `decimalAdd()`, `decimalMultiply()`; `context.values` from `"values"`; returns `quotas` (with `group`), `notes`, `plan`, `cost` (with `lines`), `account`, or `error`) |
 
 Per data source, also: `errors` (`http.<status>`, `http.default`,
@@ -173,7 +178,7 @@ struct AcmeDefinitionTests {
         stub.environment = ["ACME_API_KEY": "test-key"]
         stub.answerHTTP(#"{"session":{"used_percent":30,"reset_at":1735000000}}"#)
 
-        let usage = try await stub.make("acme").refresh()
+        let usage = try await stub.make("acme").refreshPlain()
 
         #expect(usage.quota(for: .session)?.percentRemaining == 70)
         #expect(usage.quota(for: .session)?.resetsAt == Date(timeIntervalSince1970: 1735000000))
@@ -185,8 +190,8 @@ struct AcmeDefinitionTests {
         defer { stub.cleanUp() }
         let acme = try stub.make("acme")
 
-        await #expect(throws: UsageError.authenticationRequired) { try await acme.refresh() }
-        #expect(acme.lastFailedStep == .lookup)
+        await #expect(throws: UsageError.authenticationRequired) { try await acme.refresh(acme.defaultAccount) }
+        #expect(acme.defaultAccount.lastFailedStep == .lookup)
     }
 }
 ```
@@ -209,13 +214,17 @@ Only a format no rule can read, like a terminal UI screen, gets a mapping
 script, `<id>-<what>.js`. Test it through Swift with real captured screens
 (see `ClaudeUsageScreenTests`).
 
-### 5 · Register and give it a look
-```swift
-// Sources/App/ClaudeBarApp.swift
-let acme = Self.builtIn("acme", settings: settingsRepository,
-                        accounts: settingsRepository.accounts(forProvider: "acme"), secrets: vault)
-// …and acme in the `providers` list QuotaMonitor's Providers is made from; its logins come with it
-```
+### 5 · Give it a look and a place
+There is nothing to register: the file being in `Resources/Providers/` makes it
+a provider. `"order"` places it in the default lineup (the built-ins use 10, 20,
+… 270); leave it out to come after the rest, by name. The person's own order
+still wins. `DetectionTests` lists the built-ins in order — add your id there.
+
+Every provider gets the same `Engine`: settings, the vault, the login shell (for
+a lookup with `"loginShell": true`), the cloud ports (for a `cloudWatch` fetch),
+the guest-passes runner (for `"guestPasses": {}`). Ask for one in the JSON;
+never pass one in Swift.
+
 Its name, symbol and colours are `profile.look` in the JSON — no `switch id`
 table to edit. Add the icon image to the asset catalog under `look.icon`
 ([references/provider-icon-guide.md](references/provider-icon-guide.md)).
@@ -225,6 +234,7 @@ example `fallback.enabledBySetting`) is `isOn(_:forProvider:)`.
 
 ### 6 · Docs and release note
 - `docs/providers/<id>/README.md` (what users see, setup, errors) and `design.md` (sources, fields, gotchas).
+- A row in the **Providers** table of the root `README.md` — name, what it tracks, a link to its `docs/providers/<id>/README.md` — placed by its `"order"`, so the table follows the default lineup.
 - One line under `## [Unreleased]` in `CHANGELOG.md`.
 - `python3 scripts/gen-docs.py && python3 scripts/check-docs.py --strict`.
 
@@ -247,7 +257,7 @@ Each moves to its new place the first time it's saved, and each needs a test.
 - [ ] Golden tests written first and failing
 - [ ] `<id>.json` makes them pass; no vendor-named Swift anywhere
 - [ ] Any new mapping/fetch/lookup ability added generically to `DataSources`, test-first, and listed in ENGINE_DESIGN §1
-- [ ] Registered in `ClaudeBarApp` with `Self.builtIn`
+- [ ] `"order"` set if it has a place in the default lineup, and its id in `DetectionTests`
 - [ ] `profile.look` filled in and the icon added to the asset catalog
-- [ ] Provider docs and CHANGELOG line written; docs check passes
+- [ ] Provider docs, its row in the root `README.md` Providers table, and the CHANGELOG line written; docs check passes
 - [ ] `tuist test` green

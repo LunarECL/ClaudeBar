@@ -111,14 +111,15 @@ struct CodexDefinitionTests {
         defer { stub.cleanUp() }
         stub.answerRPC(#"{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":30},"secondary":{"usedPercent":50}}}}"#)
         let codex = try stub.make("codex")
+        let login = codex.defaultAccount
 
         // When
-        let usage = try await codex.refresh()
+        let usage = try await codex.refresh(login)
 
         // Then - verify STATE, not that methods were called
         #expect(usage.quota(for: .session)?.percentRemaining == 70)
-        #expect(codex.answeredBy == "rpc")
-        #expect(codex.lastError == nil)
+        #expect(login.answeredBy == "rpc")
+        #expect(login.lastError == nil)
         // ❌ AVOID: verify(stub.transport).send(.any).called(2)  // London school
     }
 }
@@ -139,9 +140,10 @@ func `should say the key is missing when the API has no key`() async throws {
     let stub = try StubbedProvider(dataSourceKind: "api", providerId: "codex")
     defer { stub.cleanUp() }
     let codex = try stub.make("codex")
+    let login = codex.defaultAccount
 
-    await #expect(throws: UsageError.self) { try await codex.refresh() }
-    #expect(codex.lastFailedStep == .lookup)
+    await #expect(throws: UsageError.self) { try await codex.refresh(login) }
+    #expect(login.lastFailedStep == .lookup)
 }
 ```
 
@@ -181,7 +183,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 | Test Type           | What to Assert                                    |
 |---------------------|---------------------------------------------------|
 | Domain models       | Computed properties, state after mutations        |
-| Services/Probes     | Return values, thrown errors, resulting state     |
+| Workers/DataSources | Return values, thrown errors, resulting state     |
 | Actors              | State after operations complete                   |
 
 ### What NOT to Test
