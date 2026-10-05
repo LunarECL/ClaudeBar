@@ -45,6 +45,7 @@ public enum DataSources {
             scripts: scripts,
             secrets: secrets,
             browserCookies: SystemBrowserCookies(),
+            browserStorage: SystemBrowserStorage(),
             environment: environment,
             homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
             now: { Date() }
@@ -64,6 +65,7 @@ public enum DataSources {
         scripts: @escaping ScriptSource = { _ in nil },
         secrets: (any SecretStore)? = nil,
         browserCookies: any BrowserCookieReading = SystemBrowserCookies(),
+        browserStorage: any BrowserStorageReading = SystemBrowserStorage(),
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         processPaths: @escaping @Sendable () -> [String] = { [] },
@@ -86,6 +88,7 @@ public enum DataSources {
             scripts: scripts,
             secrets: secrets,
             browserCookies: browserCookies,
+            browserStorage: browserStorage,
             environment: environment,
             homeDirectory: homeDirectory,
             now: now
@@ -107,6 +110,7 @@ public enum DataSources {
         scripts: @escaping ScriptSource,
         secrets: (any SecretStore)?,
         browserCookies: any BrowserCookieReading,
+        browserStorage: any BrowserStorageReading = SystemBrowserStorage(),
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         now: @escaping @Sendable () -> Date
@@ -131,6 +135,8 @@ public enum DataSources {
             CloudWatchFetcher(call: call, client: cloudWatch, catalog: priceCatalog, now: now)
         case .directory(let call):
             DirectoryFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
+        case .sqlite(let call):
+            SQLiteFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
         case .script(let call):
             ScriptFetcher(call: call, providerId: providerId, secrets: secrets, makeExecutor: makeCommandExecutor)
         }
@@ -153,7 +159,8 @@ public enum DataSources {
         }
 
         let readers = Readers(environment: environment, homeDirectory: homeDirectory, security: security,
-                              secrets: secrets, providerId: providerId, browserCookies: browserCookies)
+                              secrets: secrets, providerId: providerId, browserCookies: browserCookies,
+                              browserStorage: browserStorage)
         return DataSource(
             definition: definition,
             providerId: providerId,
@@ -184,6 +191,7 @@ public enum DataSources {
         let secrets: (any SecretStore)?
         let providerId: String
         let browserCookies: any BrowserCookieReading
+        let browserStorage: any BrowserStorageReading
 
         func reader(for lookup: CredentialLookup) -> any CredentialFinding {
             switch lookup {
@@ -201,6 +209,8 @@ public enum DataSources {
                 SQLiteReader(file: database, homeDirectory: homeDirectory, environment: environment)
             case .browserCookies(let query):
                 BrowserCookieReader(query: query, cookies: browserCookies)
+            case .browserStorage(let query):
+                BrowserStorageReader(query: query, storage: browserStorage)
             case .firstOf(let lookups):
                 FirstOfReader(readers: lookups.map { reader(for: $0) })
             case .refreshing(let base, _):

@@ -189,11 +189,23 @@ struct ClaudeBarApp: App {
         // OpenRouter is data: Modules/Providers/Resources/Providers/openrouter.json (#89).
         let openrouter = Self.builtIn("openrouter", settings: settingsRepository,
                                       accounts: settingsRepository.accounts(forProvider: "openrouter"), secrets: vault)
+        // Cline, Warp, Devin, Windsurf, JetBrains AI and OpenAI are data: Modules/Providers/Resources/Providers/<id>.json.
+        let cline = Self.builtIn("cline", settings: settingsRepository,
+                                 accounts: settingsRepository.accounts(forProvider: "cline"), secrets: vault)
+        let warp = Self.builtIn("warp", settings: settingsRepository,
+                                accounts: settingsRepository.accounts(forProvider: "warp"), secrets: vault)
+        let devin = Self.builtIn("devin", settings: settingsRepository,
+                                 accounts: settingsRepository.accounts(forProvider: "devin"), secrets: vault)
+        let windsurf = Self.builtIn("windsurf", settings: settingsRepository)
+        let jetbrains = Self.builtIn("jetbrains", settings: settingsRepository)
+        let openai = Self.builtIn("openai", settings: settingsRepository,
+                                  accounts: settingsRepository.accounts(forProvider: "openai"), secrets: vault)
 
         // The products, in the built-in order; each holds its logins, and the
         // lineup is the enabled logins of enabled products (CANONICAL §1).
         var providers = [claude, codex, gemini, antigravity, zai, copilot, bedrock, amp, kimi, kiro, cursor,
-                         minimax, deepseek, openrouter, vercel, alibaba, mistral, openCodeGo, omp, grok, commandCode]
+                         minimax, deepseek, openrouter, vercel, alibaba, mistral, openCodeGo, omp, grok, commandCode,
+                         cline, warp, devin, windsurf, jetbrains, openai]
         // Providers people made in Add Provider (~/.claudebar/providers), after
         // the built-ins; their keys come from ClaudeBar's vault.
         for definition in ProviderCatalog().custom() {

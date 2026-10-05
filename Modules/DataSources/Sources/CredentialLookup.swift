@@ -22,6 +22,9 @@ public indirect enum CredentialLookup: Sendable, Equatable {
     case setting(String)
     /// Cookies of a site the person is signed in to in a browser — *COOKIE SOURCE*.
     case browserCookies(BrowserCookieCredential)
+    /// `{ "origin": "https://app.devin.ai", "values": { "token": { "key": "*auth1_session", "path": "$.token" } } }`
+    /// — values a browser keeps for a site, all from one profile.
+    case browserStorage(BrowserStorageCredential)
     /// A row of another app's own SQLite database, read only.
     case sqlite(SQLiteCredential)
     /// A lookup that answers only when its values match, with fixed values
@@ -59,18 +62,53 @@ public struct BrowserCookieCredential: Sendable, Equatable, Codable {
     }
 }
 
+/// Values a browser keeps in its local storage for `origin`, each found by a
+/// key (`*` matches any part) and, when its value is JSON, a path in it.
+/// `token` is required.
+public struct BrowserStorageCredential: Sendable, Equatable, Codable {
+    public struct Value: Sendable, Equatable, Codable {
+        public let key: String
+        public let path: String?
+
+        public init(key: String, path: String? = nil) {
+            self.key = key
+            self.path = path
+        }
+    }
+
+    public let origin: String
+    public let values: [String: Value]
+
+    public init(origin: String, values: [String: Value]) {
+        self.origin = origin
+        self.values = values
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        origin = try container.decode(String.self, forKey: .origin)
+        values = try container.decode([String: Value].self, forKey: .values)
+        guard values["token"] != nil else {
+            throw DecodingError.dataCorruptedError(forKey: .values, in: container, debugDescription: "browserStorage needs a token value")
+        }
+    }
+
+    /// The site as a person reads it: `app.devin.ai`.
+    var site: String { URL(string: origin)?.host ?? origin }
+}
+
 /// `{ "path": "~/…/state.vscdb", "query": "SELECT value AS token FROM …",
 /// "fields": { "token": "$.token" }, "hint": "Sign in again in Acme." }` — the
 /// first row's columns, read like a JSON object. The query must not change
 /// the database; one that would is refused.
 public struct SQLiteCredential: Sendable, Equatable, Codable {
-    public let path: String
+    public let path: PathPattern
     public let query: String
     public let fields: [String: String]
     /// What to do when no key answers — the app that owns the database.
     public let hint: String?
 
-    public init(path: String, query: String, fields: [String: String], hint: String? = nil) {
+    public init(path: PathPattern, query: String, fields: [String: String], hint: String? = nil) {
         self.path = path
         self.query = query
         self.fields = fields
@@ -198,8 +236,8 @@ public struct JSONFileCredential: Sendable, Equatable, Codable {
         }
     }
 
-    /// `~` expands to the home directory.
-    public let path: String
+    /// `~` expands to the home directory; a `*` or a list picks the newest file.
+    public let path: PathPattern
     /// Credential name → JSON path in the file. `token` is required.
     public let fields: [String: String]
     /// Further paths for a field written as a list — the first that answers.
@@ -210,7 +248,7 @@ public struct JSONFileCredential: Sendable, Equatable, Codable {
 
     private static let reserved: Set = ["path", "record", "defaults"]
 
-    public init(path: String, fields: [String: String], alternatives: [String: [String]] = [:],
+    public init(path: PathPattern, fields: [String: String], alternatives: [String: [String]] = [:],
                 record: Record? = nil, defaults: [String: String] = [:]) {
         self.path = path
         self.fields = fields
@@ -221,7 +259,7 @@ public struct JSONFileCredential: Sendable, Equatable, Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
-        path = try container.decode(String.self, forKey: TagKey("path"))
+        path = try container.decode(PathPattern.self, forKey: TagKey("path"))
         record = try container.decodeIfPresent(Record.self, forKey: TagKey("record"))
         defaults = try container.decodeIfPresent([String: String].self, forKey: TagKey("defaults")) ?? [:]
         var fields: [String: String] = [:]
@@ -365,7 +403,7 @@ public struct OAuth2Refresh: Sendable, Equatable, Codable {
 // MARK: - JSON
 
 extension CredentialLookup: Codable {
-    private static let tags = ["environment", "jsonFile", "keychain", "setting", "browserCookies", "sqlite", "firstOf"]
+    private static let tags = ["environment", "jsonFile", "keychain", "setting", "browserCookies", "browserStorage", "sqlite", "firstOf"]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: TagKey.self)
@@ -381,6 +419,8 @@ extension CredentialLookup: Codable {
             base = .setting(try container.decode(String.self, forKey: TagKey("setting")))
         case "browserCookies":
             base = .browserCookies(try container.decode(BrowserCookieCredential.self, forKey: TagKey("browserCookies")))
+        case "browserStorage":
+            base = .browserStorage(try container.decode(BrowserStorageCredential.self, forKey: TagKey("browserStorage")))
         case "sqlite":
             base = .sqlite(try container.decode(SQLiteCredential.self, forKey: TagKey("sqlite")))
         default:
@@ -422,6 +462,8 @@ extension CredentialLookup: Codable {
             try container.encode(name, forKey: TagKey("setting"))
         case .browserCookies(let cookies):
             try container.encode(cookies, forKey: TagKey("browserCookies"))
+        case .browserStorage(let storage):
+            try container.encode(storage, forKey: TagKey("browserStorage"))
         case .sqlite(let database):
             try container.encode(database, forKey: TagKey("sqlite"))
         case .refined(let base, let refinement):
@@ -448,11 +490,12 @@ extension CredentialLookup {
     public var lookupOrder: [String] {
         switch self {
         case .environment(let name): ["$\(name)"]
-        case .jsonFile(let file): [file.path]
+        case .jsonFile(let file): file.path.places
         case .keychain(let item): ["Keychain “\(item.service)”"]
         case .setting: ["API key saved in ClaudeBar"]
         case .browserCookies(let cookies): ["Browser cookies for \(cookies.domains.first ?? "the site")"]
-        case .sqlite(let database): [database.path]
+        case .browserStorage(let storage): ["Browser storage · \(storage.site)"]
+        case .sqlite(let database): database.path.places
         case .refined(let base, _): base.lookupOrder
         case .firstOf(let lookups): lookups.flatMap(\.lookupOrder)
         case .refreshing(let base, _): base.lookupOrder
@@ -467,7 +510,7 @@ extension CredentialLookup {
         case .firstOf(let lookups): lookups.lazy.compactMap(\.hint).first
         case .sqlite(let database): database.hint
         case .refined(let base, _): base.hint
-        case .environment, .jsonFile, .keychain, .setting, .browserCookies: nil
+        case .environment, .jsonFile, .keychain, .setting, .browserCookies, .browserStorage: nil
         }
     }
 }

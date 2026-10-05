@@ -1,0 +1,63 @@
+{
+  "profile": {
+    "id": "devin",
+    "name": "Devin",
+    "links": { "dashboard": "https://app.devin.ai/settings/usage" },
+    "look": {
+      "symbol": "person.crop.square.fill",
+      "icon": "DevinIcon",
+      "color": { "light": [0.16, 0.5, 0.44], "dark": [0.3, 0.72, 0.62] },
+      "gradientEnd": { "light": [0.08, 0.34, 0.3], "dark": [0.18, 0.52, 0.45] }
+    }
+  },
+  "enabledByDefault": false,
+  "settings": [
+    { "id": "token", "label": "Session token", "kind": "secret", "scope": "account" },
+    { "id": "organization", "label": "Organization ID", "scope": "account",
+      "kind": { "text": { "pattern": "^org[-_][A-Za-z0-9_-]+$" } } }
+  ],
+  "defaultDataSource": "web",
+  "dataSources": [
+    {
+      "kind": "web",
+      "label": "Web",
+      "summary": "Reads your organization's daily and weekly Devin quota with your app.devin.ai sign-in",
+      "credential": {
+        "firstOf": [
+          {
+            "browserStorage": {
+              "origin": "https://app.devin.ai",
+              "values": {
+                "token": { "key": "*auth1_session", "path": "$.token" },
+                "organization": { "key": "last-internal-org-for-external-org-v1-*" }
+              }
+            }
+          },
+          { "environment": "DEVIN_BEARER_TOKEN", "with": { "organization": "{{setting.organization}}" } },
+          { "setting": "token", "with": { "organization": "{{setting.organization}}" } }
+        ]
+      },
+      "fetch": {
+        "http": {
+          "url": "https://app.devin.ai/api/{{organization}}/billing/quota/usage",
+          "headers": {
+            "Authorization": "Bearer {{token}}",
+            "x-cog-org-id": "{{organization}}",
+            "Accept": "application/json"
+          },
+          "timeout": 15
+        }
+      },
+      "mapping": { "script": { "file": "devin-quota.js" } },
+      "errors": {
+        "http.401": { "sessionExpired": "Sign in to app.devin.ai again, or paste a new session token." },
+        "http.403": { "sessionExpired": "Sign in to app.devin.ai again, or paste a new session token." }
+      }
+    }
+  ],
+  "accounts": {
+    "patch": {
+      "web": { "credential": { "firstOf": null, "setting": "token", "with": { "organization": "{{setting.organization}}" } } }
+    }
+  }
+}

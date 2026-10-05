@@ -236,7 +236,7 @@ public struct ProviderDraft: Sendable, Equatable {
         case .file:
             let path = path.trimmingCharacters(in: .whitespaces)
             guard !path.isEmpty else { throw Missing.path }
-            return .file(FileCall(path: path))
+            return .file(FileCall(path: PathPattern(path)))
         case .copy:
             preconditionFailure("A copy keeps its data sources")
         }

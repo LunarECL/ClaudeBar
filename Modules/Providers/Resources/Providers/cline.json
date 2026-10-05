@@ -1,0 +1,77 @@
+{
+  "profile": {
+    "id": "cline",
+    "name": "Cline",
+    "links": { "dashboard": "https://app.cline.bot/dashboard" },
+    "look": {
+      "symbol": "terminal.fill",
+      "icon": "ClineIcon",
+      "color": { "light": [0.15, 0.15, 0.17], "dark": [0.9, 0.9, 0.92] },
+      "gradientEnd": { "light": [0.35, 0.35, 0.4], "dark": [0.62, 0.62, 0.68] }
+    }
+  },
+  "enabledByDefault": false,
+  "settings": [
+    { "id": "apiKey", "label": "API key", "kind": "secret", "scope": "account" }
+  ],
+  "defaultDataSource": "api",
+  "dataSources": [
+    {
+      "kind": "api",
+      "label": "API",
+      "summary": "Reads your Cline plan's five-hour, weekly and monthly limits with your key or `cline auth` login",
+      "credential": {
+        "firstOf": [
+          { "environment": "CLINE_API_KEY", "with": { "scheme": "" } },
+          { "environment": "CLINEPASS_API_KEY", "with": { "scheme": "" } },
+          { "setting": "apiKey", "with": { "scheme": "" } },
+          {
+            "jsonFile": { "path": "~/.cline/data/settings/providers.json", "token": "$.providers.cline.settings.auth.accessToken" },
+            "match": { "token": "^workos:" }, "with": { "scheme": "" }
+          },
+          {
+            "jsonFile": { "path": "~/.cline/data/settings/providers.json", "token": "$.providers.cline.settings.auth.accessToken" },
+            "with": { "scheme": "workos:" }
+          },
+          {
+            "jsonFile": {
+              "path": "~/.cline/data/settings/providers.json",
+              "token": ["$.providers.cline.settings.apiKey", "$.providers.cline.settings.auth.apiKey"]
+            },
+            "with": { "scheme": "" }
+          }
+        ]
+      },
+      "fetch": {
+        "http": {
+          "url": "https://api.cline.bot/api/v1/users/me/plan/usage-limits",
+          "headers": { "Authorization": "Bearer {{scheme}}{{token}}", "Accept": "application/json" },
+          "timeout": 15
+        }
+      },
+      "mapping": {
+        "json": {
+          "quotas": [
+            { "kind": "session", "name": "Session", "each": "$.data.limits", "where": { "path": "type", "equals": "five_hour" },
+              "usedPercent": "percentUsed", "resetsAt": { "iso8601": "resetsAt" }, "window": { "hours": 5 } },
+            { "kind": "weekly", "name": "Weekly", "each": "$.data.limits", "where": { "path": "type", "equals": "weekly" },
+              "usedPercent": "percentUsed", "resetsAt": { "iso8601": "resetsAt" }, "window": { "days": 7 } },
+            { "kind": "time", "name": "Monthly", "each": "$.data.limits", "where": { "path": "type", "equals": "monthly" },
+              "usedPercent": "percentUsed", "resetsAt": { "iso8601": "resetsAt" }, "window": { "days": 30 } }
+          ],
+          "whenEmpty": { "otherwise": "Cline listed no plan limits" },
+          "notAnObject": "Failed to parse Cline's usage limits"
+        }
+      },
+      "errors": {
+        "http.401": { "sessionExpired": "Run `cline auth` or paste a new API key." },
+        "http.403": { "sessionExpired": "Run `cline auth` or paste a new API key." }
+      }
+    }
+  ],
+  "accounts": {
+    "patch": {
+      "api": { "credential": { "firstOf": null, "setting": "apiKey", "with": { "scheme": "" } } }
+    }
+  }
+}

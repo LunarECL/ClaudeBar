@@ -1,0 +1,53 @@
+{
+  "profile": {
+    "id": "warp",
+    "name": "Warp",
+    "links": { "dashboard": "https://app.warp.dev/settings/billing", "status": "https://status.warp.dev" },
+    "look": {
+      "symbol": "chevron.right.square.fill",
+      "icon": "WarpIcon",
+      "color": { "light": [0.0, 0.42, 0.85], "dark": [0.25, 0.6, 1.0] },
+      "gradientEnd": { "light": [0.0, 0.28, 0.65], "dark": [0.12, 0.42, 0.85] }
+    }
+  },
+  "enabledByDefault": false,
+  "settings": [
+    { "id": "apiKey", "label": "API key", "kind": "secret", "scope": "account" }
+  ],
+  "defaultDataSource": "api",
+  "dataSources": [
+    {
+      "kind": "api",
+      "label": "API",
+      "summary": "Reads your Warp credits with a Warp API key",
+      "credential": {
+        "firstOf": [ { "environment": "WARP_API_KEY" }, { "environment": "WARP_TOKEN" }, { "setting": "apiKey" } ]
+      },
+      "fetch": {
+        "http": {
+          "url": "https://app.warp.dev/graphql/v2?op=GetRequestLimitInfo",
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer {{token}}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Warp/1.0",
+            "x-warp-client-id": "warp-app",
+            "x-warp-os-category": "macOS",
+            "x-warp-os-name": "macOS"
+          },
+          "body": "{\"operationName\":\"GetRequestLimitInfo\",\"variables\":{\"requestContext\":{\"clientContext\":{},\"osContext\":{\"category\":\"macOS\",\"name\":\"macOS\"}}},\"query\":\"query GetRequestLimitInfo($requestContext: RequestContext!) { user(requestContext: $requestContext) { __typename ... on UserOutput { user { requestLimitInfo { isUnlimited nextRefreshTime requestLimit requestsUsedSinceLastRefresh } bonusGrants { requestCreditsGranted requestCreditsRemaining expiration } workspaces { bonusGrantsInfo { grants { requestCreditsGranted requestCreditsRemaining expiration } } } } } } }\"}",
+          "timeout": 15
+        }
+      },
+      "mapping": { "script": { "file": "warp-credits.js" } },
+      "errors": {
+        "http.401": { "sessionExpired": "Create a new API key in Warp: Settings → Platform → API Keys." },
+        "http.403": { "sessionExpired": "Create a new API key in Warp: Settings → Platform → API Keys." }
+      }
+    }
+  ],
+  "accounts": {
+    "patch": { "api": { "credential": { "firstOf": null, "setting": "apiKey" } } }
+  }
+}

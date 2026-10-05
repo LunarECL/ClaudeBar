@@ -43,7 +43,7 @@ extension ProviderDefinition {
         case .setting(let name): [name]
         case .firstOf(let lookups): lookups.flatMap(keyNames(in:))
         case .refreshing(let base, _), .refined(let base, _): keyNames(in: base)
-        case .environment, .jsonFile, .keychain, .browserCookies, .sqlite: []
+        case .environment, .jsonFile, .keychain, .browserCookies, .browserStorage, .sqlite: []
         }
     }
 }

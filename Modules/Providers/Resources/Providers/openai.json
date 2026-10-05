@@ -1,0 +1,40 @@
+{
+  "profile": {
+    "id": "openai",
+    "name": "OpenAI API",
+    "links": { "dashboard": "https://platform.openai.com/usage", "status": "https://status.openai.com" },
+    "look": {
+      "symbol": "sparkle",
+      "color": { "light": [0.06, 0.64, 0.5], "dark": [0.25, 0.82, 0.66] },
+      "gradientEnd": { "light": [0.04, 0.45, 0.36], "dark": [0.14, 0.62, 0.5] }
+    }
+  },
+  "enabledByDefault": false,
+  "settings": [
+    { "id": "apiKey", "label": "Admin API key", "kind": "secret", "scope": "account" }
+  ],
+  "defaultDataSource": "api",
+  "dataSources": [
+    {
+      "kind": "api",
+      "label": "Admin API",
+      "summary": "Reads your organization's spend for the last 30 days with an Admin API key",
+      "credential": { "firstOf": [ { "environment": "OPENAI_ADMIN_KEY" }, { "setting": "apiKey" } ] },
+      "fetch": {
+        "http": {
+          "url": "https://api.openai.com/v1/organization/costs?start_time={{system.day-29.epoch}}&bucket_width=1d&limit=30&group_by=line_item",
+          "headers": { "Authorization": "Bearer {{token}}", "Accept": "application/json" },
+          "timeout": 20
+        }
+      },
+      "mapping": { "script": { "file": "openai-costs.js" } },
+      "errors": {
+        "http.401": { "sessionExpired": "Use an organization Admin API key; project keys can't read spend." },
+        "http.403": { "sessionExpired": "Use an organization Admin API key; project keys can't read spend." }
+      }
+    }
+  ],
+  "accounts": {
+    "patch": { "api": { "credential": { "firstOf": null, "setting": "apiKey" } } }
+  }
+}

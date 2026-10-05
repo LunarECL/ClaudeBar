@@ -24,6 +24,7 @@ extension Fetch {
         case .localServer(let call): call
         case .cloudWatch(let call): call
         case .directory(let call): call
+        case .sqlite(let call): call
         case .script(let call): call
         }
     }
@@ -71,6 +72,12 @@ extension ScriptCall: Connection {
 }
 
 extension DirectoryCall: Connection {
+    public var urls: [String] { [] }
+    public var commands: [[String]] { [] }
+}
+
+extension SQLiteCall: Connection {
+    /// An app's own database on this Mac — no host, nothing run.
     public var urls: [String] { [] }
     public var commands: [[String]] { [] }
 }

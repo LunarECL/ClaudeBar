@@ -7,23 +7,23 @@ import Foundation
 /// `{{token#jwt.sub}}` is a claim of the value, a JWT — read, not verified;
 /// `{{baseURL#host}}` is the host of a URL value.
 enum Template {
-    static func fill(_ text: String, with credential: Credential?) -> String? {
+    /// `system.` names come from `system`; without one they stay unfilled.
+    static func fill(_ text: String, with credential: Credential?, system: SystemValues? = nil) -> String? {
         var result = ""
         var rest = Substring(text)
         while let open = rest.range(of: "{{") {
             result += rest[..<open.lowerBound]
             guard let close = rest[open.upperBound...].range(of: "}}") else { return nil }
             let name = rest[open.upperBound..<close.lowerBound].trimmingCharacters(in: .whitespaces)
-            guard let value = value(of: name, in: credential) else { return nil }
+            guard let value = value(of: name, in: credential, system: system) else { return nil }
             result += value
             rest = rest[close.upperBound...]
         }
         return result + rest
     }
 
-    private static func value(of name: String, in credential: Credential?) -> String? {
-        // The Mac's own time zone, as a browser would send it.
-        if name == "system.timeZone" { return TimeZone.current.identifier }
+    private static func value(of name: String, in credential: Credential?, system: SystemValues?) -> String? {
+        if name.hasPrefix("system.") { return system?.value(String(name.dropFirst(7))) }
         if name.hasSuffix("#host") {
             return credential?[String(name.dropLast(5))].flatMap { URL(string: $0)?.host }
         }
@@ -56,18 +56,19 @@ struct HTTPFetcher: Fetching {
     func isReady() -> Bool { true }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        guard let urlText = Template.fill(request.url, with: credential?.percentEncodedForURL), let url = URL(string: urlText) else {
+        let system = SystemValues(now: now())
+        guard let urlText = Template.fill(request.url, with: credential?.percentEncodedForURL, system: system), let url = URL(string: urlText) else {
             throw UsageError.executionFailed("Invalid URL")
         }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method
         urlRequest.timeoutInterval = request.timeout
         for (name, value) in request.headers {
-            if let filled = Template.fill(value, with: credential) {
+            if let filled = Template.fill(value, with: credential, system: system) {
                 urlRequest.setValue(filled, forHTTPHeaderField: name)
             }
         }
-        if let body = request.body, let filled = Template.fill(body, with: credential) {
+        if let body = request.body, let filled = Template.fill(body, with: credential, system: system) {
             urlRequest.httpBody = Data(filled.utf8)
         }
 
@@ -413,7 +414,7 @@ struct DirectoryFetcher: Fetching {
     let environment: @Sendable (String) -> String?
 
     private var path: String {
-        Paths.expand(call.path, homeDirectory: homeDirectory, environment: environment)
+        Paths.resolve(call.path, homeDirectory: homeDirectory, environment: environment)
     }
 
     func isReady() -> Bool {
@@ -438,7 +439,7 @@ struct FileFetcher: Fetching {
     let environment: @Sendable (String) -> String?
 
     private var path: String {
-        Paths.expand(call.path, homeDirectory: homeDirectory, environment: environment)
+        Paths.resolve(call.path, homeDirectory: homeDirectory, environment: environment)
     }
 
     func isReady() -> Bool {
