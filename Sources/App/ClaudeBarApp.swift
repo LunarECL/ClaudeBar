@@ -19,28 +19,6 @@ extension Notification.Name {
 
 /// Started by `ClaudeBarMain` — never while it hosts tests (see `LaunchMode`).
 struct ClaudeBarApp: App {
-    /// A built-in provider from its bundled definition. A definition that fails
-    /// to load is a packaging bug the catalog tests catch before release.
-    @MainActor
-    private static func builtIn(
-        _ id: String,
-        settings: any MultiAccountSettingsRepository,
-        accounts: [ProviderAccountConfig] = [],
-        secrets: (any SecretVault)? = nil,
-        guestPasses: GuestPasses? = nil,
-        usageHistory: UsageHistory? = nil,
-        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
-        // Every product gets the record; `inUse` exists only where its definition declares it.
-        loginsInUse: (any LoginsInUse)? = DiskLoginsInUse()
-    ) -> Provider {
-        do {
-            return try ProviderFactory.make(id, settings: settings, accounts: accounts, secrets: secrets, guestPasses: guestPasses,
-                                      usageHistory: usageHistory, environment: environment, loginsInUse: loginsInUse)
-        } catch {
-            preconditionFailure("Built-in provider '\(id)' failed to load: \(error.localizedDescription)")
-        }
-    }
-
     /// The main domain service - monitors all AI providers
     /// This is the single source of truth for providers and their state
     @State private var monitor: QuotaMonitor
@@ -109,121 +87,31 @@ struct ClaudeBarApp: App {
         // - HookSettingsRepository
         let settingsRepository = JSONSettingsRepository.shared
 
-        // Claude is data: Modules/Providers/Resources/Providers/claude.json
-        // and the mapping scripts beside it. Guest passes ride along, the
-        // default login's. Logins added beside it live in their own config
-        // folders.
-        let claude = Self.builtIn(
-            "claude",
-            settings: settingsRepository,
-            accounts: settingsRepository.accounts(forProvider: "claude"),
-            // Guest passes run the same Claude CLI, at its CLI location (#210).
-            guestPasses: GuestPasses(source: ClaudeGuestPassSource(
-                claudeBinary: { settingsRepository.cliPath(forProvider: "claude") ?? "claude" }
-            ))
-        )
-        // Codex is data: Modules/Providers/Resources/Providers/codex.json — the
-        // product once, with the logins added beside the default one (#326).
-        let codex = Self.builtIn("codex", settings: settingsRepository, accounts: settingsRepository.accounts(forProvider: "codex"))
-
+        // Every provider is a definition on disk — the bundle, Add Provider's
+        // ~/.claudebar/providers and ~/.claudebar/extensions — found by the
+        // catalog and made on one engine; no line here names a provider
+        // (TARGET_ARCHITECTURE §10). The engine is everything that touches
+        // this Mac: a definition uses what its cases ask for.
         let vault = ProviderVault()
-        // These are data: their keys, regions and environment variables are
-        // settings in their JSON, so nothing here is theirs.
-        let minimax = Self.builtIn("minimax", settings: settingsRepository,
-                                   accounts: settingsRepository.accounts(forProvider: "minimax"), secrets: vault)
-        let vercel = Self.builtIn("vercel-gateway", settings: settingsRepository,
-                                  accounts: settingsRepository.accounts(forProvider: "vercel-gateway"), secrets: vault)
-        let commandCode = Self.builtIn("commandcode", settings: settingsRepository,
-                                       accounts: settingsRepository.accounts(forProvider: "commandcode"), secrets: vault)
-        let amp = Self.builtIn("ampcode", settings: settingsRepository,
-                               accounts: settingsRepository.accounts(forProvider: "ampcode"), secrets: vault)
-        let kiro = Self.builtIn("kiro", settings: settingsRepository,
-                                accounts: settingsRepository.accounts(forProvider: "kiro"), secrets: vault)
-        let cursor = Self.builtIn("cursor", settings: settingsRepository,
-                                  accounts: settingsRepository.accounts(forProvider: "cursor"), secrets: vault)
-        let grok = Self.builtIn("grok", settings: settingsRepository,
-                                accounts: settingsRepository.accounts(forProvider: "grok"), secrets: vault)
-        let copilot = Self.builtIn("copilot", settings: settingsRepository,
-                                   accounts: settingsRepository.accounts(forProvider: "copilot"), secrets: vault)
-        let alibaba = Self.builtIn("alibaba", settings: settingsRepository,
-                                   accounts: settingsRepository.accounts(forProvider: "alibaba"), secrets: vault)
-        let gemini = Self.builtIn("gemini", settings: settingsRepository,
-                                  accounts: settingsRepository.accounts(forProvider: "gemini"))
-        let antigravity = Self.builtIn("antigravity", settings: settingsRepository)
-        // Bedrock's metrics and prices come from the AWS SDK, linked by AWSClients alone.
-        let bedrock: Provider = {
-            do {
-                return try ProviderFactory.make("bedrock", settings: settingsRepository,
-                                          cloudWatch: AWSClients.makeCloudWatch(), priceCatalog: AWSClients.makePriceCatalog())
-            } catch {
-                preconditionFailure("Built-in provider 'bedrock' failed to load: \(error.localizedDescription)")
-            }
-        }()
-        let omp = Self.builtIn("omp", settings: settingsRepository)
-        let mistral = Self.builtIn("mistral", settings: settingsRepository)
-        let kimi = Self.builtIn("kimi", settings: settingsRepository,
-                                accounts: settingsRepository.accounts(forProvider: "kimi"), secrets: vault)
-        let openCodeGo = Self.builtIn("opencode-go", settings: settingsRepository,
-                                      accounts: settingsRepository.accounts(forProvider: "opencode-go"), secrets: vault)
-
-        // Keep the existing default login's configurable environment name until
-        // provider settings forms move to definitions. Added logins use only
-        // their own saved key, as deepseek.json's accounts.patch declares.
-        // A variable the person named for Z.ai is also read from their login
-        // shell (#170). Z.ai reads it last, after the saved key and Claude
-        // Code's settings, and no one else's lookup waits for a shell.
+        // A variable exported only in the login shell (#170), for a lookup that says `loginShell`.
         let shellEnvironment = ShellEnvironment()
-        let zai = Self.builtIn("zai", settings: settingsRepository,
-                               accounts: settingsRepository.accounts(forProvider: "zai"), secrets: vault,
-                               environment: { name in
-            let named = settingsRepository.value("glmAuthEnvVar", forProvider: "zai")
-            return name == named ? shellEnvironment.value(name) : ProcessInfo.processInfo.environment[name]
-        })
-        let deepseek = Self.builtIn("deepseek", settings: settingsRepository,
-                                   accounts: settingsRepository.accounts(forProvider: "deepseek"), secrets: vault,
-                                   environment: { name in
-            let configured = settingsRepository.deepseekAuthEnvVar()
-            let variable = name == "DEEPSEEK_API_KEY" && !configured.isEmpty ? configured : name
-            return ProcessInfo.processInfo.environment[variable]
-        })
-        // OpenRouter is data: Modules/Providers/Resources/Providers/openrouter.json (#89).
-        let openrouter = Self.builtIn("openrouter", settings: settingsRepository,
-                                      accounts: settingsRepository.accounts(forProvider: "openrouter"), secrets: vault)
-        // Cline, Warp, Devin, Windsurf, JetBrains AI and OpenAI are data: Modules/Providers/Resources/Providers/<id>.json.
-        let cline = Self.builtIn("cline", settings: settingsRepository,
-                                 accounts: settingsRepository.accounts(forProvider: "cline"), secrets: vault)
-        let warp = Self.builtIn("warp", settings: settingsRepository,
-                                accounts: settingsRepository.accounts(forProvider: "warp"), secrets: vault)
-        let devin = Self.builtIn("devin", settings: settingsRepository,
-                                 accounts: settingsRepository.accounts(forProvider: "devin"), secrets: vault)
-        let windsurf = Self.builtIn("windsurf", settings: settingsRepository)
-        let jetbrains = Self.builtIn("jetbrains", settings: settingsRepository)
-        let openai = Self.builtIn("openai", settings: settingsRepository,
-                                  accounts: settingsRepository.accounts(forProvider: "openai"), secrets: vault)
-
-        // The products, in the built-in order; each holds its logins, and the
+        let engine = Engine(
+            settings: settingsRepository,
+            vault: vault,
+            loginsInUse: DiskLoginsInUse(),
+            loginShell: { shellEnvironment.value($0) },
+            // The AWS SDK, linked by AWSClients alone, made once for a definition that reads the cloud.
+            cloud: { (AWSClients.makeCloudWatch(), AWSClients.makePriceCatalog()) },
+            // Guest passes run the declaring definition's CLI, at its CLI location (#210).
+            guestPasses: { cli in ClaudeGuestPassSource(claudeBinary: cli) }
+        )
+        let definitions = ProviderCatalog().detect()
+        // What was saved for an extension before it was a definition moves once.
+        ExtensionSettingsUpgrade.run(definitions.filter { $0.profile.origin == .extension },
+                                     store: .shared, settings: settingsRepository, vault: vault)
+        // The products, in lineup order; each holds its logins, and the
         // lineup is the enabled logins of enabled products (CANONICAL §1).
-        var providers = [claude, codex, gemini, antigravity, zai, copilot, bedrock, amp, kimi, kiro, cursor,
-                         minimax, deepseek, openrouter, vercel, alibaba, mistral, openCodeGo, omp, grok, commandCode,
-                         cline, warp, devin, windsurf, jetbrains, openai]
-        // Providers people made in Add Provider (~/.claudebar/providers), after
-        // the built-ins; their keys come from ClaudeBar's vault.
-        for definition in ProviderCatalog().custom() {
-            ProviderFactory.register(custom: definition)
-            providers.append(ProviderFactory.make(definition, settings: settingsRepository,
-                                            accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault,
-                                            loginsInUse: DiskLoginsInUse()))
-        }
-        // Extensions (~/.claudebar/extensions), read as definitions whose
-        // sections answer together (docs/features/extensions/design.md); what was saved for one moves once.
-        let extensions = Extensions.catalog()
-        ExtensionSettingsUpgrade.run(extensions, store: .shared, settings: settingsRepository, vault: vault)
-        for definition in extensions {
-            ProviderFactory.register(custom: definition)
-            providers.append(ProviderFactory.make(definition, settings: settingsRepository,
-                                            accounts: settingsRepository.accounts(forProvider: definition.id), secrets: vault,
-                                            loginsInUse: DiskLoginsInUse()))
-        }
+        let providers = ProviderFactory.make(definitions, engine: engine)
         AppLog.providers.info("Created \(providers.count) providers")
 
         // *In use*: every product whose definition declares it — chosen by the
@@ -242,7 +130,7 @@ struct ClaudeBarApp: App {
         // Hidden quotas (#140) are read from the same settings, per product.
         let monitor = QuotaMonitor(
             providers: Providers(providers, settings: settingsRepository, vault: vault, make: { definition in
-                ProviderFactory.make(definition, settings: settingsRepository, secrets: vault, loginsInUse: DiskLoginsInUse())
+                ProviderFactory.make(definition, engine: engine)
             }),
             alerter: quotaAlerter,
             settingsRepository: settingsRepository,

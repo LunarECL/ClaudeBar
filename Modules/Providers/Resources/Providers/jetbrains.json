@@ -10,6 +10,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 260,
   "defaultDataSource": "local",
   "dataSources": [
     {

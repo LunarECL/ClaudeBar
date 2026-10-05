@@ -12,6 +12,7 @@
   },
   "cli": "kimi",
   "enabledByDefault": true,
+  "order": 90,
   "settings": [
     { "id": "token", "label": "kimi-auth Session Token", "kind": "secret", "scope": "account", "for": ["api"] },
     { "id": "home", "default": "${KIMI_SHARE_DIR:-~/.kimi}", "label": "Signed-in Kimi Folder", "scope": "account", "for": ["cli"], "kind": { "path": { "mustExist": true } } },

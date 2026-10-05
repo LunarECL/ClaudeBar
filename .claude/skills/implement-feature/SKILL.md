@@ -33,9 +33,9 @@ Implement features using architecture-first design, TDD, rich domain models, and
 ┌─────────────────────────────────────────────────────────────┐
 │  2. TDD IMPLEMENTATION                                      │
 ├─────────────────────────────────────────────────────────────┤
-│  • Domain model tests → Domain models                       │
-│  • Infrastructure tests → Implementations                   │
-│  • Integration and views                                    │
+│  • Model tests → models (Quotas / Providers / Domain)       │
+│  • Module tests → generic rules and workers (DataSources)   │
+│  • Views, reading the domain directly                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -47,13 +47,16 @@ source of truth](../../../AGENTS.md#design-docs-are-the-source-of-truth)).
 
 ### Step 0: Read the design docs, and place the feature in them
 
-Read [CANONICAL_MODEL.md](../../../docs/architecture/CANONICAL_MODEL.md) (the tree, the words, each law
+Read the design in order ([ARCHITECTURE.md](../../../docs/architecture/ARCHITECTURE.md) maps it):
+[USER_JOURNEYS.md](../../../docs/architecture/USER_JOURNEYS.md) (the person and the moment),
+[CANONICAL_MODEL.md](../../../docs/architecture/CANONICAL_MODEL.md) (the tree, the words, each law
 and its owner, *owned* vs *offered*), [TARGET_ARCHITECTURE.md](../../../docs/architecture/TARGET_ARCHITECTURE.md) (the
-pieces and their one job, the flows) and any `docs/features/<x>/design.md` it touches. Then answer:
+pieces and their one job, the flows), then any `docs/features/<x>/design.md` it touches. Then answer:
 
 | Question | If yes |
 |---|---|
-| Does it answer *another question* than the product's lifecycle? | it is a **capability** (CANONICAL §2.1): declared in the definition, its own types, reached through a handle that is `nil` when not declared — never a flag on `Provider`, never chosen by a provider's name |
+| Does it answer *another question* than the product's lifecycle? | it is a **capability** (CANONICAL §2.1): declared in the definition, its own types, reached through a handle that is `nil` when not declared — never a flag on `Provider`, never chosen by a provider's name. A runner outside the modules is supplied by the `Engine` (TARGET_ARCHITECTURE §10) |
+| Does a provider need something the definition can't say? | a **generic rule or worker** in `DataSources` (ENGINE_DESIGN), then a line of JSON — never a Swift line that names the provider |
 | Does it react to a refresh, a selection, a setting? | it observes an **extension point** (e.g. `QuotaMonitor.onRefreshed`) — the Monitor is not edited for it |
 | Does it notify? | its own port in Alerting — not a new method on an existing alerter |
 | Is a law missing, or owned twice? | add it to CANONICAL §5 with **one** owner |
@@ -85,17 +88,17 @@ Example: Codex accounts (#326) — a definition change plus generic pieces
 │                                                                      │
 │  ┌──────────────┐   ┌─────────────────────────────┐   ┌───────────┐  │
 │  │ codex.json   │──▶│ Providers                   │──▶│ Accounts  │  │
-│  │  accounts:   │   │  ProviderDefinition.Accounts│   │ card      │  │
-│  │  folder, ids │   │  AddedAccounts (validate)   │   └───────────┘  │
-│  │  dataSources │   │  Provider(account:)         │         │        │
-│  └──────────────┘   └──────────────┬──────────────┘         ▼        │
-│                                    │                 ┌───────────┐   │
-│                     ┌──────────────▼──────────────┐  │ClaudeBarApp│  │
-│                     │ DataSources                 │  │ builds one│   │
-│                     │  identity, requiresFiles,   │  │ Provider  │   │
-│                     │  JSON-RPC `then`, env       │  │ per saved │   │
-│                     └──────────────┬──────────────┘  │ account   │   │
-│                                    ▼                 └───────────┘   │
+│  │  accounts:   │   │  ProviderCatalog.detect()   │   │ card      │  │
+│  │  folder, ids │   │  ProviderDefinition.Accounts│   └───────────┘  │
+│  │  dataSources │   │  Provider owns its Accounts │                  │
+│  └──────────────┘   └──────────────┬──────────────┘                  │
+│                                    │                                 │
+│                     ┌──────────────▼──────────────┐                  │
+│                     │ DataSources                 │                  │
+│                     │  identity, requiresFiles,   │                  │
+│                     │  JSON-RPC `then`, env       │                  │
+│                     └──────────────┬──────────────┘                  │
+│                                    ▼                                 │
 │                     ┌─────────────────────────────┐                  │
 │                     │ Quotas  (UsageSnapshot …)   │                  │
 │                     └─────────────────────────────┘                  │
@@ -212,12 +215,13 @@ behaviour lives on before you change it:
 | Where | Holds | Tests |
 |---|---|---|
 | `Modules/Providers/Resources/Providers/<id>.json` (+ `.js`) | every built-in provider: where the key is, how to fetch, how to read | `Modules/Providers/Tests/` (golden tests over `StubbedProvider` / `ClaudeHarness`) |
-| `Modules/Providers/Sources` | `Provider` (the one lifecycle: refresh, fallback chain, accounts), `ProviderDefinition`, `AddedAccounts`, settings and account contracts | `Modules/Providers/Tests/` |
-| `Modules/DataSources/Sources` | `DataSource` and its workers: credential lookups and refreshes; HTTP, steps, JSON-RPC, terminal, command, file, directory, local-server and CloudWatch fetches; JSON / text / script mapping; the process runners | `Modules/DataSources/Tests/` |
-| `Modules/Quotas/Sources` | the usage model: `UsageSnapshot`, `UsageQuota`, `UsageError`, plans and costs (interim shapes, see each type's `- Note:`) | the tests of the module that uses it |
-| `Sources/Domain` | `QuotaMonitor`, extension providers, Notify!, sessions, Usage History | `Tests/DomainTests/` |
-| `Sources/Infrastructure` | storage, notifications, hooks, the local-log analyzers behind Usage History | `Tests/InfrastructureTests/` |
-| `Sources/App` | SwiftUI views reading the domain directly | `Tests/AppTests/`, `Tests/AcceptanceTests/` |
+| `Modules/Providers/Sources` | `ProviderCatalog` (finds every definition), `Engine` (the shared ports), `Provider` (the one lifecycle: refresh, fallback chain, accounts), `ProviderDefinition`, settings and account contracts, the capabilities (`UsageHistory`, `GuestPasses`, `InUse`) | `Modules/Providers/Tests/` |
+| `Modules/DataSources/Sources` | `DataSource` and its workers: credential lookups (environment, login shell, files, Keychain, browser cookies and storage, SQLite) and refreshes; HTTP, steps, JSON-RPC, terminal, command, file, directory, SQLite, local-server and CloudWatch fetches; JSON / text / script mapping; `UsageLog` and its log readers; the process runners | `Modules/DataSources/Tests/` |
+| `Modules/Quotas/Sources` | the usage model: `UsageSnapshot`, `UsageQuota`, `UsageError`, plans, costs, `DailyUsageStat` / `DailyUsageReport` (interim shapes, see each type's `- Note:`) | `Tests/DomainTests/` and the tests of the module that uses it |
+| `Modules/AWSClients` | the AWS SDK behind DataSources' `CloudWatchClient` and `PriceCatalog` ports | `Modules/AWSClients/Tests/` |
+| `Sources/Domain` | `QuotaMonitor`, Notify!, sessions, In use's `NewSessions` | `Tests/DomainTests/` |
+| `Sources/Infrastructure` | storage, notifications, hooks, the shell environment, Claude's guest-pass runner | `Tests/InfrastructureTests/` |
+| `Sources/App` | SwiftUI views reading the domain directly; `ClaudeBarApp.init`, the composition root, which builds the `Engine` and names no provider | `Tests/AppTests/`, `Tests/AcceptanceTests/` |
 
 A bug in a migrated provider is fixed in its JSON, or generically in
 `DataSources`, never with vendor-named Swift. Modules never `import Domain`.
@@ -294,13 +298,16 @@ struct FeatureServiceTests {
 
 ### Phase 3: Integration
 
-Wire up in `ClaudeBarApp.swift` (the composition root) and create views.
-Acceptance specs in `Tests/AcceptanceTests/` compose real modules with stubbed ports.
+Create the views. `ClaudeBarApp.init` is the composition root: it builds the
+`Engine` (the ports every provider shares) and calls `ProviderCatalog().detect()`.
+A provider is never wired there; a new **port** is a new `Engine` field, built
+once in `init` (keep startup work there, never in `ClaudeBarMain`). Acceptance
+specs in `Tests/AcceptanceTests/` compose real modules with stubbed ports.
 
 ```bash
-tuist test Providers         # one module's tests (schemes: Providers, DataSources, Domain, Infrastructure, AppTests, AcceptanceTests)
-tuist test                     # everything
-# tuist caches results; to force a re-run of one suite:
+tuist test Providers         # one module's tests while working (schemes: Providers, DataSources, Domain, Infrastructure, AppTests, AcceptanceTests)
+# tuist caches results; the final check, and a forced re-run of one suite, use xcodebuild:
+xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace -destination 'platform=macOS,arch=arm64'
 xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
   -destination 'platform=macOS,arch=arm64' -only-testing:ProvidersTests/ClaudeAPITests
 ```
@@ -337,4 +344,4 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 - [ ] Views render and tell only — no comparing, counting or reading quotas to decide
 - [ ] Docs updated in the same change (status, build truth, laws)
 - [ ] Real UI screenshots on mock data (`scripts/demo-screenshots.sh`) for UI changes
-- [ ] Run `tuist test` to verify all tests pass
+- [ ] Full `xcodebuild test` green (`tuist test` skips cached targets)

@@ -12,6 +12,7 @@
   },
   "cli": "amp",
   "enabledByDefault": true,
+  "order": 80,
   "settings": [
     { "id": "apiKey", "label": "Access Token", "kind": "secret", "scope": "account" }
   ],

@@ -37,6 +37,7 @@
   },
   "cli": "gemini",
   "enabledByDefault": true,
+  "order": 30,
   "settings": [
     {
       "id": "home", "default": "~",

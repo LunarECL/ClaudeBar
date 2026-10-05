@@ -450,3 +450,132 @@ switching, once per low) → `InUseAnnouncer`. *A link* —
 | another shell | one case in `LoginShell`, its lines in `ShellSetup`, a test that runs it |
 | another policy than *Switch when low* | a policy beside `SwitchWhenLow` that `InUse.review` asks |
 | In use for API-key providers | an env-variable record and lines — `InUse` and `NewSessions` unchanged |
+
+## 10 · A definition on disk is a provider
+
+> **Status: BUILT** (2026-10-05). §4.2's *Launch* says the catalog reads the
+> definitions; the composition root now does exactly that.
+
+*Adding a provider is writing its definition.* It used to be editing
+`ClaudeBarApp.init` too: 27 `Self.builtIn("<id>", …)` calls, a hand-ordered
+list, and five things the App knew about particular providers. The rule now
+true: **a definition in one of three folders is a provider, and no Swift
+names one.**
+
+### 10.1 · What the App still knows, and where each goes
+
+| Was, in `ClaudeBarApp.init` | Is |
+|---|---|
+| `Self.builtIn("warp", …)`, once per provider | nothing — the file being there is enough |
+| its place in `[claude, codex, gemini, …]` | `"order": 70` in its definition; none → after the rest, by name |
+| `accounts:` and `secrets: vault` on some calls, not others | the same engine for every provider; a definition uses what its cases ask for |
+| Bedrock's `cloudWatch:` and `priceCatalog:` | the engine's cloud ports, made on first use by any `cloudWatch` fetch |
+| Z.ai's closure reading one variable from the login shell (#170) | `{ "environment": "{{setting.glmAuthEnvVar}}", "loginShell": true }` |
+| DeepSeek's closure renaming its variable | `"settings": [{ "id": "authEnvVar", "default": "DEEPSEEK_API_KEY" }]` and `{{setting.authEnvVar}}` — the card already saves `deepseek.authEnvVar` |
+| Claude's `guestPasses:` argument | `"guestPasses": {}` in `claude.json`; the engine runs it |
+| the custom and extension loops | the same `detect()` — every origin made on the same engine |
+
+### 10.2 · The pieces
+
+```text
+ three folders of definitions, one detector
+ ┌───────────────────────────────────────────────┐
+ │ app bundle      Resources/Providers/*.json    │  origin: builtIn    (ships with the app)
+ │ ~/.claudebar/providers/*.json                 │  origin: custom     (Add Provider)
+ │ ~/.claudebar/extensions/*/                    │  origin: extension  (the person's scripts)
+ └────────────────────┬──────────────────────────┘
+                      ▼
+       ProviderCatalog.detect()
+         parse each file · log and skip one that doesn't parse
+         a built-in id is reserved: another origin's file with it is renamed on import
+                      │
+                      ▼
+       [ProviderDefinition]   sorted by each one's "order", missing ones after, by name
+                      │       (the person's saved order still wins, in the lineup)
+                      ▼
+       ProviderFactory.make(definition, engine)   ── the same Engine for every provider
+                      │
+                      ▼
+       QuotaMonitor(providers)
+```
+
+```text
+ Engine — everything that touches this Mac, built once by the composition root
+ ┌───────────────────────────────────────────────────────────────────────────┐
+ │ settings · vault · loginsInUse                                            │
+ │ loginShell      the login-shell environment port — only a lookup that     │
+ │                 says "loginShell": true waits for it                      │
+ │ cloud           CloudWatchClient + PriceCatalog (AWSClients), made the    │
+ │                 first time a cloudWatch fetch asks                        │
+ │ capabilities    [.guestPasses: source] — run for whichever definition     │
+ │                 declares the capability, at that definition's CLI         │
+ └───────────────────────────────────────────────────────────────────────────┘
+```
+
+```text
+ ClaudeBarApp.init — before                      after
+ ┌──────────────────────────────────────┐        ┌──────────────────────────────────────┐
+ │ let claude = Self.builtIn("claude",  │        │ let engine = Engine(settings: …,     │
+ │   guestPasses: …)                    │        │   vault: ProviderVault(),            │
+ │ let codex = Self.builtIn("codex", …) │        │   loginShell: ShellEnvironment(),    │
+ │ … 25 more …                          │  ───►  │   cloud: .lazy(AWSClients…),         │
+ │ let zai = … environment: { closure } │        │   capabilities: [.guestPasses: …])   │
+ │ let deepseek = … environment: { … }  │        │ let providers = ProviderCatalog()    │
+ │ var providers = [claude, codex, …]   │        │   .detect()                          │
+ │ for custom … for extensions …        │        │   .map { ProviderFactory.make($0,    │
+ └──────────────────────────────────────┘        │                        engine) }     │
+                                                 └──────────────────────────────────────┘
+```
+
+| Piece | One job | Changes when |
+|---|---|---|
+| `ProviderCatalog.detect()` (`Providers`) | every definition in the three folders, parsed, deduplicated and ordered | a folder is added, or the ordering rule changes |
+| `ProviderDefinition.order` | where the product sits by default | that product's place changes |
+| `Engine` (`Providers`) | the ports every provider shares, built once | a port is added |
+| `ProviderFactory.make(_:engine)` | definition + engine → `Provider` | a port is wired differently |
+| `ClaudeBarApp.init` (`App`) | builds the `Engine` from Infrastructure and AWSClients | a port's implementation changes — never for a provider |
+
+### 10.3 · What adding a provider is
+
+```text
+ before                                   after
+ 1  write <id>.json (+ <id>-*.js)         1  write <id>.json (+ <id>-*.js), "order" if it matters
+ 2  golden tests                          2  golden tests
+ 3  Self.builtIn("<id>", …) in the App
+ 4  add it to the providers list
+ 5  any closure its key needs
+```
+
+### 10.4 · Laws
+
+| Law | Owner |
+|---|---|
+| a definition in one of the three folders is a provider; Swift lists none | `ProviderCatalog.detect` |
+| the default order is each definition's `order`; missing ones follow, by name; the person's own order wins | `ProviderCatalog` · the `providerOrder` setting |
+| a built-in id is reserved: a file from another origin with it is renamed on import, and the bundle's always loads | `ProviderCatalog` |
+| every provider gets the same engine; a definition uses only what its cases ask for | `Engine` → `ProviderFactory.make` |
+| the cloud ports are made once, on first use | `Engine.cloud` |
+| an environment lookup asks the login shell only when it says `loginShell: true` | `EnvironmentReader` + the login-shell port |
+| a capability is declared by the definition and run by the engine — never chosen by a provider's name, even when only one product has it | the definition · `Engine.capabilities` |
+
+The last law changed one row of [CANONICAL_MODEL §2.1](CANONICAL_MODEL.md):
+guest passes are declared in `claude.json`, their one runner
+(`ClaudeGuestPassSource`) supplied by the engine.
+
+### 10.5 · Built in this order, test first, the person seeing no change
+
+1. `ProviderCatalog.detect()` and `order` — the detected built-ins come out
+   in exactly today's order; one without `order` comes last, by name.
+2. `loginShell` → Z.ai; `authEnvVar` → DeepSeek; `guestPasses` → Claude —
+   their existing tests keep passing.
+3. `Engine`, with the cloud ports made on first use — Bedrock's tests keep
+   passing.
+4. `ClaudeBarApp.init` builds the `Engine` and calls `detect()`; the custom
+   and extension loops fold into it.
+5. The `add-provider` skill loses *Register in ClaudeBarApp*; AGENTS.md and
+   §2's chart follow.
+
+**Left for later:** watching the folders so a dropped file appears without a
+restart (today, and after this, detection happens at launch), and retiring
+`DeepSeekConfigCard` once the definition's settings form replaces it — it
+writes the same `deepseek.authEnvVar` key, so it keeps working meanwhile.

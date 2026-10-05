@@ -11,6 +11,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 160,
   "settings": [
     {
       "id": "apiKey",

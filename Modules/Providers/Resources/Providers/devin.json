@@ -11,6 +11,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 240,
   "settings": [
     { "id": "token", "label": "Session token", "kind": "secret", "scope": "account" },
     { "id": "organization", "label": "Organization ID", "scope": "account",

@@ -85,6 +85,24 @@ struct DeepSeekDefinitionTests {
     }
 
     @Test
+    func `should read the key from the environment variable the person named`() async throws {
+        let settings = InMemoryProviderSettings()
+        settings.setValue("MY_DEEPSEEK", "authEnvVar", forProvider: "deepseek")
+        let provider = try make(environment: ["MY_DEEPSEEK": "named", "DEEPSEEK_API_KEY": "default"], settings: settings,
+                                balancesByKey: ["Bearer named": balance])
+        #expect(try await provider.refreshPlain().quotas.first?.dollarRemaining == 40)
+    }
+
+    @Test
+    func `should read DEEPSEEK_API_KEY when the person named no variable`() async throws {
+        let settings = InMemoryProviderSettings()
+        settings.setValue("", "authEnvVar", forProvider: "deepseek")
+        let provider = try make(environment: ["DEEPSEEK_API_KEY": "default"], settings: settings,
+                                balancesByKey: ["Bearer default": balance])
+        #expect(try await provider.refreshPlain().quotas.first?.dollarRemaining == 40)
+    }
+
+    @Test
     func `should use the saved key when the environment key is empty`() async throws {
         let provider = try make(environment: ["DEEPSEEK_API_KEY": ""], balancesByKey: ["Bearer personal": balance])
         #expect(try await provider.refreshPlain().quotas.first?.dollarRemaining == 40)

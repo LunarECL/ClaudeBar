@@ -12,6 +12,7 @@
   },
   "cli": "omp",
   "enabledByDefault": true,
+  "order": 190,
   "defaultDataSource": "cli",
   "dataSources": [
     {

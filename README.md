@@ -34,26 +34,27 @@ Or download the signed and notarized DMG from [Releases](https://github.com/tddw
 | Claude | 5-hour session and weekly limits, model limits (Opus, Sonnet, Fable), Extra Usage | [docs](docs/providers/claude/README.md) |
 | Codex | 5-hour and weekly rate limits, credits | [docs](docs/providers/codex/README.md) |
 | Gemini | Per-model Code Assist quota (Pro, Flash, Flash Lite) | [docs](docs/providers/gemini/README.md) |
-| Copilot | Monthly AI credits | [docs](docs/providers/copilot/README.md) |
 | Antigravity | Gemini and Claude pools, 5-hour and weekly | [docs](docs/providers/antigravity/README.md) |
-| Cursor | Included monthly usage, on-demand and team credits | [docs](docs/providers/cursor/README.md) |
-| AWS Bedrock | Today's spend and tokens per model, optional daily budget | [docs](docs/providers/bedrock/README.md) |
-| Kiro | Monthly plan credits and bonus credits | [docs](docs/providers/kiro/README.md) |
-| Kimi | 5-hour and weekly limits | [docs](docs/providers/kimi/README.md) |
-| DeepSeek | Account balance (paid and granted) | [docs](docs/providers/deepseek/README.md) |
-| Mistral | Today's Mistral Vibe spend and tokens | [docs](docs/providers/mistral/README.md) |
-| MiniMax | Coding Plan requests per model | [docs](docs/providers/minimax/README.md) |
-| Alibaba | Coding Plan 5-hour, weekly and monthly quota | [docs](docs/providers/alibaba/README.md) |
 | Z.ai | GLM Coding Plan 5-hour, weekly, monthly and MCP usage | [docs](docs/providers/zai/README.md) |
+| Copilot | Monthly AI credits | [docs](docs/providers/copilot/README.md) |
+| AWS Bedrock | Today's spend and tokens per model, optional daily budget | [docs](docs/providers/bedrock/README.md) |
 | Amp Code | Free allowance and credit balance | [docs](docs/providers/ampcode/README.md) |
+| Kimi | 5-hour and weekly limits | [docs](docs/providers/kimi/README.md) |
+| Kiro | Monthly plan credits and bonus credits | [docs](docs/providers/kiro/README.md) |
+| Cursor | Included monthly usage, on-demand and team credits | [docs](docs/providers/cursor/README.md) |
+| MiniMax | Coding Plan requests per model | [docs](docs/providers/minimax/README.md) |
+| DeepSeek | Account balance (paid and granted) | [docs](docs/providers/deepseek/README.md) |
+| OpenRouter | Credit balance (credits minus usage) | [docs](docs/providers/openrouter/README.md) |
+| Vercel Gateway | AI Gateway credit balance | [docs](docs/providers/vercel-gateway/README.md) |
+| Alibaba | Coding Plan 5-hour, weekly and monthly quota | [docs](docs/providers/alibaba/README.md) |
+| Mistral | Today's Mistral Vibe spend and tokens | [docs](docs/providers/mistral/README.md) |
 | OpenCode Go | 5-hour, weekly and monthly windows | [docs](docs/providers/opencode-go/README.md) |
 | Oh My Pi | Every rate-limit window `omp` reports, per upstream account | [docs](docs/providers/omp/README.md) |
-| Grok | xAI credit allowance per billing period, per product | [docs](docs/providers/grok/README.md) |
+| Grok | xAI credit allowance per billing period, per product, plan and prepaid balance | [docs](docs/providers/grok/README.md) |
 | Command Code | 5-hour and weekly windows, credit balance | [docs](docs/providers/commandcode/README.md) |
-| Vercel Gateway | AI Gateway credit balance | [docs](docs/providers/vercel-gateway/README.md) |
 | Cline | Five-hour, weekly and monthly plan limits | [docs](docs/providers/cline/README.md) |
 | Warp | Monthly AI credits and add-on credits | [docs](docs/providers/warp/README.md) |
-| Devin | Daily and weekly organization quota | [docs](docs/providers/devin/README.md) |
+| Devin | Daily and weekly organization quota, with your browser sign-in | [docs](docs/providers/devin/README.md) |
 | Windsurf | Daily and weekly quota, or message and flow-action allowances | [docs](docs/providers/windsurf/README.md) |
 | JetBrains AI | Monthly AI credits from your IDE | [docs](docs/providers/jetbrains/README.md) |
 | OpenAI API | Organization spend over the last 30 days, per line item | [docs](docs/providers/openai/README.md) |

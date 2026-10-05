@@ -175,8 +175,8 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │                           write · cache read · cost: Cost (lines per model,
 │       │       │                           ESTIMATED unless the log states it) · sessions ·
 │       │       │                           working time · cache savings
-│       │       ├── guestPasses: GuestPasses?   CAPABILITY — "share a trial": Claude's alone, so no definition
-│       │       │                           block — the App hands its source in; `nil` otherwise
+│       │       ├── guestPasses: GuestPasses?   CAPABILITY — "share a trial": declared `"guestPasses": {}`,
+│       │       │                           run by the engine; `nil` when not declared
 │       │       └── status                  DERIVED — QUOTA HEALTH: the worst quota in its usage.
 │       │                                   The pill's and the menu-bar entry's colour
 │       ├── inUse: InUse?  ◆                CAPABILITY (§2.1) — "New terminal sessions use work":
@@ -305,7 +305,7 @@ its definition and **hands it out per login**; its own context runs it:
 | Capability | The person's question | Declared as | Run by | Reached as |
 |---|---|---|---|---|
 | Usage History | *how much did I use, day by day?* | `usageHistory` | the login's `UsageHistory`, over a `UsageLog` the data-source machinery runs | `account.usageHistory` → `days(in:)` |
-| Guest passes | *can I share a trial?* | — Claude's alone: the App hands in its source | `ClaudeGuestPassSource` | `account.guestPasses` |
+| Guest passes | *can I share a trial?* | `"guestPasses": {}` — Claude's alone; its runner is supplied by the engine ([TARGET §10](TARGET_ARCHITECTURE.md#10--a-definition-on-disk-is-a-provider)) | `ClaudeGuestPassSource`, at the declaring definition's CLI | `account.guestPasses` |
 | Budget | *am I spending more than I meant to?* | an account-scope setting on the cost | the cost judges it | `account.budget` |
 | Sign-in | *add another login* | `accounts.signIn` | `AccountSignIn` | `provider.signIn` |
 | In use | *which login does my next terminal session start with?* | `accounts.signIn` — its CLI and the variable that points it at a folder | `InUse` over the `LoginsInUse` record; `NewSessions` over the `ShellLines` port for the shell | `provider.inUse` · `account.isInUse` |
@@ -441,7 +441,7 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a day closes a fixed while after it ends; a closed day is summed once, kept, and never read from the logs again. Today, and the day before until it closes, are read every time | `DayLedger` |
 | a day's spend is a `Cost` with a line per model — the log's own cost wins; otherwise it is ESTIMATED from the price catalog, and says so. A model served on this Mac costs nothing; an unknown model gets the catalog's fallback price, never zero by omission | `Day.cost` · `PriceList` |
 | usage history is per login: an added login reads its own folder's logs; two logins' days are never summed | `Account.usageHistory` |
-| a capability several providers can offer is declared by the definition; one only a single product has (guest passes) is a source the App hands in — never a block in the shared definition, never a vendor name in a module. Either way it is reached through the login's handle (`account.usageHistory`, `account.guestPasses`), `nil` when not offered | `Account` |
+| a capability is declared by the definition — even one only a single product has (guest passes), whose runner the engine supplies — never chosen by a provider's name, never a vendor name in a module. Either way it is reached through the login's handle (`account.usageHistory`, `account.guestPasses`), `nil` when not offered | `Account` |
 | usage history is read when the popover opens, never in the background, and never carried on `Usage` | `UsageHistory` |
 | another app's usage on this Mac (Claude Desktop) is its OWN history under its own name: never summed with the login's days, never a data source, never a quota; the usual login reads it, an added login's patch removes it | `UsageHistory.otherApps` |
 | a login with no usage whose CLI isn't on this Mac, or that never signed in, is NOT SET UP — fetch health, not a failure: it says what setting up takes, keeps showing the usage history it can read, and the badge reads *NOT SET UP*, not *UNAVAILABLE* — or nothing, while that usage history shows: a Claude Desktop user did set Claude up, only the limits need more. Any other failure stays an error | `Account.needsSetup` · `ProviderBadgeState` |

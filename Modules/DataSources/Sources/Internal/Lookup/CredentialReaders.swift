@@ -5,9 +5,14 @@ import Foundation
 struct EnvironmentReader: CredentialFinding {
     let name: String
     let environment: @Sendable (String) -> String?
+    /// The person's login shell, asked only when the app's own environment
+    /// lacks the variable; nil for a lookup that doesn't ask for it.
+    var loginShell: (@Sendable (String) -> String?)? = nil
 
     func find() throws -> FoundCredential? {
-        guard let value = environment(name).map(Credential.trimmed), !value.isEmpty else { return nil }
+        let found = environment(name).map(Credential.trimmed).flatMap { $0.isEmpty ? nil : $0 }
+            ?? loginShell?(name).map(Credential.trimmed)
+        guard let value = found, !value.isEmpty else { return nil }
         return FoundCredential(credential: Credential(["token": value]), save: nil)
     }
 }

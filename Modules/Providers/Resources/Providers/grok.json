@@ -12,6 +12,7 @@
   },
   "cli": "grok",
   "enabledByDefault": true,
+  "order": 200,
   "settings": [
     { "id": "directory", "default": "~/.grok", "label": "Signed-in Grok Folder", "scope": "account", "kind": { "path": { "mustExist": true } } }
   ],

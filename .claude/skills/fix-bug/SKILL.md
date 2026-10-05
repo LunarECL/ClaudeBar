@@ -47,13 +47,19 @@ Fix bugs using Chicago School TDD, root cause analysis, and rich domain design.
 ### Identify the Bug
 
 1. **Reproduce**: Follow exact steps to trigger the bug
-2. **Expected**: What SHOULD happen (user's mental model)
+2. **Expected**: What SHOULD happen (the person's mental model — USER_JOURNEYS)
 3. **Actual**: What IS happening (current behavior)
 4. **Root cause**: WHY it's happening (code analysis)
 
+For a provider that shows the wrong thing or fails:
+- **The log**: `~/Library/Logs/ClaudeBar/ClaudeBar.log` (`info` and above) — which data source answered, which step failed (lookup · fetch · mapping); `debug` goes to OSLog only ([troubleshooting](../../../docs/troubleshooting.md)).
+- **The failed step**: `account.lastFailedStep` and `lastError` say whether the key, the request or the reading broke — fix that piece.
+- **The real response**: capture the CLI's or API's actual answer, **redacted** (no token, email, name or real usage), as the test's fixture. Never log a token, key or cookie while investigating.
+
 ### Find the law it breaks
 
-The design docs are the source of truth ([AGENTS.md](../../../AGENTS.md#design-docs-are-the-source-of-truth)).
+Read the design in order — USER_JOURNEYS, CANONICAL_MODEL, TARGET_ARCHITECTURE,
+then the feature's or provider's `design.md`. The design docs are the source of truth ([AGENTS.md](../../../AGENTS.md#design-docs-are-the-source-of-truth)).
 A bug is usually a law in [CANONICAL_MODEL.md](../../../docs/architecture/CANONICAL_MODEL.md) §5 (or a feature's
 `design.md`) that the code breaks: find the law and its **one owner**, and fix it there, not
 at a call site. If the right fix changes a law or moves it to another owner, that is a
@@ -66,21 +72,14 @@ it, propose the law first.
 > [TARGET_ARCHITECTURE.md](../../../docs/architecture/TARGET_ARCHITECTURE.md) (how a provider runs) ·
 > [ARCHITECTURE.md](../../../docs/architecture/ARCHITECTURE.md) (the app layers)
 
-The code is mid-migration from three layers to modules. Find which side the
-behaviour lives on before you change it:
+Find which module the behaviour lives in before you change it: the table in
+[implement-feature → Architecture](../implement-feature/SKILL.md#architecture) is the
+one map (where each thing lives, and where its tests go).
 
-| Where | Holds | Tests |
-|---|---|---|
-| `Modules/Providers/Resources/Providers/<id>.json` (+ `.js`) | every built-in provider: where the key is, how to fetch, how to read | `Modules/Providers/Tests/` (golden tests over `StubbedProvider` / `ClaudeHarness`) |
-| `Modules/Providers/Sources` | `Provider` (the one lifecycle: refresh, fallback chain, accounts), `ProviderDefinition`, `AddedAccounts`, settings and account contracts | `Modules/Providers/Tests/` |
-| `Modules/DataSources/Sources` | `DataSource` and its workers: credential lookups and refreshes; HTTP, steps, JSON-RPC, terminal, command, file, directory, local-server and CloudWatch fetches; JSON / text / script mapping; the process runners | `Modules/DataSources/Tests/` |
-| `Modules/Quotas/Sources` | the usage model: `UsageSnapshot`, `UsageQuota`, `UsageError`, plans and costs (interim shapes, see each type's `- Note:`) | the tests of the module that uses it |
-| `Sources/Domain` | `QuotaMonitor`, extension providers, Notify!, sessions, Usage History | `Tests/DomainTests/` |
-| `Sources/Infrastructure` | storage, notifications, hooks, the local-log analyzers behind Usage History | `Tests/InfrastructureTests/` |
-| `Sources/App` | SwiftUI views reading the domain directly | `Tests/AppTests/`, `Tests/AcceptanceTests/` |
-
-A bug in a migrated provider is fixed in its JSON, or generically in
-`DataSources`, never with vendor-named Swift. Modules never `import Domain`.
+A bug or improvement in a provider is made in its JSON (or its mapping
+script), or generically in `DataSources` — never with vendor-named Swift, and
+never with a line in `ClaudeBarApp` that names it (providers are found by
+`ProviderCatalog.detect()`). Modules never `import Domain`.
 
 ### Domain Invariants
 
@@ -120,7 +119,7 @@ struct {Component}Tests {
         stub.answerRPC(#"{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":30,"windowDurationMins":10080}}}}"#)
 
         // When - the real definition reads it
-        let usage = try await stub.make("codex").refresh()
+        let usage = try await stub.make("codex").refreshPlain()
 
         // Then - assert EXPECTED behavior (will FAIL before fix)
         #expect(usage.quota(for: .session)?.windowDuration == 7 * 86400)  // the window the provider stated
@@ -137,11 +136,11 @@ provider, add the captured response to its golden tests in
 ### Run Test (Should FAIL)
 
 ```bash
-tuist test Providers         # one module's tests (schemes: Providers, DataSources, Domain, Infrastructure, AppTests, AcceptanceTests)
-tuist test                     # everything
-# tuist caches results; to force a re-run of one suite:
+tuist test Providers         # one module's tests while working (schemes: Providers, DataSources, Domain, Infrastructure, AppTests, AcceptanceTests)
+# tuist caches results; one suite for real, and the final check of everything:
 xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
   -destination 'platform=macOS,arch=arm64' -only-testing:ProvidersTests/ClaudeAPITests
+xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace -destination 'platform=macOS,arch=arm64'
 ```
 
 ## Phase 3: Fix & Verify (Green)
@@ -149,9 +148,10 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 ### Fix Guidelines
 
 1. **Minimal change**: Fix only what's broken
-2. **Domain first**: Prefer fixing in domain layer when possible
-3. **Maintain invariants**: Domain should be self-validating
-4. **No over-engineering**: Don't refactor unrelated code
+2. **At the law's owner**: fix the one type that owns the rule (CANONICAL §5), not a call site or a view
+3. **A provider is data**: its JSON or script, or a generic rule in `DataSources` that every definition gains — never a branch on a provider's id
+4. **Maintain invariants**: the owner stays self-validating — tell, don't ask
+5. **No over-engineering**: Don't refactor unrelated code
 
 ### Domain Design Principles
 
@@ -178,8 +178,10 @@ private func selectFirstEnabledIfNeeded() { ... }
 
 ### Verify Fix
 
-Run the same suite again (it should PASS now), then `tuist test` for every
-target.
+Run the same suite again (it should PASS now), then the full `xcodebuild test`
+(`tuist test` skips cached targets). Then the docs in the same change: a
+provider's `README.md` Gotchas when the person can hit it, its `design.md`
+when the reading changed, and the CHANGELOG line.
 
 ## Checklist
 
@@ -191,4 +193,6 @@ target.
 - [ ] Test PASSES after fix
 - [ ] All existing tests still pass
 - [ ] Domain invariants maintained (if applicable)
-- [ ] CHANGELOG updated with fix description
+- [ ] Full `xcodebuild test` green
+- [ ] Docs updated where the person or a contributor would look (provider README / design.md)
+- [ ] One line under `## [Unreleased]` in `CHANGELOG.md`, under its heading (`Fixed` / `Changed`): the effect in the person's words, ≤300 characters, an absolute issue or PR link

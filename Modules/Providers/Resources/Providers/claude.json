@@ -24,6 +24,8 @@
   },
   "cli": "claude",
   "enabledByDefault": true,
+  "order": 10,
+  "guestPasses": {},
   "defaultDataSource": "cli",
   "dataSources": [
     {

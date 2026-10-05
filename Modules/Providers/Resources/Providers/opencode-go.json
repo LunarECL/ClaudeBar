@@ -36,6 +36,7 @@
   },
   "cli": "opencode",
   "enabledByDefault": true,
+  "order": 180,
   "settings": [
     {
       "id": "apiKey",

@@ -11,6 +11,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 230,
   "settings": [
     { "id": "apiKey", "label": "API key", "kind": "secret", "scope": "account" }
   ],

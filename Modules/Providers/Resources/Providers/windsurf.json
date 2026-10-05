@@ -11,6 +11,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 250,
   "defaultDataSource": "local",
   "dataSources": [
     {

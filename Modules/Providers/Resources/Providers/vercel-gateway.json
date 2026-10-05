@@ -11,6 +11,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 150,
   "settings": [
     { "id": "apiKey", "label": "API key", "kind": "secret", "scope": "account" },
     { "id": "authEnvVar", "label": "Environment variable", "default": "AI_GATEWAY_API_KEY" }

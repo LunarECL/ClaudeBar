@@ -25,6 +25,7 @@
     "~/Applications/Codex.app/Contents/Resources/codex"
   ],
   "enabledByDefault": true,
+  "order": 20,
   "defaultDataSource": "rpc",
   "dataSources": [
     {

@@ -11,6 +11,7 @@
     }
   },
   "enabledByDefault": true,
+  "order": 110,
   "settings": [
     { "id": "accessToken", "label": "Access Token", "kind": "secret", "scope": "account" }
   ],

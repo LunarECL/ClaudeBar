@@ -21,6 +21,7 @@ Make improvements to existing functionality using TDD and rich domain design.
 | Fix broken behavior | fix-bug |
 | Add new feature | implement-feature |
 | Add new AI provider | add-provider |
+| A new report card over usage history | add-report |
 
 ## Workflow
 
@@ -28,7 +29,7 @@ Make improvements to existing functionality using TDD and rich domain design.
 ┌─────────────────────────────────────────────────────────────┐
 │  0. CHECK THE DESIGN (docs are the source of truth)          │
 ├─────────────────────────────────────────────────────────────┤
-│  • Read CANONICAL_MODEL, TARGET_ARCHITECTURE, design.md      │
+│  • Read USER_JOURNEYS, CANONICAL, TARGET, design.md          │
 │  • Does the improvement change a law, an owner, a word?      │
 │  • If so: write it into the docs, ask the user to confirm    │
 └─────────────────────────────────────────────────────────────┘
@@ -64,7 +65,8 @@ Make improvements to existing functionality using TDD and rich domain design.
 ## Phase 0: Check the design
 
 The design docs are the source of truth ([AGENTS.md](../../../AGENTS.md#design-docs-are-the-source-of-truth)).
-Read [CANONICAL_MODEL.md](../../../docs/architecture/CANONICAL_MODEL.md), [TARGET_ARCHITECTURE.md](../../../docs/architecture/TARGET_ARCHITECTURE.md) and the
+Read the design in order — [USER_JOURNEYS.md](../../../docs/architecture/USER_JOURNEYS.md),
+[CANONICAL_MODEL.md](../../../docs/architecture/CANONICAL_MODEL.md), [TARGET_ARCHITECTURE.md](../../../docs/architecture/TARGET_ARCHITECTURE.md), then the
 feature's `design.md`. An improvement that only makes the code match the docs needs no
 approval. One that changes a law, its owner, a word the screen prints, or adds a piece is a
 design change: write it into the docs and ask the user to confirm before coding.
@@ -83,29 +85,30 @@ Examples:
 - Cleaner visual layout
 ```
 
-**Test approach**: UI behavior tests or manual verification
+**Test approach**: a mockup in `design-concept/<feature>/` first for a visible change,
+then the real UI on mock data (`scripts/demo-screenshots.sh`) — never real names,
+emails or usage. Views render and tell; a rule they need lives in the domain.
 
 ### 2. Domain Improvements
 
-Enhance domain model behavior:
+Enhance a rule on the type that owns it (CANONICAL §5) — tell, don't ask:
 
 ```
 Examples:
-- Add computed property for common queries
-- Improve status calculation
-- Add convenience methods
-- Better encapsulation
+- A status the view used to work out moves onto its owner
+- A better status calculation
+- Better encapsulation of an invariant
 ```
 
-**Test approach**: State-based domain tests
+**Never** a new field on `UsageSnapshot`: the kernel is shrinking toward `Usage`
+(CANONICAL §6). Put the rule on the value or aggregate that owns it.
+
+**Test approach**: State-based tests on the owner
 
 ```swift
-@Test func `should point at the quota with the least left`() {
-    // Given
-    let snapshot = UsageSnapshot(quotas: [quota1, quota2, quota3])
-
-    // Then - new convenience property
-    #expect(snapshot.lowestQuota == quota2)
+@Test func `should be critical when a tenth is left`() {
+    let quota = UsageQuota(percentRemaining: 10, quotaType: .session, providerId: "claude")
+    #expect(quota.status == .critical)
 }
 ```
 
@@ -168,11 +171,11 @@ struct {Component}Tests {
 Improvements should NOT break existing behavior:
 
 ```bash
-tuist test Providers         # one module's tests (schemes: Providers, DataSources, Domain, Infrastructure, AppTests, AcceptanceTests)
-tuist test                     # everything
-# tuist caches results; to force a re-run of one suite:
+tuist test Providers         # one module's tests while working (schemes: Providers, DataSources, Domain, Infrastructure, AppTests, AcceptanceTests)
+# tuist caches results; one suite for real, and the final check of everything:
 xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
   -destination 'platform=macOS,arch=arm64' -only-testing:ProvidersTests/ClaudeAPITests
+xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace -destination 'platform=macOS,arch=arm64'
 ```
 
 
@@ -182,21 +185,14 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 > [TARGET_ARCHITECTURE.md](../../../docs/architecture/TARGET_ARCHITECTURE.md) (how a provider runs) ·
 > [ARCHITECTURE.md](../../../docs/architecture/ARCHITECTURE.md) (the app layers)
 
-The code is mid-migration from three layers to modules. Find which side the
-behaviour lives on before you change it:
+Find which module the behaviour lives in before you change it: the table in
+[implement-feature → Architecture](../implement-feature/SKILL.md#architecture) is the
+one map (where each thing lives, and where its tests go).
 
-| Where | Holds | Tests |
-|---|---|---|
-| `Modules/Providers/Resources/Providers/<id>.json` (+ `.js`) | every built-in provider: where the key is, how to fetch, how to read | `Modules/Providers/Tests/` (golden tests over `StubbedProvider` / `ClaudeHarness`) |
-| `Modules/Providers/Sources` | `Provider` (the one lifecycle: refresh, fallback chain, accounts), `ProviderDefinition`, `AddedAccounts`, settings and account contracts | `Modules/Providers/Tests/` |
-| `Modules/DataSources/Sources` | `DataSource` and its workers: credential lookups and refreshes; HTTP, steps, JSON-RPC, terminal, command, file, directory, local-server and CloudWatch fetches; JSON / text / script mapping; the process runners | `Modules/DataSources/Tests/` |
-| `Modules/Quotas/Sources` | the usage model: `UsageSnapshot`, `UsageQuota`, `UsageError`, plans and costs (interim shapes, see each type's `- Note:`) | the tests of the module that uses it |
-| `Sources/Domain` | `QuotaMonitor`, extension providers, Notify!, sessions, Usage History | `Tests/DomainTests/` |
-| `Sources/Infrastructure` | storage, notifications, hooks, the local-log analyzers behind Usage History | `Tests/InfrastructureTests/` |
-| `Sources/App` | SwiftUI views reading the domain directly | `Tests/AppTests/`, `Tests/AcceptanceTests/` |
-
-A bug in a migrated provider is fixed in its JSON, or generically in
-`DataSources`, never with vendor-named Swift. Modules never `import Domain`.
+A bug or improvement in a provider is made in its JSON (or its mapping
+script), or generically in `DataSources` — never with vendor-named Swift, and
+never with a line in `ClaudeBarApp` that names it (providers are found by
+`ProviderCatalog.detect()`). Modules never `import Domain`.
 
 ## Guidelines
 
@@ -206,7 +202,7 @@ A bug in a migrated provider is fixed in its JSON, or generically in
 - Maintain existing behavior
 - Add tests for new behavior
 - Follow existing code patterns
-- Update CHANGELOG
+- Add the CHANGELOG line for a change the person notices
 
 ### Don't
 
@@ -224,5 +220,6 @@ A bug in a migrated provider is fixed in its JSON, or generically in
 - [ ] Test FAILS before implementation
 - [ ] Improvement implemented
 - [ ] New test PASSES
-- [ ] All existing tests still pass (`tuist test`)
-- [ ] CHANGELOG updated with improvement
+- [ ] Full `xcodebuild test` green (`tuist test` skips cached targets)
+- [ ] Docs updated in the same change (feature or provider README / design.md)
+- [ ] One line under `## [Unreleased]` in `CHANGELOG.md`, under its heading (`Fixed` / `Changed`): the effect in the person's words, ≤300 characters, an absolute issue or PR link, for a change the person notices

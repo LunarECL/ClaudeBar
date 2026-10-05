@@ -82,6 +82,12 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     /// a product's own app carries. `cli` lists them after the name.
     public let cliPlaces: [String]
     public let enabledByDefault: Bool
+    /// Where the product sits in the lineup by default; none → after the
+    /// rest, by name. The person's own order wins (TARGET_ARCHITECTURE §10).
+    public let order: Int?
+    /// The guest-passes capability (CANONICAL §2.1), declared `"guestPasses": {}`;
+    /// the engine runs it at this definition's CLI.
+    public let guestPasses: Bool
     public let dataSources: [DataSourceDefinition]
     public let defaultDataSource: String
     /// `"together": true` — every data source answers on each refresh, the
@@ -298,8 +304,12 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         accounts: Accounts? = nil,
         settings: [Setting] = [],
         usageHistory: UsageLog.Definition? = nil,
-        setup: Setup? = nil
+        setup: Setup? = nil,
+        order: Int? = nil,
+        guestPasses: Bool = false
     ) {
+        self.order = order
+        self.guestPasses = guestPasses
         self.together = together
         self.usageHistory = usageHistory
         self.setup = setup
@@ -344,7 +354,9 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             accounts: accounts,
             settings: settings,
             usageHistory: try container.decodeIfPresent(UsageLog.Definition.self, forKey: .usageHistory),
-            setup: try container.decodeIfPresent(Setup.self, forKey: .setup)
+            setup: try container.decodeIfPresent(Setup.self, forKey: .setup),
+            order: try container.decodeIfPresent(Int.self, forKey: .order),
+            guestPasses: try container.decodeIfPresent([String: JSONValue].self, forKey: .guestPasses) != nil
         )
         try validateSettings()
     }
@@ -357,6 +369,7 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
             else { try container.encode([cli] + cliPlaces, forKey: .cli) }
         }
         try container.encode(enabledByDefault, forKey: .enabledByDefault)
+        try container.encodeIfPresent(order, forKey: .order)
         try container.encode(dataSources, forKey: .dataSources)
         try container.encode(defaultDataSource, forKey: .defaultDataSource)
         if together { try container.encode(together, forKey: .together) }
@@ -364,10 +377,11 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         if !settings.isEmpty { try container.encode(settings, forKey: .settings) }
         try container.encodeIfPresent(usageHistory, forKey: .usageHistory)
         try container.encodeIfPresent(setup, forKey: .setup)
+        if guestPasses { try container.encode([String: JSONValue](), forKey: .guestPasses) }
     }
 
     enum CodingKeys: String, CodingKey {
-        case profile, cli, enabledByDefault, dataSources, defaultDataSource, together, accounts, settings, usageHistory, setup
+        case profile, cli, enabledByDefault, order, guestPasses, dataSources, defaultDataSource, together, accounts, settings, usageHistory, setup
     }
 
     /// Each setting's id is used once.

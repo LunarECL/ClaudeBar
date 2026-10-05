@@ -14,6 +14,7 @@
     }
   },
   "enabledByDefault": false,
+  "order": 70,
   "settings": [
     { "id": "awsProfile", "label": "AWS Profile" },
     { "id": "regions", "label": "Regions", "default": "us-east-1",
