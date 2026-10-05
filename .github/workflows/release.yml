@@ -389,7 +389,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # main can move while a release builds (it did for v0.5.6: #489 and #490
+      # merged mid-build, the push was rejected "fetch first", and the appcast
+      # and Pages steps were skipped — the DMG shipped, the feed never did).
+      # So the push is retried on the latest main, and a CHANGELOG that still
+      # can't be pushed never stops the update feed below.
       - name: Promote CHANGELOG
+        continue-on-error: true
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           ./scripts/promote-changelog.sh "$VERSION" "$(date +%Y-%m-%d)"
@@ -416,7 +422,17 @@ jobs:
           git diff --cached --quiet \
             && echo "No CHANGELOG changes to commit" \
             || git commit -m "chore(changelog): promote [Unreleased] to v$VERSION"
-          git push origin HEAD:main
+          pushed=false
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then pushed=true; break; fi
+            echo "::warning::Pushing the promoted CHANGELOG failed (attempt $attempt): main moved; retrying on the latest main"
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          if [ "$pushed" != "true" ]; then
+            echo "::error::Could not push the promoted CHANGELOG; promote [Unreleased] to v$VERSION by hand. The update feed is still published."
+            exit 1
+          fi
 
       - name: Generate Sparkle Appcast
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_appcast) || github.event_name == 'push' }}
