@@ -176,6 +176,7 @@ let days = membership.dailyTokens(from: usageHistories, in: range)
 | Standings rank by total tokens (the five counts summed); ties by username | Server |
 | A member's period ends on their own date, the one their Mac sent with its last upload, while it is within a day of UTC's | Server |
 | A hidden member is absent from the public board and still sees their own standing | Server |
+| Your own upload shows on the board you read at once, the same place *Your rank* says; everyone else's within two minutes | Server (an upload drops the boards it changes from the edge cache) |
 | The globe shows only countries, only for members who opted in; numbers only where at least three are | Server |
 | A member who hasn't opted in sees the globe offered once, until they opt in or dismiss it | `LeaderboardMembership.showsGlobeHint` |
 | A profile link is a platform and a handle that fits its rules, never a URL | `ProfileLink` (the app, as you type) and the server (the authority); one `vectors.json` |
@@ -194,7 +195,7 @@ Host: `https://claudebar-api.tddworks.com`; the public board page is `https://cl
 | `PATCH /me` `{username?, visible?, shareCountry?, link?}` | signed | rename, hide or show; opt in to the globe (the server then keeps the country Cloudflare's edge reports) or out (it forgets it at once); set the profile link as `{platform, handle}` (`x`, `instagram` or `github`, each with its own username rule, pinned by `vectors.json`) or remove it with `null` |
 | `DELETE /me` | signed | deletes the member and every row |
 | `GET /globe?period=30d` | none | every country opted-in members share; members and tokens (`countries`) only where at least 3 are, the rest named without a number (`present`, A–Z) |
-| `GET /board?period=7d&provider=claude` | none | standings of visible members, up to 100, cached briefly at the edge; the app reads it without its local HTTP cache |
+| `GET /board?period=7d&provider=claude` | none | standings of visible members, up to 100, cached at the edge for two minutes, dropped from the uploader's data centre by each `PUT /usage`; the app reads it without its local HTTP cache |
 
 **Signing.** On join the app makes a `Curve25519.Signing.PrivateKey` (CryptoKit) and sends its public half. Every signed request carries:
 
