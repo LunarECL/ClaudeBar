@@ -21,7 +21,7 @@ The provider was written on 2026-03-12 in response to #149, before the maintaine
 [ERROR] [credentials] Alibaba connection test failed: Session expired. Re-authenticate in Alibaba Cloud console.
 ```
 
-Re-login in Auto mode, a fresh Manual cookie and an API key all failed for that reporter. The reporter says CodexBar supports the plan correctly (2026-03-29), so CodexBar's implementation is the best lead for whoever picks this up.
+Re-login in Auto mode, a fresh Manual cookie and an API key all failed for that reporter. The reporter says another menu bar app reads the plan correctly (2026-03-29), so the plan can be read; how is still to be found.
 
 ## Sources
 
