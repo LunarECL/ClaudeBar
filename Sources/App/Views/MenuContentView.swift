@@ -1463,8 +1463,8 @@ struct WrappedStatCard: View {
 
     private var valueCaption: String {
         if isCappedSpend { return "Spent" }
-        if quota.isDollarBased { return theme.isOutlined ? "left" : "Remaining" }
-        return QuotaCardText.caption(mode: effectiveDisplayMode, isOutlined: theme.isOutlined)
+        if quota.isDollarBased { return "Remaining" }
+        return QuotaCardText.caption(mode: effectiveDisplayMode, isOutlined: false)
     }
 
     /// The color used for the pace label/number
@@ -1509,7 +1509,24 @@ struct WrappedStatCard: View {
             // flipped fields are the ones whose value just changed. A number
             // that reads correctly is worth more than a rolling animation.
             HStack(alignment: .firstTextBaseline) {
-                if let dollarUsed = quota.formattedDollarUsed,
+                if theme.isOutlined {
+                    // Printed: every headline outlined — "62%" and "$24.19"
+                    // alike (#499) — its short caption right beside it.
+                    let headline = QuotaCardText.headline(for: quota, mode: effectiveDisplayMode)
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        OutlinedNumber(
+                            text: headline.number,
+                            size: 28,
+                            color: isPercent && effectiveDisplayMode == .pace ? paceColor : nil
+                        )
+                        .layoutPriority(1)
+                        Text(headline.caption)
+                            .font(.system(size: 9, weight: .heavy, design: theme.fontDesign))
+                            .foregroundStyle(theme.textTertiary)
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                } else if let dollarUsed = quota.formattedDollarUsed,
                    let dollarCap = quota.formattedDollarCap {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(dollarUsed)
@@ -1527,18 +1544,6 @@ struct WrappedStatCard: View {
                     Text(dollarText)
                         .font(theme.displayFont(size: 18))
                         .foregroundStyle(theme.textPrimary)
-                } else if theme.isOutlined {
-                    // Printed: "62%" outlined, its short caption right beside it.
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        OutlinedNumber(
-                            text: "\(Int(quota.displayPercent(mode: effectiveDisplayMode)))%",
-                            size: 28,
-                            color: effectiveDisplayMode == .pace ? paceColor : nil
-                        )
-                        Text(valueCaption)
-                            .font(.system(size: 9, weight: .heavy, design: theme.fontDesign))
-                            .foregroundStyle(theme.textTertiary)
-                    }
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text("\(Int(quota.displayPercent(mode: effectiveDisplayMode)))")
@@ -1553,7 +1558,7 @@ struct WrappedStatCard: View {
 
                 Spacer(minLength: 4)
 
-                if !(theme.isOutlined && isPercent) {
+                if !theme.isOutlined {
                     Text(valueCaption)
                         .font(.system(size: isCappedSpend ? 10 : 12, weight: .medium, design: theme.fontDesign))
                         .fixedSize()
