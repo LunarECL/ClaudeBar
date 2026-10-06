@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Board scroll and globe total</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FFF8EC;--dot:#E9DCC4;--ink:#1E1B2E;--muted:#5E5873;--card:#fff;--sky:#A9D8FF;--sun:#FFD84D;--pink:#FFB3C7;--line:3px solid var(--ink);--shadow:4px 4px 0 var(--ink)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#17151F;--dot:#2A2735;--ink:#F3EEFF;--muted:#B9B2D0;--card:#221F2E;--sky:#2C5A80;--sun:#8A6D10;--pink:#8A3A55}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);background-image:radial-gradient(var(--dot) 1.4px,transparent 1.4px);background-size:18px 18px;color:var(--ink);font:500 15px/1.45 "Bricolage Grotesque",system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:32px 16px 64px;display:flex;flex-direction:column;gap:22px}
+h1{margin:0;font-size:36px;font-weight:800;letter-spacing:-.02em}
+h2{margin:0;font-size:20px;font-weight:800}
+.sub{margin:4px 0 0;color:var(--muted)}
+.n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--sun);border:2px solid var(--ink);font:800 12px "Bricolage Grotesque",sans-serif;color:#1E1B2E;flex:none;margin-right:6px}
+.why{font-size:13px;color:var(--muted);margin:0}
+
+/* 1. The board scrolls inside its card; the header stays put */
+.box{border:var(--line);border-radius:16px;background:var(--card);box-shadow:var(--shadow);overflow:auto;max-height:min(560px,70vh)}
+table{border-collapse:collapse;width:100%;min-width:560px}
+th,td{padding:10px 14px;text-align:left;border-bottom:2px solid var(--dot);font-size:14px}
+th{position:sticky;top:0;z-index:1;background:var(--card);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+td.num,th.num{text-align:right;font-family:"JetBrains Mono",monospace}
+
+/* The globe */
+.globe-wrap{display:flex;flex-wrap:wrap;gap:18px}
+.globe-card{flex:999 1 520px;min-width:0;position:relative;border:var(--line);border-radius:20px;box-shadow:var(--shadow);background:radial-gradient(circle at 50% 45%,#2B2442 0%,#17141F 70%);min-height:480px;overflow:hidden}
+.globe-card h3{position:absolute;left:16px;top:14px;margin:0;color:#FFF8EC;font-size:20px;font-weight:800}
+.globe-card .earth{position:absolute;left:50%;top:52%;width:380px;height:380px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle at 35% 35%,#D6ECFF,#A9D8FF 60%,#7FB6E6);border:3px solid #1E1B2E}
+.globe-card .legend{position:absolute;left:16px;bottom:14px;color:#D9D2EE;font-size:12px}
+.side{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.side .card{background:var(--card);border:var(--line);border-radius:18px;box-shadow:var(--shadow);padding:14px}
+.label{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.big{font-size:40px;font-weight:800;line-height:1;margin-top:4px}
+
+/* 2. Two numbers in one card */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stats>div+div{border-left:2px solid var(--dot);padding-left:12px}
+.stats .big{font-size:34px}
+.stats .big.mono{font-family:"JetBrains Mono",monospace;font-size:30px}
+.foot{margin:8px 0 0;font-size:12px;color:var(--muted)}
+
+/* 3. Rows keep their height; the list scrolls */
+.list{list-style:none;margin:8px 0 0;padding:0 4px 0 0;display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto}
+.list li{flex:none;display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border:2px solid var(--ink);border-radius:12px;position:relative;overflow:hidden;font-size:13px}
+.list li .fill{position:absolute;inset:0 auto 0 0;background:var(--sky);opacity:.55}
+.list li>*:not(.fill){position:relative}
+.list .num{font:700 12px "JetBrains Mono",monospace}
+.note{font-size:13px;color:var(--muted);margin:0}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Board scroll and globe total</h1>
+    <p class="sub">Three changes to <code>claudebar.tddworks.com/leaderboard</code>. Mock data.</p>
+  </header>
+
+  <h2><span class="n">1</span>The board scrolls inside its card</h2>
+  <p class="why">Up to 100 rows used to push the globe far down the page. Now the card is at most 560px tall (or 70% of the window), the column headers stay put, and the globe sits right under it. Same as the app's Leaderboard tab.</p>
+  <div class="box">
+    <table>
+      <thead><tr><th>#</th><th>User</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <h2><span class="n">2</span><span class="n">3</span>Globe: tokens on the globe, and rows that don't clip</h2>
+  <p class="why">② The first card now shows the countries and the tokens they total. The total adds up only countries with 3+ members, the same ones the list shows a number for. A total that also counted the smaller countries would give away one person's tokens whenever a single small country was left out, so the card says which countries it counts. ③ Rows keep their own height and the list scrolls, so no name is cut in half.</p>
+  <section class="globe-wrap">
+    <div class="globe-card"><h3>Where ClaudeBar is used</h3><div class="earth"></div><div class="legend">Last 30 days · drag to turn</div></div>
+    <div class="side">
+      <div class="card">
+        <div class="stats">
+          <div><div class="label">Countries</div><div class="big">11</div></div>
+          <div><div class="label">Tokens</div><div class="big mono">59.9B</div></div>
+        </div>
+        <p class="foot">Last 30 days, from the 2 countries with 3+ members.</p>
+      </div>
+      <div class="card"><div class="label">Countries · tokens</div><ol class="list" id="list"></ol></div>
+      <p class="note"><b>A country shows from its first member.</b> Its tokens show once 3 members there share it, so no total is one person's own.</p>
+    </div>
+  </section>
+</main>
+<script>
+const names = ["tokenwhale","cachemaxx","deltaforge","nightshift","pairprog","quietcoder","refactorly","specfirst","tinycommits","yakshaver"];
+const rows = document.getElementById("rows");
+for (let i = 0; i < 100; i++) {
+  const t = Math.round(9e9 / (i + 1));
+  const tr = document.createElement("tr");
+  [String(i + 1), "@" + names[i % names.length] + (i >= 10 ? i : ""), (t * .1 / 1e6).toFixed(1) + "M", (t * .05 / 1e6).toFixed(1) + "M", (t * .85 / 1e6).toFixed(1) + "M", (t / 1e6).toFixed(1) + "M"]
+    .forEach((v, j) => { const td = document.createElement("td"); td.textContent = v; if (j > 1) td.className = "num"; tr.append(td); });
+  rows.append(tr);
+}
+const list = document.getElementById("list");
+[["🇪🇸","Spain","31.9B",100],["🇺🇸","United States","28.0B",88],["🇦🇺","Australia","—",0],["🇨🇳","China","—",0],["🇩🇪","Germany","—",0],["🇬🇧","United Kingdom","—",0],["🇬🇷","Greece","—",0],["🇮🇱","Israel","—",0],["🇮🇳","India","—",0],["🇹🇼","Taiwan","—",0],["🇻🇳","Vietnam","—",0]]
+  .forEach(([f, n, v, w]) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="fill" style="width:${w}%"></span><span></span><span></span><span class="num"></span>`;
+    li.children[1].textContent = f; li.children[2].textContent = n; li.children[3].textContent = v;
+    list.append(li);
+  });
+</script>
+</body>
+</html>
