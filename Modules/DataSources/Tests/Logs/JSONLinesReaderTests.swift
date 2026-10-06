@@ -8,7 +8,7 @@ import Testing
 struct JSONLinesReaderTests {
     static let shape = RecordShape(UsageLog.Records(
         files: "~/logs/*.jsonl",
-        where: Match(path: "$.kind", equals: .string("reply")),
+        where: [Match(path: "$.kind", equals: .string("reply"))],
         at: "$.at",
         id: ["$.reply.id", "$.request"],
         model: "$.reply.model",
@@ -119,6 +119,37 @@ struct JSONLinesReaderTests {
         {"kind":"ask","reply":{"content":"the \"reply\" kind"},"at":"2026-03-11T10:00:00.000Z"}
         """#
         #expect(reader().read(content: content).isEmpty)
+    }
+
+    // MARK: - A log that writes usage in two shapes
+
+    /// A reply's usage sits under it; a side call's sits at the top.
+    static let twoShapes = RecordShape(UsageLog.Records(
+        files: "~/logs/*.jsonl",
+        where: [Match(path: "$.reply.role", equals: .string("model")), Match(path: "$.kind", equals: .string("side"))],
+        at: "$.at",
+        tokens: UsageLog.Tokens(input: ["$.reply.usage.in", "$.usage.in"], output: ["$.reply.usage.out", "$.usage.out"]),
+        cost: ["$.reply.usage.usd", "$.usage.usd"]
+    ))
+
+    @Test func `should count a line in either shape when a log writes usage two ways`() {
+        let content = """
+        {"kind":"turn","reply":{"role":"model","usage":{"in":100,"out":50,"usd":0.5}},"at":"2026-03-11T10:00:00.000Z"}
+        {"kind":"side","usage":{"in":7,"out":3,"usd":0.01},"at":"2026-03-11T10:00:01.000Z"}
+        """
+        let records = JSONLinesReader(shape: Self.twoShapes).read(content: content)
+
+        #expect(records.map(\.input) == [100, 7])
+        #expect(records.map(\.output) == [50, 3])
+        #expect(records.map(\.cost) == [Decimal(string: "0.5"), Decimal(string: "0.01")])
+    }
+
+    @Test func `should pass over a line none of the log's rules picks out, even when its fields answer`() {
+        let content = """
+        {"kind":"turn","reply":{"role":"person","usage":{"in":100}},"at":"2026-03-11T10:00:00.000Z"}
+        {"kind":"rollup","usage":{"in":999},"at":"2026-03-11T10:00:01.000Z"}
+        """
+        #expect(JSONLinesReader(shape: Self.twoShapes).read(content: content).isEmpty)
     }
 
     // MARK: - A file, from an offset

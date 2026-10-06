@@ -26,7 +26,7 @@ struct DayLedgerTests {
         calendar.startOfDay(for: Date()).addingTimeInterval(hour * 3600)
     }
 
-    private func history(now: Date, cost: String = "$.cost") -> UsageHistory {
+    private func history(now: Date, cost: UsageLog.FieldPath = "$.cost") -> UsageHistory {
         let definition = UsageLog.Definition(records: UsageLog.Records(
             files: "~/.acme/*.jsonl", at: "$.at", tokens: UsageLog.Tokens(total: "$.tokens"), cost: cost))
         let log = DataSources.makeUsageLog(definition, environment: { _ in nil }, homeDirectory: home,

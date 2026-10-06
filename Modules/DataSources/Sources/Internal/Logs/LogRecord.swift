@@ -65,41 +65,48 @@ struct LogRecord: Sendable, Equatable {
 }
 
 /// How one record reads, from a definition's `records`: the paths, the
-/// filter, and the bytes a line must hold before it is decoded.
+/// filter, and the bytes a line must hold one of before it is decoded.
 struct RecordShape: Sendable {
     let records: UsageLog.Records
+    /// The `where` texts, quoted as JSON writes them: a line holding none of
+    /// them can't match, so it is skipped undecoded. Inside a JSON string the
+    /// quotes would be escaped, so a quoted mention never matches. Empty —
+    /// every line is decoded — without a `where`, or when a condition has no
+    /// text to look for.
+    let fragments: [[UInt8]]
 
     init(_ records: UsageLog.Records) {
         self.records = records
-    }
-
-    /// The `where` texts, quoted as JSON writes them: a line without one
-    /// can't match, so it is skipped undecoded. Inside a JSON string the
-    /// quotes would be escaped, so a quoted mention never matches.
-    var requiredFragments: [[UInt8]] {
-        guard case .string(let text)? = records.where?.equals else { return [] }
-        return [Array("\"\(text)\"".utf8)]
+        var fragments: [[UInt8]] = []
+        for condition in records.where {
+            guard case .string(let text) = condition.equals else {
+                fragments = []
+                break
+            }
+            fragments.append(Array("\"\(text)\"".utf8))
+        }
+        self.fragments = fragments
     }
 
     /// The record in `json`, read from the file at `path`, or `nil` when it
     /// doesn't match, has no time or declared model, or says nothing about usage.
     func record(from json: Any, path: String = "") -> LogRecord? {
         let scope = JSONScope(root: json)
-        if let condition = records.where, !JSONMapper.holds(condition, in: scope) { return nil }
+        if !records.where.isEmpty, !records.where.contains(where: { JSONMapper.holds($0, in: scope) }) { return nil }
         guard let at = time(in: scope, path: path) else { return nil }
         var model: String?
-        if let path = records.model {
-            guard let name = scope.string(path) else { return nil }
+        if let field = records.model {
+            guard let name = field.first(answering: { scope.string($0) }) else { return nil }
             model = name
         }
         let tokens = records.tokens
         let read = [tokens.input, tokens.output, tokens.cacheWrite, tokens.cacheRead, tokens.total, tokens.cacheWrite1h]
-            .map { path in path.flatMap { scope.number($0) } }
+            .map { field in field.flatMap { $0.first(answering: { scope.number($0) }) } }
         // A count is a whole number of tokens: a negative or a fraction is a
         // log that changed shape, not usage.
         guard read.allSatisfy({ $0.map { $0 >= 0 && $0.rounded() == $0 } ?? true }) else { return nil }
         let counts = read.map { $0.map { Int($0) } }
-        let cost = records.cost.flatMap { Self.decimal(scope.value($0)) }
+        let cost = records.cost.flatMap { $0.first(answering: { Self.decimal(scope.value($0)) }) }
         // A record that says nothing about usage isn't usage.
         guard counts.prefix(5).contains(where: { $0 != nil }) || cost != nil else { return nil }
         let parts = records.id.map { scope.string($0) }
@@ -157,5 +164,15 @@ struct RecordShape: Sendable {
         default: return nil
         }
         return Decimal(string: text, locale: Locale(identifier: "en_US_POSIX"))
+    }
+}
+
+extension UsageLog.FieldPath {
+    /// What the first of its paths that answers reads.
+    func first<Value>(answering read: (String) -> Value?) -> Value? {
+        for path in paths {
+            if let value = read(path) { return value }
+        }
+        return nil
     }
 }

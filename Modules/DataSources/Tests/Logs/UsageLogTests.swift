@@ -10,7 +10,7 @@ struct UsageLogTests {
     static let definition = UsageLog.Definition(
         records: UsageLog.Records(
             files: "~/.acme/sessions/**/*.jsonl",
-            where: Match(path: "$.kind", equals: .string("reply")),
+            where: [Match(path: "$.kind", equals: .string("reply"))],
             at: "$.at",
             id: ["$.reply.id", "$.request"],
             model: "$.reply.model",

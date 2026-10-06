@@ -130,6 +130,7 @@ screens) never learns which tool wrote it.
 |---|---|---|
 | where the files are, what a field is called (Claude's `message.usage.input_tokens`, Vibe's `stats.session_total_llm_tokens`) | `files` and the field paths | no |
 | the same idea, said another way: the time in a folder's name, the log's own cost, a session per file, a running total | an option: `at.fromPath`, `cost`, no `sessionGap`, `"cumulative": true` | no |
+| one log, two shapes of usage line (Oh My Pi's turns under `message.usage`, the side calls it logs under `usage`) | a list of `where` conditions (a line any of them admits) and, per field, a list of paths (the first that answers) | no |
 | a record no path can say (a field to compute, a list to add up) | `"script": "x-log.js"` — `read(record, context)` returns one `LogRecord`, the escape hatch a mapping already has (built when a tool first needs it) | no |
 | a file of another kind (SQLite, binary) | a new `format` case and its reader, named for the format, with a test that names no tool | once |
 
@@ -206,8 +207,15 @@ data. The reading rules every format shares:
 
 - **`files`** is a glob: `**` any depth, `*` within one name; hidden files
   are skipped, and only files changed since the range's first day are read.
-- **`where`** keeps the records that match; its text values are also a byte
-  prefilter, so a line without them is never decoded.
+- **`where`** keeps the records that match: one condition, or a list of
+  them, any of which admits a record — a log that writes usage in more than
+  one shape. Its text values are also a byte prefilter, so a line holding
+  none of them is never decoded; a condition without a text value turns the
+  prefilter off.
+- A field — `model`, `cost`, any token count — names one path or **a list,
+  the first that answers**, so one definition reads every shape a log
+  writes. Each field takes its own first answer, so a list names, for each
+  shape, a path only that shape writes.
 - A record without `at`, or without a declared `model`, is skipped; so is
   one where no token field and no `cost` answers — it says nothing about
   usage (Claude's assistant line without `usage`, a Vibe `meta.json`
@@ -303,6 +311,7 @@ a vendor; the readers are named for formats. The page owns the views:
 | a new model's price, or a price cut | `claude-prices.json` |
 | *TODAY'S USAGE* for another tool that logs JSON | that tool's definition: a `usageHistory` block |
 | Codex's usage history (`~/.codex/sessions/**/rollout-*.jsonl`, whose `token_count` events carry a session's **running total**) | `codex.json`'s `usageHistory`, plus one reader option, `"cumulative": true` (the last record per session counts), with a neutral test |
+| Oh My Pi's usage history (turns, subagents and side calls in `~/.omp/agent/sessions/**/*.jsonl`, copied whole into forked sessions) | `omp.json`'s `usageHistory`: a `where` list, path lists, and `id: [$.id, $.timestamp]` — the identity omp's own stats use for fork copies |
 | a binary log format | one new reader, named for the format |
 | an added login's own usage history | nothing: `accounts.patch.usageHistory` |
 

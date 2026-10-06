@@ -127,11 +127,12 @@ actor JSONLinesReader {
         data.withUnsafeBytes { parseLine($0) }.map { [$0] } ?? []
     }
 
-    /// The record on one line, or `nil` when it lacks a required fragment,
-    /// isn't JSON, or isn't a record.
+    /// The record on one line, or `nil` when it holds none of the shape's
+    /// fragments, isn't JSON, or isn't a record.
     private nonisolated func parseLine(_ line: UnsafeRawBufferPointer) -> LogRecord? {
         guard let base = line.baseAddress,
-              shape.requiredFragments.allSatisfy({ fragment in memmem(base, line.count, fragment, fragment.count) != nil }),
+              shape.fragments.isEmpty
+                || shape.fragments.contains(where: { fragment in memmem(base, line.count, fragment, fragment.count) != nil }),
               let json = try? JSONSerialization.jsonObject(with: Data(bytes: base, count: line.count))
         else { return nil }
         return shape.record(from: json)
