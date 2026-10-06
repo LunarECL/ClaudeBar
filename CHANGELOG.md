@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Settings → Appearance → Popover Text Size scales the popover's text up to 1.4× and widens the window to fit. ([#364](https://github.com/tddworks/ClaudeBar/issues/364)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/settings.md)
+
 ---
 
 ## [0.5.8] - 2026-10-06
