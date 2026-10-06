@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.7] - 2026-10-06
+
 ### Changed
 - **Leaderboard** is the first tab in the popover's row, so it's always in reach; the popover still opens on your first provider. ([#501](https://github.com/tddworks/ClaudeBar/pull/501)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md)
 
@@ -140,7 +144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.7...HEAD
+[0.5.7]: https://github.com/tddworks/ClaudeBar/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/tddworks/ClaudeBar/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/tddworks/ClaudeBar/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/tddworks/ClaudeBar/compare/v0.5.3...v0.5.4
