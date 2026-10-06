@@ -83,26 +83,10 @@ Presentation is separate and may change freely:
 
 *TODAY'S USAGE*, the 30-day chart and the leaderboard read omp's own session logs, not `omp usage`. Researched against omp 18.6.1 (installed) and its source at 18.6.2: `@oh-my-pi/pi-utils` `dirs.ts`, `pi-coding-agent` `session/session-entries.ts` and `session-manager.ts`, and `@oh-my-pi/omp-stats`, omp's own usage dashboard, whose `parser.ts` and `db.ts` decide what counts.
 
-```jsonc
-"usageHistory": {
-  "records": [
-    { "files": "${PI_CODING_AGENT_DIR:-~/.omp/agent}/sessions/**/*.jsonl",
-      "where": { "path": "$.message.role", "equals": "assistant" },
-      "at": "$.timestamp", "id": ["$.id", "$.timestamp"],
-      "tokens": { "input": "$.message.usage.input", … },   // output · cacheWrite · cacheRead alike
-      "cost": "$.message.usage.cost.total" },
-    { "files": "${PI_CODING_AGENT_DIR:-~/.omp/agent}/sessions/**/*.jsonl",
-      "where": { "path": "$.type", "equals": "model_usage" },
-      "at": "$.timestamp", "id": ["$.id", "$.timestamp"],
-      "tokens": { "input": "$.usage.input", … },
-      "cost": "$.usage.cost.total" }
-  ],
-  "sessionGap": 1800
-}
-```
+The mapping is `usageHistory` in [`omp.json`](../../../Modules/Providers/Resources/Providers/omp.json): one log, every `*.jsonl` under the sessions folder, in two `shapes`, and a 30-minute `sessionGap` like Claude's and Codex's. Why each part is what it is:
 
 - **Where.** `getSessionsDir()` is `<agent dir>/sessions`, the agent dir `PI_CODING_AGENT_DIR` or `~/.omp/agent`. A main session is `<project>/<session>.jsonl`; its subagents' and advisor's transcripts sit one folder deeper (`<project>/<session>/<agent>.jsonl`, `__advisor.jsonl`), nested subagents deeper still. omp-stats reads every `*.jsonl` under each project folder, and so does the glob.
-- **Two kinds of usage record.** A turn is `{"type":"message","message":{"role":"assistant","usage":{…}}}`. A model call outside the conversation (memory, judgment, an advisor's) is `{"type":"model_usage","usage":{…}}`, written by `appendModelUsage`. omp-stats counts both and nothing else, so `records` lists both kinds, each read whole ([daily-usage design §2](../../features/daily-usage/design.md)). Only `message` entries have a `message`, so `$.message.role` picks out assistant turns alone, and a line is never both kinds.
+- **One record, two shapes.** A turn is `{"type":"message","message":{"role":"assistant","usage":{…}}}`. A model call outside the conversation (memory, judgment, an advisor's) is `{"type":"model_usage","usage":{…}}`, written by `appendModelUsage`. omp-stats counts both and nothing else, so `records` has both `shapes`, each read whole ([daily-usage design §2](../../features/daily-usage/design.md)). Only `message` entries have a `message`, so `$.message.role` picks out assistant turns alone, and no line has both shapes.
 - **Not counted, on purpose.** A `task` tool result carries `details.usage`, the sum of its subagent's turns, which are already counted from the subagent's own transcript; omp-stats skips it too, as it skips `generate_image`'s `details.usage`. User and tool-result messages carry no `usage`.
 - **Forks copy whole entries.** A forked session copies the parent's entries with their `id` and `timestamp`: 19% of the usage lines on the machine this was measured on. omp-stats dedupes on `(entry_id, timestamp)` (`backfillForkDuplicates`), and so does `id`. An entry id is 8 hex characters, so the id alone repeats across sessions (31 of 511,851 ids there, at different times); the time keeps those apart.
 - **Tokens.** pi-ai's `Usage.input` is the non-cached input for every provider (OpenAI's cached tokens are taken out in `calculateOpenAIUsageAccounting`), so there is no `inputIncludesCacheRead`. On the measured machine `totalTokens == input + output + cacheRead + cacheWrite` held for all 510,295 records across 8 providers. `usage.orchestration` (provider-side tokens outside those four) isn't read; no record there carried it.
