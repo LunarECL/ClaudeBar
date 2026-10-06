@@ -251,7 +251,7 @@ A destination, not a provider, so it sits beside Notify! (AGENTS.md: destination
 │  └───────────────┬─────────────────┘          ├────────────────────────────────┤             │           │
 │                  ▼                            │ Username · DailyTokens ·       │             │           │
 │  Account.usageHistory ──days(in:)──▶ per login│ BoardView · Standing           │             │           │
-│   (Claude, Codex, Mistral)                    │ LeaderboardUploader (hourly) ◀─┼── App driver timer      │
+│   (Claude, Codex, Mistral, Oh My Pi)          │ LeaderboardUploader (hourly) ◀─┼── App driver timer      │
 │                                               │ RequestSigner (canonical)      │                         │
 │                                               ├─ @Mockable ports ──────────────┤                         │
 │                                               │ LeaderboardAPI                 │                         │
