@@ -16,6 +16,19 @@ struct ClaudeSessionTests {
     }
 
     @Test
+    func `should be idle, with nothing finished, when opened at its prompt`() {
+        let session = ClaudeSession(id: "test", cwd: "/tmp", phase: .stopped)
+
+        #expect(session.phase == .stopped)
+        #expect(session.finishedAt == nil)
+        #expect(session.isActive == true)
+        #expect(session.activeSubagentCount == 0)
+        #expect(session.completedTaskCount == 0)
+        #expect(session.isActive == true)
+        #expect(session.endedAt == nil)
+    }
+
+    @Test
     func `should show agents working when a subagent starts`() {
         var session = ClaudeSession(id: "test", cwd: "/tmp")
 
@@ -69,6 +82,34 @@ struct ClaudeSessionTests {
 
         #expect(session.activeSubagentCount == 0)
         #expect(session.phase == .active)
+    }
+
+    @Test
+    func `should stay stopped when a subagent reports stopping after Claude stopped`() {
+        // Claude Code reports a subagent's stop a moment after the turn's own
+        // Stop; that must not make an idle session look like it is working.
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.subagentStarted()
+        let stoppedAt = Date()
+        session.stop(at: stoppedAt)
+
+        session.subagentStopped()
+
+        #expect(session.phase == .stopped)
+        #expect(session.stoppedAt == stoppedAt)
+        #expect(session.activeSubagentCount == 0)
+    }
+
+    @Test
+    func `should keep needing the person, with the prompt, when a subagent stops`() {
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.subagentStarted()
+        session.awaitInput("Claude needs your permission to use Bash")
+
+        session.subagentStopped()
+
+        #expect(session.phase == .awaitingInput)
+        #expect(session.pendingPrompt == "Claude needs your permission to use Bash")
     }
 
     @Test
@@ -336,11 +377,11 @@ struct ClaudeSessionTests {
     }
 
     @Test
-    func `should print each phase as Active, Agents Working, Needs You, Stopped or Ended`() {
-        #expect(ClaudeSession.Phase.active.label == "Active")
-        #expect(ClaudeSession.Phase.subagentsWorking.label == "Agents Working")
-        #expect(ClaudeSession.Phase.awaitingInput.label == "Needs You")
-        #expect(ClaudeSession.Phase.stopped.label == "Stopped")
+    func `should print each phase with the notch's words: Working, Agents working, Needs you, Done or Ended`() {
+        #expect(ClaudeSession.Phase.active.label == "Working")
+        #expect(ClaudeSession.Phase.subagentsWorking.label == "Agents working")
+        #expect(ClaudeSession.Phase.awaitingInput.label == "Needs you")
+        #expect(ClaudeSession.Phase.stopped.label == "Done")
         #expect(ClaudeSession.Phase.ended.label == "Ended")
     }
 }

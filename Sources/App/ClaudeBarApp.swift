@@ -63,6 +63,10 @@ struct ClaudeBarApp: App {
 
     /// Task for the hook server event loop (allows cancellation on toggle off)
     @State private var hookServerTask: Task<Void, Never>?
+    @State private var sessionSweepTask: Task<Void, Never>?
+
+    /// How often ClaudeBar checks that each session's Claude Code process still exists.
+    private static let sessionSweepInterval: Duration = .seconds(30)
 
     /// Alerts users when quota status degrades
     private let quotaAlerter = NotificationAlerter(accountSettings: JSONSettingsRepository.shared)
@@ -228,6 +232,17 @@ struct ClaudeBarApp: App {
         hookServerTask?.cancel()
         hookServer.stop()
 
+        // A session killed without a SessionEnd would otherwise stay forever.
+        sessionSweepTask?.cancel()
+        sessionSweepTask = Task {
+            let liveness = SystemProcessLiveness()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.sessionSweepInterval)
+                guard !Task.isCancelled else { break }
+                sessionMonitor.endSessionsWhoseProcessIsGone(according: liveness, at: Date())
+            }
+        }
+
         hookServerTask = Task {
             do {
                 let events = try await hookServer.start()
@@ -247,6 +262,8 @@ struct ClaudeBarApp: App {
     }
 
     func stopHookServer() {
+        sessionSweepTask?.cancel()
+        sessionSweepTask = nil
         hookServerTask?.cancel()
         hookServerTask = nil
         hookServer.stop()
@@ -265,11 +282,17 @@ struct ClaudeBarApp: App {
                 )
             }
         case .sessionEnd:
-            let taskCount = sessionMonitor.recentSessions.first?.completedTaskCount ?? 0
-            let duration = sessionMonitor.recentSessions.first?.durationDescription ?? ""
-            let summary = taskCount > 0
-                ? "Completed \(taskCount) task\(taskCount == 1 ? "" : "s") in \(duration)"
-                : "Session ended after \(duration)"
+            // The session that just ended, not merely the newest in the list:
+            // several can be running, and one ClaudeBar never saw has no entry.
+            let ended = sessionMonitor.recentSessions.first { $0.id == event.sessionId }
+            let taskCount = ended?.completedTaskCount ?? 0
+            let summary = if let duration = ended?.durationDescription {
+                taskCount > 0
+                    ? "Completed \(taskCount) task\(taskCount == 1 ? "" : "s") in \(duration)"
+                    : "Session ended after \(duration)"
+            } else {
+                "Session ended"
+            }
             Task {
                 try? await sessionAlertSender.send(
                     title: "Claude Code Finished",

@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Leaderboard web board**: the board scrolls inside its card so the globe is close by, the globe shows the tokens its countries total, and country names in its list are no longer cut in half. ([#503](https://github.com/tddworks/ClaudeBar/pull/503)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md)
 
+### Fixed
+- The popover opens scrolled to the top every time, instead of where you left it last time.
+- Every running Claude Code session is tracked, including ones started before ClaudeBar; before, only the newest one changed the status. The popover card lists each with its state, most pressing first; the menu bar follows the one that most needs you.
+- The session card names states the way the notch does — Working, Agents working, Needs you, Done — instead of Active, Needs You and Stopped.
+- A Claude Code session that has just opened, or been resumed, shows Done until you send it a prompt instead of Working; and the durations in the session card now tick while the popover is open.
+- A session no longer flips back to Working when Claude Code reports a subagent stopping a moment after the turn ended; it stays Done until your next prompt.
+- A session whose turn ended in an error (the connection dropped while the Mac slept, say) now shows Done instead of staying on Working: ClaudeBar listens to Claude Code's `StopFailure` hook.
+- A Claude Code session that was killed without ending cleanly (a crash, a closed terminal) is dropped within 30 seconds instead of staying until ClaudeBar restarts.
+
 ### Added
 - **Share your rank**: Share on the Leaderboard's *Your rank* makes an image of your place, square or wide, with your name shown or masked, to copy, save or share. Drawn on your Mac; nothing is uploaded. ([#504](https://github.com/tddworks/ClaudeBar/pull/504)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md#share-your-rank)
 - **Oh My Pi daily usage**: today's cost and tokens, the 30-day chart and Leaderboard sharing for Oh My Pi, read from omp's own session logs — subagents and the model calls it makes outside the chat included, a forked session's copies counted once. ([#502](https://github.com/tddworks/ClaudeBar/pull/502)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/omp/README.md#daily-usage)

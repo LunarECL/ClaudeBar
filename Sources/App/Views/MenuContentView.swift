@@ -31,6 +31,15 @@ struct MenuContentView: View {
     @State private var isHoveringRefresh = false
     @State private var animateIn = false
     @State private var showSharePass = false
+
+    /// The Claude Code card's height with its padding, taken off the
+    /// scroll region's cap so the action bar stays on screen.
+    @State private var sessionCardHeight: CGFloat = 0
+
+    /// How many times the popover has opened. The window-style dropdown keeps
+    /// this view alive between opens, so the scroll view would keep its offset;
+    /// folding this into its identity starts every open at the top.
+    @State private var openCount = 0
     @State private var settings = AppSettings.shared
     @State private var hasRequestedNotificationPermission = false
     @State private var pillsOverflow = false
@@ -85,11 +94,18 @@ struct MenuContentView: View {
                         .padding(.bottom, 16 - scrollTopInset)
                 }
 
-                // Session Indicator (shown when Claude Code is active)
-                if let session = sessionMonitor.activeSession {
-                    SessionIndicatorView(session: session)
+                // The Claude Code card (shown while any session is running).
+                // Measured, so the scroll region below gives up its height.
+                if sessionMonitor.hasActiveSession {
+                    SessionsCardView(sessionMonitor: sessionMonitor)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                            sessionCardHeight = height
+                        }
+                } else {
+                    Color.clear.frame(height: 0)
+                        .onAppear { sessionCardHeight = 0 }
                 }
 
                 // Main Content Area — hugs its content, but caps at the
@@ -105,10 +121,11 @@ struct MenuContentView: View {
                     .padding(.bottom, 16)
                 }
                 .frame(maxHeight: contentMaxHeight)
-                // Recreate the scroll view when the shown content
-                // changes, so a newly selected provider starts at the
-                // top instead of inheriting the previous scroll offset.
-                .id(settings.overviewModeEnabled ? "overview" : monitor.selectedProviderId)
+                // Recreate the scroll view when the shown content changes
+                // or the popover reopens, so a newly selected provider and
+                // every open start at the top instead of inheriting the
+                // previous scroll offset.
+                .id("\(settings.overviewModeEnabled ? "overview" : monitor.selectedProviderId)-\(openCount)")
 
                 // Bottom Action Bar
                 actionBar
@@ -156,6 +173,7 @@ struct MenuContentView: View {
         .frame(width: popoverWidth)
         .fixedSize(horizontal: false, vertical: true)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .onAppear { openCount += 1 }
         .background(TouchBarWindowAccessor())
         .background(keyboardShortcuts)
         .background(PopoverKeyWindowAccessor())
@@ -211,7 +229,8 @@ struct MenuContentView: View {
     private var contentMaxHeight: CGFloat {
         PopoverContentHeight.maxHeight(
             visibleScreenHeight: NSScreen.main?.visibleFrame.height ?? 800,
-            overviewMode: settings.overviewModeEnabled
+            overviewMode: settings.overviewModeEnabled,
+            sessionCardHeight: sessionCardHeight
         )
     }
 

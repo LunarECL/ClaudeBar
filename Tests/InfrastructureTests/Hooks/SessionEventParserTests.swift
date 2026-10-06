@@ -20,6 +20,28 @@ struct SessionEventParserTests {
     }
 
     @Test
+    func `should take the Claude Code process from the hook's header`() {
+        let json = """
+        {"session_id": "abc-123", "hook_event_name": "SessionStart", "cwd": "/tmp/project"}
+        """
+
+        let event = SessionEventParser.parse(json.data(using: .utf8)!, processId: "34901")
+
+        #expect(event?.processId == 34901)
+    }
+
+    @Test
+    func `should carry no process when the hook sent none or something that is not a number`() {
+        let json = """
+        {"session_id": "abc-123", "hook_event_name": "SessionStart", "cwd": "/tmp/project"}
+        """
+
+        #expect(SessionEventParser.parse(json.data(using: .utf8)!)?.processId == nil)
+        #expect(SessionEventParser.parse(json.data(using: .utf8)!, processId: "")?.processId == nil)
+        #expect(SessionEventParser.parse(json.data(using: .utf8)!, processId: "$CLAUDE_PID")?.processId == nil)
+    }
+
+    @Test
     func `should recognise a completed task`() {
         let json = """
         {"session_id": "xyz", "hook_event_name": "TaskCompleted", "cwd": "/home/user/code"}
@@ -50,6 +72,18 @@ struct SessionEventParserTests {
         let event = SessionEventParser.parse(json.data(using: .utf8)!)
 
         #expect(event?.eventName == .subagentStop)
+    }
+
+    @Test
+    func `should recognise a turn that ended in an error, with what went wrong`() {
+        let json = """
+        {"session_id": "test", "hook_event_name": "StopFailure", "cwd": "/tmp", "error": "Connection error"}
+        """
+
+        let event = SessionEventParser.parse(json.data(using: .utf8)!)
+
+        #expect(event?.eventName == .stopFailure)
+        #expect(event?.message == "Connection error")
     }
 
     @Test

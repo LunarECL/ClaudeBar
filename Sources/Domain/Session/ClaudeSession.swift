@@ -23,15 +23,25 @@ public struct ClaudeSession: Sendable, Equatable, Identifiable {
     /// (e.g. "Claude needs your permission to use Bash"). Cleared when work resumes.
     public private(set) var pendingPrompt: String?
 
+    /// The Claude Code process running this session, once a hook event has
+    /// said. nil for a session whose hooks never sent one.
+    public private(set) var processId: Int?
+
+    /// - Parameter phase: `.active` for a session seen mid-turn; `.stopped` for
+    ///   one that has just opened at its prompt — idle, with nothing finished
+    ///   yet, so `finishedAt` stays nil and the notch has nothing to flash.
     public init(
         id: String,
         cwd: String,
-        startedAt: Date = Date()
+        startedAt: Date = Date(),
+        processId: Int? = nil,
+        phase: Phase = .active
     ) {
         self.id = id
         self.cwd = cwd
         self.startedAt = startedAt
-        self.phase = .active
+        self.processId = processId
+        self.phase = phase
         self.activeSubagentCount = 0
         self.completedTaskCount = 0
     }
@@ -45,19 +55,25 @@ public struct ClaudeSession: Sendable, Equatable, Identifiable {
         case stopped
         case ended
 
-        /// Human-readable label for this phase
+        /// Human-readable label for this phase: the notch's words for the
+        /// same states (docs/features/notch), so the two never disagree.
         public var label: String {
             switch self {
-            case .active: return "Active"
-            case .subagentsWorking: return "Agents Working"
-            case .awaitingInput: return "Needs You"
-            case .stopped: return "Stopped"
+            case .active: return "Working"
+            case .subagentsWorking: return "Agents working"
+            case .awaitingInput: return "Needs you"
+            case .stopped: return "Done"
             case .ended: return "Ended"
             }
         }
     }
 
     // MARK: - Mutations
+
+    /// Records which process runs this session, when a later event says.
+    public mutating func runs(inProcess processId: Int) {
+        self.processId = processId
+    }
 
     /// Records a subagent starting work. Subagent activity also revives a
     /// `.stopped` session: a new turn is clearly underway, so the indicator
@@ -68,11 +84,16 @@ public struct ClaudeSession: Sendable, Equatable, Identifiable {
         updatePhase()
     }
 
-    /// Records a subagent stopping work
+    /// Records a subagent stopping work. Only changes the phase while agents
+    /// were what defined it: Claude Code reports a subagent's stop a moment
+    /// after the turn's own `Stop`, and that must not revive a stopped session
+    /// or release one waiting on the person.
     public mutating func subagentStopped() {
         guard phase != .ended else { return }
         activeSubagentCount = max(0, activeSubagentCount - 1)
-        updatePhase()
+        if phase == .subagentsWorking {
+            updatePhase()
+        }
     }
 
     /// Revives a stopped/idle session when a new turn begins (UserPromptSubmit).

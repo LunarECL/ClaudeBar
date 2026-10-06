@@ -23,18 +23,24 @@ public struct SessionEvent: Sendable, Equatable, Codable {
     /// (e.g. "Claude needs your permission to use Bash").
     public let message: String?
 
+    /// The Claude Code process the event came from, when the hook said.
+    /// Lets ClaudeBar notice a session whose process died without a `SessionEnd`.
+    public let processId: Int?
+
     public init(
         sessionId: String,
         eventName: EventName,
         cwd: String,
         receivedAt: Date = Date(),
-        message: String? = nil
+        message: String? = nil,
+        processId: Int? = nil
     ) {
         self.sessionId = sessionId
         self.eventName = eventName
         self.cwd = cwd
         self.receivedAt = receivedAt
         self.message = message
+        self.processId = processId
     }
 
     /// Whether this event must be ignored as ClaudeBar's own background probe traffic.
@@ -69,6 +75,9 @@ public struct SessionEvent: Sendable, Equatable, Codable {
         case subagentStart = "SubagentStart"
         case subagentStop = "SubagentStop"
         case stop = "Stop"
+        /// Fires instead of `Stop` when the turn ends in an error — an API
+        /// connection lost while the Mac slept, say. The turn is over either way.
+        case stopFailure = "StopFailure"
         /// Fires at the start of every turn (before Claude processes the prompt).
         /// Used to revive a session out of `.stopped` so the indicator tracks
         /// real activity instead of sticking on the end-of-turn `Stop`.

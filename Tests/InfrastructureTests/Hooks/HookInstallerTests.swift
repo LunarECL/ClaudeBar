@@ -19,13 +19,19 @@ struct HookInstallerTests {
     }
 
     @Test
+    func `should tell ClaudeBar which Claude Code process sent the event, so it can notice when it is gone`() {
+        #expect(HookInstaller.hookCommand.contains("-H \"\(HookConstants.processIdHeader): $CLAUDE_PID\""))
+    }
+
+    @Test
     func `should find ClaudeBar's port in the file ClaudeBar leaves for it`() {
         #expect(HookInstaller.hookCommand.contains("claudebar-hook-port"))
     }
 
     @Test
-    func `should listen to the seven session events Claude Code reports`() {
+    func `should listen to the eight session events Claude Code reports`() {
         let events = HookInstaller.hookEvents
+        #expect(events.contains("StopFailure"))
         #expect(events.contains("SessionStart"))
         #expect(events.contains("SessionEnd"))
         #expect(events.contains("TaskCompleted"))
@@ -33,7 +39,7 @@ struct HookInstallerTests {
         #expect(events.contains("SubagentStop"))
         #expect(events.contains("Stop"))
         #expect(events.contains("UserPromptSubmit"))
-        #expect(events.count == 7)
+        #expect(events.count == 8)
     }
 
     // MARK: - Claude Code's settings file
