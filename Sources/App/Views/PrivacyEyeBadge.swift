@@ -19,8 +19,8 @@ struct PrivacyEyeBadge: View {
                 .foregroundStyle(isHidden ? theme.textPrimary : theme.textTertiary)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .background(Capsule().fill(isHidden ? theme.progressTrack : Color.clear))
-                .overlay(Capsule().stroke(theme.glassBorder, lineWidth: isHidden ? 0 : 1))
+                .background(theme.controlShape.fill(isHidden ? theme.progressTrack : Color.clear))
+                .overlay(theme.controlShape.stroke(theme.glassBorder, lineWidth: isHidden ? 0 : 1))
         }
         .buttonStyle(.plain)
         .help(isHidden ? "Show \(what)" : "Hide \(what)")

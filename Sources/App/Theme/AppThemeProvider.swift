@@ -163,6 +163,36 @@ public protocol AppThemeProvider {
     /// default "AI Usage Monitor".
     var tagline: String? { get }
 
+    /// The name of this theme's own text style ("Pixel") when the person may
+    /// choose it or Classic; `nil` when there's nothing to choose.
+    var textStyleName: String? { get }
+
+    /// This theme printing its words in `style`.
+    func styled(_ style: ThemeTextStyle) -> any AppThemeProvider
+
+    /// The corners of buttons, pickers and toggles: `nil` for round ones
+    /// (capsules and circles), else rounded rectangles of this radius.
+    var controlCornerRadius: CGFloat? { get }
+
+    /// The floor drawn along the popover's bottom edge, which the action bar
+    /// stands on; 0 for none.
+    var groundHeight: CGFloat { get }
+
+    /// What heads the popover.
+    var headerStyle: HeaderStyle { get }
+
+    /// Whether a badge for `status` blinks to catch the eye.
+    func blinks(_ status: QuotaStatus) -> Bool
+
+    /// Text on an accent fill: the selected tab.
+    var textOnAccent: Color { get }
+
+    /// A badge's corners: `nil` for the theme's usual (a pill when outlined).
+    var badgeCornerRadius: CGFloat? { get }
+
+    /// The size of the rivets in a card's four corners; `nil` for none.
+    var cardRivetSize: CGFloat? { get }
+
     // MARK: - Computed Helpers
 
     /// Returns the appropriate status color for a given quota status
@@ -204,6 +234,22 @@ public extension AppThemeProvider {
     func statusWord(for status: QuotaStatus) -> String { status.badgeText }
     func badgeFont(size: CGFloat) -> Font { AppTheme.captionFont(size: size) }
     var tagline: String? { nil }
+    var textStyleName: String? { nil }
+    func styled(_ style: ThemeTextStyle) -> any AppThemeProvider { self }
+    var controlCornerRadius: CGFloat? { nil }
+    var groundHeight: CGFloat { 0 }
+    var headerStyle: HeaderStyle { .standard }
+    func blinks(_ status: QuotaStatus) -> Bool { false }
+    var textOnAccent: Color { .white }
+    var badgeCornerRadius: CGFloat? { nil }
+    var cardRivetSize: CGFloat? { nil }
+
+    /// The shape of a button, picker or toggle: a capsule (a circle when
+    /// square-framed) unless the theme squares its controls off.
+    var controlShape: AnyShape {
+        guard let controlCornerRadius else { return AnyShape(Capsule()) }
+        return AnyShape(RoundedRectangle(cornerRadius: controlCornerRadius))
+    }
 
     /// The font for a big number in this theme — the display font, else the
     /// system font at `weight` in `fontDesign`.
@@ -245,6 +291,30 @@ public extension AppThemeProvider {
         case .critical, .depleted: progressGradient(for: 0)
         }
     }
+}
+
+// MARK: - Text Style
+
+/// How a theme with its own text face prints words.
+public enum ThemeTextStyle: String, CaseIterable, Identifiable, Sendable {
+    /// The theme's face on every word.
+    case themed
+    /// The theme's look in normal fonts: none of the faces it bundles.
+    case classic
+
+    public var id: String { rawValue }
+}
+
+// MARK: - Header Style
+
+/// What heads the popover.
+public enum HeaderStyle: Equatable, Sendable {
+    /// ClaudeBar's name and the status pill.
+    case standard
+    /// A game's score line above the name, and a ? block in place of the
+    /// status pill (whose word moves into the score line). The ? block
+    /// refreshes, as the action bar's Refresh button still does.
+    case scoreLine
 }
 
 // MARK: - Progress Style

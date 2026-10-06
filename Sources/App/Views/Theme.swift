@@ -569,6 +569,10 @@ struct BadgeStyle: ViewModifier {
     /// its pills: Pop's are capsules, Platformer's square blocks.
     private var isOutlined: Bool { theme.cardBorderWidth > 1 }
 
+    private var cornerRadius: CGFloat {
+        theme.badgeCornerRadius ?? (isOutlined ? theme.pillCornerRadius : 4)
+    }
+
     func body(content: Content) -> some View {
         content
             .font(theme.badgeFont(size: 8))
@@ -576,7 +580,7 @@ struct BadgeStyle: ViewModifier {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
-                RoundedRectangle(cornerRadius: isOutlined ? theme.pillCornerRadius : 4)
+                RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(isOutlined ? color : color.opacity(colorScheme == .dark ? 0.9 : 0.85))
                     .shadow(
                         color: colorScheme == .light && !isOutlined ? color.opacity(0.3) : .clear,
@@ -585,7 +589,7 @@ struct BadgeStyle: ViewModifier {
                     )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: isOutlined ? theme.pillCornerRadius : 4)
+                RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth * 0.6)
             )
             .fixedSize()
@@ -595,6 +599,63 @@ struct BadgeStyle: ViewModifier {
 extension View {
     func badge(_ color: Color) -> some View {
         modifier(BadgeStyle(color: color))
+    }
+}
+
+// MARK: - Blinking
+
+/// Blinks a view on and off — no fade, like an arcade sign — while `isOn`:
+/// a badge a theme wants noticed (Platformer's HURRY UP!).
+struct Blinking: ViewModifier {
+    let isOn: Bool
+
+    func body(content: Content) -> some View {
+        if isOn {
+            TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                let lit = Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
+                content.opacity(lit ? 1 : 0.25)
+            }
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: - Rivets
+
+/// A theme's rivets in a card's four corners (Platformer's), inked; nothing
+/// for a theme without them.
+struct ThemeRivets: ViewModifier {
+    @Environment(\.appTheme) private var theme
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if let size = theme.cardRivetSize {
+                ZStack {
+                    ForEach(0..<4, id: \.self) { corner in
+                        Rectangle()
+                            .fill(theme.glassBorder.opacity(0.55))
+                            .frame(width: size, height: size)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity,
+                                   alignment: [Alignment.topLeading, .topTrailing, .bottomLeading, .bottomTrailing][corner])
+                    }
+                }
+                .padding(theme.cardBorderWidth + 3)
+                .allowsHitTesting(false)
+            }
+        }
+    }
+}
+
+extension View {
+    func themeRivets() -> some View {
+        modifier(ThemeRivets())
+    }
+}
+
+extension View {
+    func blinking(_ isOn: Bool) -> some View {
+        modifier(Blinking(isOn: isOn))
     }
 }
 

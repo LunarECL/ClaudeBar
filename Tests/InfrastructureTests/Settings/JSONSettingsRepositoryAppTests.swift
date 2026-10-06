@@ -85,6 +85,23 @@ struct JSONSettingsRepositoryAppTests {
     }
 
     @Test
+    func `should print a theme's own text everywhere until the person picks another style`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.themeTextStyle() == "themed")
+    }
+
+    @Test
+    func `should remember the chosen text style`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setThemeTextStyle("classic")
+        #expect(repo.themeTextStyle() == "classic")
+    }
+
+    @Test
     func `should know the person has not chosen a theme yet`() {
         let (repo, dir) = makeRepository()
         defer { cleanup(dir) }

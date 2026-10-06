@@ -51,7 +51,8 @@ public struct AppThemeProviderModifier: ViewModifier {
         ThemeRegistry.shared.resolveTheme(
             for: themeModeId,
             systemColorScheme: systemColorScheme,
-            statusColors: AppSettings.shared.statusColorPolicy
+            statusColors: AppSettings.shared.statusColorPolicy,
+            textStyle: AppSettings.shared.themeTextStyle
         )
     }
 

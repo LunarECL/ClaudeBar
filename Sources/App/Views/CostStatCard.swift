@@ -110,6 +110,7 @@ struct CostStatCard: View {
                 }
             }
         )
+        .themeRivets()
         .overlay(alignment: .topTrailing) {
             if printedBudget != nil {
                 sticker.offset(x: -12, y: -9)

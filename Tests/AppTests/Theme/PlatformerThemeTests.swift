@@ -100,3 +100,135 @@ struct ProgressBlocksTests {
         #expect(ProgressBlocks.filled(percent: 140, of: 10) == 10)
     }
 }
+
+/// What Platformer adds to the popover — a choice of text style, square
+/// controls, a brick floor the buttons stand on, a score line with a ?
+/// block, a blinking HURRY UP! — and that no other theme changes.
+@MainActor
+@Suite
+struct PlatformerLevelTests {
+    @Test func `should let the person choose Pixel or Classic text in Platformer`() {
+        #expect(PlatformerTheme().textStyleName == "Pixel")
+    }
+
+    @Test func `should print every word in pixels with Pixel text`() {
+        let theme = PlatformerTheme().styled(.themed)
+        #expect(theme.customFontName == "PixelifySans")
+    }
+
+    @Test func `should drop every pixel face with Classic text but keep the level`() {
+        let theme = PlatformerTheme().styled(.classic)
+        #expect(theme.customFontName == nil)
+        #expect(theme.displayFontName == nil)
+        #expect(theme.progressStyle == .blocks(10))
+        #expect(theme.statusWord(for: .critical) == "HURRY UP!")
+    }
+
+    @Test func `should print square badges and rivet each card's corners`() {
+        let theme = PlatformerTheme()
+        #expect(theme.badgeCornerRadius == 0)
+        #expect(theme.cardRivetSize == 4)
+    }
+
+    @Test func `should keep Classic text when the person also picks their own status colours`() {
+        let theme = ThemeRegistry.shared.resolveTheme(
+            for: "platformer",
+            systemColorScheme: .light,
+            statusColors: StatusColorPolicy(overrides: StatusColorOverrides(healthy: RGBColorValue(red: 0, green: 0, blue: 1)), highContrastEnabled: false),
+            textStyle: .classic
+        )
+        #expect(theme.customFontName == nil)
+        #expect(theme.statusWord(for: .depleted) == "GAME OVER")
+    }
+
+    @Test func `should square off Platformer's buttons and stand them on the brick floor`() {
+        let theme = PlatformerTheme()
+        #expect(theme.controlCornerRadius == 3)
+        #expect(theme.groundHeight == 36)
+    }
+
+    @Test func `should head Platformer's popover with a score line and a ? block`() {
+        #expect(PlatformerTheme().headerStyle == .scoreLine)
+    }
+
+    @Test func `should blink HURRY UP and nothing else`() {
+        let theme = PlatformerTheme()
+        #expect(theme.blinks(.critical))
+        #expect(!theme.blinks(.healthy))
+        #expect(!theme.blinks(.warning))
+        #expect(!theme.blinks(.depleted))
+    }
+
+    @Test func `should write on Platformer's selected tab in ink`() {
+        #expect(PlatformerTheme().textOnAccent == PlatformerTheme.ink)
+    }
+
+    @Test func `should write on CLI's selected tab in its own text colour`() throws {
+        let cli = try #require(ThemeRegistry.shared.theme(for: "cli"))
+        #expect(cli.textOnAccent == cli.textPrimary)
+    }
+
+    @Test(arguments: ["light", "dark", "system", "cli", "christmas", "pop"])
+    func `should keep every other theme's round controls, header and steady badges`(id: String) throws {
+        let theme = try #require(ThemeRegistry.shared.theme(for: id))
+        #expect(theme.textStyleName == nil)
+        #expect(theme.controlCornerRadius == nil)
+        #expect(theme.groundHeight == 0)
+        #expect(theme.headerStyle == .standard)
+        #expect(!theme.blinks(.critical))
+        #expect(theme.badgeCornerRadius == nil)
+        #expect(theme.cardRivetSize == nil)
+        // Another style changes nothing on a theme that offers none.
+        #expect(theme.styled(.classic).customFontName == theme.customFontName)
+    }
+}
+
+/// The score line across the top of Platformer's popover, read from the
+/// selected provider like the rest of the popover: who, how it's doing,
+/// how much is left as coins, which tab, and minutes until it resets.
+@Suite
+struct ScoreLineTests {
+    private let now = Date(timeIntervalSince1970: 1_000_000)
+
+    @Test func `should name the provider and say how it is doing`() {
+        let line = ScoreLine(providerName: "Claude", status: "HEALTHY", quotas: [], tab: 1, now: now)
+        #expect(line.player == "CLAUDE")
+        #expect(line.status == "HEALTHY")
+    }
+
+    @Test func `should count what is left of the first quota as coins`() {
+        let quotas = [UsageQuota(percentRemaining: 62, quotaType: .session, providerId: "claude"),
+                      UsageQuota(percentRemaining: 10, quotaType: .weekly, providerId: "claude")]
+        let line = ScoreLine(providerName: "Claude", status: "HEALTHY", quotas: quotas, tab: 1, now: now)
+        #expect(line.coins == "62")
+    }
+
+    @Test func `should count a balance's whole dollars as coins`() {
+        let quotas = [UsageQuota(percentRemaining: 97, quotaType: .modelSpecific("Credits"), providerId: "openrouter", dollarRemaining: Decimal(string: "24.19"))]
+        let line = ScoreLine(providerName: "OpenRouter", status: "HEALTHY", quotas: quotas, tab: 3, now: now)
+        #expect(line.coins == "24")
+    }
+
+    @Test func `should number the world after the selected tab`() {
+        let line = ScoreLine(providerName: "Codex", status: "HEALTHY", quotas: [], tab: 2, now: now)
+        #expect(line.world == "1-2")
+    }
+
+    @Test func `should count down the minutes until the first quota resets`() {
+        let quotas = [UsageQuota(percentRemaining: 62, quotaType: .session, providerId: "claude", resetsAt: now.addingTimeInterval(4 * 3600 + 48 * 60))]
+        let line = ScoreLine(providerName: "Claude", status: "HEALTHY", quotas: quotas, tab: 1, now: now)
+        #expect(line.time == "288")
+    }
+
+    @Test func `should cap a long countdown at 999 minutes`() {
+        let quotas = [UsageQuota(percentRemaining: 62, quotaType: .weekly, providerId: "claude", resetsAt: now.addingTimeInterval(3 * 86400))]
+        let line = ScoreLine(providerName: "Claude", status: "HEALTHY", quotas: quotas, tab: 1, now: now)
+        #expect(line.time == "999")
+    }
+
+    @Test func `should show dashes when nothing is known yet`() {
+        let line = ScoreLine(providerName: "Claude", status: "SYNCING", quotas: [], tab: 1, now: now)
+        #expect(line.coins == "--")
+        #expect(line.time == "---")
+    }
+}

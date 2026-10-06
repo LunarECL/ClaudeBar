@@ -70,6 +70,7 @@ struct UsageHistoryChartView: View {
                     .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             }
         )
+        .themeRivets()
         .opacity(isVisible ? 1 : 0)
         .onAppear {
             withAnimation(.easeOut(duration: 0.4).delay(delay)) { isVisible = true }
@@ -111,8 +112,8 @@ struct UsageHistoryChartView: View {
                 .foregroundStyle(isOn ? theme.textPrimary : theme.textTertiary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Capsule().fill(isOn ? theme.progressTrack : Color.clear))
-                .overlay(Capsule().stroke(theme.glassBorder, lineWidth: isOn ? 0 : 1))
+                .background(theme.controlShape.fill(isOn ? theme.progressTrack : Color.clear))
+                .overlay(theme.controlShape.stroke(theme.glassBorder, lineWidth: isOn ? 0 : 1))
         }
         .buttonStyle(.plain)
     }

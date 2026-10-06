@@ -225,7 +225,7 @@ struct MenuBarChoiceButton: View {
     }
 
     private var selectedForeground: Color {
-        theme.id == "cli" ? theme.textPrimary : .white
+        theme.textOnAccent
     }
 
     private var buttonBackground: some View {

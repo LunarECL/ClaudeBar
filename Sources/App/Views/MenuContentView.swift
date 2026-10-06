@@ -109,7 +109,8 @@ struct MenuContentView: View {
                 // Bottom Action Bar
                 actionBar
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                    // A theme's floor: the buttons stand on it.
+                    .padding(.bottom, 12 + theme.groundHeight)
             }
 
             // Share Pass Overlay
@@ -276,6 +277,51 @@ struct MenuContentView: View {
     // MARK: - Header
 
     private var headerView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if theme.headerStyle == .scoreLine {
+                ScoreLineView(line: scoreLine)
+            }
+            brandRow
+        }
+        .opacity(animateIn ? 1 : 0)
+        .offset(y: animateIn ? 0 : -10)
+    }
+
+    /// The selected tab as a game's score line: its name and status word,
+    /// its first quota's coins, the tab's place, the minutes to its reset.
+    private var scoreLine: ScoreLine {
+        let tabs = monitor.tabs
+        let index = tabs.firstIndex { $0.contains(selectedProviderId) } ?? 0
+        return ScoreLine(
+            providerName: tabs.indices.contains(index) ? settings.shown(tabs[index].name) : "ClaudeBar",
+            status: statusText,
+            quotas: selectedLogin?.snapshot?.quotas ?? [],
+            tab: index + 1
+        )
+    }
+
+    private var isCurrentlyRefreshing: Bool {
+        settings.overviewModeEnabled
+            ? monitor.lineup.contains { $0.isSyncing }
+            : selectedLogin?.isSyncing == true
+    }
+
+    /// Refresh what's on screen — the selected provider, or every one in
+    /// the overview — and the leaderboard.
+    private func refreshNow() {
+        // An explicit refresh is the moment a user who just installed a
+        // CLI expects it to be picked up, so drop the cached lookups
+        // instead of waiting for their TTL to lapse.
+        BinaryLocator.invalidateCaches()
+        Task { await leaderboard.refresh() }
+        if settings.overviewModeEnabled {
+            Task { await refreshAllEnabled() }
+        } else {
+            Task { await refresh(providerId: selectedProviderId) }
+        }
+    }
+
+    private var brandRow: some View {
         HStack(spacing: 12) {
             // Custom Provider Icon - shows AppLogo in overview mode and on the Leaderboard
             // tab (it isn't any one provider's), the provider icon otherwise.
@@ -331,14 +377,17 @@ struct MenuContentView: View {
 
             // Status Badge: the provider's status, or on the Leaderboard tab the
             // leaderboard's own — same pill, so the header never changes height.
-            if showsLeaderboard {
+            // A score-line header has a ? block there instead, which refreshes
+            // too: its status word is in the score line.
+            if theme.headerStyle == .scoreLine {
+                QuestionBlockButton(isSyncing: isCurrentlyRefreshing, action: refreshNow)
+                    .help("Refresh")
+            } else if showsLeaderboard {
                 leaderboardBadge
             } else {
                 statusBadge
             }
         }
-        .opacity(animateIn ? 1 : 0)
-        .offset(y: animateIn ? 0 : -10)
     }
 
     private var headerSubtitle: String {
@@ -436,6 +485,10 @@ struct MenuContentView: View {
     private var providerPills: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
+                // Leaderboard leads the row, but the popover still opens on
+                // the first provider: it shows only once it's picked.
+                LeaderboardPill(isSelected: showsLeaderboard) { showsLeaderboard = true }
+                    .help("Leaderboard")
                 ForEach(Array(monitor.tabs.enumerated()), id: \.element.id) { index, tab in
                     ProviderPill(
                         providerId: tab.id,
@@ -451,8 +504,6 @@ struct MenuContentView: View {
                     }
                     .help(index < 9 ? "\(settings.shown(tab.name)) (⌘\(index + 1))" : settings.shown(tab.name))
                 }
-                LeaderboardPill(isSelected: showsLeaderboard) { showsLeaderboard = true }
-                    .help("Leaderboard")
             }
             // A scroll view clips at its edges: leave room for an outlined
             // theme's thick outline and hard shadow.
@@ -1067,27 +1118,14 @@ struct MenuContentView: View {
             .keyboardShortcut("d")
             .help("Open dashboard (⌘D)")
 
-            // Refresh Button
-            let isCurrentlyRefreshing = settings.overviewModeEnabled
-                ? monitor.lineup.contains { $0.isSyncing }
-                : selectedLogin?.isSyncing == true
+            // Refresh Button — always here, a ? block in the header or not.
             WrappedActionButton(
                 icon: isCurrentlyRefreshing ? "arrow.trianglehead.2.counterclockwise.rotate.90" : "arrow.clockwise",
                 label: isCurrentlyRefreshing ? "Syncing" : "Refresh",
                 gradient: theme.accentGradient,
-                isLoading: isCurrentlyRefreshing
-            ) {
-                // An explicit refresh is the moment a user who just installed a
-                // CLI expects it to be picked up, so drop the cached lookups
-                // instead of waiting for their TTL to lapse.
-                BinaryLocator.invalidateCaches()
-                Task { await leaderboard.refresh() }
-                if settings.overviewModeEnabled {
-                    Task { await refreshAllEnabled() }
-                } else {
-                    Task { await refresh(providerId: selectedProviderId) }
-                }
-            }
+                isLoading: isCurrentlyRefreshing,
+                action: refreshNow
+            )
             .keyboardShortcut("r")
             .help("Refresh (⌘R)")
 
@@ -1100,10 +1138,10 @@ struct MenuContentView: View {
                     Task { await fetchAndShowPasses() }
                 } label: {
                     ZStack {
-                        Circle()
+                        theme.controlShape
                             .fill(theme.shareGradient)
                             .themeShadow(theme, scale: 0.6)
-                            .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
+                            .overlay(theme.controlShape.stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                             .frame(width: 32, height: 32)
 
                         // On a printed theme's light candy fill, the icon is ink.
@@ -1131,10 +1169,10 @@ struct MenuContentView: View {
                 NSApp.activate(ignoringOtherApps: true)
             } label: {
                 ZStack {
-                    Circle()
+                    theme.controlShape
                         .fill(theme.glassBackground)
                         .themeShadow(theme, scale: 0.6)
-                        .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
+                        .overlay(theme.controlShape.stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                         .frame(width: 32, height: 32)
 
                     Image(systemName: "gearshape.fill")
@@ -1159,10 +1197,10 @@ struct MenuContentView: View {
                 NSApplication.shared.terminate(nil)
             } label: {
                 ZStack {
-                    Circle()
+                    theme.controlShape
                         .fill(theme.glassBackground)
                         .themeShadow(theme, scale: 0.6)
-                        .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
+                        .overlay(theme.controlShape.stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                         .frame(width: 32, height: 32)
 
                     Image(systemName: "xmark")
@@ -1275,7 +1313,7 @@ struct ProviderPill: View {
                     .lineLimit(1)
                     .fixedSize()
             }
-            .foregroundStyle(isSelected ? (theme.id == "cli" ? theme.textPrimary : .white) : theme.textPrimary)
+            .foregroundStyle(isSelected ? theme.textOnAccent : theme.textPrimary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
@@ -1490,8 +1528,10 @@ struct WrappedStatCard: View {
                     Text(quota.pace.displayName.uppercased())
                         .badge(paceColor)
                 } else {
-                    Text(theme.statusWord(for: quota.status(under: settings.statusPolicy)))
+                    let status = quota.status(under: settings.statusPolicy)
+                    Text(theme.statusWord(for: status))
                         .badge(statusColor)
+                        .blinking(theme.blinks(status))
                 }
             }
 
@@ -1627,6 +1667,7 @@ struct WrappedStatCard: View {
                     .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             }
         )
+        .themeRivets()
         .scaleEffect(isHovering ? 1.015 : 1.0)
         .animation(.easeOut(duration: 0.15), value: isHovering)
         .onHover { isHovering = $0 }
@@ -1773,15 +1814,15 @@ struct WrappedActionButton: View {
                     if theme.isOutlined {
                         // Printed: a paper chip on a hard shadow, mint under the
                         // pointer, sky while it works — never greyed out.
-                        Capsule()
+                        theme.controlShape
                             .fill(isLoading ? theme.accentSecondary : (isHovering ? theme.statusHealthy : theme.glassBackground))
                             .themeShadow(theme, scale: isHovering ? 1 : 0.75)
                     } else {
-                        Capsule()
+                        theme.controlShape
                             .fill(isHovering ? AnyShapeStyle(gradient) : AnyShapeStyle(theme.glassBackground))
                     }
 
-                    Capsule()
+                    theme.controlShape
                         .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
                 }
             )

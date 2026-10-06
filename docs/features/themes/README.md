@@ -22,6 +22,8 @@ Settings → **Appearance** → **Theme**, then click one. The change applies st
 | **Pop** | Cream dotted paper, thick ink outlines, hard shadows, candy-coloured status and chunky numbers |
 | **Platformer** | A Super Mario–style 8-bit level: blue sky, pixel clouds and hills on a brick floor, quota bars as a row of ten blocks, pixel text everywhere. A low quota says **HURRY UP!**, an empty one **GAME OVER** |
 
+**Platformer's text**: with Platformer chosen, Settings → **Appearance** → **Text** picks **Pixel** (every word and number in pixel fonts) or **Classic** (the same level in normal fonts, easier to read). Platformer also swaps the status pill for a score line (provider and status, coins left, the tab as WORLD, minutes to the reset as TIME) and a **?** block you can click to refresh, beside the usual Refresh button.
+
 **Christmas turns itself on** from December 24 to 26, but only if you've never picked a theme yourself. After the 26th it switches back to System. Once you've chosen any theme, ClaudeBar leaves your choice alone.
 
 ## Import a terminal theme

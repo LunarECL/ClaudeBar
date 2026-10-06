@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Leaderboard** is the first tab in the popover's row, so it's always in reach; the popover still opens on your first provider. ([#501](https://github.com/tddworks/ClaudeBar/pull/501)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md)
+
 ### Fixed
 - Pop theme: a dollar balance or spend now prints in the same outlined style as a percentage, with its caption beside it, so a card's big numbers no longer look like two different fonts ([#499](https://github.com/tddworks/ClaudeBar/issues/499))
 
 ### Added
-- **Platformer theme**: a Super Mario–style 8-bit level with blocks for bars and pixel text. Low quotas say HURRY UP! ([#501](https://github.com/tddworks/ClaudeBar/pull/501)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/themes/README.md)
+- **Platformer theme**: a Super Mario–style 8-bit level with a score line, a ? block to refresh, blocks for bars and Pixel or Classic text. ([#501](https://github.com/tddworks/ClaudeBar/pull/501)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/themes/README.md)
 
 ---
 

@@ -22,13 +22,26 @@
   (`statusWord(for:)` — Platformer's HURRY UP! and GAME OVER) and their font
   (`badgeFont(size:)`), how a quota's bar
   is drawn (`progressStyle`: `.bar`, or `.blocks(10)` for Platformer), and how
-  large a wide display font prints (`displayFontScale`). A wrapper such as
+  large a wide display font prints (`displayFontScale`), whether controls are
+  round or square (`controlCornerRadius`, drawn through `controlShape`), the
+  floor the action bar stands on (`groundHeight`), what heads the popover
+  (`headerStyle`: `.scoreLine` puts a `ScoreLine` above the name and a ?
+  block that refreshes in place of the status pill), which badges blink
+  (`blinks(_:)`), the text on an accent fill (`textOnAccent`), a badge's
+  corners (`badgeCornerRadius`) and the rivets in a card's corners
+  (`cardRivetSize`, drawn by `.themeRivets()` on every popover card). A wrapper such as
   `StatusColorOverridingTheme` forwards every one, or the person's own status
   colours would quietly drop them.
 - **An outlined theme** (`cardBorderWidth` above 1: Pop, Platformer) prints
   paper cards, inked pills and outlined big numbers — percentages and money
   alike (#499), and badges as round as its pills (`pillCornerRadius`). A
   bundled font is registered through `BundledFont`.
+- **A theme's text style is the person's choice**: a theme that names one
+  (`textStyleName`, Platformer's "Pixel") is resolved `styled(.themed)` or
+  `styled(.classic)` from `AppSettings.themeTextStyle` (`app.themeTextStyle`
+  in settings.json). Classic drops every face the theme bundles
+  (`customFontName`, `displayFontName`, its badge face) and keeps the rest of
+  the look. Settings shows the choice only for such a theme.
 - **Views set text through `theme.font(size:weight:)`**, never
   `.system(…, design: theme.fontDesign)`, so a theme with `customFontName`
   (Platformer's Pixelify Sans) reaches every word; without one it is the

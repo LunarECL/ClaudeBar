@@ -52,6 +52,7 @@ struct CustomWebCardView: View {
                     .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             }
         )
+        .themeRivets()
         .scaleEffect(isHovering ? 1.015 : 1.0)
         .animation(.easeOut(duration: 0.15), value: isHovering)
         .onHover { isHovering = $0 }

@@ -75,9 +75,14 @@ public struct PlatformerTheme: AppThemeProvider {
     /// Navy reads on the paper cards and on the sky behind them.
     public var textTertiary: Color { Self.navy }
     public var fontDesign: Font.Design { .rounded }
-    /// Every word in a pixel face: Pixelify Sans, in four weights.
-    public var customFontName: String? { PlatformerFonts.body }
-    public var displayFontName: String? { PlatformerFonts.display }
+    /// Pixel text: every word in Pixelify Sans, in four weights. Classic:
+    /// plain words.
+    public var customFontName: String? { textStyle == .themed ? PlatformerFonts.body : nil }
+    public var textStyleName: String? { "Pixel" }
+    public func styled(_ style: ThemeTextStyle) -> any AppThemeProvider { PlatformerTheme(textStyle: style) }
+    /// Pixel text: big numbers in Press Start 2P. Classic: no pixel face at
+    /// all — bold outlined numbers in the system font.
+    public var displayFontName: String? { textStyle == .themed ? PlatformerFonts.display : nil }
     /// Press Start 2P is half again as wide as Lilita One.
     public var displayFontScale: CGFloat { 0.6 }
     public var tagline: String? { "Your quotas, one level at a time" }
@@ -90,9 +95,12 @@ public struct PlatformerTheme: AppThemeProvider {
     public var statusDepleted: Color { Self.stone }
     public var textOnStatus: Color { Self.ink }
 
-    /// Badges in the score-line face, a step smaller: it's wide.
+    /// Pixel text: badges in the score-line face, a step smaller (it's
+    /// wide). Classic: a small bold monospace, like a game's printout.
     public func badgeFont(size: CGFloat) -> Font {
-        guard let display = PlatformerFonts.display else { return AppTheme.captionFont(size: size) }
+        guard textStyle == .themed, let display = PlatformerFonts.display else {
+            return .system(size: size, weight: .bold, design: .monospaced)
+        }
         return .custom(display, size: size * 0.8)
     }
 
@@ -119,8 +127,9 @@ public struct PlatformerTheme: AppThemeProvider {
     public var accentPrimary: Color { Self.block }
     public var accentSecondary: Color { Self.pipe }
 
+    /// The selected tab is a pipe-green block.
     public var accentGradient: LinearGradient {
-        LinearGradient(colors: [Self.block, Self.block], startPoint: .leading, endPoint: .trailing)
+        LinearGradient(colors: [Self.pipe, Self.pipe], startPoint: .leading, endPoint: .trailing)
     }
 
     public var pillGradient: LinearGradient {
@@ -141,6 +150,23 @@ public struct PlatformerTheme: AppThemeProvider {
     public var progressTrack: Color { Self.paperDeep }
     public var progressStyle: ProgressStyle { .blocks(10) }
 
+    // MARK: - The Level
+
+    /// Square buttons and pickers, like blocks.
+    public var controlCornerRadius: CGFloat? { 3 }
+    /// Two rows of bricks; the action bar stands on them.
+    public var groundHeight: CGFloat { PlatformerScenery.floorHeight }
+    /// A score line across the top, a ? block to refresh.
+    public var headerStyle: HeaderStyle { .scoreLine }
+    /// HURRY UP! blinks, as the music speeds up when time runs low.
+    public func blinks(_ status: QuotaStatus) -> Bool { status == .critical }
+    /// Ink on the green of the selected tab.
+    public var textOnAccent: Color { Self.ink }
+    /// Badges are square blocks.
+    public var badgeCornerRadius: CGFloat? { 0 }
+    /// Four rivets hold each card on, like a block's corners.
+    public var cardRivetSize: CGFloat? { 4 }
+
     /// One flat colour for the status, never a blend.
     public func progressGradient(for percent: Double) -> LinearGradient {
         let color: Color = switch percent {
@@ -151,23 +177,32 @@ public struct PlatformerTheme: AppThemeProvider {
         return LinearGradient(colors: [color, color], startPoint: .leading, endPoint: .trailing)
     }
 
-    public init() {}
+    public let textStyle: ThemeTextStyle
+
+    public init(textStyle: ThemeTextStyle = .themed) {
+        self.textStyle = textStyle
+    }
 }
 
 // MARK: - Scenery
 
-/// The level behind the popover: two clouds near the top, two hills standing
-/// on a brick floor at the bottom. Drawn in 3-point art pixels.
+/// The level behind the popover: two clouds, one under the score line and
+/// one beside the cards; two hills on the brick floor in the gap the
+/// action bar leaves between Dashboard and the icon buttons. Drawn in
+/// 3-point art pixels.
 struct PlatformerScenery: View {
     private static let px: CGFloat = 3
+    static let floorHeight: CGFloat = px * 12
 
     var body: some View {
         Canvas { context, size in
-            let floorHeight = Self.px * 12
-            drawCloud(in: &context, at: CGPoint(x: size.width * 0.62, y: 14), scale: 1)
-            drawCloud(in: &context, at: CGPoint(x: size.width * 0.12, y: size.height * 0.42), scale: 0.7)
-            drawHill(in: &context, left: size.width * 0.04, floor: size.height - floorHeight, columns: 34, rows: 15)
-            drawHill(in: &context, left: size.width * 0.66, floor: size.height - floorHeight, columns: 20, rows: 7)
+            let floorHeight = Self.floorHeight
+            // As the design has them: a small one under the score line, left
+            // of the ? block; a big one in the open sky beside the cards.
+            drawCloud(in: &context, at: CGPoint(x: size.width - 118, y: 64), scale: 0.67)
+            drawCloud(in: &context, at: CGPoint(x: size.width - 104, y: 380), scale: 1)
+            drawHill(in: &context, left: size.width * 0.34, floor: size.height - floorHeight, columns: 30, rows: 15)
+            drawHill(in: &context, left: size.width * 0.34 + 84, floor: size.height - floorHeight, columns: 14, rows: 6)
             drawBricks(in: &context, size: size, height: floorHeight)
         }
         .ignoresSafeArea()
