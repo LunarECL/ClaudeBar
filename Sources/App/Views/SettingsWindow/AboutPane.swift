@@ -29,11 +29,11 @@ struct AboutPane: View {
 
                 VStack(spacing: 4) {
                     Text("ClaudeBar")
-                        .font(.system(size: 20, weight: .bold, design: theme.fontDesign))
+                        .font(theme.font(size: 20, weight: .bold))
                         .foregroundStyle(theme.textPrimary)
 
                     Text("One menu bar for every AI coding assistant quota.")
-                        .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 12, weight: .medium))
                         .foregroundStyle(theme.textSecondary)
                         .multilineTextAlignment(.center)
                 }
@@ -44,7 +44,7 @@ struct AboutPane: View {
                             .font(.system(size: 11, weight: .semibold))
 
                         Text("View on GitHub")
-                            .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 11, weight: .semibold))
 
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 9, weight: .bold))
@@ -57,7 +57,7 @@ struct AboutPane: View {
                 .buttonStyle(.plain)
 
                 Text("Report issues or contribute on GitHub")
-                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
             }
             .frame(maxWidth: .infinity)

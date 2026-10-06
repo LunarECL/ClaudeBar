@@ -21,13 +21,13 @@ struct CustomProviderCard: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Custom provider")
-                        .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 12, weight: .semibold))
                     Text("Export shares it without keys — they stay in your Keychain. Deleting removes it and forgets its key.")
-                        .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 10, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                     if let error {
                         Text(error)
-                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 10, weight: .semibold))
                             .foregroundStyle(theme.statusWarning)
                     }
                 }

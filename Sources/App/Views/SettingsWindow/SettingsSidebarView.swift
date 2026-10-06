@@ -53,7 +53,7 @@ struct SettingsSidebarView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 5))
 
                 Text("ClaudeBar")
-                    .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 13, weight: .semibold))
                     .foregroundStyle(theme.textSecondary)
             }
             .padding(.horizontal, 12)
@@ -64,7 +64,7 @@ struct SettingsSidebarView: View {
 
                 if !sections.isEmpty {
                     Text(group.title.uppercased())
-                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .semibold))
                         .foregroundStyle(theme.textTertiary)
                         .tracking(1.2)
                         .padding(.horizontal, 12)
@@ -91,7 +91,7 @@ struct SettingsSidebarView: View {
                     .frame(width: 7, height: 7)
 
                 Text(updateStatus.footer)
-                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
             }
             .padding(.horizontal, 12)
@@ -134,14 +134,14 @@ private struct SidebarItem: View {
                 }
 
                 Text(section.title)
-                    .font(.system(size: 13, weight: theme.isOutlined ? .bold : .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 13, weight: theme.isOutlined ? .bold : .medium))
                     .foregroundStyle(isSelected ? (theme.isOutlined ? theme.glassBackground : theme.textPrimary) : theme.textSecondary)
 
                 Spacer()
 
                 if let badge {
                     Text(badge)
-                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .semibold))
                         .foregroundStyle(theme.textTertiary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)

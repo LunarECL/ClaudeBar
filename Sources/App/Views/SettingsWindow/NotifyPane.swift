@@ -75,7 +75,7 @@ struct NotifyPane: View {
 
             TextField("", text: $deviceIdField, prompt: prompt("ABC12345"))
                 .textFieldStyle(.plain)
-                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 12, weight: .medium))
                 .foregroundStyle(theme.textPrimary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
@@ -94,7 +94,7 @@ struct NotifyPane: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 9))
                         Text("Configured")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 9, weight: .semibold))
                     }
                     .foregroundStyle(theme.statusHealthy)
                 }
@@ -115,7 +115,7 @@ struct NotifyPane: View {
                     }
                 }
                 .textFieldStyle(.plain)
-                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 12, weight: .medium))
                 .foregroundStyle(theme.textPrimary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
@@ -187,7 +187,7 @@ struct NotifyPane: View {
             }
 
             Text("The check asks Notify! about the device, and Notify! allows only a few of those a minute. So it runs when you press it, never on its own.")
-                .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 10, weight: .medium))
                 .foregroundStyle(theme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
@@ -296,7 +296,7 @@ struct NotifyPane: View {
 
     private func statusText(_ message: String, tone: Color) -> some View {
         Text(message)
-            .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+            .font(theme.font(size: 11, weight: .medium))
             .foregroundStyle(tone)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -316,13 +316,7 @@ struct NotifyPane: View {
                 .font(.system(size: isProminent ? 10 : 9))
 
             Text(reason)
-                .font(
-                    .system(
-                        size: isProminent ? 11 : 10,
-                        weight: isProminent ? .semibold : .medium,
-                        design: theme.fontDesign
-                    )
-                )
+                .font(theme.font(size: isProminent ? 11 : 10, weight: isProminent ? .semibold : .medium))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(theme.statusWarning)
@@ -336,7 +330,7 @@ struct NotifyPane: View {
                 Image(systemName: "trash.fill")
                     .font(.system(size: 9))
                 Text("Remove")
-                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .semibold))
             }
             .foregroundStyle(theme.statusCritical)
         }
@@ -473,7 +467,7 @@ struct NotifyPane: View {
 
             if isGaugeAutomatic {
                 Text("Automatic shows whichever quota needs attention most.")
-                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
@@ -481,7 +475,7 @@ struct NotifyPane: View {
 
                     if gaugeQuotaOptions.isEmpty {
                         Text("No quota data")
-                            .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 11, weight: .medium))
                             .foregroundStyle(theme.textTertiary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 10)
@@ -779,7 +773,7 @@ private struct NotifyOutcomeLine: View {
 
     var body: some View {
         Text(outcome.message)
-            .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+            .font(theme.font(size: 11, weight: .medium))
             .foregroundStyle(outcome.isFailure ? theme.statusCritical : theme.statusHealthy)
             .fixedSize(horizontal: false, vertical: true)
     }

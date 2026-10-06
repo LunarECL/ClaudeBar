@@ -3,7 +3,7 @@ import SwiftUI
 /// A segmented picker in an outlined theme's ink: one outlined capsule, the
 /// chosen option filled with ink, which slides to the option you pick.
 /// macOS can't restyle SwiftUI's segmented `Picker`, so this draws its own
-/// look and hands VoiceOver a real `Picker` for the same choice.
+/// look (round, or square in a theme with square controls) and hands VoiceOver a real `Picker` for the same choice.
 struct InkSegmentedPicker<Option: Hashable & Identifiable>: View {
     let title: String
     let options: [Option]
@@ -20,8 +20,8 @@ struct InkSegmentedPicker<Option: Hashable & Identifiable>: View {
             }
         }
         .padding(2)
-        .background(Capsule().fill(theme.cardGradient))
-        .overlay(Capsule().stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth * 0.8))
+        .background(theme.controlShape.fill(theme.cardGradient))
+        .overlay(theme.controlShape.stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth * 0.8))
         .accessibilityRepresentation {
             Picker(title, selection: $selection) {
                 ForEach(options) { option in
@@ -38,18 +38,18 @@ struct InkSegmentedPicker<Option: Hashable & Identifiable>: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { selection = option }
         } label: {
             Text(label(option))
-                .font(.system(size: 9.5, weight: .heavy, design: theme.fontDesign))
+                .font(theme.font(size: 9.5, weight: .heavy))
                 .foregroundStyle(isOn ? theme.cardGradient : LinearGradient(colors: [theme.textPrimary], startPoint: .leading, endPoint: .trailing))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 3)
                 .background {
                     if isOn {
-                        Capsule()
+                        theme.controlShape
                             .fill(theme.glassBorder)
                             .matchedGeometryEffect(id: "thumb", in: thumb)
                     }
                 }
-                .contentShape(Capsule())
+                .contentShape(theme.controlShape)
         }
         .buttonStyle(.plain)
     }

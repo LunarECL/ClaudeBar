@@ -51,14 +51,15 @@ public struct AppThemeProviderModifier: ViewModifier {
         ThemeRegistry.shared.resolveTheme(
             for: themeModeId,
             systemColorScheme: systemColorScheme,
-            statusColors: AppSettings.shared.statusColorPolicy
+            statusColors: AppSettings.shared.statusColorPolicy,
+            textStyle: AppSettings.shared.themeTextStyle
         )
     }
 
     private var effectiveColorScheme: ColorScheme {
         let mode = ThemeMode(rawValue: themeModeId)
         switch mode {
-        case .light, .pop: return .light
+        case .light, .pop, .platformer: return .light
         case .dark, .cli, .christmas: return .dark
         case .system: return systemColorScheme
         case .none:

@@ -44,9 +44,22 @@ struct StatusColorOverridingTheme: AppThemeProvider {
     var fontDesign: Font.Design { base.fontDesign }
     var customFontName: String? { base.customFontName }
     var displayFontName: String? { base.displayFontName }
+    var displayFontScale: CGFloat { base.displayFontScale }
     var cardBorderWidth: CGFloat { base.cardBorderWidth }
     var cardShadow: ThemeShadow? { base.cardShadow }
     var textOnStatus: Color { base.textOnStatus }
+    var progressStyle: ProgressStyle { base.progressStyle }
+    func statusWord(for status: QuotaStatus) -> String { base.statusWord(for: status) }
+    func badgeFont(size: CGFloat) -> Font { base.badgeFont(size: size) }
+    var tagline: String? { base.tagline }
+    var textStyleName: String? { base.textStyleName }
+    var controlCornerRadius: CGFloat? { base.controlCornerRadius }
+    var groundHeight: CGFloat { base.groundHeight }
+    var headerStyle: HeaderStyle { base.headerStyle }
+    func blinks(_ status: QuotaStatus) -> Bool { base.blinks(status) }
+    var textOnAccent: Color { base.textOnAccent }
+    var badgeCornerRadius: CGFloat? { base.badgeCornerRadius }
+    var cardRivetSize: CGFloat? { base.cardRivetSize }
 
     // MARK: Status Colors
 

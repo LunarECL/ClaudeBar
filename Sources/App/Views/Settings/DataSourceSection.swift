@@ -72,18 +72,18 @@ struct DataSourceSection: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(text.title)
-                    .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                    .font(theme.font(size: 14, weight: .bold))
                     .foregroundStyle(theme.textPrimary)
 
                 Text(text.subtitle)
-                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
             }
 
             Spacer()
 
             Text(text.origin.uppercased())
-                .font(.system(size: 8, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 8, weight: .semibold))
                 .foregroundStyle(theme.textSecondary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
@@ -128,7 +128,7 @@ struct DataSourceSection: View {
                         .foregroundStyle(theme.textTertiary)
                         .frame(width: 16)
                     Text(cacheNote)
-                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                 }
             }
@@ -169,7 +169,7 @@ struct DataSourceSection: View {
                 }
             }
             Text(cliPathError ?? location.help)
-                .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 9, weight: .medium))
                 .foregroundStyle(cliPathError == nil ? theme.textTertiary : theme.statusWarning)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -211,12 +211,12 @@ struct DataSourceSection: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(choice.label)
-                    .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .semibold))
                     .foregroundStyle(picked ? theme.textPrimary : theme.textSecondary)
 
                 if let summary = choice.summary {
                     Text(summary)
-                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                 }
             }
@@ -239,13 +239,13 @@ struct DataSourceSection: View {
                     .foregroundStyle(found ? theme.statusHealthy : theme.statusWarning)
 
                 Text(found ? "Key found" : "No key found")
-                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .semibold))
                     .foregroundStyle(found ? theme.statusHealthy : theme.statusWarning)
             }
 
             if !found, let hint = text.keyHint(for: kind) {
                 Text(hint)
-                    .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
             }
         }
@@ -256,7 +256,7 @@ struct DataSourceSection: View {
         if text.fallbackIsSwitchable(for: kind) {
             HStack(spacing: 8) {
                 Text(sentence)
-                    .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .semibold))
                     .foregroundStyle(theme.textPrimary)
                 Spacer(minLength: 8)
                 SettingsSwitch(isOn: $fallbackOn)
@@ -272,7 +272,7 @@ struct DataSourceSection: View {
                     .foregroundStyle(theme.textTertiary)
                     .frame(width: 16)
                 Text(sentence)
-                    .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
             }
         }
@@ -294,7 +294,7 @@ struct DataSourceSection: View {
 
             if let testResult {
                 Text(testResult)
-                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .semibold))
                     .foregroundStyle(testFailed ? theme.statusWarning : theme.statusHealthy)
                     .lineLimit(2)
             }
@@ -303,7 +303,7 @@ struct DataSourceSection: View {
 
     private func sectionLabel(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+            .font(theme.font(size: 9, weight: .semibold))
             .foregroundStyle(theme.textSecondary)
             .tracking(0.5)
     }

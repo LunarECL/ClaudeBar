@@ -44,6 +44,7 @@ public final class ThemeRegistry {
         register(CLITheme())
         register(ChristmasTheme())
         register(PopTheme())
+        register(PlatformerTheme())
     }
 
     // MARK: - Public API
@@ -90,18 +91,21 @@ public final class ThemeRegistry {
     ///   - id: The theme ID (may be "system")
     ///   - systemColorScheme: The current system color scheme
     ///   - statusColors: `.default` returns the stored theme untouched
+    ///   - textStyle: how a theme with its own text face prints words
     /// - Returns: The resolved theme
     public func resolveTheme(
         for id: String,
         systemColorScheme: ColorScheme,
-        statusColors: StatusColorPolicy = .default
+        statusColors: StatusColorPolicy = .default,
+        textStyle: ThemeTextStyle = .themed
     ) -> any AppThemeProvider {
-        let base: any AppThemeProvider
+        let registered: any AppThemeProvider
         if id == "system" {
-            base = systemColorScheme == .dark ? (themes["dark"] ?? DarkTheme()) : (themes["light"] ?? LightTheme())
+            registered = systemColorScheme == .dark ? (themes["dark"] ?? DarkTheme()) : (themes["light"] ?? LightTheme())
         } else {
-            base = themes[id] ?? defaultTheme
+            registered = themes[id] ?? defaultTheme
         }
+        let base = registered.styled(textStyle)
         guard statusColors.isActive else { return base }
         return StatusColorOverridingTheme(
             base: base,

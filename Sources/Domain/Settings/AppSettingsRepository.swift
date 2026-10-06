@@ -19,6 +19,11 @@ public protocol AppSettingsRepository: Sendable {
     func userHasChosenTheme() -> Bool
     func setUserHasChosenTheme(_ chosen: Bool)
 
+    /// How a theme with its own faces prints text: "themed" (its faces, the
+    /// default) or "classic" (its look in normal fonts).
+    func themeTextStyle() -> String
+    func setThemeTextStyle(_ style: String)
+
     // MARK: - Display
 
     func usageDisplayMode() -> String

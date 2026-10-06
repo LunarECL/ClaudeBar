@@ -18,7 +18,7 @@ struct SyncAlertsPane: View {
                     subtitle: "Keep the menu-bar number fresh in the background. \"Off\" updates only when you open the menu. Never refreshes faster than once a minute."
                 ) {
                     Text(settings.refreshInterval.label)
-                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .semibold))
                         .foregroundStyle(theme.textSecondary)
                 }
 
@@ -55,7 +55,7 @@ private struct QuotaAlertsCard: View {
                 subtitle: "Tell me when a login's quota falls below a percentage I pick — once, and again only after it climbs back."
             ) {
                 Text("\(alerts.percents.count) / \(QuotaAlerts.most)")
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
                     .foregroundStyle(theme.textTertiary)
             }
 
@@ -82,7 +82,7 @@ private struct QuotaAlertsCard: View {
                 }
 
                 Text(refusal ?? "ClaudeBar already alerts at 20% and when a quota is empty.")
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(refusal == nil ? theme.textTertiary : theme.statusWarning)
             }
         }
@@ -101,7 +101,7 @@ private struct QuotaAlertsCard: View {
     private func chip(_ title: String, remove: (() -> Void)?) -> some View {
         HStack(spacing: 4) {
             Text(title)
-                .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 12, weight: .semibold))
                 .foregroundStyle(remove == nil ? theme.textTertiary : theme.textPrimary)
             if let remove {
                 Button(action: remove) {

@@ -24,7 +24,7 @@ struct DailyUsageCardView: View {
                         .foregroundStyle(metric.color)
 
                     Text((title.map { "\($0) · \(metric.label)" } ?? metric.label).uppercased())
-                        .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 8, weight: .medium))
                         .foregroundStyle(theme.textSecondary)
                         .tracking(0.3)
                 }
@@ -41,14 +41,14 @@ struct DailyUsageCardView: View {
                 Spacer()
 
                 Text(metric.unitLabel)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
             }
 
             // Optional subtitle (e.g., cache breakdown for tokens card)
             if let subtitle = subtitleText {
                 Text(subtitle)
-                    .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
                     .lineLimit(1)
             }
@@ -72,7 +72,7 @@ struct DailyUsageCardView: View {
                         .font(.system(size: 7))
 
                     Text(deltaText)
-                        .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 8, weight: .medium))
                 }
                 .foregroundStyle(deltaColor)
                 .lineLimit(1)
@@ -88,6 +88,7 @@ struct DailyUsageCardView: View {
                     .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             }
         )
+        .themeRivets()
         .scaleEffect(isHovering ? 1.015 : 1.0)
         .animation(.easeOut(duration: 0.15), value: isHovering)
         .onHover { isHovering = $0 }

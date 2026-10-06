@@ -24,7 +24,7 @@ struct LogsPane: View {
                                 .font(.system(size: 11, weight: .semibold))
 
                             Text("Open Log File")
-                                .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                                .font(theme.font(size: 11, weight: .semibold))
                         }
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)

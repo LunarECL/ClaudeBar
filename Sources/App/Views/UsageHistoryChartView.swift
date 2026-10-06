@@ -70,6 +70,7 @@ struct UsageHistoryChartView: View {
                     .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             }
         )
+        .themeRivets()
         .opacity(isVisible ? 1 : 0)
         .onAppear {
             withAnimation(.easeOut(duration: 0.4).delay(delay)) { isVisible = true }
@@ -85,7 +86,7 @@ struct UsageHistoryChartView: View {
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(colors[0])
                 Text("DAILY USAGE — LAST 30 DAYS")
-                    .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 8, weight: .medium))
                     .foregroundStyle(theme.textSecondary)
                     .tracking(0.3)
             }
@@ -95,7 +96,7 @@ struct UsageHistoryChartView: View {
                     .font(theme.displayFont(size: 13))
                     .foregroundStyle(theme.textPrimary)
                 Text(caption)
-                    .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 8, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
             }
         }
@@ -107,12 +108,12 @@ struct UsageHistoryChartView: View {
             withAnimation(.easeInOut(duration: 0.2)) { measure = choice }
         } label: {
             Text(choice.rawValue)
-                .font(.system(size: 9, weight: isOn ? .bold : .medium, design: theme.fontDesign))
+                .font(theme.font(size: 9, weight: isOn ? .bold : .medium))
                 .foregroundStyle(isOn ? theme.textPrimary : theme.textTertiary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Capsule().fill(isOn ? theme.progressTrack : Color.clear))
-                .overlay(Capsule().stroke(theme.glassBorder, lineWidth: isOn ? 0 : 1))
+                .background(theme.controlShape.fill(isOn ? theme.progressTrack : Color.clear))
+                .overlay(theme.controlShape.stroke(theme.glassBorder, lineWidth: isOn ? 0 : 1))
         }
         .buttonStyle(.plain)
     }
@@ -126,7 +127,7 @@ struct UsageHistoryChartView: View {
                     HStack(spacing: 3) {
                         Circle().fill(color).frame(width: 5, height: 5)
                         Text(kind)
-                            .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 8, weight: .medium))
                             .foregroundStyle(theme.textTertiary)
                     }
                 }
@@ -209,7 +210,7 @@ struct UsageHistoryChartView: View {
         .chartXAxis {
             AxisMarks(values: .stride(by: .day, count: 7)) { _ in
                 AxisValueLabel(format: .dateTime.month(.abbreviated).day(), centered: true)
-                    .font(.system(size: 7, design: theme.fontDesign))
+                    .font(theme.font(size: 7))
                     .foregroundStyle(theme.textTertiary)
             }
         }
@@ -219,7 +220,7 @@ struct UsageHistoryChartView: View {
                 AxisValueLabel {
                     if let amount = value.as(Double.self) {
                         Text(measure == .cost ? Self.money(Decimal(amount), whole: true) : Self.count(Int(amount)))
-                            .font(.system(size: 7, design: theme.fontDesign))
+                            .font(theme.font(size: 7))
                             .foregroundStyle(theme.textTertiary)
                     }
                 }

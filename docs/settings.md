@@ -46,7 +46,8 @@ A few `app.*` keys worth knowing:
 
 | Key | Values |
 |---|---|
-| `app.themeMode` | `system` (default), `light`, `dark`, `cli`, `christmas`, or `imported-<name>` |
+| `app.themeMode` | `system` (default), `light`, `dark`, `cli`, `christmas`, `pop`, `platformer`, or `imported-<name>` |
+| `app.themeTextStyle` | `themed` (default: a theme's own face on every word) or `classic` (the theme's look in normal fonts). Only Platformer offers the choice |
 | `app.usageDisplayMode` | `remaining` (default), `used`, `pace` |
 | `app.menuBarProviderLogoEnabled` | `false` (default) shows a single readout without a logo; `true` starts it with the provider's logo. Several providers or accounts always show logos |
 | `app.menuBarAccountLabelsEnabled` | `true` (default) shows names when the same provider has multiple enabled accounts; `false` hides those names. Single accounts never show an account name in either mode |

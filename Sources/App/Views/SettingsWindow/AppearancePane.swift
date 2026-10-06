@@ -38,6 +38,24 @@ struct AppearancePane: View {
                     .padding(.top, 12)
             }
 
+            // A theme with its own fonts lets the person keep its look in
+            // normal ones (Platformer: Pixel or Classic).
+            if let styleName = ThemeRegistry.shared.theme(for: settings.themeMode)?.textStyleName {
+                SettingsCard {
+                    SettingsRow(
+                        title: "Text",
+                        subtitle: "\(styleName) prints every word and number in the theme's own fonts. Classic keeps the look in normal fonts, easier to read."
+                    ) {
+                        SettingsSegmentedControl(
+                            options: ThemeTextStyle.allCases,
+                            label: { $0 == .themed ? styleName : "Classic" },
+                            selection: $settings.themeTextStyle
+                        )
+                        .frame(width: 160)
+                    }
+                }
+            }
+
             SettingsCard {
                 SettingsRow(
                     title: "Native menu bar icons",
@@ -67,7 +85,7 @@ struct AppearancePane: View {
                     settings.resetStatusColors()
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .semibold))
                 .foregroundStyle(settings.statusColorOverrides.isEmpty ? theme.textTertiary : theme.accentPrimary)
                 .disabled(settings.statusColorOverrides.isEmpty)
                 .padding(.top, 14)
@@ -91,7 +109,7 @@ private struct StatusColorRow: View {
             HStack(spacing: 8) {
                 if isOverridden {
                     Text("Custom")
-                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .semibold))
                         .foregroundStyle(theme.accentPrimary)
                     Button {
                         settings.setStatusColorOverride(nil, for: status)

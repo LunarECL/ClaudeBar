@@ -38,7 +38,7 @@ struct LeaderboardBoardCard: View {
             providerFilter
             if top.isEmpty {
                 Text(error ?? "No one is on the board for \(period.label.lowercased()) yet.")
-                    .font(.system(size: 12, design: theme.fontDesign))
+                    .font(theme.font(size: 12))
                     .foregroundStyle(error == nil ? theme.textTertiary : theme.statusCritical)
             } else {
                 standingsList
@@ -70,7 +70,7 @@ struct LeaderboardBoardCard: View {
 
     private var label: some View {
         Text(title)
-            .font(.system(size: 10, weight: .bold, design: theme.fontDesign))
+            .font(theme.font(size: 10, weight: .bold))
             .tracking(1)
             .foregroundStyle(theme.textSecondary)
             .lineLimit(1)
@@ -161,7 +161,7 @@ struct LeaderboardBoardCard: View {
             OutlinedNumber(text: "\(standing.rank)", size: 15, color: standing.rank <= 3 ? theme.statusWarning : nil)
                 .frame(width: 22)
             Text(isMe ? leaderboardName(standing.username, hidden: hidesMyName) : "@" + standing.username)
-                .font(.system(size: 12, weight: .bold, design: theme.fontDesign))
+                .font(theme.font(size: 12, weight: .bold))
                 .foregroundStyle(theme.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -170,7 +170,7 @@ struct LeaderboardBoardCard: View {
             }
             if isMe {
                 Text("YOU")
-                    .font(.system(size: 9, weight: .heavy, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .heavy))
                     .foregroundStyle(theme.textOnStatus)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -179,7 +179,7 @@ struct LeaderboardBoardCard: View {
             }
             Spacer(minLength: 6)
             Text(LeaderboardStandingsView.tokens(standing.total))
-                .font(.system(size: 12, weight: .heavy, design: theme.fontDesign))
+                .font(theme.font(size: 12, weight: .heavy))
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize()
         }
@@ -226,7 +226,7 @@ struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 9.5, weight: .heavy, design: theme.fontDesign))
+                .font(theme.font(size: 9.5, weight: .heavy))
                 // The period picker's colours: ink fill, card-paper label — legible in every theme.
                 .foregroundStyle(isOn ? theme.cardGradient : LinearGradient(colors: [theme.textSecondary], startPoint: .leading, endPoint: .trailing))
                 .padding(.horizontal, 9)

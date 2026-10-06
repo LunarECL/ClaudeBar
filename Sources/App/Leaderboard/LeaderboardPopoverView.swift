@@ -45,7 +45,7 @@ private struct CardLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 10, weight: .bold, design: theme.fontDesign))
+            .font(theme.font(size: 10, weight: .bold))
             .tracking(1)
             .foregroundStyle(theme.textSecondary)
     }
@@ -100,7 +100,7 @@ struct LeaderboardJoinView: View {
             LeaderboardCard {
                 CardLabel(text: "JOIN THE BOARD")
                 Text("Rank your token usage against other ClaudeBar users")
-                    .font(.system(size: 15, weight: .bold, design: theme.fontDesign))
+                    .font(theme.font(size: 15, weight: .bold))
                     .foregroundStyle(theme.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -114,20 +114,20 @@ struct LeaderboardJoinView: View {
                         .autocorrectionDisabled()
                         .accessibilityLabel("Username")
                 }
-                .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 13, weight: .semibold))
                 .foregroundStyle(theme.textPrimary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(RoundedRectangle(cornerRadius: 8).fill(theme.glassBackground)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)))
                 Text(hint.text)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(hint.color)
 
                 CardLabel(text: "SHARE TOKENS FROM").padding(.top, 4)
                 if shareable.isEmpty {
                     Text("No provider on this Mac keeps token logs yet. Claude, Codex and Mistral do.")
-                        .font(.system(size: 11, design: theme.fontDesign))
+                        .font(theme.font(size: 11))
                         .foregroundStyle(theme.textTertiary)
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -152,14 +152,14 @@ struct LeaderboardJoinView: View {
                     .accessibilityAddTraits(sharesCountry ? .isSelected : [])
                     .padding(.horizontal, 4)
                 Text("Only your country, counted with others, never your city or IP. Off unless you tick it.")
-                    .font(.system(size: 11, design: theme.fontDesign))
+                    .font(theme.font(size: 11))
                     .foregroundStyle(theme.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 DisclosureGroup("Exactly what gets uploaded", isExpanded: $showPayload) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Signed as @\(username?.value ?? "you"), hourly. This is today; the first upload sends each of the last 30 days the same way. Nothing else leaves this Mac.")
-                            .font(.system(size: 11, design: theme.fontDesign))
+                            .font(theme.font(size: 11))
                             .foregroundStyle(theme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(payload)
@@ -175,7 +175,7 @@ struct LeaderboardJoinView: View {
                     }
                     .padding(.top, 6)
                 }
-                .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 12, weight: .semibold))
                 .foregroundStyle(theme.textPrimary)
                 .task(id: showPayload ? sharing : []) {
                     if showPayload { preview = await leaderboard.preview(sharing: sharing) }
@@ -183,7 +183,7 @@ struct LeaderboardJoinView: View {
 
                 if let error {
                     Text(error)
-                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .semibold))
                         .foregroundStyle(theme.statusCritical)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -192,7 +192,7 @@ struct LeaderboardJoinView: View {
                     Task { await join() }
                 } label: {
                     Text(isJoining ? "Joining…" : sharing.isEmpty ? "Pick at least one provider" : "Join leaderboard")
-                        .font(.system(size: 13, weight: .bold, design: theme.fontDesign))
+                        .font(theme.font(size: 13, weight: .bold))
                         .foregroundStyle(theme.textOnStatus)
                         .frame(maxWidth: .infinity, minHeight: 32)
                         .background(RoundedRectangle(cornerRadius: theme.pillCornerRadius).fill(theme.accentGradient))
@@ -264,16 +264,16 @@ struct LeaderboardStandingsView: View {
         LeaderboardCard {
             HStack(alignment: .top, spacing: 10) {
                 Text("NEW")
-                    .font(.system(size: 9, weight: .heavy, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .heavy))
                     .foregroundStyle(theme.textOnStatus)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(Capsule().fill(theme.accentPrimary))
                 VStack(alignment: .leading, spacing: 4) {
                     Text("🌍 Put your country on the globe")
-                        .font(.system(size: 13, weight: .bold, design: theme.fontDesign))
+                        .font(theme.font(size: 13, weight: .bold))
                         .foregroundStyle(theme.textPrimary)
                     Text("Only your country, from where your requests come from, counted with others. Never your city or IP.")
-                        .font(.system(size: 11, design: theme.fontDesign))
+                        .font(theme.font(size: 11))
                         .foregroundStyle(theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -287,14 +287,14 @@ struct LeaderboardStandingsView: View {
             HStack(spacing: 8) {
                 Button { Task { try? await membership.setSharesCountry(true) } } label: {
                     Label("Turn on", systemImage: "globe.europe.africa.fill")
-                        .font(.system(size: 11, weight: .bold, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .bold))
                         .foregroundStyle(theme.textOnStatus)
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(Capsule().fill(theme.accentGradient))
                 }
                 .buttonStyle(.plain)
                 Link("See the globe", destination: leaderboard.globePage)
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
             }
         }
     }
@@ -308,7 +308,7 @@ struct LeaderboardStandingsView: View {
                 HStack(spacing: 6) {
                     Text("🌍")
                     Text(globeText)
-                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .semibold))
                         .foregroundStyle(theme.textSecondary)
                         .lineLimit(2)
                     Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold)).foregroundStyle(theme.textTertiary)
@@ -322,7 +322,7 @@ struct LeaderboardStandingsView: View {
             if membership.sharesCountry {
                 Button("Turn off") { Task { try? await membership.setSharesCountry(false) } }
                     .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .bold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .bold))
                     .foregroundStyle(theme.textPrimary)
                     .padding(.horizontal, 9).padding(.vertical, 3)
                     .overlay(Capsule().stroke(theme.glassBorder, lineWidth: max(1, theme.cardBorderWidth * 0.6)))
@@ -356,18 +356,18 @@ struct LeaderboardStandingsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(membership.username.map { leaderboardName($0.value, hidden: settings.hideLeaderboardName) } ?? "")
-                            .font(.system(size: 15, weight: .bold, design: theme.fontDesign))
+                            .font(theme.font(size: 15, weight: .bold))
                             .foregroundStyle(theme.textPrimary)
                             .lineLimit(1)
                         // Like every eye in the popover: masks the text beside it on screen.
                         PrivacyEyeBadge(isHidden: $settings.hideLeaderboardName, what: "your username")
                     }
                     Text("\(Self.tokens(mine?.standing?.total ?? 0)) tokens")
-                        .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 12, weight: .semibold))
                         .foregroundStyle(theme.textSecondary)
                     if let gap = gapLine {
                         Text(gap)
-                            .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 11, weight: .medium))
                             .foregroundStyle(theme.textTertiary)
                     }
                 }
@@ -409,12 +409,12 @@ struct LeaderboardStandingsView: View {
             Image(systemName: leaderboard.uploader.lastError == nil ? "arrow.triangle.2.circlepath" : "exclamationmark.triangle.fill")
                 .font(.system(size: 10, weight: .semibold))
             Text(status)
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .medium))
                 .lineLimit(2)
             Spacer(minLength: 8)
             Link(destination: leaderboard.boardPage) {
                 Label("Full board", systemImage: "arrow.up.right")
-                    .font(.system(size: 11, weight: .bold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .bold))
                     .foregroundStyle(theme.textPrimary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
@@ -472,7 +472,7 @@ private struct YourMix: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text("YOUR MIX")
-                .font(.system(size: 9, weight: .bold, design: theme.fontDesign))
+                .font(theme.font(size: 9, weight: .bold))
                 .tracking(1)
                 .foregroundStyle(theme.textTertiary)
             GeometryReader { geo in
@@ -496,7 +496,7 @@ private struct YourMix: View {
                     Text("\(Int((part.share * 100).rounded()))%")
                         .fixedSize()
                 }
-                .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 10, weight: .semibold))
                 .foregroundStyle(theme.textSecondary)
             }
         }

@@ -38,13 +38,13 @@ struct HooksPane: View {
                         .frame(width: 6, height: 6)
 
                     Text(hooksInstalled ? "Hooks installed in ~/.claude/settings.json" : "Hooks not installed")
-                        .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .medium))
                         .foregroundStyle(theme.textSecondary)
                 }
 
                 if let hookError {
                     Text(hookError)
-                        .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .medium))
                         .foregroundStyle(theme.statusCritical)
                         .padding(.top, 6)
                 }

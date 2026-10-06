@@ -78,7 +78,7 @@ struct ProfileLinkField: View {
                 .background(RoundedRectangle(cornerRadius: 8).fill(theme.glassBackground)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)))
                 Text(hint)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(hintColor)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -104,7 +104,7 @@ struct ProfileLinkField: View {
                 if let image {
                     Image(image).renderingMode(.template).resizable().scaledToFit().frame(width: 10, height: 10)
                 }
-                Text(title).font(.system(size: 11, weight: .bold, design: theme.fontDesign))
+                Text(title).font(theme.font(size: 11, weight: .bold))
             }
             .foregroundStyle(isOn ? AnyShapeStyle(theme.cardGradient) : AnyShapeStyle(theme.textSecondary))
             .padding(.horizontal, 9)

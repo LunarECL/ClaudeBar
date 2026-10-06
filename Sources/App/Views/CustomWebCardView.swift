@@ -19,7 +19,7 @@ struct CustomWebCardView: View {
                     .foregroundStyle(theme.accentPrimary)
 
                 Text(url.host ?? url.absoluteString)
-                    .font(.system(size: 9, weight: .bold, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .bold))
                     .foregroundStyle(theme.textSecondary)
                     .textCase(.uppercase)
                     .lineLimit(1)
@@ -52,6 +52,7 @@ struct CustomWebCardView: View {
                     .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             }
         )
+        .themeRivets()
         .scaleEffect(isHovering ? 1.015 : 1.0)
         .animation(.easeOut(duration: 0.15), value: isHovering)
         .onHover { isHovering = $0 }

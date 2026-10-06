@@ -98,11 +98,11 @@ struct AddProviderSheet: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Add Provider")
-                .font(.system(size: 17, weight: .bold, design: theme.fontDesign))
+                .font(theme.font(size: 17, weight: .bold))
             HStack(spacing: 6) {
                 ForEach(visibleSteps, id: \.self) { item in
                     Text(item.title)
-                        .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 10, weight: .semibold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Capsule().fill(item == step ? theme.accentPrimary.opacity(0.25) : theme.glassBorder.opacity(0.4)))
@@ -263,7 +263,7 @@ struct AddProviderSheet: View {
                 .disabled(isTesting)
             if let testText {
                 Text(testText)
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
                     .foregroundStyle(testFailed ? theme.statusWarning : theme.statusHealthy)
                     .lineLimit(2)
             }
@@ -360,7 +360,7 @@ struct AddProviderSheet: View {
                     fieldPicker("Limit", selection: $draft.limit, fields: fields.filter(\.isNumber))
                 }
                 HStack {
-                    Text("Currency").font(.system(size: 11, design: theme.fontDesign))
+                    Text("Currency").font(theme.font(size: 11))
                     TextField("USD", text: $currency)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 80)
@@ -379,7 +379,7 @@ struct AddProviderSheet: View {
 
         label("LIVE CARD")
         Text(livePreview)
-            .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
+            .font(theme.font(size: 13, weight: .semibold))
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 8).fill(theme.glassBackground))
@@ -487,7 +487,7 @@ struct AddProviderSheet: View {
 
         if let saveError {
             Text(saveError)
-                .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .semibold))
                 .foregroundStyle(theme.statusWarning)
         }
     }
@@ -536,14 +536,14 @@ struct AddProviderSheet: View {
 
     private func label(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+            .font(theme.font(size: 9, weight: .semibold))
             .foregroundStyle(theme.textSecondary)
             .tracking(0.5)
     }
 
     private func hint(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+            .font(theme.font(size: 10, weight: .medium))
             .foregroundStyle(theme.textTertiary)
             .fixedSize(horizontal: false, vertical: true)
     }

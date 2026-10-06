@@ -24,7 +24,7 @@ struct InUseStrip: View {
             }
             if let problem = sessions.problem {
                 Text(problem)
-                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .medium))
                     .foregroundStyle(theme.statusCritical)
             }
         }
@@ -35,7 +35,7 @@ struct InUseStrip: View {
         (Text(Image(systemName: "terminal")) + Text(" New terminal sessions use ")
             + Text(settings.shown(login.displayName)).bold().foregroundColor(theme.textPrimary)
             + Text(" · Desktop & IDE keep their own login"))
-            .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+            .font(theme.font(size: 10, weight: .medium))
             .foregroundStyle(theme.textTertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -44,7 +44,7 @@ struct InUseStrip: View {
         HStack(spacing: 8) {
             Image(systemName: "terminal.fill").foregroundStyle(theme.statusWarning)
             Text("\(settings.shown(from.displayName)) is low — \(settings.shown(to.displayName)) has \(to.percentLeft.map { "\(Int($0))%" } ?? "more") left")
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .medium))
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
@@ -66,10 +66,10 @@ struct InUseSetupCard: View {
         @Bindable var sessions = sessions
         VStack(alignment: .leading, spacing: 8) {
             Text("Let ClaudeBar choose the login?")
-                .font(.system(size: 13, weight: .bold, design: theme.fontDesign))
+                .font(theme.font(size: 13, weight: .bold))
                 .foregroundStyle(theme.textPrimary)
             Text("One time: ClaudeBar adds these lines to your shell. Each time you run \(sessions.commands.formatted(.list(type: .or))), they start on the login you chose here. Delete them to turn this off.")
-                .font(.system(size: 11, design: theme.fontDesign))
+                .font(theme.font(size: 11))
                 .foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 4) {
@@ -99,7 +99,7 @@ struct InUseSetupCard: View {
                 InUseButton(title: "Cancel", prominent: false) { sessions.cancel() }
             }
             Text("Terminals already open pick it up in a new tab.")
-                .font(.system(size: 10, design: theme.fontDesign))
+                .font(theme.font(size: 10))
                 .foregroundStyle(theme.textTertiary)
         }
         .padding(12)
@@ -193,7 +193,7 @@ struct InUseBadge: View {
 
     var body: some View {
         Text("IN USE")
-            .font(.system(size: 8, weight: .heavy, design: theme.fontDesign))
+            .font(theme.font(size: 8, weight: .heavy))
             .padding(.horizontal, 6)
             .frame(height: Self.chipHeight(in: theme) - 2 * Self.gap(in: theme))
             .foregroundStyle(theme.textPrimary)
@@ -213,7 +213,7 @@ struct InUseButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 10.5, weight: .bold, design: theme.fontDesign))
+                .font(theme.font(size: 10.5, weight: .bold))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .foregroundStyle(prominent ? theme.textPrimary : theme.textSecondary)

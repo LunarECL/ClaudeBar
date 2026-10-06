@@ -1,6 +1,5 @@
 import SwiftUI
 import Domain
-import CoreText
 
 // MARK: - Pop Theme
 
@@ -69,6 +68,7 @@ public struct PopTheme: AppThemeProvider {
     public var textTertiary: Color { Self.muted }
     public var fontDesign: Font.Design { .rounded }
     public var displayFontName: String? { PopFonts.display }
+    public var tagline: String? { "Your quotas, the cute way" }
 
     // MARK: - Status
 
@@ -151,18 +151,8 @@ struct PopDotGrid: View {
 
 // MARK: - Fonts
 
-/// Lilita One (SIL Open Font License, Resources/Fonts), registered for this
-/// process the first time Pop asks for it. `nil` if it can't be — the
-/// system font stands in.
+/// Lilita One (SIL Open Font License, Resources/Fonts). `nil` if it can't be
+/// registered — the system font stands in.
 enum PopFonts {
-    static let display: String? = {
-        guard let url = Bundle.main.url(forResource: "LilitaOne-Regular", withExtension: "ttf") else { return nil }
-        var error: Unmanaged<CFError>?
-        if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
-            // Already registered is fine; anything else falls back.
-            let code = (error?.takeRetainedValue()).map { CFErrorGetCode($0) } ?? 0
-            if code != CTFontManagerError.alreadyRegistered.rawValue { return nil }
-        }
-        return "LilitaOne"
-    }()
+    static let display: String? = BundledFont.register(file: "LilitaOne-Regular", name: "LilitaOne")
 }

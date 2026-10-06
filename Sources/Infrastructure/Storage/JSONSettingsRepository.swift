@@ -46,6 +46,14 @@ public final class JSONSettingsRepository:
         store.write(value: mode, key: "app.themeMode")
     }
 
+    public func themeTextStyle() -> String {
+        store.read(key: "app.themeTextStyle") ?? "themed"
+    }
+
+    public func setThemeTextStyle(_ style: String) {
+        store.write(value: style, key: "app.themeTextStyle")
+    }
+
     public func userHasChosenTheme() -> Bool {
         store.read(key: "app.userHasChosenTheme") ?? false
     }

@@ -30,12 +30,12 @@ struct ThemeOptionButton: View {
 
                 HStack(spacing: 4) {
                     Text(themeProvider.displayName)
-                        .font(.system(size: 11, weight: .bold, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .bold))
                         .foregroundStyle(theme.textPrimary)
                         .lineLimit(1)
                     if let subtitle = themeProvider.subtitle {
                         Text(subtitle)
-                            .font(.system(size: 8, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 8, weight: .semibold))
                             .foregroundStyle(theme.textTertiary)
                             .lineLimit(1)
                     }
@@ -142,7 +142,7 @@ struct DisplayModeButton: View {
                     .font(.system(size: 10, weight: .bold))
 
                 Text(mode.displayLabel)
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
@@ -212,7 +212,7 @@ struct MenuBarChoiceButton: View {
                     .font(.system(size: 10, weight: .bold))
 
                 Text(label)
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
                     .lineLimit(1)
             }
             .foregroundStyle(isSelected ? selectedForeground : theme.textSecondary)
@@ -225,7 +225,7 @@ struct MenuBarChoiceButton: View {
     }
 
     private var selectedForeground: Color {
-        theme.id == "cli" ? theme.textPrimary : .white
+        theme.textOnAccent
     }
 
     private var buttonBackground: some View {

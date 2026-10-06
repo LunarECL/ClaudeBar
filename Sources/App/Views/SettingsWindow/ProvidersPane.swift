@@ -53,7 +53,7 @@ struct ProvidersPane: View {
                 HStack {
                     if let importError {
                         Text(importError)
-                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 10, weight: .semibold))
                             .foregroundStyle(theme.statusWarning)
                     }
                     Spacer()
@@ -130,11 +130,11 @@ private struct ProviderListRow: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(AppSettings.shared.shown(tab.name))
-                        .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 13, weight: .semibold))
                         .foregroundStyle(theme.textPrimary)
 
                     Text(statusText)
-                        .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 10, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                 }
 
@@ -240,11 +240,11 @@ private struct ProviderDetailView: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(AppSettings.shared.shown(tab.name))
-                            .font(.system(size: 21, weight: .bold, design: theme.fontDesign))
+                            .font(theme.font(size: 21, weight: .bold))
                             .foregroundStyle(theme.textPrimary)
 
                         Text(tab.isEnabled ? "Enabled" : "Disabled")
-                            .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 11, weight: .semibold))
                             .foregroundStyle(tab.isEnabled ? theme.statusHealthy : theme.textTertiary)
                     }
 
@@ -274,7 +274,7 @@ private struct ProviderDetailView: View {
                     }
                 } else {
                     Text("Enable \(tab.name) to configure it.")
-                        .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 12, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                 }
             }
@@ -291,7 +291,7 @@ private struct ProviderDetailView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 10, weight: .bold))
                 Text("All Providers")
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
             }
             .foregroundStyle(theme.textSecondary)
             .padding(.horizontal, 10)
@@ -365,12 +365,12 @@ private struct QuotaVisibilityCard: View {
                     }
                 }
                 Text(refused ?? "Turn off a quota you don't use: it disappears everywhere and no longer sets \(monitor.lineupName(of: provider))'s status or alerts.")
-                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .medium))
                     .foregroundStyle(refused == nil ? theme.textTertiary : theme.statusWarning)
                     .padding(.top, 8)
             } else {
                 Text("No quotas to choose from yet. Refresh \(monitor.lineupName(of: provider)) once, then pick the ones you watch.")
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
             }
         }
@@ -408,7 +408,7 @@ private struct LoginMeter: View {
         HStack(spacing: 6) {
             if let name {
                 Text(name)
-                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .medium))
                     .foregroundStyle(theme.textSecondary)
                     .lineLimit(1)
             }
@@ -422,7 +422,7 @@ private struct LoginMeter: View {
                 .frame(width: 70, height: 4)
             }
             Text(quota.percentLeft.map { "\(Int($0))%" } ?? quota.formattedDollarRemaining ?? "—")
-                .font(.system(size: 11, weight: .bold, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .bold))
                 .foregroundStyle(color)
                 .monospacedDigit()
                 .frame(minWidth: 30, alignment: .trailing)

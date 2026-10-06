@@ -33,7 +33,7 @@ Quota-only providers (Gemini, Copilot, Cursor and the rest) report percentages, 
 
 ## Joining
 
-1. Open the ClaudeBar menu and pick the **Leaderboard** pill after your providers.
+1. Open the ClaudeBar menu and pick the **Leaderboard** pill, first in the row of tabs. (The menu still opens on your first provider.)
 2. Type a username: 3–20 letters, numbers, `-` or `_`. It's shown publicly.
 3. Tick the providers to share, and open **Exactly what gets uploaded** if you want to check.
 4. Press **Join leaderboard**. Your last 30 days are uploaded straight away.

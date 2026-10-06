@@ -110,6 +110,7 @@ struct CostStatCard: View {
                 }
             }
         )
+        .themeRivets()
         .overlay(alignment: .topTrailing) {
             if printedBudget != nil {
                 sticker.offset(x: -12, y: -9)
@@ -131,7 +132,7 @@ struct CostStatCard: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(QuotaCardText.spentLabel(for: costUsage.kind))
-                    .font(.system(size: 8, weight: .heavy, design: theme.fontDesign))
+                    .font(theme.font(size: 8, weight: .heavy))
                     .foregroundStyle(theme.textPrimary)
                     .tracking(0.6)
                 OutlinedNumber(text: costUsage.formattedCost, size: 26, color: theme.accentPrimary)
@@ -139,14 +140,14 @@ struct CostStatCard: View {
             Spacer(minLength: 4)
             VStack(alignment: .trailing, spacing: 1) {
                 Text("of your budget")
-                    .font(.system(size: 9, weight: .bold, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .bold))
                     .foregroundStyle(theme.textTertiary)
                 Text(formatBudget(budget, cents: true))
                     .font(theme.displayFont(size: 14))
                     .foregroundStyle(theme.textPrimary)
                 if let status = budgetStatus {
                     Text(QuotaCardText.budgetPhrase(status))
-                        .font(.system(size: 9, weight: .bold, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .bold))
                         .foregroundStyle(theme.textTertiary)
                 }
             }
@@ -156,7 +157,7 @@ struct CostStatCard: View {
     /// The card's name on a tilted, dashed sticker over its top edge.
     private var sticker: some View {
         Text(headerTitle)
-            .font(.system(size: 8.5, weight: .heavy, design: theme.fontDesign))
+            .font(theme.font(size: 8.5, weight: .heavy))
             .foregroundStyle(theme.textPrimary)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
@@ -185,7 +186,7 @@ struct CostStatCard: View {
                     .foregroundStyle(budgetStatusColor)
 
                 Text(headerTitle)
-                    .font(.system(size: 8, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 8, weight: .semibold))
                     .foregroundStyle(theme.textSecondary)
                     .tracking(0.3)
             }
@@ -207,7 +208,7 @@ struct CostStatCard: View {
 
             if let budget = effectiveBudget {
                 Text("of \(formatBudget(budget))")
-                    .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 12, weight: .semibold))
                     .foregroundStyle(theme.textSecondary)
             }
         }
@@ -217,7 +218,7 @@ struct CostStatCard: View {
             budgetProgressBar(budget: budget)
         } else if costUsage.kind == .extraUsage, effectiveBudget == nil {
             Text("No monthly cap")
-                .font(.system(size: 8, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 8, weight: .semibold))
                 .foregroundStyle(theme.textTertiary)
         }
     }
@@ -231,19 +232,19 @@ struct CostStatCard: View {
                 ForEach(Array(costUsage.lines.prefix(3).enumerated()), id: \.offset) { _, line in
                     HStack(spacing: 6) {
                         Text(line.label)
-                            .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 10, weight: .medium))
                             .foregroundStyle(theme.textSecondary)
                             .lineLimit(1)
                         Spacer(minLength: 4)
                         Text(line.formattedAmount)
-                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 10, weight: .semibold))
                             .foregroundStyle(theme.textPrimary)
                     }
                     .help(line.detail ?? line.label)
                 }
                 if costUsage.lines.count > 3 {
                     Text("and \(costUsage.lines.count - 3) more")
-                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -257,7 +258,7 @@ struct CostStatCard: View {
                     .font(.system(size: 7))
 
                 Text("API Time: \(costUsage.formattedApiDuration)")
-                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .semibold))
             }
             .foregroundStyle(theme.textTertiary)
             .lineLimit(1)
@@ -267,7 +268,7 @@ struct CostStatCard: View {
                     .font(.system(size: 7))
 
                 Text(resetText)
-                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .semibold))
             }
             .foregroundStyle(theme.textTertiary)
             .lineLimit(1)
@@ -290,7 +291,7 @@ struct CostStatCard: View {
             if let remaining = effectiveBudgetRemaining {
                 HStack {
                     Text("\(Int(budgetPercentUsed))% used · \(formatBudget(remaining)) left")
-                        .font(.system(size: 8, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 8, weight: .semibold))
                         .foregroundStyle(theme.textTertiary)
 
                     Spacer()

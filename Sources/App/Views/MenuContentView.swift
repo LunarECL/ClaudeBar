@@ -109,7 +109,8 @@ struct MenuContentView: View {
                 // Bottom Action Bar
                 actionBar
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                    // A theme's floor: the buttons stand on it.
+                    .padding(.bottom, 12 + theme.groundHeight)
             }
 
             // Share Pass Overlay
@@ -276,6 +277,51 @@ struct MenuContentView: View {
     // MARK: - Header
 
     private var headerView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if theme.headerStyle == .scoreLine {
+                ScoreLineView(line: scoreLine)
+            }
+            brandRow
+        }
+        .opacity(animateIn ? 1 : 0)
+        .offset(y: animateIn ? 0 : -10)
+    }
+
+    /// The selected tab as a game's score line: its name and status word,
+    /// its first quota's coins, the tab's place, the minutes to its reset.
+    private var scoreLine: ScoreLine {
+        let tabs = monitor.tabs
+        let index = tabs.firstIndex { $0.contains(selectedProviderId) } ?? 0
+        return ScoreLine(
+            providerName: tabs.indices.contains(index) ? settings.shown(tabs[index].name) : "ClaudeBar",
+            status: statusText,
+            quotas: selectedLogin?.snapshot?.quotas ?? [],
+            tab: index + 1
+        )
+    }
+
+    private var isCurrentlyRefreshing: Bool {
+        settings.overviewModeEnabled
+            ? monitor.lineup.contains { $0.isSyncing }
+            : selectedLogin?.isSyncing == true
+    }
+
+    /// Refresh what's on screen — the selected provider, or every one in
+    /// the overview — and the leaderboard.
+    private func refreshNow() {
+        // An explicit refresh is the moment a user who just installed a
+        // CLI expects it to be picked up, so drop the cached lookups
+        // instead of waiting for their TTL to lapse.
+        BinaryLocator.invalidateCaches()
+        Task { await leaderboard.refresh() }
+        if settings.overviewModeEnabled {
+            Task { await refreshAllEnabled() }
+        } else {
+            Task { await refresh(providerId: selectedProviderId) }
+        }
+    }
+
+    private var brandRow: some View {
         HStack(spacing: 12) {
             // Custom Provider Icon - shows AppLogo in overview mode and on the Leaderboard
             // tab (it isn't any one provider's), the provider icon otherwise.
@@ -323,7 +369,7 @@ struct MenuContentView: View {
                 }
 
                 Text(headerSubtitle)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(theme.id == "cli" ? theme.accentPrimary : theme.textSecondary)
             }
 
@@ -331,23 +377,21 @@ struct MenuContentView: View {
 
             // Status Badge: the provider's status, or on the Leaderboard tab the
             // leaderboard's own — same pill, so the header never changes height.
-            if showsLeaderboard {
+            // A score-line header has a ? block there instead, which refreshes
+            // too: its status word is in the score line.
+            if theme.headerStyle == .scoreLine {
+                QuestionBlockButton(isSyncing: isCurrentlyRefreshing, action: refreshNow)
+                    .help("Refresh")
+            } else if showsLeaderboard {
                 leaderboardBadge
             } else {
                 statusBadge
             }
         }
-        .opacity(animateIn ? 1 : 0)
-        .offset(y: animateIn ? 0 : -10)
     }
 
     private var headerSubtitle: String {
-        switch theme.id {
-        case "cli": return "> usage monitor"
-        case "christmas": return "Happy Holidays!"
-        case "pop": return "Your quotas, the cute way"
-        default: return "AI Usage Monitor"
-        }
+        theme.tagline ?? "AI Usage Monitor"
     }
 
     /// What the header pill says — the monitor's word for the selected tab.
@@ -393,7 +437,7 @@ struct MenuContentView: View {
             )
 
             Text(text)
-                .font(.system(size: 11, weight: outlined ? .heavy : .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: outlined ? .heavy : .medium))
                 .foregroundStyle(outlined ? theme.textOnStatus : theme.textPrimary)
         }
         .padding(.horizontal, 12)
@@ -411,7 +455,7 @@ struct MenuContentView: View {
     }
 
     private var statusText: String {
-        selectedProviderBadge.badgeText
+        selectedProviderBadge.badgeText(in: theme)
     }
 
     /// Help text for settings button, includes update info if available
@@ -441,6 +485,10 @@ struct MenuContentView: View {
     private var providerPills: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
+                // Leaderboard leads the row, but the popover still opens on
+                // the first provider: it shows only once it's picked.
+                LeaderboardPill(isSelected: showsLeaderboard) { showsLeaderboard = true }
+                    .help("Leaderboard")
                 ForEach(Array(monitor.tabs.enumerated()), id: \.element.id) { index, tab in
                     ProviderPill(
                         providerId: tab.id,
@@ -456,8 +504,6 @@ struct MenuContentView: View {
                     }
                     .help(index < 9 ? "\(settings.shown(tab.name)) (⌘\(index + 1))" : settings.shown(tab.name))
                 }
-                LeaderboardPill(isSelected: showsLeaderboard) { showsLeaderboard = true }
-                    .help("Leaderboard")
             }
             // A scroll view clips at its edges: leave room for an outlined
             // theme's thick outline and hard shadow.
@@ -579,7 +625,7 @@ struct MenuContentView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 Text("ACCOUNTS")
-                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .semibold))
                     .foregroundStyle(theme.textTertiary)
                 ForEach(tab.accounts, id: \.id) { account in
                     let hidden = hiddenAccountIds.contains(account.id)
@@ -602,7 +648,7 @@ struct MenuContentView: View {
                         if tab.provider.inUse?.canBeInUse(account) == true, tab.provider.inUse?.isInUse(account) != true {
                             Button { newSessions.use(account) } label: {
                                 Text("Use")
-                                    .font(.system(size: 10, weight: .bold, design: theme.fontDesign))
+                                    .font(theme.font(size: 10, weight: .bold))
                                     .foregroundStyle(theme.accentPrimary)
                             }
                             .buttonStyle(.plain)
@@ -610,7 +656,7 @@ struct MenuContentView: View {
                             .accessibilityLabel("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
                         }
                     }
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     // The provider pills' shape and height. A leading IN USE badge sits
                     // concentric: the same gap on its left as above and below it.
                     .frame(height: InUseBadge.chipHeight(in: theme))
@@ -645,7 +691,7 @@ struct MenuContentView: View {
         return HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.statusColor(for: status))
             Text("\(settings.shown(worst.displayName))\(detail) — causing \(status.badgeText.capitalized)")
-                .font(.system(size: 11, design: theme.fontDesign))
+                .font(theme.font(size: 11))
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -699,14 +745,14 @@ struct MenuContentView: View {
 
             Text(settings.shown(monitor.lineupName(of: provider)))
                 .fixedSize(horizontal: false, vertical: true)
-                .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 13, weight: .semibold))
                 .foregroundStyle(theme.textPrimary)
 
             Spacer()
 
             // The same word the header uses: no "HEALTHY" without data (#259).
             let badge = ProviderBadgeState(of: [provider], quotaStatus: monitor.status(of: provider))
-            Text(badge.badgeText)
+            Text(badge.badgeText(in: theme))
                 .badge(badge.badgeColor(theme))
                 .opacity(badge.showsBadge ? 1 : 0)
         }
@@ -717,7 +763,7 @@ struct MenuContentView: View {
     private func freshnessLine(_ text: String) -> some View {
         HStack {
             Text(text)
-                .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 10, weight: .semibold))
                 .foregroundStyle(theme.textTertiary)
             Spacer()
         }
@@ -734,12 +780,12 @@ struct MenuContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let headline = failure.headline {
                     Text(headline)
-                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .semibold))
                         .foregroundStyle(theme.textPrimary)
                 }
                 Text(failure.detail)
                     .help(failure.detail)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -758,7 +804,7 @@ struct MenuContentView: View {
 
             Text(provider.lastError?.localizedDescription ?? "Unavailable")
                 .help(provider.lastError?.localizedDescription ?? "Unavailable")
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .medium))
                 .foregroundStyle(theme.textTertiary)
                 .lineLimit(1)
 
@@ -807,7 +853,7 @@ struct MenuContentView: View {
                     }
 
                     Text((group.title ?? "Other").uppercased())
-                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .semibold))
                         .foregroundStyle(theme.textSecondary)
                         .tracking(0.5)
 
@@ -815,21 +861,21 @@ struct MenuContentView: View {
 
                     if case .headerInline(let note) = group.notePlacement {
                         Text(note)
-                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 9, weight: .medium))
                             .foregroundStyle(theme.textTertiary)
                     } else if isNoteOnly {
                         Text("No usage data")
-                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 9, weight: .medium))
                             .foregroundStyle(theme.textTertiary)
                     } else {
                         // Collapsed sections keep their headline number visible.
                         if isCollapsed, let lowest = group.lowestQuota {
                             Text("\(Int(lowest.percentRemaining))% left")
-                                .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                                .font(theme.font(size: 9, weight: .semibold))
                                 .foregroundStyle(theme.textTertiary)
                         }
 
-                        Text(group.worstStatus.badgeText)
+                        Text(theme.statusWord(for: group.worstStatus))
                             .badge(theme.statusColor(for: group.worstStatus))
                     }
                 }
@@ -844,7 +890,7 @@ struct MenuContentView: View {
                 // its own row - never silently dropped.
                 if case .row(let note) = group.notePlacement {
                     Text(note)
-                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                 }
 
@@ -872,7 +918,7 @@ struct MenuContentView: View {
                 .font(.system(size: 8))
 
             Text(text)
-                .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 10, weight: .medium))
 
             Spacer(minLength: 0)
         }
@@ -1000,12 +1046,12 @@ struct MenuContentView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(theme.textSecondary)
                 Text(setup.title)
-                    .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 12, weight: .semibold))
                     .foregroundStyle(theme.textPrimary)
                 Spacer()
             }
             Text(setup.text)
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .medium))
                 .foregroundStyle(theme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
             if let url = setup.url {
@@ -1038,14 +1084,14 @@ struct MenuContentView: View {
             // A provider that is data names the step that failed first.
             let failure = selectedLogin.flatMap { RefreshReport.of($0).failure }
             Text(failure?.headline ?? "\(selectedLogin.map(monitor.lineupName(of:)) ?? selectedProviderId) Unavailable")
-                .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                .font(theme.font(size: 14, weight: .bold))
                 .foregroundStyle(theme.textPrimary)
 
             // Show actual error message if available, otherwise generic message
             Text(failure?.headline != nil
                  ? "\(selectedLogin.map(monitor.lineupName(of:)) ?? selectedProviderId) Unavailable · \(failure?.detail ?? "")"
                  : selectedLogin?.lastError?.localizedDescription ?? "Install CLI or check configuration")
-                .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .semibold))
                 .foregroundStyle(theme.textTertiary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 16)
@@ -1072,27 +1118,14 @@ struct MenuContentView: View {
             .keyboardShortcut("d")
             .help("Open dashboard (⌘D)")
 
-            // Refresh Button
-            let isCurrentlyRefreshing = settings.overviewModeEnabled
-                ? monitor.lineup.contains { $0.isSyncing }
-                : selectedLogin?.isSyncing == true
+            // Refresh Button — always here, a ? block in the header or not.
             WrappedActionButton(
                 icon: isCurrentlyRefreshing ? "arrow.trianglehead.2.counterclockwise.rotate.90" : "arrow.clockwise",
                 label: isCurrentlyRefreshing ? "Syncing" : "Refresh",
                 gradient: theme.accentGradient,
-                isLoading: isCurrentlyRefreshing
-            ) {
-                // An explicit refresh is the moment a user who just installed a
-                // CLI expects it to be picked up, so drop the cached lookups
-                // instead of waiting for their TTL to lapse.
-                BinaryLocator.invalidateCaches()
-                Task { await leaderboard.refresh() }
-                if settings.overviewModeEnabled {
-                    Task { await refreshAllEnabled() }
-                } else {
-                    Task { await refresh(providerId: selectedProviderId) }
-                }
-            }
+                isLoading: isCurrentlyRefreshing,
+                action: refreshNow
+            )
             .keyboardShortcut("r")
             .help("Refresh (⌘R)")
 
@@ -1105,10 +1138,10 @@ struct MenuContentView: View {
                     Task { await fetchAndShowPasses() }
                 } label: {
                     ZStack {
-                        Circle()
+                        theme.controlShape
                             .fill(theme.shareGradient)
                             .themeShadow(theme, scale: 0.6)
-                            .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
+                            .overlay(theme.controlShape.stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                             .frame(width: 32, height: 32)
 
                         // On a printed theme's light candy fill, the icon is ink.
@@ -1136,10 +1169,10 @@ struct MenuContentView: View {
                 NSApp.activate(ignoringOtherApps: true)
             } label: {
                 ZStack {
-                    Circle()
+                    theme.controlShape
                         .fill(theme.glassBackground)
                         .themeShadow(theme, scale: 0.6)
-                        .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
+                        .overlay(theme.controlShape.stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                         .frame(width: 32, height: 32)
 
                     Image(systemName: "gearshape.fill")
@@ -1164,10 +1197,10 @@ struct MenuContentView: View {
                 NSApplication.shared.terminate(nil)
             } label: {
                 ZStack {
-                    Circle()
+                    theme.controlShape
                         .fill(theme.glassBackground)
                         .themeShadow(theme, scale: 0.6)
-                        .overlay(Circle().stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
+                        .overlay(theme.controlShape.stroke(theme.isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth))
                         .frame(width: 32, height: 32)
 
                     Image(systemName: "xmark")
@@ -1276,11 +1309,11 @@ struct ProviderPill: View {
 
                 Text(providerName)
                     .help(providerName)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .lineLimit(1)
                     .fixedSize()
             }
-            .foregroundStyle(isSelected ? (theme.id == "cli" ? theme.textPrimary : .white) : theme.textPrimary)
+            .foregroundStyle(isSelected ? theme.textOnAccent : theme.textPrimary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
@@ -1483,7 +1516,7 @@ struct WrappedStatCard: View {
                         .foregroundStyle(statusColor)
 
                     Text((quota.compactTitle ?? quota.quotaType.displayName).uppercased())
-                        .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 8, weight: .medium))
                         .foregroundStyle(theme.textSecondary)
                         .tracking(0.3)
                 }
@@ -1495,8 +1528,10 @@ struct WrappedStatCard: View {
                     Text(quota.pace.displayName.uppercased())
                         .badge(paceColor)
                 } else {
-                    Text(quota.status(under: settings.statusPolicy).badgeText)
+                    let status = quota.status(under: settings.statusPolicy)
+                    Text(theme.statusWord(for: status))
                         .badge(statusColor)
+                        .blinking(theme.blinks(status))
                 }
             }
 
@@ -1521,7 +1556,7 @@ struct WrappedStatCard: View {
                         )
                         .layoutPriority(1)
                         Text(headline.caption)
-                            .font(.system(size: 9, weight: .heavy, design: theme.fontDesign))
+                            .font(theme.font(size: 9, weight: .heavy))
                             .foregroundStyle(theme.textTertiary)
                     }
                     .lineLimit(1)
@@ -1534,7 +1569,7 @@ struct WrappedStatCard: View {
                             .foregroundStyle(theme.textPrimary)
 
                         Text("of \(dollarCap)")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 9, weight: .semibold))
                             .foregroundStyle(theme.textSecondary)
                     }
                     .lineLimit(1)
@@ -1551,7 +1586,7 @@ struct WrappedStatCard: View {
                             .foregroundStyle(effectiveDisplayMode == .pace ? paceColor : theme.textPrimary)
 
                         Text("%")
-                            .font(.system(size: 13, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 13, weight: .medium))
                             .foregroundStyle(effectiveDisplayMode == .pace ? paceColor.opacity(0.7) : theme.textTertiary)
                     }
                 }
@@ -1560,7 +1595,7 @@ struct WrappedStatCard: View {
 
                 if !theme.isOutlined {
                     Text(valueCaption)
-                        .font(.system(size: isCappedSpend ? 10 : 12, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: isCappedSpend ? 10 : 12, weight: .medium))
                         .fixedSize()
                         .foregroundStyle(effectiveDisplayMode == .pace ? paceColor.opacity(0.8) : theme.textTertiary)
                 }
@@ -1613,7 +1648,7 @@ struct WrappedStatCard: View {
                             .font(.system(size: 7))
 
                         Text(resetText)
-                            .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 8, weight: .medium))
                     }
                     .foregroundStyle(theme.textTertiary)
                     .lineLimit(1)
@@ -1632,6 +1667,7 @@ struct WrappedStatCard: View {
                     .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
             }
         )
+        .themeRivets()
         .scaleEffect(isHovering ? 1.015 : 1.0)
         .animation(.easeOut(duration: 0.15), value: isHovering)
         .onHover { isHovering = $0 }
@@ -1656,12 +1692,12 @@ struct WrappedStatCard: View {
     private func resetLine(_ line: QuotaCardText.ResetLine) -> Text {
         let time = line.time.map {
             Text($0)
-                .font(.system(size: 8.5, weight: .heavy, design: theme.fontDesign))
+                .font(theme.font(size: 8.5, weight: .heavy))
                 .foregroundColor(theme.textPrimary)
         }
         guard !line.lead.isEmpty else { return time ?? Text("") }
         let lead = Text(line.lead)
-            .font(.system(size: 8.5, weight: .semibold, design: theme.fontDesign))
+            .font(theme.font(size: 8.5, weight: .semibold))
             .foregroundColor(theme.textTertiary)
         guard let time else { return lead }
         return lead + Text(" ") + time
@@ -1729,7 +1765,7 @@ struct LoadingSpinnerView: View {
             }
 
             Text("Fetching usage data...")
-                .font(.system(size: 13, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 13, weight: .medium))
                 .foregroundStyle(theme.textSecondary)
         }
         .frame(height: 140)
@@ -1767,7 +1803,7 @@ struct WrappedActionButton: View {
                 }
 
                 Text(label)
-                    .font(.system(size: 12, weight: theme.isOutlined ? .bold : .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 12, weight: theme.isOutlined ? .bold : .medium))
                     .fixedSize()
             }
             .foregroundStyle(isHovering && !theme.isOutlined ? .white : theme.textPrimary)
@@ -1778,15 +1814,15 @@ struct WrappedActionButton: View {
                     if theme.isOutlined {
                         // Printed: a paper chip on a hard shadow, mint under the
                         // pointer, sky while it works — never greyed out.
-                        Capsule()
+                        theme.controlShape
                             .fill(isLoading ? theme.accentSecondary : (isHovering ? theme.statusHealthy : theme.glassBackground))
                             .themeShadow(theme, scale: isHovering ? 1 : 0.75)
                     } else {
-                        Capsule()
+                        theme.controlShape
                             .fill(isHovering ? AnyShapeStyle(gradient) : AnyShapeStyle(theme.glassBackground))
                     }
 
-                    Capsule()
+                    theme.controlShape
                         .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
                 }
             )
