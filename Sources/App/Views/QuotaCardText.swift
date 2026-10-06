@@ -10,6 +10,27 @@ enum QuotaCardText {
         return mode == .used ? "used" : "left"
     }
 
+    /// The big number an outlined theme prints on a quota card, and the
+    /// short words beside it. A balance and a capped spend print the same
+    /// way a percentage does, so every headline reads as one font (#499).
+    struct Headline: Equatable {
+        let number: String
+        let caption: String
+    }
+
+    static func headline(for quota: UsageQuota, mode: UsageDisplayMode) -> Headline {
+        if let used = quota.formattedDollarUsed, let cap = quota.formattedDollarCap {
+            return Headline(number: used, caption: "of \(cap)")
+        }
+        if let balance = quota.formattedDollarRemaining {
+            return Headline(number: balance, caption: "left")
+        }
+        return Headline(
+            number: "\(Int(quota.displayPercent(mode: mode)))%",
+            caption: caption(mode: mode, isOutlined: true)
+        )
+    }
+
     /// The label over a budget card's amount: extra usage is billed by the
     /// month, an API cost is just what was spent.
     static func spentLabel(for kind: CostUsage.Kind) -> String {

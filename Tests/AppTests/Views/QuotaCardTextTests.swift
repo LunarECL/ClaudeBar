@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import Domain
 @testable import ClaudeBar
@@ -19,6 +20,26 @@ struct QuotaCardTextTests {
         #expect(QuotaCardText.caption(mode: .remaining, isOutlined: true) == "left")
         #expect(QuotaCardText.caption(mode: .used, isOutlined: true) == "used")
         #expect(QuotaCardText.caption(mode: .pace, isOutlined: true) == "left")
+    }
+
+    // MARK: - Headline (#499: dollars print like percentages)
+
+    @Test func `should headline a quota with its percentage and say left beside it`() {
+        let quota = UsageQuota(percentRemaining: 62, quotaType: .session, providerId: "claude")
+        let headline = QuotaCardText.headline(for: quota, mode: .remaining)
+        #expect(headline == .init(number: "62%", caption: "left"))
+    }
+
+    @Test func `should headline a credit balance with its amount and say left beside it`() {
+        let quota = UsageQuota(percentRemaining: 97, quotaType: .modelSpecific("Credits"), providerId: "openrouter", dollarRemaining: Decimal(string: "24.19"))
+        let headline = QuotaCardText.headline(for: quota, mode: .remaining)
+        #expect(headline == .init(number: "$24.19", caption: "left"))
+    }
+
+    @Test func `should headline a capped spend with what was spent and its cap beside it`() {
+        let quota = UsageQuota(percentRemaining: 75, quotaType: .modelSpecific("Spend"), providerId: "cursor", dollarUsed: 125, dollarCap: 500)
+        let headline = QuotaCardText.headline(for: quota, mode: .remaining)
+        #expect(headline == .init(number: "$125.00", caption: "of $500"))
     }
 
     // MARK: - Reset line

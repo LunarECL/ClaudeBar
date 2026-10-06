@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Pop theme: a dollar balance or spend now prints in the same outlined style as a percentage, with its caption beside it, so a card's big numbers no longer look like two different fonts ([#499](https://github.com/tddworks/ClaudeBar/issues/499))
+
 ---
 
 ## [0.5.6] - 2026-10-05
