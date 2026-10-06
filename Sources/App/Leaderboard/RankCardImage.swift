@@ -1,8 +1,8 @@
 import SwiftUI
 import Domain
 
-/// The shared image of a `RankCard`: drawn in Pop whatever theme the app
-/// wears, so a rank looks like ClaudeBar wherever it's posted.
+/// The shared image of a `RankCard`, in the theme the member wears: a card
+/// of that theme on its background, the way the popover draws one.
 /// Design: design-concept/leaderboard/share-standing.html.
 struct RankCardImage: View {
     let card: RankCard
@@ -10,8 +10,10 @@ struct RankCardImage: View {
     /// `@itshan`, or `@i•••` when the member masks it.
     let name: String
     let providerName: (String) -> String
-
-    private let theme = PopTheme()
+    /// Passed in, not read from the environment: `ImageRenderer` renders
+    /// outside the popover's window and inherits neither.
+    let theme: any AppThemeProvider
+    let colorScheme: ColorScheme
 
     /// Drawn at a third of its pixels; rendered at 3×.
     static let scale: CGFloat = 3
@@ -26,13 +28,19 @@ struct RankCardImage: View {
             case .wide: wide
             }
         }
-        .padding(shape == .square ? 22 : 20)
-        .frame(width: Self.points(shape).width, height: Self.points(shape).height, alignment: .topLeading)
-        .background(paper)
-        .overlay(RoundedRectangle(cornerRadius: 26).strokeBorder(PopTheme.ink, lineWidth: 3))
-        .clipShape(RoundedRectangle(cornerRadius: 26))
+        .foregroundStyle(theme.textPrimary)
+        .padding(shape == .square ? 18 : 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: cardRadius)
+                .fill(theme.cardGradient)
+                .overlay(RoundedRectangle(cornerRadius: cardRadius).strokeBorder(theme.glassBorder, lineWidth: border))
+        )
+        .padding(12)
+        .frame(width: Self.points(shape).width, height: Self.points(shape).height)
+        .background(theme.backgroundGradient)
         .environment(\.appTheme, theme)
-        .environment(\.colorScheme, .light)
+        .environment(\.colorScheme, colorScheme)
     }
 
     private var square: some View {
@@ -70,32 +78,23 @@ struct RankCardImage: View {
                 placementBadge.padding(.top, 8)
                 mixBar.padding(.top, 10)
                 Spacer(minLength: 6)
-                Text(Self.boardAddress).font(theme.font(size: 10, weight: .bold)).foregroundStyle(PopTheme.muted)
+                Text(Self.boardAddress).font(theme.font(size: 10, weight: .bold)).foregroundStyle(theme.textTertiary)
+                    .lineLimit(1).minimumScaleFactor(0.6)
             }
         }
-        .foregroundStyle(PopTheme.ink)
     }
 
     // MARK: Pieces
 
-    private var paper: some View {
-        PopTheme.cream.overlay(
-            Canvas { context, size in
-                let dot = Path(ellipseIn: CGRect(x: 0, y: 0, width: 2.6, height: 2.6))
-                for x in stride(from: CGFloat(6), to: size.width, by: 15) {
-                    for y in stride(from: CGFloat(6), to: size.height, by: 15) {
-                        context.fill(dot.offsetBy(dx: x, dy: y), with: .color(PopTheme.dot))
-                    }
-                }
-            })
-    }
+    /// The theme's card corners and border, never thinner than a hairline that survives 3×.
+    private var cardRadius: CGFloat { min(26, theme.cardCornerRadius + 6) }
+    private var border: CGFloat { max(1.5, theme.cardBorderWidth) }
 
     private var brand: some View {
         HStack(spacing: 6) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 22, height: 22)
             Text("ClaudeBar Leaderboard").font(theme.font(size: 13, weight: .heavy)).lineLimit(1).fixedSize()
         }
-        .foregroundStyle(PopTheme.ink)
     }
 
     private var viewPill: some View {
@@ -103,9 +102,8 @@ struct RankCardImage: View {
             .font(theme.font(size: 10, weight: .heavy))
             .lineLimit(1).fixedSize()
             .padding(.horizontal, 8).padding(.vertical, 2)
-            .background(Capsule().fill(.white))
-            .overlay(Capsule().strokeBorder(PopTheme.ink, lineWidth: 2))
-            .foregroundStyle(PopTheme.ink)
+            .background(Capsule().fill(theme.glassBackground))
+            .overlay(Capsule().strokeBorder(theme.glassBorder, lineWidth: max(1, border * 0.7)))
     }
 
     private func rankNumber(size: CGFloat) -> some View {
@@ -117,11 +115,10 @@ struct RankCardImage: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(name).font(theme.font(size: 24, weight: .heavy)).lineLimit(1).minimumScaleFactor(0.6)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(LeaderboardStandingsView.tokens(card.total)).font(.system(size: 20, weight: .heavy, design: .monospaced))
-                Text("tokens").font(theme.font(size: 12, weight: .bold)).foregroundStyle(PopTheme.muted)
+                Text(LeaderboardStandingsView.tokens(card.total)).font(theme.font(size: 20, weight: .heavy))
+                Text("tokens").font(theme.font(size: 12, weight: .bold)).foregroundStyle(theme.textSecondary)
             }
         }
-        .foregroundStyle(PopTheme.ink)
     }
 
     @ViewBuilder
@@ -130,9 +127,9 @@ struct RankCardImage: View {
             Text(text)
                 .font(theme.font(size: 12, weight: .heavy))
                 .padding(.horizontal, 7).padding(.vertical, 1)
-                .background(RoundedRectangle(cornerRadius: 6).fill(PopTheme.butter))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(PopTheme.ink, lineWidth: 2))
-                .foregroundStyle(PopTheme.ink)
+                .background(RoundedRectangle(cornerRadius: theme.badgeCornerRadius ?? 6).fill(theme.accentGradient))
+                .overlay(RoundedRectangle(cornerRadius: theme.badgeCornerRadius ?? 6).strokeBorder(theme.glassBorder, lineWidth: max(1, border * 0.7)))
+                .foregroundStyle(theme.textOnAccent)
         }
     }
 
@@ -146,31 +143,31 @@ struct RankCardImage: View {
                     Spacer(minLength: 0)
                 }
                 .clipShape(Capsule())
-                .overlay(Capsule().strokeBorder(PopTheme.ink, lineWidth: 2))
+                .background(Capsule().fill(theme.progressTrack))
+                .overlay(Capsule().strokeBorder(theme.glassBorder, lineWidth: max(1, border * 0.7)))
             }
             .frame(height: 14)
             HStack(spacing: 12) {
                 ForEach(card.mix.prefix(3), id: \.provider) { part in
                     HStack(spacing: 4) {
                         Circle().fill(color(part.provider)).frame(width: 8, height: 8)
-                            .overlay(Circle().strokeBorder(PopTheme.ink, lineWidth: 1.5))
+                            .overlay(Circle().strokeBorder(theme.glassBorder, lineWidth: 1))
                         Text("\(providerName(part.provider)) \(part.percent)%").lineLimit(1)
                     }
                 }
             }
             .font(theme.font(size: 11, weight: .bold))
-            .foregroundStyle(PopTheme.ink)
         }
     }
 
     private var footer: some View {
         HStack {
-            Text(Self.boardAddress)
-            Spacer()
+            Text(Self.boardAddress).lineLimit(1).minimumScaleFactor(0.6)
+            Spacer(minLength: 8)
             Text("tokens only")
         }
         .font(theme.font(size: 10, weight: .bold))
-        .foregroundStyle(PopTheme.muted)
+        .foregroundStyle(theme.textTertiary)
     }
 
     // MARK: Words
@@ -196,7 +193,7 @@ struct RankCardImage: View {
     }
 
     private func color(_ provider: String) -> Color {
-        ProviderVisualIdentityLookup.color(for: provider, scheme: .light)
+        ProviderVisualIdentityLookup.color(for: provider, scheme: colorScheme)
     }
 }
 

@@ -285,7 +285,7 @@ A destination, not a provider, so it sits beside Notify! (AGENTS.md: destination
 | `LeaderboardMembership`, `DailyTokens`, `Username`, `BoardView`, `Standing`, `RankCard`, `LeaderboardUploader` | `Sources/Domain/Leaderboard/` |
 | `@Mockable` ports `LeaderboardAPI` and `SigningKeyStore`; plain `LeaderboardSettingsRepository` (like Notify!'s) and `@MainActor` `TokenLogs`, faked in tests | `Sources/Domain/Leaderboard/` |
 | `LeaderboardHTTPClient`, `CredentialSigningKeyStore`; settings as `leaderboard.*` in `JSONSettingsRepository` | `Sources/Infrastructure/` |
-| `Leaderboard` (wiring, the 5-minute check and the wake observer, `refresh()` for the popover's Refresh, `share(_:)` for *Share my rank*), `MonitorTokenLogs`, popover tab, `RankCardImage` (the image, always in Pop) and `RankShareOverlay`, `LeaderboardPane` | `Sources/App/` |
+| `Leaderboard` (wiring, the 5-minute check and the wake observer, `refresh()` for the popover's Refresh, `share(_:)` for *Share my rank*), `MonitorTokenLogs`, popover tab, `RankCardImage` (the image, in the member's theme) and `RankShareOverlay`, `LeaderboardPane` | `Sources/App/` |
 | Server and board page | Private repo `tddworks/claudebar-server` |
 
 ## 8 · Build sequence

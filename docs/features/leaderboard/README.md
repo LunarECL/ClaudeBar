@@ -48,7 +48,7 @@ The tab then shows your rank (the eye next to your name shows it as `@i•••
 - **Name:** shown or masked as `@i•••`. It starts the way the eye on *Your rank* has it.
 - **Copy image** puts it on the clipboard, **Save…** writes a PNG, **Share…** opens the Mac's share menu.
 
-The image is drawn on your Mac; nothing is uploaded. It always uses the Pop look, whatever theme you use. The button shows once you have a rank in the view you're looking at.
+The image is drawn on your Mac in the theme you use, Platformer, Pop, Dark or any other; nothing is uploaded. The button shows once you have a rank in the view you're looking at.
 
 ## Settings → Leaderboard
 

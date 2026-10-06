@@ -13,13 +13,14 @@ struct RankShareOverlay: View {
     let onDismiss: () -> Void
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @State private var shape: RankCard.Shape = .square
     @State private var masksName = AppSettings.shared.hideLeaderboardName
     @State private var copied = false
 
     private var image: RankCardImage {
         RankCardImage(card: card, shape: shape, name: leaderboardName(card.username, hidden: masksName),
-                      providerName: { leaderboardProviderName($0, in: monitor) })
+                      providerName: { leaderboardProviderName($0, in: monitor) }, theme: theme, colorScheme: colorScheme)
     }
 
     var body: some View {

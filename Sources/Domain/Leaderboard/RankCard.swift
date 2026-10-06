@@ -51,7 +51,7 @@ public struct RankCard: Sendable, Equatable {
     public let username: String
     public let total: Int
     public let view: BoardView
-    /// Largest first; providers with no tokens left out.
+    /// Largest first; a provider whose share rounds to 0% is left out, as one with no tokens is.
     public let mix: [MixShare]
     /// Every member in the view, when the board lists them all and the rank is among them.
     public let members: Int?
@@ -71,6 +71,7 @@ public struct RankCard: Sendable, Equatable {
             .filter { $0.value > 0 }
             .sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
             .map { MixShare(provider: $0.key, percent: Int((Double($0.value) / sum * 100).rounded())) }
+            .filter { $0.percent > 0 }
 
         let listsEveryone = board.count < Self.listLimit
         members = listsEveryone && standing.rank <= board.count ? board.count : nil

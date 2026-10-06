@@ -58,6 +58,12 @@ struct RankCardTests {
         #expect(card.mix == [.init(provider: "claude", percent: 75), .init(provider: "codex", percent: 25)])
     }
 
+    @Test func `should leave out a provider whose share rounds to none`() throws {
+        let card = try #require(card(rank: 2, on: board(5), byProvider: ["claude": 996, "codex": 4]))
+
+        #expect(card.mix == [.init(provider: "claude", percent: 100)])
+    }
+
     @Test func `should keep the board view the rank was read in`() throws {
         let codex = BoardView(period: .thirtyDays, provider: "codex")
         let card = try #require(RankCard(standing: Standing(rank: 1, username: "itshan", total: 5), in: codex, board: board(3)))
