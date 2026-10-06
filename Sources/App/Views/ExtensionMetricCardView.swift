@@ -23,7 +23,7 @@ struct ExtensionMetricCardView: View {
                     }
 
                     Text(metric.label.uppercased())
-                        .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 8, weight: .medium))
                         .foregroundStyle(theme.textSecondary)
                         .tracking(0.3)
                 }
@@ -42,7 +42,7 @@ struct ExtensionMetricCardView: View {
                 Spacer()
 
                 Text(metric.unit)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -69,7 +69,7 @@ struct ExtensionMetricCardView: View {
                         .font(.system(size: 7))
 
                     Text(deltaText(delta))
-                        .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 8, weight: .medium))
                 }
                 .foregroundStyle(theme.textTertiary)
                 .lineLimit(1)

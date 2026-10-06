@@ -118,7 +118,7 @@ struct SettingsWindowView: View {
 
             TextField("Search settings…", text: $searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 12, weight: .medium))
                 .foregroundStyle(theme.textPrimary)
 
             if !searchText.isEmpty {

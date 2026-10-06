@@ -28,14 +28,14 @@ struct ImportProviderSheet: View {
                     .font(.system(size: 18))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Import provider")
-                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .semibold))
                         .foregroundStyle(theme.textSecondary)
                     Text(review.definition.profile.name)
-                        .font(.system(size: 17, weight: .bold, design: theme.fontDesign))
+                        .font(theme.font(size: 17, weight: .bold))
                 }
                 Spacer()
                 Text("CUSTOM")
-                    .font(.system(size: 8, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 8, weight: .semibold))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(theme.glassBorder.opacity(0.6)))
@@ -62,7 +62,7 @@ struct ImportProviderSheet: View {
                             .background(RoundedRectangle(cornerRadius: 6).fill(theme.glassBackground))
                     }
                     Toggle("I trust this command — ClaudeBar runs it with my rights each time it refreshes", isOn: $trustsCommands)
-                        .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 10, weight: .medium))
                 }
             }
 
@@ -72,7 +72,7 @@ struct ImportProviderSheet: View {
                     SecureField("Paste your own key", text: Binding(get: { keys[name] ?? "" }, set: { keys[name] = $0 }))
                         .textFieldStyle(.roundedBorder)
                     Text("Kept in your Keychain — never in the provider's file.")
-                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                 }
             }
@@ -82,7 +82,7 @@ struct ImportProviderSheet: View {
                     .disabled(isTesting || !canRun)
                 if let testText {
                     Text(testText)
-                        .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 10, weight: .semibold))
                         .foregroundStyle(testFailed ? theme.statusWarning : theme.statusHealthy)
                         .lineLimit(2)
                 }
@@ -90,7 +90,7 @@ struct ImportProviderSheet: View {
 
             if let error {
                 Text(error)
-                    .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .semibold))
                     .foregroundStyle(theme.statusWarning)
             }
 
@@ -157,14 +157,14 @@ struct ImportProviderSheet: View {
             Image(systemName: symbol)
                 .foregroundStyle(theme.statusWarning)
             Text(text)
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private func label(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+            .font(theme.font(size: 9, weight: .semibold))
             .foregroundStyle(theme.textSecondary)
             .tracking(0.5)
     }

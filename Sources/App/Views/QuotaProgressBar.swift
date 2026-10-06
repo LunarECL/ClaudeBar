@@ -5,7 +5,8 @@ import Domain
 
 /// A quota's or a budget's bar. Glass themes draw a thin flat track; an
 /// outlined theme (Pop) a tall inked capsule over a striped track, its fill
-/// ending in an ink edge.
+/// ending in an ink edge; a theme whose `progressStyle` is blocks
+/// (Platformer) a row of inked blocks.
 struct QuotaProgressBar<Fill: ShapeStyle>: View {
     /// 0–100; clamped.
     let percent: Double
@@ -18,7 +19,28 @@ struct QuotaProgressBar<Fill: ShapeStyle>: View {
     private var fraction: Double { max(0, min(100, percent)) / 100 }
 
     var body: some View {
-        if theme.isOutlined { outlined } else { glass }
+        switch theme.progressStyle {
+        case .blocks(let count): blocks(count)
+        case .bar: if theme.isOutlined { outlined } else { glass }
+        }
+    }
+
+    private func blocks(_ count: Int) -> some View {
+        let filled = animate ? ProgressBlocks.filled(percent: percent, of: count) : 0
+        return HStack(spacing: 2) {
+            ForEach(0..<count, id: \.self) { index in
+                Rectangle()
+                    .fill(index < filled ? AnyShapeStyle(fill) : AnyShapeStyle(theme.progressTrack))
+                    .overlay(alignment: .top) {
+                        // The lit block's shine.
+                        Rectangle().fill(.white.opacity(index < filled ? 0.45 : 0)).frame(height: 3)
+                    }
+            }
+        }
+        .padding(2)
+        .background(theme.glassBorder)
+        .frame(height: 14)
+        .animation(.easeOut(duration: 0.4).delay(delay + 0.2), value: animate)
     }
 
     private var glass: some View {
@@ -57,6 +79,16 @@ struct QuotaProgressBar<Fill: ShapeStyle>: View {
 }
 
 /// Diagonal stripes, the paper under an outlined theme's bar.
+/// How many of a bar's blocks a percentage lights: to the nearest block,
+/// and at least one while anything is left.
+enum ProgressBlocks {
+    static func filled(percent: Double, of count: Int) -> Int {
+        guard percent > 0, count > 0 else { return 0 }
+        let nearest = Int((min(100, percent) / 100 * Double(count)).rounded())
+        return min(count, max(1, nearest))
+    }
+}
+
 private struct StripedTrack: View {
     let base: Color
     let stripe: Color
@@ -138,7 +170,7 @@ struct PaceBadge: View {
                 Text(pace.displayName.uppercased())
             }
         }
-        .font(.system(size: 7.5, weight: .heavy, design: theme.fontDesign))
+        .font(theme.font(size: 7.5, weight: .heavy))
         .foregroundStyle(theme.textPrimary)
         .padding(.horizontal, 5)
         .padding(.vertical, 1.5)

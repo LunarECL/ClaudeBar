@@ -1,5 +1,5 @@
 ---
-description: Pick a built-in theme (System, Light, Dark, CLI, Christmas, Pop) or import an iTerm2 .itermcolors scheme to match your terminal. Use when changing how the popover, menu bar and Settings look.
+description: Pick a built-in theme (System, Light, Dark, CLI, Christmas, Pop, Platformer) or import an iTerm2 .itermcolors scheme to match your terminal. Use when changing how the popover, menu bar and Settings look.
 ---
 
 # Themes
@@ -20,6 +20,7 @@ Settings → **Appearance** → **Theme**, then click one. The change applies st
 | **CLI** | Monochrome terminal look with a monospaced font and green accents |
 | **Christmas** | Festive colors, snowfall, and a snowflake menu bar icon |
 | **Pop** | Cream dotted paper, thick ink outlines, hard shadows, candy-coloured status and chunky numbers |
+| **Platformer** | A Super Mario–style 8-bit level: blue sky, pixel clouds and hills on a brick floor, quota bars as a row of ten blocks, pixel text everywhere. A low quota says **HURRY UP!**, an empty one **GAME OVER** |
 
 **Christmas turns itself on** from December 24 to 26, but only if you've never picked a theme yourself. After the 26th it switches back to System. Once you've chosen any theme, ClaudeBar leaves your choice alone.
 

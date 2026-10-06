@@ -39,7 +39,7 @@ struct LeaderboardPane: View {
             }
             if let message {
                 Text(message)
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
                     .foregroundStyle(theme.textSecondary)
             }
         }
@@ -138,7 +138,7 @@ struct LeaderboardPane: View {
                 }
             }
             Text("Turning a provider off stops new uploads for it; days already uploaded stay until you leave.")
-                .font(.system(size: 11, design: theme.fontDesign))
+                .font(theme.font(size: 11))
                 .foregroundStyle(theme.textTertiary)
                 .padding(.top, 8)
         }

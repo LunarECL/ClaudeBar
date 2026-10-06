@@ -38,7 +38,7 @@ struct InkSegmentedPicker<Option: Hashable & Identifiable>: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { selection = option }
         } label: {
             Text(label(option))
-                .font(.system(size: 9.5, weight: .heavy, design: theme.fontDesign))
+                .font(theme.font(size: 9.5, weight: .heavy))
                 .foregroundStyle(isOn ? theme.cardGradient : LinearGradient(colors: [theme.textPrimary], startPoint: .leading, endPoint: .trailing))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 3)

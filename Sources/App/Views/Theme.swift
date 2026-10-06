@@ -11,6 +11,7 @@ enum ThemeMode: String, CaseIterable {
     case cli
     case christmas
     case pop
+    case platformer
 
     var displayName: String {
         switch self {
@@ -20,6 +21,7 @@ enum ThemeMode: String, CaseIterable {
         case .cli: "CLI"
         case .christmas: "Christmas"
         case .pop: "Pop"
+        case .platformer: "Platformer"
         }
     }
 
@@ -31,6 +33,7 @@ enum ThemeMode: String, CaseIterable {
         case .cli: "terminal.fill"
         case .christmas: "snowflake"
         case .pop: "paintpalette.fill"
+        case .platformer: "gamecontroller.fill"
         }
     }
 
@@ -562,17 +565,18 @@ struct BadgeStyle: ViewModifier {
     @Environment(\.appTheme) private var theme
     let color: Color
 
-    /// An outlined theme (Pop) draws badges as solid outlined chips.
+    /// An outlined theme draws badges as solid outlined chips, as round as
+    /// its pills: Pop's are capsules, Platformer's square blocks.
     private var isOutlined: Bool { theme.cardBorderWidth > 1 }
 
     func body(content: Content) -> some View {
         content
-            .font(AppTheme.captionFont(size: 8))
+            .font(theme.badgeFont(size: 8))
             .foregroundStyle(theme.textOnStatus)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
-                RoundedRectangle(cornerRadius: isOutlined ? 999 : 4)
+                RoundedRectangle(cornerRadius: isOutlined ? theme.pillCornerRadius : 4)
                     .fill(isOutlined ? color : color.opacity(colorScheme == .dark ? 0.9 : 0.85))
                     .shadow(
                         color: colorScheme == .light && !isOutlined ? color.opacity(0.3) : .clear,
@@ -581,7 +585,7 @@ struct BadgeStyle: ViewModifier {
                     )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: isOutlined ? 999 : 4)
+                RoundedRectangle(cornerRadius: isOutlined ? theme.pillCornerRadius : 4)
                     .stroke(isOutlined ? theme.glassBorder : .clear, lineWidth: theme.cardBorderWidth * 0.6)
             )
             .fixedSize()
@@ -692,6 +696,12 @@ extension ProviderBadgeState {
         case .awaitingData: "NO DATA"
         case .quota(let status): status.badgeText
         }
+    }
+
+    /// The header pill's text in `theme`'s own words for a quota's status.
+    func badgeText(in theme: any AppThemeProvider) -> String {
+        if case .quota(let status) = self { return theme.statusWord(for: status) }
+        return badgeText
     }
 
     /// Pill accent color, resolved against the active theme.
@@ -808,7 +818,8 @@ struct ThemeSwitcherButton: View {
         case .system: themeMode = .cli
         case .cli: themeMode = .christmas
         case .christmas: themeMode = .pop
-        case .pop: themeMode = .light
+        case .pop: themeMode = .platformer
+        case .platformer: themeMode = .light
         }
     }
 }
@@ -827,6 +838,7 @@ struct ThemeProvider: ViewModifier {
         case .cli: .dark  // CLI uses dark mode base
         case .christmas: .dark  // Christmas uses dark mode base
         case .pop: .light  // Pop is cream paper
+        case .platformer: .light  // Platformer is a daytime sky
         }
     }
 

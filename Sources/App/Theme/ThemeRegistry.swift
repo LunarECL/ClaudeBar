@@ -44,6 +44,7 @@ public final class ThemeRegistry {
         register(CLITheme())
         register(ChristmasTheme())
         register(PopTheme())
+        register(PlatformerTheme())
     }
 
     // MARK: - Public API

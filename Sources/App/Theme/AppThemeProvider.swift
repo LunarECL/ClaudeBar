@@ -18,7 +18,7 @@ import Domain
 ///
 /// Text("Hello")
 ///     .foregroundStyle(theme.textPrimary)
-///     .font(.system(size: 14, design: theme.fontDesign))
+///     .font(theme.font(size: 14))
 /// ```
 public protocol AppThemeProvider {
     // MARK: - Identity
@@ -143,8 +143,25 @@ public protocol AppThemeProvider {
     /// `nil` is the system font, bold, in `fontDesign`.
     var displayFontName: String? { get }
 
+    /// How large the display font prints against the size asked for: below
+    /// 1 for a wide face, like a pixel font, so a number fits its card.
+    var displayFontScale: CGFloat { get }
+
     /// Text drawn on a status colour (a badge), readable on all four.
     var textOnStatus: Color { get }
+
+    /// How a quota's bar is drawn: one bar, or a row of blocks.
+    var progressStyle: ProgressStyle { get }
+
+    /// What a status badge says. The plain words unless the theme has its own.
+    func statusWord(for status: QuotaStatus) -> String
+
+    /// The font of a status badge's words.
+    func badgeFont(size: CGFloat) -> Font
+
+    /// The line under ClaudeBar's name in the popover header; `nil` for the
+    /// default "AI Usage Monitor".
+    var tagline: String? { get }
 
     // MARK: - Computed Helpers
 
@@ -181,12 +198,17 @@ public extension AppThemeProvider {
     /// outlines, inked selections and switches.
     var isOutlined: Bool { cardBorderWidth > 1 }
     var displayFontName: String? { nil }
+    var displayFontScale: CGFloat { 1 }
     var textOnStatus: Color { .white }
+    var progressStyle: ProgressStyle { .bar }
+    func statusWord(for status: QuotaStatus) -> String { status.badgeText }
+    func badgeFont(size: CGFloat) -> Font { AppTheme.captionFont(size: size) }
+    var tagline: String? { nil }
 
     /// The font for a big number in this theme — the display font, else the
     /// system font at `weight` in `fontDesign`.
     func displayFont(size: CGFloat, weight: Font.Weight = .bold) -> Font {
-        if let displayFontName { return .custom(displayFontName, size: size) }
+        if let displayFontName { return .custom(displayFontName, size: size * displayFontScale) }
         return .system(size: size, weight: weight, design: fontDesign)
     }
 
@@ -223,6 +245,16 @@ public extension AppThemeProvider {
         case .critical, .depleted: progressGradient(for: 0)
         }
     }
+}
+
+// MARK: - Progress Style
+
+/// How a theme draws a quota's bar.
+public enum ProgressStyle: Equatable, Sendable {
+    /// One continuous bar.
+    case bar
+    /// A row of this many blocks, each one filled or empty.
+    case blocks(Int)
 }
 
 // MARK: - Theme Font Helper

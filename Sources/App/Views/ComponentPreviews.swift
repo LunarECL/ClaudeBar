@@ -349,11 +349,11 @@ import Domain
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("ClaudeBar")
-                    .font(.system(size: 18, weight: .bold, design: theme.fontDesign))
+                    .font(theme.font(size: 18, weight: .bold))
                     .foregroundStyle(.white)
 
                 Text("AI Usage Monitor")
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.7))
             }
 
@@ -365,7 +365,7 @@ import Domain
                     .fill(theme.statusHealthy)
                     .frame(width: 8, height: 8)
                 Text("HEALTHY")
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
                     .foregroundStyle(.white)
             }
             .padding(.horizontal, 12)

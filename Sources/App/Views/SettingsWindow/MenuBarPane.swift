@@ -55,11 +55,11 @@ struct MenuBarPane: View {
                         SettingsFieldLabel(text: "PROVIDERS")
                         Spacer()
                         Text("\(settings.menuBarProviderIds.count) / 3 selected")
-                            .font(.system(size: 11, design: theme.fontDesign))
+                            .font(theme.font(size: 11))
                             .foregroundStyle(theme.textSecondary)
                     }
                     Text("Select up to three, then customize each provider below.")
-                        .font(.system(size: 11, design: theme.fontDesign))
+                        .font(theme.font(size: 11))
                         .foregroundStyle(theme.textSecondary)
                         .padding(.top, 5)
                         .padding(.bottom, 12)
@@ -121,7 +121,7 @@ private struct MenuBarProviderCard: View {
             HStack(spacing: 10) {
                 ProviderIconView(providerId: provider.id, size: 24, showGlow: false)
                 Text(name)
-                    .font(.system(size: 15, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 15, weight: .semibold))
                     .foregroundStyle(theme.textPrimary)
                 Spacer()
                 if settings.menuBarProviderIds.count > 1 {
@@ -140,13 +140,13 @@ private struct MenuBarProviderCard: View {
             }
             if !provider.isEnabled || quotas.isEmpty {
                 Text(provider.isEnabled ? "Waiting for quota data… Your choices are saved." : "Enable this provider in Providers to show its usage.")
-                    .font(.system(size: 11, design: theme.fontDesign))
+                    .font(theme.font(size: 11))
                     .foregroundStyle(theme.textSecondary)
                     .padding(.top, 10)
             }
             if !quotas.isEmpty && !config.primaryQuotaKey.isEmpty && !quotas.contains(where: { $0.quotaType.quotaKey == config.primaryQuotaKey }) {
                 Text("The saved quota is unavailable. Choose another quota below.")
-                    .font(.system(size: 11, design: theme.fontDesign))
+                    .font(theme.font(size: 11))
                     .foregroundStyle(theme.textSecondary)
                     .padding(.top, 10)
             }

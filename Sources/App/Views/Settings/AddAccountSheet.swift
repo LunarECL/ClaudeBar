@@ -50,12 +50,12 @@ struct AddAccountSheet: View {
         switch step {
         case .how:
             Text("How do you want to add it?")
-                .font(.system(size: 12, design: theme.fontDesign))
+                .font(theme.font(size: 12))
                 .foregroundStyle(theme.textSecondary)
             ForEach(text.ways, id: \.label) { way in
                 Button { start(way.way) } label: {
                     Label(way.label, systemImage: way.way == .signIn ? "globe" : way.way == .folder ? "folder" : "key")
-                        .font(.system(size: 13, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 13, weight: .medium))
                         .foregroundStyle(theme.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)

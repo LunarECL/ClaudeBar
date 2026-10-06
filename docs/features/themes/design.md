@@ -17,6 +17,22 @@
   is `1`, `cardShadow` is none), so adding one never edits every theme.
 - **Shared colours live in `BaseTheme`**; a theme takes them by name instead of
   repeating the values.
+- **What a theme says and draws is the theme's too**, never a branch on its id:
+  the header's line under ClaudeBar (`tagline`), a status badge's words
+  (`statusWord(for:)` — Platformer's HURRY UP! and GAME OVER) and their font
+  (`badgeFont(size:)`), how a quota's bar
+  is drawn (`progressStyle`: `.bar`, or `.blocks(10)` for Platformer), and how
+  large a wide display font prints (`displayFontScale`). A wrapper such as
+  `StatusColorOverridingTheme` forwards every one, or the person's own status
+  colours would quietly drop them.
+- **An outlined theme** (`cardBorderWidth` above 1: Pop, Platformer) prints
+  paper cards, inked pills and outlined big numbers — percentages and money
+  alike (#499), and badges as round as its pills (`pillCornerRadius`). A
+  bundled font is registered through `BundledFont`.
+- **Views set text through `theme.font(size:weight:)`**, never
+  `.system(…, design: theme.fontDesign)`, so a theme with `customFontName`
+  (Platformer's Pixelify Sans) reaches every word; without one it is the
+  same system font.
 
 ## Imported terminal themes
 

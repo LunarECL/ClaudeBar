@@ -28,7 +28,7 @@ struct SharePassOverlay: View {
                         .foregroundStyle(theme.accentPrimary)
 
                     Text("Share Claude Code")
-                        .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                        .font(theme.font(size: 14, weight: .bold))
                         .foregroundStyle(theme.textPrimary)
 
                     Spacer()
@@ -46,7 +46,7 @@ struct SharePassOverlay: View {
                 // Referral Link
                 HStack(spacing: 8) {
                     Text(pass.referralURL.absoluteString)
-                        .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .medium))
                         .foregroundStyle(theme.textPrimary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -77,7 +77,7 @@ struct SharePassOverlay: View {
                             Image(systemName: copied ? "checkmark" : "doc.on.doc")
                                 .font(.system(size: 11, weight: .semibold))
                             Text(copied ? "Copied!" : "Copy Link")
-                                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                                .font(theme.font(size: 11, weight: .medium))
                         }
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)
@@ -98,7 +98,7 @@ struct SharePassOverlay: View {
                             Image(systemName: "safari")
                                 .font(.system(size: 11, weight: .semibold))
                             Text("Open")
-                                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                                .font(theme.font(size: 11, weight: .medium))
                         }
                         .foregroundStyle(theme.textPrimary)
                         .padding(.horizontal, 14)
@@ -117,7 +117,7 @@ struct SharePassOverlay: View {
 
                 // Help text
                 Text("Share a free week of Claude Code with friends")
-                    .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .semibold))
                     .foregroundStyle(theme.textTertiary)
             }
             .padding(16)
@@ -181,7 +181,7 @@ struct SharePassErrorOverlay: View {
                         .foregroundStyle(theme.statusCritical)
 
                     Text("Couldn't Get Invitation Link")
-                        .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                        .font(theme.font(size: 14, weight: .bold))
                         .foregroundStyle(theme.textPrimary)
 
                     Spacer()
@@ -197,13 +197,13 @@ struct SharePassErrorOverlay: View {
                 }
 
                 Text(message)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text("Invitation links are only available on Claude Max plans.")
-                    .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 10, weight: .semibold))
                     .foregroundStyle(theme.textTertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

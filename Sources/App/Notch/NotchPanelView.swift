@@ -35,12 +35,12 @@ struct NotchPanelView: View {
     private var header: some View {
         HStack(spacing: 9) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
 
             if let badge = headlineBadge {
                 Text(badge.text)
-                    .font(.system(size: 9.5, weight: .bold, design: theme.fontDesign))
+                    .font(theme.font(size: 9.5, weight: .bold))
                     .textCase(.uppercase)
                     .kerning(0.5)
                     .padding(.horizontal, 6)
@@ -105,7 +105,7 @@ struct NotchPanelView: View {
                     Spacer(minLength: 12)
 
                     Text(statusText(for: session))
-                        .font(.system(size: 10.5, design: theme.fontDesign))
+                        .font(theme.font(size: 10.5))
                         .foregroundStyle(.white.opacity(0.5))
                         .lineLimit(1)
 
@@ -140,7 +140,7 @@ struct NotchPanelView: View {
 
     private func permissionPrompt(_ prompt: String) -> some View {
         Text(prompt)
-            .font(.system(size: 11.5, design: theme.fontDesign))
+            .font(theme.font(size: 11.5))
             .foregroundStyle(.yellow.opacity(0.95))
             .lineLimit(2)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -170,7 +170,7 @@ struct NotchPanelView: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(quota.compactTitle ?? quota.quotaType.shortLabel)
-                    .font(.system(size: 10.5, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 10.5, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(1)
                 Spacer(minLength: 4)
@@ -191,7 +191,7 @@ struct NotchPanelView: View {
             .frame(height: 4)
 
             Text(quota.compactResetTime.map { "resets \($0)" } ?? " ")
-                .font(.system(size: 9.5, design: theme.fontDesign))
+                .font(theme.font(size: 9.5))
                 .foregroundStyle(.white.opacity(0.4))
                 .lineLimit(1)
         }

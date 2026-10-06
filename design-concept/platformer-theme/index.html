@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platformer Theme</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* Platformer: a Super Mario–style 8-bit theme for ClaudeBar. Concept only.
+   Original pixel art; no Nintendo names, characters or sprites. */
+:root{
+  --sky:#5C94FC;      /* the overworld sky */
+  --sky-deep:#3F6FD8;
+  --cloud:#FFFFFF;
+  --cloud-edge:#A8D8FF;
+  --ink:#141414;      /* every outline */
+  --brick:#C84C0C;    /* bricks */
+  --brick-dark:#7C2C00;
+  --brick-light:#F0A070;
+  --block:#FAB005;    /* the ? block */
+  --block-dark:#A86400;
+  --coin:#FFD43B;
+  --pipe:#00A800;     /* healthy */
+  --pipe-light:#80D010;
+  --pipe-dark:#005800;
+  --fire:#E40058;     /* critical */
+  --lava:#FC7460;
+  --stone:#6B6B6B;    /* depleted */
+  --paper:#FFF8E7;    /* card face */
+  --paper-2:#FCE9C0;
+  --text:#141414;
+  --text-2:#4A3A2A;
+  --text-3:#7C6A55;
+  --px:3px;           /* one art pixel */
+  --page:#E9E4D8;
+  --page-text:#2A2620;
+  --page-muted:#6E675C;
+  --rule:#CFC7B6;
+  --panel:#FFFDF7;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#14161C; --page-text:#ECE8E0; --page-muted:#9A958C; --rule:#2E323C; --panel:#1C1F27;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#14161C; --page-text:#ECE8E0; --page-muted:#9A958C; --rule:#2E323C; --panel:#1C1F27;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--page);color:var(--page-text)}
+body{font-family:"Pixelify Sans",ui-rounded,system-ui,sans-serif;font-size:16px;line-height:1.45;padding:40px 16px 80px;overflow-x:hidden}
+.wrap{max-width:1120px;margin:0 auto}
+.pix{font-family:"Press Start 2P",monospace;letter-spacing:0}
+svg.art{shape-rendering:crispEdges;image-rendering:pixelated;display:block}
+
+/* ---------- page header ---------- */
+.eyebrow{font-family:"Press Start 2P",monospace;font-size:10px;color:var(--page-muted);letter-spacing:.06em}
+h1{font-family:"Press Start 2P",monospace;font-size:clamp(20px,4vw,34px);line-height:1.35;margin:14px 0 14px}
+h1 em{font-style:normal;color:var(--block)}
+.lede{max-width:660px;color:var(--page-muted);font-size:18px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{font-size:13px;border:2px solid var(--rule);border-radius:4px;padding:3px 10px;color:var(--page-muted)}
+
+/* ---------- stage ---------- */
+.stage{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:44px;margin-top:44px;align-items:start}
+@media (max-width:860px){.stage{grid-template-columns:1fr}}
+.section-title{font-family:"Press Start 2P",monospace;font-size:13px;margin:0 0 16px;color:var(--page-text)}
+
+/* the menu bar strip above the popover */
+.menubar{height:26px;background:#2b2b2b;border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:0 12px;color:#ddd;font:12px system-ui}
+.mb-item{display:flex;align-items:center;gap:5px;padding:2px 6px;border-radius:4px}
+.mb-item.on{background:rgba(255,255,255,.18)}
+.mb-item .pct{font-family:"Press Start 2P",monospace;font-size:8px;color:var(--pipe-light)}
+
+/* ---------- the popover ---------- */
+.pop{position:relative;width:100%;max-width:380px;border:3px solid var(--ink);border-radius:6px;overflow:hidden;background:var(--sky);box-shadow:6px 6px 0 var(--ink)}
+.sky-art{position:absolute;inset:0;pointer-events:none}
+.sky-art .cloud{position:absolute}
+.sky-art .hill{position:absolute;bottom:75px}
+.pop-inner{position:relative;padding:14px 14px 0}
+
+/* HUD: the score line at the top */
+.hud{display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between;color:#fff;font-family:"Press Start 2P",monospace;font-size:8px;line-height:1.7;text-shadow:2px 2px 0 var(--ink);margin-bottom:12px}
+.hud b{display:block;font-size:10px;font-weight:400}
+.hud .coinline{display:flex;align-items:center;gap:4px}
+
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.brand h2{font-family:"Press Start 2P",monospace;font-size:13px;color:#fff;text-shadow:2px 2px 0 var(--ink)}
+.brand p{font-size:13px;color:#fff;text-shadow:1px 1px 0 var(--ink);opacity:.95}
+.qblock{margin-left:auto;cursor:pointer;position:relative;border:0;background:none;padding:0}
+.qblock:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.qblock .art{transition:transform .08s}
+.qblock.bump .art{animation:bump .28s steps(4)}
+@keyframes bump{0%{transform:translateY(0)}40%{transform:translateY(-9px)}100%{transform:translateY(0)}}
+.coin-pop{position:absolute;left:50%;top:-6px;transform:translateX(-50%);opacity:0;pointer-events:none}
+.qblock.bump .coin-pop{animation:coin .6s steps(8) forwards}
+@keyframes coin{0%{opacity:1;transform:translate(-50%,0)}60%{opacity:1;transform:translate(-50%,-34px)}100%{opacity:0;transform:translate(-50%,-22px)}}
+.syncing{font-family:"Press Start 2P",monospace;font-size:7px;color:#fff;text-shadow:1px 1px 0 var(--ink);position:absolute;right:-4px;top:42px;white-space:nowrap;opacity:0}
+.qblock.bump .syncing{opacity:1}
+
+/* provider tabs as pipes' tops */
+.tabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px}
+.tab{flex:none;display:flex;align-items:center;gap:6px;padding:5px 9px;font-size:13px;font-weight:600;background:var(--paper);border:3px solid var(--ink);border-radius:3px;cursor:pointer;box-shadow:3px 3px 0 var(--ink)}
+.tab.on{background:var(--pipe-light);transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.tab .dot{width:9px;height:9px;border:2px solid var(--ink)}
+
+.provider{display:flex;align-items:center;gap:8px;color:#fff;text-shadow:2px 2px 0 var(--ink);font-family:"Press Start 2P",monospace;font-size:10px;margin:2px 0 8px}
+.provider .lives{margin-left:auto;font-size:8px}
+
+/* the cards: paper blocks with riveted corners */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{position:relative;background:var(--paper);border:3px solid var(--ink);border-radius:4px;box-shadow:4px 4px 0 var(--ink);padding:10px 10px 9px;transition:transform .08s steps(2)}
+.card:hover{transform:translate(-1px,-2px);box-shadow:5px 6px 0 var(--ink)}
+.card::before,.card::after,.card .rv1,.card .rv2{content:"";position:absolute;width:4px;height:4px;background:var(--ink);opacity:.55}
+.card::before{left:4px;top:4px}.card::after{right:4px;top:4px}
+.card .rv1{left:4px;bottom:4px}.card .rv2{right:4px;bottom:4px}
+.card.wide{grid-column:1/-1}
+.row{display:flex;align-items:center;gap:6px}
+.label{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--text-2);text-transform:uppercase}
+.badge{margin-left:auto;font-family:"Press Start 2P",monospace;font-size:7px;padding:4px 5px 3px;border:2px solid var(--ink);color:var(--ink);white-space:nowrap}
+.headline{display:flex;align-items:baseline;gap:5px;margin:9px 0 8px}
+.num{font-family:"Press Start 2P",monospace;font-size:19px;letter-spacing:1px;color:#fff;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;text-shadow:3px 3px 0 var(--ink)}
+.wide .pace{margin-left:auto}
+.wide .num{font-size:21px}
+.cap{font-size:12px;font-weight:700;color:var(--text-3)}
+
+/* the bar: a row of blocks, one per 10% */
+.blocks{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;padding:2px;border:3px solid var(--ink);background:var(--ink)}
+.blk{height:10px;background:var(--paper-2);position:relative}
+.blk.f{background:var(--fill)}
+.blk.f::after{content:"";position:absolute;left:0;top:0;right:0;height:3px;background:rgba(255,255,255,.45)}
+.tick{position:relative;height:7px}
+.tick i{position:absolute;top:1px;width:7px;height:6px;transform:translateX(-50%);background:var(--ink);clip-path:polygon(50% 0,100% 100%,0 100%)}
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;white-space:nowrap;font-size:12px;color:var(--text-3);margin-top:3px}
+.foot b{color:var(--text);font-weight:700}
+.time{font-family:"Press Start 2P",monospace;font-size:7px;color:var(--text-2)}
+.pace{font-family:"Press Start 2P",monospace;font-size:7px;padding:3px 4px;border:2px dashed var(--ink)}
+.blink{animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+
+/* bottom bar: the ground */
+.ground{position:relative;margin-top:14px}
+.btns{position:relative;z-index:1;display:flex;gap:8px;padding:0 14px 10px}
+.btn{font-family:"Press Start 2P",monospace;font-size:8px;padding:9px 10px;background:var(--paper);border:3px solid var(--ink);box-shadow:3px 3px 0 var(--ink);cursor:pointer;color:var(--ink)}
+.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+.btn.go{background:var(--pipe-light)}
+.btn.sq{margin-left:auto}
+.bricks{height:36px;background-color:var(--brick);
+  background-image:
+    linear-gradient(var(--ink) 3px,transparent 3px),
+    linear-gradient(90deg,var(--ink) 3px,transparent 3px),
+    linear-gradient(var(--brick-light) 3px,transparent 3px);
+  background-size:36px 18px,36px 18px,36px 18px;
+  background-position:0 0,0 0,3px 3px;
+  border-top:3px solid var(--ink)}
+.bricks.r2{background-position:0 0,18px 0,3px 3px}
+
+/* mode toggle */
+.toggle{display:flex;gap:6px;margin:14px 0 0;flex-wrap:wrap}
+.toggle button{font:600 13px "Pixelify Sans",system-ui;border:2px solid var(--rule);background:var(--panel);color:var(--page-text);border-radius:4px;padding:4px 10px;cursor:pointer}
+.toggle button.on{border-color:var(--page-text)}
+
+/* ---------- right column ---------- */
+.panel{background:var(--panel);border:2px solid var(--rule);border-radius:8px;padding:20px}
+.panel + .panel{margin-top:22px}
+.panel p{color:var(--page-muted);font-size:15px}
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-top:14px;background:var(--sky);padding:14px;border:3px solid var(--ink);border-radius:6px}
+.states .card{box-shadow:4px 4px 0 var(--ink)}
+.palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;margin-top:14px}
+.sw{border:2px solid var(--rule);border-radius:6px;overflow:hidden;font-size:12px}
+.sw i{display:block;height:40px;border-bottom:2px solid var(--ink)}
+.sw div{padding:6px 8px}
+.sw b{display:block;font-size:13px}
+.sw span{color:var(--page-muted);font-family:ui-monospace,monospace;font-size:11px}
+
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px}
+th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-size:12px;color:var(--page-muted);font-weight:600}
+td code{font-family:ui-monospace,monospace;font-size:12.5px}
+.new{font-family:"Press Start 2P",monospace;font-size:7px;background:var(--block);color:var(--ink);padding:2px 4px;border:2px solid var(--ink);margin-left:4px;vertical-align:2px}
+.tablewrap{overflow-x:auto}
+.note{margin-top:30px;font-size:13px;color:var(--page-muted);border-top:2px dashed var(--rule);padding-top:14px}
+.stamp{display:inline-block;font-family:"Press Start 2P",monospace;font-size:9px;border:2px solid var(--page-muted);padding:5px 8px;color:var(--page-muted);margin-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">CLAUDEBAR · THEME CONCEPT</div>
+  <h1>Your quotas, <em>platformer</em></h1>
+  <p class="lede">A Super Mario–style 8-bit theme, named <b>Platformer</b> in the app. Blue sky, ? blocks, a brick floor and chunky pixel numbers. Each quota bar is a row of blocks, the reset countdown is the level's TIME, and an empty quota reads GAME OVER.</p>
+  <div class="chips">
+    <span class="chip">Outlined theme (like Pop)</span>
+    <span class="chip">Press Start 2P · OFL</span>
+    <span class="chip">Original pixel art</span>
+    <span class="chip">Click the ? block</span>
+  </div>
+
+  <div class="stage">
+    <!-- ================= the popover ================= -->
+    <div>
+      <h2 class="section-title">THE POPOVER</h2>
+      <div style="max-width:380px">
+        <div class="menubar">
+          <span class="mb-item">⌁</span>
+          <span class="mb-item on">
+            <svg class="art" width="14" height="14" viewBox="0 0 7 7" aria-hidden="true"><rect x="2" y="0" width="3" height="1" fill="#141414"/><rect x="1" y="1" width="5" height="5" fill="#141414"/><rect x="2" y="6" width="3" height="1" fill="#141414"/><rect x="2" y="1" width="3" height="5" fill="#FFD43B"/><rect x="1" y="2" width="5" height="3" fill="#FFD43B"/><rect x="3" y="2" width="1" height="3" fill="#A86400"/></svg>
+            <span class="pct" id="mbPct">62%</span>
+          </span>
+          <span>Tue 9:41</span>
+        </div>
+        <div class="pop" id="pop">
+          <!-- sky: clouds and hills, each at a fixed pixel size -->
+          <div class="sky-art" aria-hidden="true">
+            <svg class="art cloud" style="left:262px;top:50px" width="48" height="18" viewBox="0 0 24 9"><rect x="8" y="0" width="8" height="3" fill="#141414"/><rect x="4" y="3" width="16" height="3" fill="#141414"/><rect x="1" y="5" width="22" height="4" fill="#141414"/><rect x="9" y="1" width="6" height="3" fill="#fff"/><rect x="5" y="4" width="14" height="3" fill="#fff"/><rect x="2" y="6" width="20" height="2" fill="#fff"/><rect x="2" y="7" width="20" height="1" fill="#A8D8FF"/></svg>
+            <svg class="art cloud" style="right:40px;top:380px" width="48" height="21" viewBox="0 0 16 7"><rect x="5" y="0" width="6" height="2" fill="#141414"/><rect x="1" y="2" width="14" height="5" fill="#141414"/><rect x="6" y="1" width="4" height="2" fill="#fff"/><rect x="2" y="3" width="12" height="3" fill="#fff"/><rect x="2" y="5" width="12" height="1" fill="#A8D8FF"/></svg>
+            <svg class="art hill" style="left:150px" width="105" height="46" viewBox="0 0 50 22"><rect x="18" y="0" width="14" height="4" fill="#141414"/><rect x="12" y="4" width="26" height="5" fill="#141414"/><rect x="6" y="9" width="38" height="6" fill="#141414"/><rect x="0" y="15" width="50" height="7" fill="#141414"/><rect x="19" y="1" width="12" height="4" fill="#3FA832"/><rect x="13" y="5" width="24" height="5" fill="#3FA832"/><rect x="7" y="10" width="36" height="6" fill="#3FA832"/><rect x="1" y="16" width="48" height="6" fill="#3FA832"/><rect x="21" y="6" width="2" height="3" fill="#141414"/><rect x="27" y="6" width="2" height="3" fill="#141414"/></svg>
+            <svg class="art hill" style="right:62px" width="60" height="20" viewBox="0 0 30 10"><rect x="4" y="0" width="22" height="4" fill="#141414"/><rect x="0" y="3" width="30" height="7" fill="#141414"/><rect x="5" y="1" width="20" height="4" fill="#80D010"/><rect x="1" y="4" width="28" height="6" fill="#80D010"/></svg>
+          </div>
+
+          <div class="pop-inner">
+            <div class="hud" aria-label="Summary">
+              <div>CLAUDE<b>000620</b></div>
+              <div class="coinline"><svg class="art" width="10" height="12" viewBox="0 0 5 6" aria-hidden="true"><rect x="1" y="0" width="3" height="6" fill="#FFD43B"/><rect x="0" y="1" width="5" height="4" fill="#FFD43B"/><rect x="2" y="1" width="1" height="4" fill="#A86400"/></svg><span>×<b style="display:inline">24</b></span></div>
+              <div>WORLD<b>1-1</b></div>
+              <div>TIME<b id="hudTime">288</b></div>
+            </div>
+
+            <div class="brand">
+              <svg class="art" width="36" height="36" viewBox="0 0 12 12" aria-hidden="true">
+                <rect x="1" y="1" width="10" height="10" fill="#141414"/>
+                <rect x="2" y="2" width="8" height="8" fill="#8BE04E"/>
+                <rect x="2" y="2" width="8" height="2" fill="#B6F07A"/>
+                <rect x="4" y="5" width="1" height="2" fill="#141414"/><rect x="7" y="5" width="1" height="2" fill="#141414"/>
+                <rect x="4" y="8" width="4" height="1" fill="#141414"/>
+              </svg>
+              <div>
+                <h2>CLAUDEBAR</h2>
+                <p>Your quotas, one level at a time</p>
+              </div>
+              <button class="qblock" id="qblock" aria-label="Refresh">
+                <span class="coin-pop"><svg class="art" width="14" height="20" viewBox="0 0 5 7" aria-hidden="true"><rect x="1" y="0" width="3" height="7" fill="#141414"/><rect x="0" y="1" width="5" height="5" fill="#141414"/><rect x="1" y="1" width="3" height="5" fill="#FFD43B"/><rect x="2" y="2" width="1" height="3" fill="#A86400"/></svg></span>
+                <svg class="art" width="36" height="36" viewBox="0 0 12 12">
+                  <rect x="0" y="0" width="12" height="12" fill="#141414"/>
+                  <rect x="1" y="1" width="10" height="10" fill="#FAB005"/>
+                  <rect x="1" y="1" width="10" height="1" fill="#FFE08A"/>
+                  <rect x="1" y="1" width="1" height="1" fill="#141414"/><rect x="10" y="1" width="1" height="1" fill="#141414"/>
+                  <rect x="1" y="10" width="1" height="1" fill="#141414"/><rect x="10" y="10" width="1" height="1" fill="#141414"/>
+                  <g fill="#7C2C00"><rect x="4" y="3" width="4" height="1"/><rect x="7" y="4" width="1" height="2"/><rect x="5" y="6" width="2" height="1"/><rect x="5" y="7" width="1" height="1"/><rect x="5" y="9" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/></g>
+                </svg>
+                <span class="syncing">SYNCING…</span>
+              </button>
+            </div>
+
+            <div class="tabs" role="tablist">
+              <span class="tab on" data-p="claude"><span class="dot" style="background:#D97757"></span>Claude</span>
+              <span class="tab" data-p="codex"><span class="dot" style="background:#10A37F"></span>Codex</span>
+              <span class="tab" data-p="router"><span class="dot" style="background:#6E56CF"></span>OpenRouter</span>
+              <span class="tab" data-p="copilot"><span class="dot" style="background:#9AA4B2"></span>Copilot</span>
+            </div>
+
+            <div class="provider"><span id="provName">CLAUDE</span><span class="lives" id="provSub">MAX · ×2 LOGINS</span></div>
+            <div class="grid" id="cards"></div>
+            <div class="toggle" aria-label="Show">
+              <button class="on" data-m="left">Remaining</button>
+              <button data-m="used">Used</button>
+            </div>
+          </div>
+
+          <div class="ground">
+            <div class="btns">
+              <button class="btn go">DASHBOARD</button>
+              <button class="btn">⚙</button>
+              <button class="btn sq">✕</button>
+            </div>
+            <div class="bricks"></div>
+            <div class="bricks r2" style="border-top:0"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= the explanation ================= -->
+    <div>
+      <div class="panel">
+        <h2 class="section-title">EVERY STATE OF A CARD</h2>
+        <p>The status colours are the level's own: pipe green, coin gold, fire red, and grey stone when a quota is empty. A quota near its limit says HURRY UP!, as the music does when time runs out.</p>
+        <div class="states" id="states"></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title">PALETTE</h2>
+        <div class="palette" id="palette"></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title">HOW IT MAPS ONTO CLAUDEBAR'S THEME</h2>
+        <p>Most of it is existing <code>AppThemeProvider</code> properties set to new values; with <code>cardBorderWidth</code> above 1 it is an outlined theme, so the big numbers already print outlined, like Pop's (#499). Two things are new, and their defaults leave every current theme unchanged.</p>
+        <div class="tablewrap">
+        <table>
+          <thead><tr><th>Theme property</th><th>Platformer value</th><th>Where it shows</th></tr></thead>
+          <tbody>
+            <tr><td><code>backgroundGradient</code> · <code>overlayView</code></td><td>flat sky <code>#5C94FC</code>; pixel clouds, hills and a two-row brick floor</td><td>popover, settings</td></tr>
+            <tr><td><code>cardGradient</code> · <code>glassBackground</code></td><td>flat paper <code>#FFF8E7</code>, four rivets in the corners</td><td>every card</td></tr>
+            <tr><td><code>glassBorder</code> · <code>cardBorderWidth</code></td><td>ink <code>#141414</code> · 3</td><td>cards, pills, buttons</td></tr>
+            <tr><td><code>cardShadow</code></td><td>ink, x 4 y 4, no blur</td><td>cards; buttons press into it</td></tr>
+            <tr><td><code>cardCornerRadius</code> · <code>pillCornerRadius</code></td><td>4 · 3 (square, like blocks)</td><td>cards · pills</td></tr>
+            <tr><td><code>displayFontName</code> · <code>fontDesign</code></td><td>Press Start 2P (bundled, OFL) · <code>.rounded</code> body</td><td>percentages, amounts, the HUD</td></tr>
+            <tr><td><code>statusHealthy / Warning / Critical / Depleted</code></td><td>pipe green, coin gold, fire red, stone grey</td><td>badges, blocks, the menu-bar coin</td></tr>
+            <tr><td><code>textOnStatus</code></td><td>ink</td><td>badges</td></tr>
+            <tr><td><code>accentPrimary</code></td><td>? block gold <code>#FAB005</code></td><td>refresh, plan badge, cost</td></tr>
+            <tr><td><code>statusBarIconName</code></td><td>a pixel coin</td><td>menu bar</td></tr>
+            <tr><td><code>progressStyle</code> <span class="new">NEW</span></td><td><code>.blocks(10)</code>: ten blocks, one per 10% (default <code>.bar</code>)</td><td>quota bars</td></tr>
+            <tr><td><code>statusWords</code> <span class="new">NEW</span></td><td>HURRY UP! for critical, GAME OVER for depleted (default: the plain words)</td><td>badges</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      <div class="stamp">CONCEPT · NOT BUILT YET</div>
+      <p class="note">The look is inspired by classic 8-bit platformers. All pixel art here is drawn for ClaudeBar; the theme ships no third-party characters, sprites, logos or names. Sample data only.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const C={pipe:'var(--pipe-light)',coin:'var(--coin)',fire:'var(--lava)',stone:'var(--stone)'};
+const STATUS={
+  healthy:{word:'HEALTHY',bg:'var(--pipe-light)',fill:C.pipe},
+  warning:{word:'WARNING',bg:'var(--coin)',fill:C.coin},
+  critical:{word:'HURRY UP!',bg:'var(--lava)',fill:C.fire,blink:true},
+  depleted:{word:'GAME OVER',bg:'#BDBDBD',fill:C.stone}
+};
+const status=left=>left<=0?'depleted':left<20?'critical':left<50?'warning':'healthy';
+const PROVIDERS={
+  claude:{name:'CLAUDE',sub:'MAX · ×2 LOGINS',score:'000620',quotas:[
+    {label:'Session',left:62,reset:'4h 48m',time:288,pace:'ON TRACK',expect:55},
+    {label:'Weekly',left:41,reset:'2d 6h',time:3240,pace:'RUNNING HOT',expect:58},
+    {label:'Sonnet',left:12,reset:'2d 6h',time:3240,pace:'RUNNING HOT',expect:58},
+    {label:'Extra usage',money:'$125.00',cap:'of $500',left:75,wide:true,reset:'Oct 31',time:0}
+  ]},
+  codex:{name:'CODEX',sub:'PLUS',score:'000780',quotas:[
+    {label:'Session',left:78,reset:'2h 10m',time:130,pace:'ROOM TO SPARE',expect:60},
+    {label:'Weekly',left:53,reset:'4d 1h',time:5820,pace:'ON TRACK',expect:50}
+  ]},
+  router:{name:'OPENROUTER',sub:'CREDITS',score:'002419',quotas:[
+    {label:'Credits',money:'$24.19',cap:'left',left:97,wide:true,reset:'',time:0}
+  ]},
+  copilot:{name:'COPILOT',sub:'PRO',score:'000000',quotas:[
+    {label:'Premium requests',left:0,reset:'18d 2h',time:999,pace:'',expect:40,wide:true}
+  ]}
+};
+let mode='left', current='claude';
+
+function blocks(pct,fill){
+  const n=Math.max(0,Math.min(10,Math.round(pct/10)));
+  return '<div class="blocks">'+Array.from({length:10},(_,i)=>`<span class="blk${i<n?' f':''}" style="--fill:${fill}"></span>`).join('')+'</div>';
+}
+function card(q){
+  const st=STATUS[status(q.left)];
+  const shown=q.money?q.money:(mode==='left'?q.left:100-q.left)+'%';
+  const cap=q.money?q.cap:(mode==='left'?'left':'used');
+  const bar=q.money?q.left:(mode==='left'?q.left:100-q.left);
+  const tick=q.expect!=null&&!q.money?`<div class="tick"><i style="left:${mode==='left'?100-q.expect:q.expect}%"></i></div>`:'<div class="tick"></div>';
+  const foot=q.reset?`<span>${q.money?'Renews':'Resets in'}</span><b>${q.reset}</b>`:'<span>Prepaid balance</span>';
+  const pace=q.pace&&q.left>0?`<span class="pace">${q.pace}</span>`:'';
+  return `<div class="card${q.wide?' wide':''}"><span class="rv1"></span><span class="rv2"></span>
+    <div class="row"><span class="label">${q.label}</span><span class="badge${st.blink?' blink':''}" style="background:${st.bg}">${st.word}</span></div>
+    <div class="headline"><span class="num">${shown}</span><span class="cap">${cap}</span></div>
+    ${blocks(bar,st.fill)}${tick}
+    <div class="foot">${foot}${pace}</div></div>`;
+}
+function render(){
+  const p=PROVIDERS[current];
+  document.getElementById('provName').textContent=p.name;
+  document.getElementById('provSub').textContent=p.sub;
+  document.getElementById('cards').innerHTML=p.quotas.map(card).join('');
+  const first=p.quotas[0];
+  document.getElementById('hudTime').textContent=String(first.time).padStart(3,'0');
+  document.querySelector('.hud div b').textContent=p.score;
+  document.getElementById('mbPct').textContent=(first.money?first.money:first.left+'%');
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');current=t.dataset.p;render();
+});
+document.querySelectorAll('.toggle button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.toggle button').forEach(x=>x.classList.remove('on'));b.classList.add('on');mode=b.dataset.m;render();
+});
+const qb=document.getElementById('qblock');
+qb.onclick=()=>{qb.classList.remove('bump');void qb.offsetWidth;qb.classList.add('bump');setTimeout(()=>qb.classList.remove('bump'),900)};
+
+document.getElementById('states').innerHTML=[
+  {label:'Session',left:82,reset:'3h 12m',pace:'ROOM TO SPARE',expect:40},
+  {label:'Weekly',left:38,reset:'1d 19h',pace:'ON TRACK',expect:60},
+  {label:'Sonnet',left:9,reset:'1d 19h',pace:'RUNNING HOT',expect:60},
+  {label:'Premium',left:0,reset:'18d 2h',pace:'',expect:40}
+].map(card).join('');
+
+document.getElementById('palette').innerHTML=[
+  ['Sky','#5C94FC','background'],['Paper','#FFF8E7','cards'],['Ink','#141414','outlines, text'],
+  ['Pipe green','#80D010','healthy'],['Coin gold','#FFD43B','warning'],['Fire red','#FC7460','critical'],
+  ['Stone','#6B6B6B','depleted'],['? block','#FAB005','accent'],['Brick','#C84C0C','floor']
+].map(([n,h,u])=>`<div class="sw"><i style="background:${h}"></i><div><b>${n}</b><span>${h}</span> · ${u}</div></div>`).join('');
+
+render();
+</script>
+</body>
+</html>

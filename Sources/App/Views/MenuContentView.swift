@@ -323,7 +323,7 @@ struct MenuContentView: View {
                 }
 
                 Text(headerSubtitle)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(theme.id == "cli" ? theme.accentPrimary : theme.textSecondary)
             }
 
@@ -342,12 +342,7 @@ struct MenuContentView: View {
     }
 
     private var headerSubtitle: String {
-        switch theme.id {
-        case "cli": return "> usage monitor"
-        case "christmas": return "Happy Holidays!"
-        case "pop": return "Your quotas, the cute way"
-        default: return "AI Usage Monitor"
-        }
+        theme.tagline ?? "AI Usage Monitor"
     }
 
     /// What the header pill says — the monitor's word for the selected tab.
@@ -393,7 +388,7 @@ struct MenuContentView: View {
             )
 
             Text(text)
-                .font(.system(size: 11, weight: outlined ? .heavy : .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: outlined ? .heavy : .medium))
                 .foregroundStyle(outlined ? theme.textOnStatus : theme.textPrimary)
         }
         .padding(.horizontal, 12)
@@ -411,7 +406,7 @@ struct MenuContentView: View {
     }
 
     private var statusText: String {
-        selectedProviderBadge.badgeText
+        selectedProviderBadge.badgeText(in: theme)
     }
 
     /// Help text for settings button, includes update info if available
@@ -579,7 +574,7 @@ struct MenuContentView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 Text("ACCOUNTS")
-                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 9, weight: .semibold))
                     .foregroundStyle(theme.textTertiary)
                 ForEach(tab.accounts, id: \.id) { account in
                     let hidden = hiddenAccountIds.contains(account.id)
@@ -602,7 +597,7 @@ struct MenuContentView: View {
                         if tab.provider.inUse?.canBeInUse(account) == true, tab.provider.inUse?.isInUse(account) != true {
                             Button { newSessions.use(account) } label: {
                                 Text("Use")
-                                    .font(.system(size: 10, weight: .bold, design: theme.fontDesign))
+                                    .font(theme.font(size: 10, weight: .bold))
                                     .foregroundStyle(theme.accentPrimary)
                             }
                             .buttonStyle(.plain)
@@ -610,7 +605,7 @@ struct MenuContentView: View {
                             .accessibilityLabel("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
                         }
                     }
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     // The provider pills' shape and height. A leading IN USE badge sits
                     // concentric: the same gap on its left as above and below it.
                     .frame(height: InUseBadge.chipHeight(in: theme))
@@ -645,7 +640,7 @@ struct MenuContentView: View {
         return HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.statusColor(for: status))
             Text("\(settings.shown(worst.displayName))\(detail) — causing \(status.badgeText.capitalized)")
-                .font(.system(size: 11, design: theme.fontDesign))
+                .font(theme.font(size: 11))
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -699,14 +694,14 @@ struct MenuContentView: View {
 
             Text(settings.shown(monitor.lineupName(of: provider)))
                 .fixedSize(horizontal: false, vertical: true)
-                .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 13, weight: .semibold))
                 .foregroundStyle(theme.textPrimary)
 
             Spacer()
 
             // The same word the header uses: no "HEALTHY" without data (#259).
             let badge = ProviderBadgeState(of: [provider], quotaStatus: monitor.status(of: provider))
-            Text(badge.badgeText)
+            Text(badge.badgeText(in: theme))
                 .badge(badge.badgeColor(theme))
                 .opacity(badge.showsBadge ? 1 : 0)
         }
@@ -717,7 +712,7 @@ struct MenuContentView: View {
     private func freshnessLine(_ text: String) -> some View {
         HStack {
             Text(text)
-                .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 10, weight: .semibold))
                 .foregroundStyle(theme.textTertiary)
             Spacer()
         }
@@ -734,12 +729,12 @@ struct MenuContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let headline = failure.headline {
                     Text(headline)
-                        .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .semibold))
                         .foregroundStyle(theme.textPrimary)
                 }
                 Text(failure.detail)
                     .help(failure.detail)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .foregroundStyle(theme.textTertiary)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -758,7 +753,7 @@ struct MenuContentView: View {
 
             Text(provider.lastError?.localizedDescription ?? "Unavailable")
                 .help(provider.lastError?.localizedDescription ?? "Unavailable")
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .medium))
                 .foregroundStyle(theme.textTertiary)
                 .lineLimit(1)
 
@@ -807,7 +802,7 @@ struct MenuContentView: View {
                     }
 
                     Text((group.title ?? "Other").uppercased())
-                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .semibold))
                         .foregroundStyle(theme.textSecondary)
                         .tracking(0.5)
 
@@ -815,21 +810,21 @@ struct MenuContentView: View {
 
                     if case .headerInline(let note) = group.notePlacement {
                         Text(note)
-                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 9, weight: .medium))
                             .foregroundStyle(theme.textTertiary)
                     } else if isNoteOnly {
                         Text("No usage data")
-                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 9, weight: .medium))
                             .foregroundStyle(theme.textTertiary)
                     } else {
                         // Collapsed sections keep their headline number visible.
                         if isCollapsed, let lowest = group.lowestQuota {
                             Text("\(Int(lowest.percentRemaining))% left")
-                                .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                                .font(theme.font(size: 9, weight: .semibold))
                                 .foregroundStyle(theme.textTertiary)
                         }
 
-                        Text(group.worstStatus.badgeText)
+                        Text(theme.statusWord(for: group.worstStatus))
                             .badge(theme.statusColor(for: group.worstStatus))
                     }
                 }
@@ -844,7 +839,7 @@ struct MenuContentView: View {
                 // its own row - never silently dropped.
                 if case .row(let note) = group.notePlacement {
                     Text(note)
-                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 9, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                 }
 
@@ -872,7 +867,7 @@ struct MenuContentView: View {
                 .font(.system(size: 8))
 
             Text(text)
-                .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 10, weight: .medium))
 
             Spacer(minLength: 0)
         }
@@ -1000,12 +995,12 @@ struct MenuContentView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(theme.textSecondary)
                 Text(setup.title)
-                    .font(.system(size: 12, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 12, weight: .semibold))
                     .foregroundStyle(theme.textPrimary)
                 Spacer()
             }
             Text(setup.text)
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .medium))
                 .foregroundStyle(theme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
             if let url = setup.url {
@@ -1038,14 +1033,14 @@ struct MenuContentView: View {
             // A provider that is data names the step that failed first.
             let failure = selectedLogin.flatMap { RefreshReport.of($0).failure }
             Text(failure?.headline ?? "\(selectedLogin.map(monitor.lineupName(of:)) ?? selectedProviderId) Unavailable")
-                .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                .font(theme.font(size: 14, weight: .bold))
                 .foregroundStyle(theme.textPrimary)
 
             // Show actual error message if available, otherwise generic message
             Text(failure?.headline != nil
                  ? "\(selectedLogin.map(monitor.lineupName(of:)) ?? selectedProviderId) Unavailable · \(failure?.detail ?? "")"
                  : selectedLogin?.lastError?.localizedDescription ?? "Install CLI or check configuration")
-                .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: .semibold))
                 .foregroundStyle(theme.textTertiary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 16)
@@ -1276,7 +1271,7 @@ struct ProviderPill: View {
 
                 Text(providerName)
                     .help(providerName)
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
                     .lineLimit(1)
                     .fixedSize()
             }
@@ -1483,7 +1478,7 @@ struct WrappedStatCard: View {
                         .foregroundStyle(statusColor)
 
                     Text((quota.compactTitle ?? quota.quotaType.displayName).uppercased())
-                        .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 8, weight: .medium))
                         .foregroundStyle(theme.textSecondary)
                         .tracking(0.3)
                 }
@@ -1495,7 +1490,7 @@ struct WrappedStatCard: View {
                     Text(quota.pace.displayName.uppercased())
                         .badge(paceColor)
                 } else {
-                    Text(quota.status(under: settings.statusPolicy).badgeText)
+                    Text(theme.statusWord(for: quota.status(under: settings.statusPolicy)))
                         .badge(statusColor)
                 }
             }
@@ -1521,7 +1516,7 @@ struct WrappedStatCard: View {
                         )
                         .layoutPriority(1)
                         Text(headline.caption)
-                            .font(.system(size: 9, weight: .heavy, design: theme.fontDesign))
+                            .font(theme.font(size: 9, weight: .heavy))
                             .foregroundStyle(theme.textTertiary)
                     }
                     .lineLimit(1)
@@ -1534,7 +1529,7 @@ struct WrappedStatCard: View {
                             .foregroundStyle(theme.textPrimary)
 
                         Text("of \(dollarCap)")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 9, weight: .semibold))
                             .foregroundStyle(theme.textSecondary)
                     }
                     .lineLimit(1)
@@ -1551,7 +1546,7 @@ struct WrappedStatCard: View {
                             .foregroundStyle(effectiveDisplayMode == .pace ? paceColor : theme.textPrimary)
 
                         Text("%")
-                            .font(.system(size: 13, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 13, weight: .medium))
                             .foregroundStyle(effectiveDisplayMode == .pace ? paceColor.opacity(0.7) : theme.textTertiary)
                     }
                 }
@@ -1560,7 +1555,7 @@ struct WrappedStatCard: View {
 
                 if !theme.isOutlined {
                     Text(valueCaption)
-                        .font(.system(size: isCappedSpend ? 10 : 12, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: isCappedSpend ? 10 : 12, weight: .medium))
                         .fixedSize()
                         .foregroundStyle(effectiveDisplayMode == .pace ? paceColor.opacity(0.8) : theme.textTertiary)
                 }
@@ -1613,7 +1608,7 @@ struct WrappedStatCard: View {
                             .font(.system(size: 7))
 
                         Text(resetText)
-                            .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
+                            .font(theme.font(size: 8, weight: .medium))
                     }
                     .foregroundStyle(theme.textTertiary)
                     .lineLimit(1)
@@ -1656,12 +1651,12 @@ struct WrappedStatCard: View {
     private func resetLine(_ line: QuotaCardText.ResetLine) -> Text {
         let time = line.time.map {
             Text($0)
-                .font(.system(size: 8.5, weight: .heavy, design: theme.fontDesign))
+                .font(theme.font(size: 8.5, weight: .heavy))
                 .foregroundColor(theme.textPrimary)
         }
         guard !line.lead.isEmpty else { return time ?? Text("") }
         let lead = Text(line.lead)
-            .font(.system(size: 8.5, weight: .semibold, design: theme.fontDesign))
+            .font(theme.font(size: 8.5, weight: .semibold))
             .foregroundColor(theme.textTertiary)
         guard let time else { return lead }
         return lead + Text(" ") + time
@@ -1729,7 +1724,7 @@ struct LoadingSpinnerView: View {
             }
 
             Text("Fetching usage data...")
-                .font(.system(size: 13, weight: .medium, design: theme.fontDesign))
+                .font(theme.font(size: 13, weight: .medium))
                 .foregroundStyle(theme.textSecondary)
         }
         .frame(height: 140)
@@ -1767,7 +1762,7 @@ struct WrappedActionButton: View {
                 }
 
                 Text(label)
-                    .font(.system(size: 12, weight: theme.isOutlined ? .bold : .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 12, weight: theme.isOutlined ? .bold : .medium))
                     .fixedSize()
             }
             .foregroundStyle(isHovering && !theme.isOutlined ? .white : theme.textPrimary)

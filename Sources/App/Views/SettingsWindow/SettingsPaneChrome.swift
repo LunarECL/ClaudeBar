@@ -20,7 +20,7 @@ struct SettingsPane<Content: View>: View {
                         .foregroundStyle(theme.textPrimary)
 
                     Text(subtitle)
-                        .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 12, weight: .medium))
                         .foregroundStyle(theme.textSecondary)
                 }
                 .padding(.bottom, 8)
@@ -72,12 +72,12 @@ struct SettingsRow<Trailing: View>: View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 13, weight: .semibold))
                     .foregroundStyle(theme.textPrimary)
 
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                        .font(theme.font(size: 11, weight: .medium))
                         .foregroundStyle(theme.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -158,7 +158,7 @@ struct SettingsFieldLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+            .font(theme.font(size: 9, weight: .semibold))
             .foregroundStyle(theme.textSecondary)
             .tracking(0.5)
     }
@@ -210,7 +210,7 @@ private struct SegmentButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 11, weight: isSelected ? .semibold : .medium, design: theme.fontDesign))
+                .font(theme.font(size: 11, weight: isSelected ? .semibold : .medium))
                 .foregroundStyle(isSelected ? theme.textPrimary : theme.textSecondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -268,7 +268,7 @@ struct SettingsActionButton: View {
                         .font(.system(size: 11, weight: .semibold))
                 }
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .semibold))
             }
             .foregroundStyle(style == .secondary ? theme.textPrimary : theme.textOnStatus)
             .padding(.horizontal, 14)
@@ -302,7 +302,7 @@ struct SettingsTextField: View {
     var body: some View {
         TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(theme.textTertiary))
             .textFieldStyle(.plain)
-            .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+            .font(theme.font(size: 12, weight: .medium))
             .foregroundStyle(theme.textPrimary)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)

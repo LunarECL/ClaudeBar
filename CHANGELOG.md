@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Pop theme: a dollar balance or spend now prints in the same outlined style as a percentage, with its caption beside it, so a card's big numbers no longer look like two different fonts ([#499](https://github.com/tddworks/ClaudeBar/issues/499))
 
+### Added
+- **Platformer theme**: a Super Mario–style 8-bit level — blue sky, pixel clouds and hills on a brick floor, quota bars as ten blocks and pixel text. A low quota says HURRY UP!, an empty one GAME OVER. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/themes/README.md)
+
 ---
 
 ## [0.5.6] - 2026-10-05

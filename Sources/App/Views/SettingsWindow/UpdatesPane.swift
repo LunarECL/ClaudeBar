@@ -43,7 +43,7 @@ struct UpdatesPane: View {
                 Image(systemName: "hammer.fill")
                     .font(.system(size: 10))
                 Text("Updates unavailable in debug builds")
-                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .font(theme.font(size: 11, weight: .medium))
             }
             .foregroundStyle(theme.textTertiary)
         }
@@ -92,7 +92,7 @@ struct UpdatesPane: View {
                         }
 
                         Text(sparkleUpdater?.isCheckingForUpdates == true ? "Checking..." : status.buttonTitle)
-                            .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                            .font(theme.font(size: 11, weight: .semibold))
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
