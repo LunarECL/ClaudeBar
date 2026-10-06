@@ -224,6 +224,12 @@ async function start(): Promise<void> {
       el("span", { text: flag(c.country) }),
       el("span", { text: nameOf(c.country) }),
       el("span", { class: "num", text: num }));
+    // Only the countries the API totals add up, so no part of it is one member's own.
+    const tokens = $("globe-tokens"), from = $("globe-tokens-from");
+    if (tokens) tokens.textContent = shown.length ? fmt(shown.reduce((sum, c) => sum + c.tokens, 0)) : "—";
+    if (from) from.textContent = shown.length
+      ? `Last 30 days, from the ${shown.length === 1 ? "country" : `${shown.length} countries`} with 3+ members.`
+      : "Last 30 days. Tokens show for countries with 3+ members.";
     const list = $("globe-list");
     list?.replaceChildren(
       ...shown.map((c) => row(c, (c.tokens / max) * 100, fmt(c.tokens))),
