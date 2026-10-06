@@ -13,6 +13,8 @@ final class Leaderboard {
     let uploader: LeaderboardUploader
     let boardPage = URL(string: "https://claudebar.tddworks.com/leaderboard/")!
     let globePage = URL(string: "https://claudebar.tddworks.com/leaderboard/#globe-section")!
+    /// The rank the member is sharing, while *Share my rank* is open over the popover.
+    private(set) var sharing: RankCard?
 
     @ObservationIgnored private let api: any LeaderboardAPI
     @ObservationIgnored private let logs: MonitorTokenLogs
@@ -68,6 +70,15 @@ final class Leaderboard {
     func preview(sharing providers: Set<String>) async -> [DailyTokens] {
         let today = DateRange.last(1)
         return DailyTokens.summed(await logs.days(in: today), providers: providers)
+    }
+
+    /// *Share* on *Your rank*: opens *Share my rank* with this card.
+    func share(_ card: RankCard) {
+        sharing = card
+    }
+
+    func stopSharing() {
+        sharing = nil
     }
 
     func board(in view: BoardView) async throws -> [Standing] {
