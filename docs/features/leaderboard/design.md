@@ -143,7 +143,7 @@ People code on more than one machine: a MacBook, a Mac mini, a Windows PC. A too
 
 Each device makes its own key and keeps the private half where its platform keeps secrets: the Keychain, with §4's fallback, on a Mac; Credential Manager or DPAPI on Windows ([#507](https://github.com/tddworks/ClaudeBar/issues/507)). Every signed request also carries the public half as `X-Key`. The server finds the device by its key, and the member through the device. It never uses `X-Member` for this: a rename on one device would leave that header stale on the others, and today a stale name is answered `401`, after which the app forgets its membership (`LeaderboardUploader`). The signed string doesn't change, so `vectors.json`'s signing cases don't either.
 
-A client from before devices sends no `X-Key`. The server then finds the member by `X-Member`, and the device by whichever of the member's keys verifies the signature. Such a client still loses its membership when another device renames the member, as in v1. Its device stays in the list until removed, and its days count; once that Mac is updated and added again, the member removes the old entry.
+A client from before devices sends no `X-Key`. The server then finds the member by `X-Member`, and the device by whichever of the member's keys verifies the signature. Such a client still loses its membership when another device renames the member, as in v1. Its device stays in the list until removed, and its days count; once that Mac is updated and added again, the member removes the old entry. It never reads `/me`, so it never repairs a row another holder of its key replaced (*A key copied to another machine*).
 
 Why not copy one key to every machine:
 - The private half would leave its device.
@@ -209,7 +209,7 @@ Below, *past its first week* means the device that joined, or one added 7 days a
 
 ### What an upload sends
 
-v1 sends every day from `lastUpload`'s day to today. With devices, a device sends every day of its last 30 whose counts differ from `lastSent`, what the server last accepted from it, except the days it withholds. On join that is all 30. Closed days come from the device's `DayLedger`, so this reads no more logs than v1's upload, except when the ledger starts over: a change to how a log reads (its fingerprint, which includes the price list) reads its 30 days again, and any day whose counts changed is sent again.
+v1 sends every day from `lastUpload`'s day to today. With devices, a device sends every day of its last 30 whose counts differ from `lastSent`, what the server last accepted from it, except the days it withholds. A day with no `lastSent` differs, so on join that is all 30, and so is the first upload after an update from v1, whose settings hold no `lastSent`. Closed days come from the device's `DayLedger`, so this reads no more logs than v1's upload, except when the ledger starts over: a change to how a log reads (its fingerprint, which includes the price list) reads its 30 days again, and any day whose counts changed is sent again.
 - A day that changed after it was sent is sent again: a Mac that slept through midnight, or a log that synced in before the day closed. A day closes an hour after its midnight and isn't read again until the ledger starts over (`DayLedger.closesAfter`).
 - A day the server refused is sent again on each upload, until it fits under the cap or falls out of the 30 days.
 - `lastSent` keeps the last 30 days only, and the checks below look only within them.
@@ -264,14 +264,14 @@ Finding partial copies, too, would take something per record from each device: a
 - **Its row missing:** the device didn't delete it (it withholds what it deletes), so another holder of its key did. It sends that day again.
 - **Its row present with other counts, the first time:** it sends that day again. A settings file restored from a backup gives the same sign once.
 - **Changed again after that resend:** another machine is sending as this device. It says so and offers **Make this Mac its own device**.
-- **No `lastSent` for a day:** that proves nothing, and the day is left alone.
+- **No `lastSent` for a day:** that proves nothing. The day is sent as any other, and raises no alarm.
 
 **Make this Mac its own device.**
 1. It makes a new key and asks for a code. The copied key, which still signs, approves it. If that key is itself in its first week, another device of the member past its first week approves it instead, or the switch waits for the week to pass.
 2. Under the copied key it deletes every row that is what it last sent: each day where the server's row equals its `lastSent`.
 3. It forgets the copied key, and uploads its last 30 days under the new one.
 
-Where each day ends up. Nothing is lost, as long as the old Mac uploads again within 30 days: each Mac sends all of its own records, the old one under the copied key and the new one under its own.
+Where each day ends up, when the other Mac also runs a version with devices. Nothing is lost, as long as it uploads again within 30 days: each Mac sends all of its own records, the old one under the copied key and the new one under its own.
 - **Rows step 2 deleted.**
   - They were this Mac's last sends.
   - Each day the other Mac sent too is in the other Mac's `lastSent`, so it finds the row missing and sends its own records again.
@@ -282,6 +282,11 @@ Where each day ends up. Nothing is lost, as long as the old Mac uploads again wi
   - Being the same records read the same way, they show as *the same day, twice*.
 - **What isn't caught:** the migration day itself. Both Macs hold its records from before the migration and add their own after it, so the rows differ and the shared part counts twice without being shown.
 - **The remedy:** this Mac offers to withhold those days and delete its own rows for them, which it may. They then count once, under the other Mac.
+
+**When the other Mac runs a version from before devices**, nothing repairs its side. That app sends only from its `lastUpload`'s day to today and never reads `/me` (`LeaderboardUploader.uploadNow()`):
+- Its rows that this Mac's sends replaced, and that step 2 then deleted, come back only for the days still in its range: today, or yesterday until its first upload after midnight.
+- Its other days stay off the board until it is updated. Its first upload after that has no `lastSent`, so it sends its last 30 days and brings them back. Days older than 30 by then are lost.
+- These are the days v1 already loses when two Macs share a key, where a row holds whichever Mac wrote last. Detection can't repair them from one side; the notice tells the member to update the other Mac.
 
 **Prevention instead of detection** would need a key that can't migrate: the data protection keychain with a `ThisDeviceOnly` class, which "do not migrate to a new device" ([Apple](https://developer.apple.com/documentation/security/ksecattraccessibleafterfirstunlockthisdeviceonly)). Tailscale keeps its node state that way on Apple platforms, except in its standalone macOS build ([blog](https://tailscale.com/blog/encrypting-data-at-rest)). The data protection keychain needs a provisioning profile ([TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)). The Mac App Store build has one (`appstore-release.yml`); the Developer ID build, the DMG and Homebrew, has none (§9).
 
@@ -524,8 +529,8 @@ Test-first slices, each green on its own. Slices 1–10 are built; 11–17 are �
 12. **Signing with `X-Key`, and the member's settings from `/me`.** Pins: every signed request names the device's key; a rename on another device reaches this one's name on the next `/me` and never makes it forget its membership; visibility, globe and link follow `/me`.
 13. **The same logs on two devices.** Pins: a shared provider with a log file, symlinks resolved, that iCloud Drive holds or that sits under `~/Library/CloudStorage` is pointed out when ticked and on upload, and one with none is not; two devices' rows for one provider and day with all five counts equal are named with the devices and the days, and rows differing in any count are not; the board's numbers never change because of either.
 14. **Adding and removing devices.** Pins: the new device waits, names the member it joined and asks before its first upload, then uploads 30 days; approve shows the label before it adds; every other device shows the new one once, with **Remove**, and a device turned off shows it when turned on; removing this device forgets the key only after the server's 2xx; a removed device forgets its membership on its next upload's `401` and says which device removed it.
-15. **A copied key.** Pins: a row missing, or differing from `lastSent`, is sent again unless withheld; differing again after that resend says another machine holds the key; a day without `lastSent` is left alone; *Make this Mac its own device* gets the new key approved by the old one, or by another device when the old one is in its first week, deletes under the old key every row equal to `lastSent`, forgets the old key, and uploads 30 days under the new one; the days both Macs then hold are offered for withholding here.
-16. **What an upload sends.** Pins: each upload sends every day of the last 30 whose counts differ from `lastSent`, and on join all 30; a day under `refused` stays out of `lastSent`, is said, and is sent again on later uploads; `lastUpload` moves as for a good upload; *Don't count these days here* withholds them and deletes this device's rows for them, so they're never sent again; *Count them here again* sends them on the next upload; `lastSent` keeps 30 days.
+15. **A copied key.** Pins: a row missing, or differing from `lastSent`, is sent again unless withheld; differing again after that resend says another machine holds the key; a day without `lastSent` raises no alarm; *Make this Mac its own device* gets the new key approved by the old one, or by another device when the old one is in its first week, deletes under the old key every row equal to `lastSent`, forgets the old key, and uploads 30 days under the new one; the days both Macs then hold are offered for withholding here.
+16. **What an upload sends.** Pins: each upload sends every day of the last 30 whose counts differ from `lastSent`, a day without one included, so on join and on the first upload after an update from v1 all 30; a day under `refused` stays out of `lastSent`, is said, and is sent again on later uploads; `lastUpload` moves as for a good upload; *Don't count these days here* withholds them and deletes this device's rows for them, so they're never sent again; *Count them here again* sends them on the next upload; `lastSent` keeps 30 days.
 17. **Surfaces**, from a mockup in `design-concept/leaderboard/` first (AGENTS.md: a UI change starts there): the Settings pane's *Devices* list (label, *This Mac*, added, removed and by which device, *Remove*, and *Delete its days* for a removed device), *Add a device* with the code and **Approve**, the join form's *Already a member? Add this Mac* with its code, a wait and the member's name to confirm, the notice that a device was added, and the notices for a shared folder, the same day twice, a copied key and a refused day.
 
 Each user-visible slice adds its CHANGELOG line; the feature's `README.md` lands with slice 8.
