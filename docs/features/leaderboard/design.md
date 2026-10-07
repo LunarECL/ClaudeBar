@@ -45,7 +45,7 @@ Two findings fall out of these. A rank is never a property of a member alone; it
    each device (a Mac, a PC)                  the server (Worker + D1)
  ┌──────────────────────────────┐   signed   ┌────────────────────────────┐
  │ Membership                   │ ─────────▶ │ members   (username)       │
- │  key, sharing, lastSent      │  PUT /usage│ devices   (key, label)     │
+ │  key, sharing, refused       │  PUT /usage│ devices   (key, label)     │
  │ UsageHistory per login ──▶   │            │ daily_tokens (one row per  │
  │   DailyTokens per provider   │ ◀───────── │   member·device·provider·  │
  └──────────────────────────────┘ GET /board │   day)                     │
@@ -89,8 +89,8 @@ LeaderboardMembership                     this device's membership (aggregate ro
  ├─ isOn : Bool                           OFF = PAUSED: NO TAB, NOTHING UPLOADED; NAME, KEY, DAYS KEPT
  ├─ key : SigningKey                      PRIVATE HALF NEVER LEAVES THE DEVICE
  ├─ lastUpload : Date?                    the last good upload: v1 resumes there, devices time the hour by it
- ├─ lastSent : [DailyTokens]              WHAT THE SERVER LAST ACCEPTED FROM THIS DEVICE, LAST 30 DAYS: A DAY THAT DIFFERS IS SENT AGAIN
- └─ withheld : Set<provider · day>        DAYS THE MEMBER CHOSE NOT TO COUNT HERE, LAST 30 DAYS: NEVER SENT, UNTIL UNDONE
+ ├─ refused : Set<provider · day>         DAYS THE SERVER REFUSED, LAST 30 DAYS: SENT AGAIN WITH EACH UPLOAD
+ └─ machine : hash?                       THIS MAC'S HARDWARE UUID, HASHED WITH THE KEY'S PUBLIC HALF. NEVER SENT
 
 Board                                     the server's ranking (aggregate root, Worker)
  ├─ members : Member                      username, visible, joined at
@@ -112,9 +112,9 @@ There is no `Leaderboard` type on the app side that holds standings. The app doe
 | **Owns: only shared providers leave the device** | `dailyTokens(from:)` drops every provider not in `sharing` before anything is built |
 | **Owns: only shareable providers can be shared** | `share(_:)` refuses a provider with no usage history; the ability is absent, not ignored |
 | **Owns: a turned-off Leaderboard uploads nothing** | `uploadCredentials` is `nil` while off, so the uploader has nothing to sign with and `lastUpload` stays where uploads stopped |
-| **Owns: a device's own rows are its own** | `lastSent` keeps what it sent; after each upload it reads its rows on `/me`, sends again a row that's missing or differs, and says another machine holds its key when one differs again after that ([§2a](#2a--devices-one-member-several-machines)) |
-| **Tell it** | `join(as:sharing:)` · `share(_:)` · `stopSharing(_:)` · `setVisible(_:)` · `rename(to:)` · `leave()` · `turnOff()` · `turnOn()` · `requestToJoin(label:)` · `pendingDevice(code:)` · `approve(code:)` · `remove(device:)` · `withhold(provider:days:)` · `countAgain(provider:days:)` · `deleteDays(of:provider:day:)` · `becomeOwnDevice()` |
-| **It answers** | `isJoined` · `isOn` · `sharing` · `devices` · `myStanding(in:)` · `sameDays` (two devices' rows for one provider and day with the same five counts) · `sharedFolders` (a shared provider whose logs are in a synced folder) |
+| **Owns: a copied key never uploads unasked** | at launch, a key whose `machine` hash isn't this Mac's uploads nothing until the member answers: this Mac gets its own key, or keeps this one and records its hash ([§2a](#2a--devices-one-member-several-machines)); every key made here is recorded with this Mac's hash, and forgetting a key forgets its hash |
+| **Tell it** | `join(as:sharing:)` · `share(_:)` · `stopSharing(_:)` · `setVisible(_:)` · `rename(to:)` · `leave()` · `turnOff()` · `turnOn()` · `requestToJoin(label:)` · `pendingDevice(code:)` · `approve(code:)` · `remove(device:deletingDays:)` · `deleteDays(of:provider:day:)` · `becomeOwnDevice()` · `keepKeyHere()` |
+| **It answers** | `isJoined` · `isOn` · `sharing` · `devices` · `myStanding(in:)` · `refused` (days the server refused, tried again) · `holdsCopiedKey` (this Mac's key came from another Mac) |
 | **Never** | holds a ranking · sends a provider it was not told to share · forgets its key before the server confirmed the leave or the removal · keeps a member setting the server has changed since |
 
 ### `DailyTokens`: one provider's day
@@ -143,7 +143,7 @@ People code on more than one machine: a MacBook, a Mac mini, a Windows PC. A too
 
 Each device makes its own key and keeps the private half where its platform keeps secrets: the Keychain, with §4's fallback, on a Mac; Credential Manager or DPAPI on Windows ([#507](https://github.com/tddworks/ClaudeBar/issues/507)). Every signed request also carries the public half as `X-Key`. The server finds the device by its key, and the member through the device. It never uses `X-Member` for this: a rename on one device would leave that header stale on the others, and today a stale name is answered `401`, after which the app forgets its membership (`LeaderboardUploader`). The signed string doesn't change, so `vectors.json`'s signing cases don't either.
 
-A client from before devices sends no `X-Key`. The server then finds the member by `X-Member`, and the device by whichever of the member's keys verifies the signature. Such a client still loses its membership when another device renames the member, as in v1. Its device stays in the list until removed, and its days count; once that Mac is updated and added again, the member removes the old entry. It never reads `/me`, so it never repairs a row another holder of its key replaced (*A key copied to another machine*).
+A client from before devices sends no `X-Key`. The server then finds the member by `X-Member`, and the device by whichever of the member's keys verifies the signature. Such a client still loses its membership when another device renames the member, as in v1. Its device stays in the list until removed, and its days count; once that Mac is updated and added again, the member removes the old entry.
 
 Why not copy one key to every machine:
 - The private half would leave its device.
@@ -154,7 +154,7 @@ Why not copy one key to every machine:
 This is RFC 8628's device flow, the one GitHub's and Microsoft's sign-ins use. Keybase and WhatsApp link the same way: a device the person already has vouches for the new one.
 
 1. **On the new machine**, the join form's *Already a member? Add this Mac*:
-   - It makes its key and sends `POST /devices {publicKey, label}`.
+   - It makes its key and sends `POST /devices {publicKey, label}`. The label is filled in with the Mac's model, never its computer name (§6).
    - The server answers with a code: 8 characters of RFC 8628's `BCDFGHJKLMNPQRSTVWXZ`, shown as `WDJB-MJHT`, good for 10 minutes and once.
 2. **On a device already joined**, *Add a device*, then type the code:
    - It first reads what the code would add (`GET /me/devices/pending/{code}`: the label, and when it asked) and shows that above **Approve**. RFC 8628 §5.4 asks for this, so a code read out to a stranger isn't approved blind.
@@ -173,7 +173,7 @@ This is RFC 8628's device flow, the one GitHub's and Microsoft's sign-ins use. K
 For its first 7 days a device that was *added* uploads, reads, and changes only its own days and settings. The device that joined isn't held back: it is the member, and there is no one else to protect it from. An added device can't do these until then (`403 deviceTooNew`):
 - rename or hide the member, or change its globe or link;
 - approve a device, or remove another one (removing itself is allowed);
-- delete another device's days;
+- delete a removed device's days;
 - leave.
 
 Without this, a device approved by mistake, or a phished code (RFC 8628 §5.4), could remove every other device before anyone noticed. Each would forget its membership on its next upload, and the name would be the stranger's.
@@ -194,27 +194,21 @@ Below, *past its first week* means the device that joined, or one added 7 days a
 - Its uploaded days stay and keep counting, listed under it as *removed*. Google, Apple, Microsoft, Tailscale and Keybase all remove a device this way: its access goes, the account's data doesn't.
 - The last device can't be removed (`409 lastDevice`). That is leaving, which deletes the member, every device and every row.
 
-### Deleting a device's days is its own act
+**Remove and delete its days.** When a device removes *another* device that is still in its first week, the dialog offers **Remove** and **Remove and delete its days** side by side. The second removes the device, then deletes its days (`DELETE /me/devices/{key}/days`, below); if that second request fails, the device is removed all the same and its days can be deleted from the list. A stranger's device approved by mistake can fill the member's cap with made-up days, and the cap then refuses whichever device uploads last, which is the member's real ones ([Counting, and its bound](#counting-and-its-bound)). Deleting its days frees the cap, and the refused days come back on the next uploads. It is a choice the member sees, so deleting is still never a side effect of removing. A device removing itself isn't offered it.
 
-`DELETE /me/devices/{key}/days`, narrowed with `?provider=claude` and `&day=2026-10-06`. Where a device can be removed, data deletion is a separate, named action, never a side effect of removing it: Signal's *Delete Data*, WakaTime's bulk delete.
+### Deleting a removed device's days
 
-**Who may delete:** a device deletes its own days, or the days of a removed device (`403 notYours` otherwise). The app deletes its own days only by withholding them, by day, since a day it still logs and doesn't withhold is sent again on the next upload; a removed device's days it may delete for one provider, one day or all. It never deletes the days of another device still in use: that device would only send them again, and it can't tell such a deletion from the copied-key case below.
+`DELETE /me/devices/{key}/days`, narrowed with `?provider=claude` and `&day=2026-10-06`, deletes a removed device's days, for one provider, one day or all, from another device of the member past its first week. For a device still in use it is `403 notYours`: that device would only send them again. Where a device can be removed, deleting its data is a separate, named action, never a side effect of removing it: Signal's *Delete Data*, WakaTime's bulk delete.
 
-**What it remedies:** days counted twice. The remedy is offered for the days shown, by day (`&day=`).
-- **Two devices reading the same logs.** On one of them, *Don't count these days here*:
-  - It **withholds** the days, remembering them so it never sends them again, and deletes its own rows for them.
-  - *Count them here again* undoes it while the logs still hold them.
-  - For a folder that stays shared, it also stops sharing that provider there.
-- **An old entry after a reinstall.** Once it's removed, the other device deletes the old entry's days that show as the same day twice. Days only it had stay.
+It remedies days counted twice by an old entry, after a reinstall (*Losing a key*) or a copy (*A key copied to another machine*), and a phished device's made-up days.
 
 ### What an upload sends
 
-v1 sends every day from `lastUpload`'s day to today. With devices, a device sends every day of its last 30 whose counts differ from `lastSent`, what the server last accepted from it, except the days it withholds. A day with no `lastSent` differs, so on join that is all 30, and so is the first upload after an update from v1, whose settings hold no `lastSent`. Closed days come from the device's `DayLedger`, so this reads no more logs than v1's upload, except when the ledger starts over: a change to how a log reads (its fingerprint, which includes the price list) reads its 30 days again, and any day whose counts changed is sent again.
-- A day that changed after it was sent is sent again: a Mac that slept through midnight, or a log that synced in before the day closed. A day closes an hour after its midnight and isn't read again until the ledger starts over (`DayLedger.closesAfter`).
-- A day the server refused is sent again on each upload, until it fits under the cap or falls out of the 30 days.
-- `lastSent` keeps the last 30 days only, and the checks below look only within them.
-- Every per-day refusal is listed under `refused` in a `2xx`, and the rest of the upload is kept: a day too old, in the future, or over the cap. An upload fails whole only for what is wrong with all of it, its signature or its clock.
-- This answer is for every client, with or without `X-Key`, replacing v1's `400` for a future day. A client from before devices ignores the body and moves `lastUpload`, so it sends a refused day again only while that day is still in its range: today, or yesterday until its first upload after midnight. A refused day that has left its range is what it loses. Answered `400`, it would lose more: once other devices' rows put one of its days over the member's cap, its whole upload would fail every hour, `lastUpload` would never move (`LeaderboardUploader.uploadNow()`), and none of its 30 days would get through.
+As in v1: every day from `lastUpload`'s day to today, at most 30 days, and the last 30 on join or once added, except a copy made its own device, which keeps the copied `lastUpload` (*A key copied to another machine*). Two things change:
+- **A bad day is refused alone.** Every per-day refusal is listed under `refused` in a `2xx`, and the rest of the upload is kept: a day too old, in the future, or over the cap. An upload fails whole only for what is wrong with all of it, its signature or its clock.
+- **A refused day is tried again.** The device keeps it (`refused`) and sends it with each upload until the server takes it or it is 30 days old. A day the cap pushed out comes back once the cap has room, after a phished device's days are deleted, say.
+
+This answer is for every client, with or without `X-Key`, replacing v1's `400` for a future day. A client from before devices ignores the body and moves `lastUpload`, so it sends a refused day again only while that day is still in its range: today, or yesterday until its first upload after midnight. A refused day that has left its range is what it loses. Answered `400`, it would lose more: once other devices' rows put one of its days over the member's cap, its whole upload would fail every hour, `lastUpload` would never move (`LeaderboardUploader.uploadNow()`), and none of its 30 days would get through.
 
 ### Counting, and its bound
 
@@ -227,80 +221,50 @@ That bound is the defence, with the maintainer's `suspended`, whatever the devic
 - Google Play Games' score limits and Strava's flags end at the same pair, bounds plus review. So do the Claude Code leaderboards, viberank and tokscale, which hide or delete by hand. None of them observes the usage itself.
 - Steam can do better only where the game's own server writes the score ("Writes: Trusted").
 
-### Two devices reading the same records: shown, never subtracted
+### Two devices reading the same logs count twice, and nothing is subtracted
 
-**Two devices can count the same records.**
-- **How it happens:** a log folder synced between machines, a Mac reinstalled under a new key, a migrated account, or a folder copied on purpose.
+- **How it happens:** a log folder synced between machines, or a folder copied on purpose. A reinstall or a migration is handled below.
 - **Why the server can't take them out:** no log says which machine wrote a record. A Claude line carries `cwd`, `sessionId`, `version`; Codex's `session_meta` carries `cwd`, `cli_version`. The server sees only daily totals.
 - **Why the app doesn't send more to find them:** exact removal needs every record (Splitrail Cloud uploads a hash per message), which would end §6's "four token counts per provider per day".
+- **Why no rule lowers a number on a guess:** a sum of two daily totals can't tell shared records from coincidence. Two devices sharing 10,000 one-token calls, each with one distinct million-token call, both show 1,010,000 tokens, yet together they used 2,010,000. Any rule that keeps one of two rows would drop a real million there.
 
-**This design never lowers a number on a guess.** It shows the member what looks counted twice, and the member fixes it.
-- A sum of two daily totals can't tell shared records from coincidence.
-- Two devices sharing 10,000 one-token calls, each with one distinct million-token call, both show 1,010,000 tokens, yet together they used 2,010,000.
-- Any rule that keeps one of two rows would drop a real million there.
-- Strava does the same with a duplicate activity: the athlete sets it to *Only You* ([guidelines](https://support.strava.com/en-us/articles/15401921-segment-leaderboard-guidelines)).
-
-What the app shows, from what it already has:
-- **A shared folder, before it counts twice.** When a provider is ticked, and on each upload, the app reads where each of that provider's log files really is, with symlinks resolved.
-  - **What it looks for:** a file iCloud Drive holds ([`isUbiquitousItem`](https://developer.apple.com/documentation/foundation/urlresourcevalues/isubiquitousitem)), or one under `~/Library/CloudStorage`, where macOS's File Provider keeps Dropbox, OneDrive and Google Drive ([Microsoft](https://learn.microsoft.com/en-us/answers/questions/5181222/onedrive-use-users-username-library-cloudstorage-l), [Dropbox](https://community.dropbox.com/en/discussion/697515/why-does-apple-fileprovider-force-files-into-the-library-folder-which-is-hidden-by-default)).
-  - **What it says:** if another device shares this provider from the same folder, those days count twice, so share it from one.
-  - **What it doesn't see:** Dropbox installed outside File Provider (`~/Dropbox`), Syncthing, or rsync into an ordinary folder. The Windows client has no such check until it brings its own.
-- **The same day, twice.** After each upload a device reads its member's rows on `/me`. Two devices' rows for one provider and day with all four counts and `unsplit` equal are named, with the provider, the devices and the days.
-  - **It's a hint, not proof**, and the notice says so. Two days read from different records rarely add up to the same five counts. Small, repeated days can: one scripted call a day on two machines, or Mistral's single `unsplit` number.
-  - **What it catches:** copies of one day, read the same way, match. That covers a synced folder that held the whole day before it closed on both machines, a reinstalled or migrated Mac's past days, and a copied folder.
-  - **What it misses:** partial copies, such as a folder whose last lines synced in after the day closed on one machine, or a copy with a file left out. It also misses two machines that split days by different time zones, or read logs with different versions of a definition. In each of these the shared part counts twice, unseen.
-- **The maintainer** can run the same comparison across the board, and `suspended` stays the answer to a member who doesn't fix it.
-
-Finding partial copies, too, would take something per record from each device: a keyed MinHash of record ids, say. Its key must be shared only among the member's devices, or the server could test guessable ids, such as Mistral's session folders, which are named by time. That is §9's question for the maintainer, not part of this design.
+So such days count twice, bounded by the cap. Pointing them out to the member is a follow-up (§9).
 
 ### A key copied to another machine
 
 **How a key gets copied.**
 - Migration Assistant transfers keychains, and the old Mac keeps its copy ([Keychain Access guide](https://support.apple.com/en-gb/guide/keychain-access/kyca1121/mac), [Migration Assistant](https://support.apple.com/en-us/102613)). A Time Machine restore brings back the whole account ([102551](https://support.apple.com/en-us/102551)).
-- The key is a generic-password item in the file-based login keychain: SecItem without `kSecUseDataProtectionKeychain` ([TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)). An ad-hoc build keeps it in UserDefaults instead. Either way it comes along, with `~/.claudebar/settings.json` and its `lastSent`.
-- The result is two machines that are one device. Until both send different numbers for the same day nothing is lost: the migrated logs are the same on both, and a machine that isn't used sends no new days.
+- The key is a generic-password item in the file-based login keychain: SecItem without `kSecUseDataProtectionKeychain` ([TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)). An ad-hoc build keeps it in UserDefaults instead. Either way it comes along, with `~/.claudebar/settings.json`.
+- The result is two machines that are one device, whose uploads replace each other's days, as in v1.
 
-**Who can spot it.** The server can't tell the two apart: Tailscale spots a duplicated node key by two live endpoints, and the Worker logs no IPs. The device can, from `lastSent`, after each upload:
-- **Its row missing:** the device didn't delete it (it withholds what it deletes), so another holder of its key did. It sends that day again.
-- **Its row present with other counts, the first time:** it sends that day again. A settings file restored from a backup gives the same sign once.
-- **Changed again after that resend:** another machine is sending as this device. It says so and offers **Make this Mac its own device**.
-- **No `lastSent` for a day:** that proves nothing. The day is sent as any other, and raises no alarm.
+**How the copy knows, before it uploads.** Next to its key a device keeps a hash of its Mac's hardware UUID (`IOPlatformUUID`, in the I/O Registry's `IOPlatformExpertDevice`), salted with the key's public half, and never sends it. Every key made on a Mac, on join, when added, or by *Make this Mac its own device*, is recorded with that Mac's hash; forgetting a key, by leaving or being removed, forgets its hash too.
+- The UUID is read live from the hardware's registry, not from a file, so Migration Assistant, or a restore to another Mac, brings the key and the hash but not the UUID: at launch the copy finds that the hash isn't its Mac's. Fleet hit the same Migration Assistant copy and fixed it the same way, comparing a kept hardware UUID with the live one ([fleetdm/fleet#17934](https://github.com/fleetdm/fleet/issues/17934)).
+- A restore to the same Mac keeps the UUID, so nothing is asked. A repair that replaces the logic board is expected to change the UUID, unconfirmed; that Mac is asked, and answers *Keep the key here* (below).
+- Keeping a hash, not the UUID, keeps a hardware id out of a settings file someone might attach to a bug report.
+- A key from before this rule has no hash: the first launch with it records whichever Mac that is, so a copy made before then goes unnoticed, as in v1. If the UUID can't be read (§9), the device keeps no hash, and a copy goes unnoticed the same way.
 
-**Make this Mac its own device.**
-1. It makes a new key and asks for a code. The copied key, which still signs, approves it. If that key is itself in its first week, another device of the member past its first week approves it instead, or the switch waits for the week to pass.
-2. Under the copied key it deletes every row that is what it last sent: each day where the server's row equals its `lastSent`.
-3. It forgets the copied key, and uploads its last 30 days under the new one.
+**What the copy does.** It uploads nothing under the copied key and asks, until answered: *This Mac has a copy of «label»'s key.*
+- **Make this Mac its own device**, when both Macs stay in use:
+  1. It makes a new key, and the copied key, which still signs, approves it, as *Add a device* does. If the copied key is in its first week, another device of the member past its first week approves it, or the switch waits for the week to pass.
+  2. It forgets the copied key, its hash and the copied `refused` days, which are the other Mac's to retry, and records this Mac's hash with the new key. It keeps the copied `lastUpload`, so its first upload under the new key starts at that day rather than 30 days back: the days before were the other Mac's, sent under the copied key already.
+  3. The new key is an added device, held to its first week. The other Mac goes on as before.
+- **Keep the key here**, when the other Mac is gone (a wiped or sold Mac) or this is the same Mac after a repair: it records this Mac's hash and goes on with the key, its first week and its days as they were. Chosen while the other Mac is still in use, it leaves two Macs on one key, which replace each other's days as in v1, and the other Mac doesn't notice.
 
-Where each day ends up, when the other Mac also runs a version with devices. Nothing is lost, as long as it uploads again within 30 days, apart from a day the member's cap refuses ([Counting, and its bound](#counting-and-its-bound)): each Mac sends all of its own records, the old one under the copied key and the new one under its own.
-- **Rows step 2 deleted.**
-  - They were this Mac's last sends.
-  - Each day the other Mac sent too is in the other Mac's `lastSent`, so it finds the row missing and sends its own records again.
-  - This Mac's records for those days are under its new key.
-- **What can count twice:** the days both Macs hold the same logs for, which are the days before the migration.
-  - The copied settings hold the old Mac's `lastSent` for them, so step 2 deleted them.
-  - The old Mac sends them again, and this Mac uploads them under its new key.
-  - Being the same records read the same way, they show as *the same day, twice*.
-- **What isn't caught:** the migration day itself. Both Macs hold its records from before the migration and add their own after it, so the rows differ and the shared part counts twice without being shown.
-- **The remedy:** this Mac offers to withhold those days and delete its own rows for them, which it may. They then count once, under the other Mac.
+**What can count twice,** after *Make this Mac its own device*: every day from the copied `lastUpload`'s day to the copy's day. Both Macs hold those days' records from before the copy, and both send them, the other Mac under the copied key and this one under its new key. They stay counted twice, bounded by the cap, as two devices reading the same logs do. If the other Mac turns out to be gone after all, the member removes it and deletes its rows for those days, from a device past its first week: for a member with no other device, once this Mac's new key is past its first week. A copy whose app is from before this rule doesn't check, and uploads as v1 would.
 
-**When the other Mac runs a version from before devices**, nothing repairs its side. That app sends only from its `lastUpload`'s day to today and never reads `/me` (`LeaderboardUploader.uploadNow()`):
-- Its rows that this Mac's sends replaced, and that step 2 then deleted, come back only for the days still in its range: today, or yesterday until its first upload after midnight.
-- Its other days stay off the board until it is updated. Its first upload after that has no `lastSent`, so it sends its last 30 days and brings them back, apart from any the cap refuses. Days older than 30 by then are lost.
-- These are the days v1 already loses when two Macs share a key, where a row holds whichever Mac wrote last. Detection can't repair them from one side; the notice tells the member to update the other Mac.
-
-**Prevention instead of detection** would need a key that can't migrate: the data protection keychain with a `ThisDeviceOnly` class, which "do not migrate to a new device" ([Apple](https://developer.apple.com/documentation/security/ksecattraccessibleafterfirstunlockthisdeviceonly)). Tailscale keeps its node state that way on Apple platforms, except in its standalone macOS build ([blog](https://tailscale.com/blog/encrypting-data-at-rest)). The data protection keychain needs a provisioning profile ([TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)). The Mac App Store build has one (`appstore-release.yml`); the Developer ID build, the DMG and Homebrew, has none (§9).
+**Prevention instead of detection** would need a key that can't migrate: the data protection keychain with a `ThisDeviceOnly` class, which "do not migrate to a new device" ([Apple](https://developer.apple.com/documentation/security/ksecattraccessibleafterfirstunlockthisdeviceonly)). Tailscale keeps its node state that way on Apple platforms, except in its standalone macOS build ([blog](https://tailscale.com/blog/encrypting-data-at-rest)). The data protection keychain needs a provisioning profile ([TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)). The Mac App Store build has one (`appstore-release.yml`); the Developer ID build, the DMG and Homebrew, has none. The UUID check above needs no profile.
 
 ### Losing a key
 
 - **With a second device past its first week**, a lost key is a device to remove from the other one and a new device to approve. Keybase and GitHub both tell people to keep a second device or method for exactly this. What happens to the old entry's days:
-  - **The reinstalled Mac still has its logs:** its 30 days copy the old entry's and show as *the same day, twice*. The other device deletes the old entry's days that do, by day.
+  - **The reinstalled Mac still has its logs:** the new device sends its 30 days, the same as the old entry's, so once the old entry is removed the member deletes its days that the new device sent again, by provider and day. Its other days stay.
   - **The logs are gone too:** the old entry's days are all that's left of them, so they stay.
 - **With one device**, §9's question stands.
 
 ### What a device keeps, and what it takes from the server
 
 - **The member's, kept as a copy:** name, visibility, globe and link. The copy follows every `/me` answer, which therefore carries `username`. A rename on the MacBook reaches the Mac mini on its next upload, and never as a stale `X-Member` that forgets it.
-- **The device's own, never sent as settings:** sharing, on/off, `lastUpload`, `lastSent`, `withheld`, and which devices it has already shown as added. Each device ticks its own providers, pauses on its own, and uploads on its own clock.
+- **The device's own, never sent:** sharing, on/off, `lastUpload`, `refused`, the hash of its Mac's UUID, and which devices it has already shown as added. Each device ticks its own providers, pauses on its own, and uploads on its own clock.
 
 ## 3 · The tells
 
@@ -323,16 +287,17 @@ try await membership.leave()                     // server deletes first, then t
 
 // On / off: a pause, kept on this Mac only. The server hears nothing.
 leaderboard.turnOff()                            // tab gone, uploads stop; says so once in the popover
-leaderboard.turnOn()                             // tab back; uploads now: each day that differs from what it last sent
+leaderboard.turnOn()                             // tab back; uploads now, from where they stopped
 
 // Devices (§2a). The new device shows a code; one the member already has approves it.
 let code = try await membership.requestToJoin(label: "Mac mini")   // on the new machine; then it waits for approval
 let pending = try await membership.pendingDevice(code: code)         // on a joined device: the label and when it asked
 try await membership.approve(code: code)                             // from a device past its first week
-try await membership.remove(device: oldMac)                          // revokes its key; its days stay
-try await membership.withhold(provider: "claude", days: shown)          // this Mac's own: deletes its rows, never sends them again
+try await membership.remove(device: oldMac, deletingDays: false)     // revokes its key; its days stay
+try await membership.remove(device: stranger, deletingDays: true)    // another device in its first week: removes, then deletes its days
 try await membership.deleteDays(of: oldMac, provider: "claude", day: nil) // a removed device's; never a side effect
-try await membership.becomeOwnDevice()                               // this Mac holds a copied key: give it its own
+try await membership.becomeOwnDevice()                               // the key's machine hash isn't this Mac's: Make this Mac its own device
+try await membership.keepKeyHere()                                   // or: the other Mac is gone, or this is the same Mac after a repair
 
 // Popover
 let standings = try await board.standings(in: BoardView(period: .sevenDays, provider: nil))
@@ -359,7 +324,7 @@ let days = membership.dailyTokens(from: usageHistories, in: range)
 | A provider's day is the sum of all its logins on this device; days without tokens aren't sent | `DailyTokens.summed`, which both the upload and the join form's preview use, so the preview is exactly what is sent |
 | A device's private key never leaves it and is never logged | `SigningKeyStore` (Keychain, with the UserDefaults fallback Notify! uses for ad-hoc builds) |
 | Uploading a day again replaces that device's row; it never adds, and never touches another device's | Server |
-| A missed hour, or a device asleep for days, heals on the next upload | `LeaderboardUploader`: v1 uploads from the day of `lastUpload` to today, at most 30 days, and on join the last 30. With devices it sends every day of the last 30 whose counts differ from `lastSent`, except withheld days; on join that is all 30 |
+| A missed hour, or a device asleep for days, heals on the next upload | `LeaderboardUploader`: uploads from the day of `lastUpload` to today, at most 30 days, and on join, or once added, the last 30; a copy made its own device keeps the copied `lastUpload` |
 | Uploads stay hourly by the clock, even after the Mac sleeps | `LeaderboardUploader.uploadDue()`: uploads only when there is no `lastUpload` or it is at least an hour old by the wall clock. The App driver only asks often (every 5 minutes and on wake) and never decides |
 | An upload you asked for always goes, hour or not | `LeaderboardUploader.uploadNow()`: Refresh in the popover, whatever tab is open, joining, and switching a shared provider |
 | Every write and every private read is signed by one of the member's device keys | Server |
@@ -380,21 +345,21 @@ let days = membership.dailyTokens(from: usageHistories, in: range)
 | Leaving deletes the member, every device and every row, on the server | Server — the app forgets the key only after a 2xx |
 | A turned-off Leaderboard uploads nothing, joined or not, and keeps the membership as it was | `LeaderboardMembership.uploadCredentials` (nil while off) |
 | Turned off stays off across launches, and outlives leaving and joining again | `LeaderboardMembership.isOn`, kept as `leaderboard.on` apart from the membership record |
-| Turning it back on catches up the days missed, up to 30 | `LeaderboardUploader`: v1 resumes from `lastUpload`; with devices, every day of the last 30 that differs from `lastSent`. `Leaderboard.turnOn()` asks for it at once |
+| Turning it back on catches up the days missed, up to 30 | `LeaderboardUploader`'s range from `lastUpload`, unchanged; `Leaderboard.turnOn()` asks for it at once |
 | While off there is no Leaderboard tab, and the popover falls back to its provider | The popover reads `membership.isOn` |
 | A member has at most 5 devices that aren't removed | Server |
 | A device is added only when another device of the member, past its first week, approves the code it shows, within 10 minutes, once; the new device names the member and asks before it uploads | Server, and the new device |
-| For its first 7 days an added device changes only its own days and settings: it can't rename or hide the member, change its globe or link, approve a device, remove another, delete another's days, or leave. After that, and from the start for the device that joined, it may do what the member may | Server |
-| Removing a device revokes its key at once and says which device removed it; its days stay and count until deleted; the last device can't be removed | Server |
-| A device's days are deleted only when it asks, for one provider, one day or all, or, once it's removed, when another device asks; a device in use never has its days deleted by another | Server |
-| A day a device was told not to count there is withheld: never sent again, until the member undoes it | `LeaderboardMembership.withheld` |
+| For its first 7 days an added device changes only its own days and settings: it can't rename or hide the member, change its globe or link, approve a device, remove another, delete a removed device's days, or leave. After that, and from the start for the device that joined, it may do what the member may | Server |
+| Removing a device revokes its key at once and says which device removed it; its days stay and count until deleted; removing another device in its first week, the app offers *Remove and delete its days* beside *Remove*; the last device can't be removed | Server, and the app's dialog |
+| Only a removed device's days can be deleted, by another device of the member past its first week, for one provider, one day or all | Server |
 | Every device in use shows, once, each device added since it last read `/me`, with **Remove** | `LeaderboardMembership.devices` |
 | A device whose key the server no longer knows forgets its membership | `LeaderboardUploader`, as for a member the server forgot |
 | The member's name, visibility, globe and link come from the server; a device's copy follows every `/me` | `LeaderboardMembership` |
-| A device whose row is missing, or differs from what it last sent, sends that day again, unless it withholds it; when it differs again after that, the device says another machine holds its key | `LeaderboardMembership.lastSent`, read by `LeaderboardUploader` after each upload |
+| A day the server refused is sent again with each upload until it is taken or 30 days old | `LeaderboardMembership.refused`, read by `LeaderboardUploader` |
+| A key whose `machine` hash isn't this Mac's uploads nothing, and asks until answered: *Make this Mac its own device* or *Keep the key here* | `LeaderboardMembership.holdsCopiedKey` |
+| A new device's label is filled in with the Mac's model, never its computer name | `DeviceLabel` |
+| Every request names its client in `X-Client`, signed or not; the macOS app as `claudebar-macos/<version>` | `LeaderboardHTTPClient` |
 | No rule lowers a member's number on a guess: two devices' rows always both count | Server |
-| Two devices' rows for one provider and day with the same five counts are shown to the member as a hint, with the devices and the days | `LeaderboardMembership.sameDays`, from `/me` |
-| A shared provider with a log file iCloud Drive holds, or one under `~/Library/CloudStorage`, is pointed out when it's ticked and on each upload | `LeaderboardMembership.sharedFolders` |
 
 ## 5 · The API
 
@@ -407,7 +372,7 @@ Host: `https://claudebar-api.tddworks.com`; the public board page is `https://cl
 | `GET /me/devices/pending/{code}` | signed, limited per member per hour with approving | what approving `code` would add: `{label, requestedAt}`; `404` when there's no such code, or it expired |
 | `POST /me/devices` `{code}` | signed, limited per member per hour | approves the device that showed `code`; `409 deviceLimit` when the member has 5 devices; `403 deviceTooNew` from a device in its first week |
 | `DELETE /me/devices/{publicKey}` | signed | removes a device: its key is revoked, its days stay; `409 lastDevice` for the last device; `403 deviceTooNew` from a device in its first week removing another |
-| `DELETE /me/devices/{publicKey}/days[?provider=][&day=]` | signed | deletes that device's days, for one provider, one day or all: its own, or a removed device's; `403 notYours` for another device in use, `403 deviceTooNew` for a removed device's from a device in its first week |
+| `DELETE /me/devices/{publicKey}/days[?provider=][&day=]` | signed | deletes a removed device's days, for one provider, one day or all; `403 notYours` for a device in use, `403 deviceTooNew` from a device in its first week |
 | `PUT /usage` `{today, days: [DailyTokens]}` | signed | upserts each of the signing device's days; `today` is the device's date, refused when more than a day from UTC's. With devices, a day that is too old, in the future, or would put the member over the cap is refused alone: the `2xx` answer lists it under `refused` |
 | `GET /me` | signed | the member (`username`, `visible`, `shareCountry`, `country`, `link`), their standing in a view, their devices (`publicKey`, `label`, `addedAt`, `removedAt`, `removedBy`), and every row each device uploaded. Signed by a key still waiting for approval: `202`; by one whose code expired: `401` |
 | `GET /me/export` | signed | the same, as a downloadable JSON file |
@@ -426,7 +391,9 @@ X-Nonce:     <16 random bytes, base64url>
 X-Signature: base64url( sign( METHOD \n PATH?QUERY \n TIMESTAMP \n NONCE \n hex(SHA256(body bytes)) ) )
 ```
 
-A client other than the macOS app also sends `X-Client: <name>/<version>`, for example ClaudeBar for Windows' `claudebar-windows/<version>`. It isn't a credential; it lets the server tell clients apart and refuse a broken version alone ([#507](https://github.com/tddworks/ClaudeBar/issues/507)).
+Every request, signed or not (`POST /join` and `POST /devices` too), also carries `X-Client: <name>/<version>`: the macOS app `claudebar-macos/<version>`, ClaudeBar for Windows `claudebar-windows/<version>`. It isn't a credential and isn't signed; it lets the server tell clients apart and refuse one broken version alone ([#507](https://github.com/tddworks/ClaudeBar/issues/507)). A request without it comes from a macOS app from before this rule.
+
+**Periods per device, in one query.** A board view joins each row to its device and keeps the rows inside that device's own period, v1's window ending on the device's date rather than one date, then sums per member as v1 does. The device's date is its `today` while that is within a day of UTC's, and UTC's date once it isn't, so a device that stopped uploading (removed, turned off, a wiped Mac) ages out of *Today* and *7 days* as v1's rows do. For a 7-day window, say: `end = CASE WHEN julianday(date('now')) - julianday(device.today) <= 1 THEN device.today ELSE date('now') END`, then `WHERE row.day BETWEEN date(end, '-6 days') AND end … GROUP BY member`. One member's week can span time zones that way and still be one `GROUP BY`; the indexes and the exact SQL are `claudebar-server`'s.
 
 The Worker verifies with WebCrypto's Ed25519 against the public key `X-Key` names, over **the exact bytes received**, never re-serialised JSON. The canonical string is pinned by `Tests/DomainTests/Leaderboard/vectors.json`, of which the server keeps an identical copy.
 
@@ -436,13 +403,13 @@ CryptoKit's Ed25519 signatures are randomised, so the shared vectors are **verif
 
 The second destination after Notify! that sends ClaudeBar's own state outward, so the same rules apply, stated plainly:
 
-- **What leaves a device:** the username, and per shared provider per day four token counts. No cost, no model names, no projects, no paths, no prompts, no account email. Devices change none of this: telling two devices' copies apart uses only the counts already sent (§2a). To join or be added, a device also sends its public key and its label (below); neither is usage, and neither reaches the board.
-- **What a device is called** is a label the person types when it joins or is added, filled in with the computer's name, which they can change. Only the member's own devices see it on `/me`, as they see each device's rows; the board shows only the sum.
+- **What leaves a device:** the username, and per shared provider per day four token counts. No cost, no model names, no projects, no paths, no prompts, no account email. Devices change none of this: the hash of a Mac's hardware UUID that spots a copied key stays on the device (§2a). To join or be added, a device also sends its public key and its label (below), and every request names the app and its version (`X-Client`, §5); none of these is usage, and none reaches the board.
+- **What a device is called** is a label the person types when it joins or is added, filled in with the Mac's model ("MacBook Pro", "Mac mini"), which they can change. Never the computer's name, which is often a person's ("Jane's MacBook Pro"). The model comes from the `product-name` on the I/O Registry's device-tree `product` node on Apple silicon ("MacBook Pro (14-inch, 2021)"), with the parenthetical dropped. On an Intel Mac it comes from `IOPlatformExpertDevice`'s `model` ("MacBookPro16,1"), its family mapped to a name ("MacBook Pro"). When neither can be read, the label is "Mac". Only the member's own devices see it on `/me`, as they see each device's rows; the board shows only the sum.
 - **Where it goes:** a Cloudflare Worker run by tddworks, and from there to a public page if visible.
 - **Off by default.** Nothing is sent until the user joins, and only for providers they tick.
 - **A profile link is optional, and only a handle.** A member may add one X, Instagram or GitHub handle; the address is always built from the platform's own base, never typed. It is not verified, and every place it shows says so.
 - **The globe is opt-in, and only a country.** With *Show my country on the globe* on, the server keeps the two-letter country Cloudflare's edge sees the request that turned it on come from, once: later requests don't change it, or a VPN's exit would move the member from call to call; the Mac sends no location and asks for none. Never a city, coordinates or the IP. Publicly a country is named from its first member; its members and tokens are totalled only where at least three are, and the web board's tokens-on-the-globe figure adds up only those totals, never a number that, less the shown ones, would be one member's own. Turning it off forgets the country at once.
-- **Leaving is deletion,** on the server, not hiding: the member, every device and every row. Removing one device only revokes its key; deleting its days is its own act.
+- **Leaving is deletion,** on the server, not hiding: the member, every device and every row. Removing one device only revokes its key; deleting its days is its own act, offered beside removing for a device in its first week.
 - **The Worker logs no IP addresses and no request bodies.** Cloudflare itself still sees IPs to serve the request.
 
 ## 6a · Security, as the app sees it
@@ -451,9 +418,9 @@ Nothing the app relies on depends on the server's code staying secret, and the a
 
 - **Only you can post as you.** Every write and private read is signed with an Ed25519 key made on one of your devices; the server holds only the public halves, which can check a signature but never make one. Who you are comes from the device whose key verified the signature, never from a parameter or a name.
 - **A captured request can't be replayed.** The signature covers the method, path, query, time, a one-time nonce and the body's hash, and the server accepts it once, within five minutes.
-- **Each key stays on its device.** It lives in the Keychain in release builds. A locally built, ad-hoc signed app can't use the Keychain, so the key falls back to UserDefaults, as Notify!'s token does. A whole-account copy (Migration Assistant, a restore) takes it along; the device spots the copy, and the copy can become its own device (§2a). A stolen key of a device past its first week can do what you can: post, rename, approve a device, remove your others, delete days, or leave. A v1 key could already post and leave.
+- **Each key stays on its device.** It lives in the Keychain in release builds. A locally built, ad-hoc signed app can't use the Keychain, so the key falls back to UserDefaults, as Notify!'s token does. A whole-account copy (Migration Assistant, a restore) takes it along. On another Mac the copy finds that the hardware UUID isn't the one recorded with its key, uploads nothing, and asks whether to become its own device or keep the key, unless the copy was made before this rule (§2a). A stolen key of a device past its first week can do what you can: post, rename, approve a device, remove your others, delete a removed device's days, or leave. A v1 key could already post and leave.
 - **Adding a device needs a device you have.** A code only starts the request; a device of the member past its first week approves it, after seeing the new device's label, within 10 minutes, once. Approving and reading codes are limited per member, asking per IP. Every other device then shows the new one with **Remove**, and for its first week the new device can change nothing but its own days: the phishing RFC 8628 §5.4 warns of, a stranger asking you to approve their code, ends in a device you see and remove before it can lock you out.
-- **Totals are self-reported.** A modified client, or logs written by hand, can inflate its own numbers. The server refuses a member's provider-day above the cap, summed over their devices, so devices and copied log folders don't multiply it, and no prizes ride on the board. Two devices counting the same logs are shown to the member, never subtracted (§2a). Nothing on the client can prove a number is real.
+- **Totals are self-reported.** A modified client, or logs written by hand, can inflate its own numbers. The server refuses a member's provider-day above the cap, summed over their devices, so devices and copied log folders don't multiply it, and no prizes ride on the board. Two devices counting the same logs both count, bounded by the cap; nothing is subtracted on a guess (§2a). Nothing on the client can prove a number is real.
 - **The server may forget a member** who joined and never uploaded, or a device that was removed; the app then forgets the membership too, on its next upload, and shows the join form again (`LeaderboardUploader`).
 
 The server's own threat model (rate limits, caching, moderation, logging) is in `tddworks/claudebar-server`, `leaderboard/DESIGN.md`.
@@ -497,23 +464,24 @@ A destination, not a provider, so it sits beside Notify! (AGENTS.md: destination
 |---|---|---|
 | Codex `usageHistory` (JSON) | Codex daily tokens from its session logs | Each `token_count` line's `last_token_usage`, deduplicated by the session's running total (Codex writes some lines twice). No cost: the lines name no model |
 | `UsageLog.Tokens.inputIncludesCacheRead` | Generic engine rule | A log whose input count already holds its cache reads; the engine takes them out, so input means the same for every provider |
-| `LeaderboardMembership` | The laws of §4 on this device | Only ticked providers leave; only providers with usage history can be ticked; a provider's logins are summed; the member's settings follow `/me`; `lastSent` spots a copied key; `sameDays` and `sharedFolders` point out logs counted on two devices |
+| `LeaderboardMembership` | The laws of §4 on this device | Only ticked providers leave; only providers with usage history can be ticked; a provider's logins are summed; the member's settings follow `/me`; a key whose `machine` hash isn't this Mac's never uploads; refused days are tried again |
 | `RequestSigner` | The canonical string, signed with CryptoKit Ed25519 | Pinned by `Tests/DomainTests/Leaderboard/vectors.json`; the server checks an identical copy |
-| `LeaderboardUploader` + App driver | Uploads 30 days on join, then hourly the days that differ from `lastSent` (v1: from `lastUpload`), and now when you ask | `lastUpload` moves only on success. The driver asks `uploadDue()` every 5 minutes and on `NSWorkspace.didWakeNotification`; a `Timer`'s clock stops while the Mac sleeps, so the hour is the uploader's to judge |
+| `LeaderboardUploader` + App driver | Uploads 30 days on join, then hourly from `lastUpload` with the refused days, and now when you ask | `lastUpload` moves only on success. The driver asks `uploadDue()` every 5 minutes and on `NSWorkspace.didWakeNotification`; a `Timer`'s clock stops while the Mac sleeps, so the hour is the uploader's to judge |
 | Server | The server's laws of §4 | Private repo `tddworks/claudebar-server`; deployed with the `cf` CLI |
 
 | Piece | Home |
 |---|---|
 | `LeaderboardMembership`, `DailyTokens`, `Username`, `BoardView`, `Standing`, `RankCard`, `LeaderboardUploader` | `Sources/Domain/Leaderboard/` |
-| `@Mockable` ports `LeaderboardAPI` and `SigningKeyStore`; plain `LeaderboardSettingsRepository` (like Notify!'s, now also keeping `lastSent`, `withheld` and the devices already shown) and `@MainActor` `TokenLogs`, faked in tests | `Sources/Domain/Leaderboard/` |
-| `Device`, `DeviceCode`, `SameDay` | `Sources/Domain/Leaderboard/` |
+| `@Mockable` ports `LeaderboardAPI`, `SigningKeyStore` and `MachineIdentity` (this Mac's hardware UUID and model, faked in tests to stand for another Mac); plain `LeaderboardSettingsRepository` (like Notify!'s, now also keeping `refused`, the `machine` hash and the devices already shown) and `@MainActor` `TokenLogs`, faked in tests | `Sources/Domain/Leaderboard/` |
+| `Device`, `DeviceCode`, `DeviceLabel` | `Sources/Domain/Leaderboard/` |
+| `IOKitMachineIdentity`: `MachineIdentity` read through IOKit (`IOPlatformUUID`, the model) | `Sources/Infrastructure/` |
 | `LeaderboardHTTPClient`, `CredentialSigningKeyStore`; settings as `leaderboard.*` in `JSONSettingsRepository` | `Sources/Infrastructure/` |
-| `Leaderboard` (wiring, the 5-minute check and the wake observer, `refresh()` for the popover's Refresh, `share(_:)` for *Share my rank*, `turnOff()`/`turnOn()` and the one-time `offNotice`), `MonitorTokenLogs`, popover tab, `RankCardImage` (the image, in the member's theme) and `RankShareOverlay`, `TurnOffMenu` (the tab's *Turn off ▾*, drawn in the popover's top layer so the scroll view never clips it), `LeaderboardPane` (with its *Devices* list, *Add a device*, and the notices for a device added, a shared folder, the same day twice, a copied key and a refused day), the join form's *Already a member? Add this Mac* | `Sources/App/` |
+| `Leaderboard` (wiring, the 5-minute check and the wake observer, `refresh()` for the popover's Refresh, `share(_:)` for *Share my rank*, `turnOff()`/`turnOn()` and the one-time `offNotice`), `MonitorTokenLogs`, popover tab, `RankCardImage` (the image, in the member's theme) and `RankShareOverlay`, `TurnOffMenu` (the tab's *Turn off ▾*, drawn in the popover's top layer so the scroll view never clips it), `LeaderboardPane` (with its *Devices* list, *Add a device*, and the notices for a device added, a copied key and a refused day), the join form's *Already a member? Add this Mac* | `Sources/App/` |
 | Server and board page | Private repo `tddworks/claudebar-server` |
 
 ## 8 · Build sequence
 
-Test-first slices, each green on its own. Slices 1–10 are built; 11–17 are §2a's devices, a design not built yet.
+Test-first slices, each green on its own. Slices 1–10 are built; 11–15 are §2a's devices, a design not built yet.
 
 1. **`Username` and `DailyTokens`.** Pins the name rule against the shared vectors, and that a `DailyUsageStat` becomes four counts and nothing else.
 2. **`LeaderboardMembership` sharing.** Pins: an unticked provider never appears in `dailyTokens`; a provider without usage history can't be shared; two logins of one provider sum into one day.
@@ -525,13 +493,11 @@ Test-first slices, each green on its own. Slices 1–10 are built; 11–17 are �
 8. **App surfaces.** Popover tab and Settings pane, per the design concept.
 9. **Board page** on GitHub Pages.
 10. **On / off.** Pins: off uploads nothing and keeps the membership; off is remembered across launches and outlives leaving; back on uploads from `lastUpload`. Surfaces per [the mockup](../../../design-concept/leaderboard/index.html) (*5 · Turn it off*): the first card in Settings, *Not for me · hide Leaderboard* under the join form, and *Turn off ▾* on the tab's globe line with *My country on the globe* (while on it), *Leaderboard: pause & hide* and *Leave and delete my data…*.
-11. **Worker: devices** (in `tddworks/claudebar-server`). Pins: an existing member's key becomes their first device, holding every row; the device that joined, then or later, is never held to the first week, and an added one is for 7 days; `X-Key` finds the device and `X-Member` is ignored then; without `X-Key`, the member by `X-Member` and the device by the key that verifies; a pending key is answered `202`, an expired one `401`; a code works once, within 10 minutes, approved only by a device of the same member past its first week; a sixth device is refused (`409 deviceLimit`); an added device in its first week can't `PATCH /me`, approve, remove another, delete another's days or leave (`403 deviceTooNew`); removing revokes at once, answers the removed key `401 unauthorized` with `removedBy`, and keeps the rows; the last device can't be removed (`409 lastDevice`); a device deletes its own days, or a removed device's, for one provider, one day or all, and another in-use device's is `403 notYours`; the cap is checked on the member's sum; a day too old, in the future or over the cap is refused alone and listed under `refused` in a `2xx`, for clients with and without `X-Key`, replacing slice 4's `400` for a future day; each device's rows count in periods ending on its own `today`; `/me` carries `username`, the devices with `removedBy`, and each row's device.
-12. **Signing with `X-Key`, and the member's settings from `/me`.** Pins: every signed request names the device's key; a rename on another device reaches this one's name on the next `/me` and never makes it forget its membership; visibility, globe and link follow `/me`.
-13. **The same logs on two devices.** Pins: a shared provider with a log file, symlinks resolved, that iCloud Drive holds or that sits under `~/Library/CloudStorage` is pointed out when ticked and on upload, and one with none is not; two devices' rows for one provider and day with all five counts equal are named with the devices and the days, and rows differing in any count are not; the board's numbers never change because of either.
-14. **Adding and removing devices.** Pins: the new device waits, names the member it joined and asks before its first upload, then uploads 30 days; approve shows the label before it adds; every other device shows the new one once, with **Remove**, and a device turned off shows it when turned on; removing this device forgets the key only after the server's 2xx; a removed device forgets its membership on its next upload's `401` and says which device removed it.
-15. **A copied key.** Pins [§2a's copied-key rules](#a-key-copied-to-another-machine): when a day is sent again and when that raises the alarm, each step of *Make this Mac its own device*, and the days offered for withholding after it.
-16. **What an upload sends.** Pins [§2a's upload rules](#what-an-upload-sends): which days an upload sends, on join and after an update from v1 too; a refused day; withholding a day and undoing it; and that `lastUpload` moves as for a good upload.
-17. **Surfaces**, from a mockup in `design-concept/leaderboard/` first (AGENTS.md: a UI change starts there): the Settings pane's *Devices* list (label, *This Mac*, added, removed and by which device, *Remove*, and *Delete its days* for a removed device), *Add a device* with the code and **Approve**, the join form's *Already a member? Add this Mac* with its code, a wait and the member's name to confirm, the notice that a device was added, and the notices for a shared folder, the same day twice, a copied key and a refused day.
+11. **Worker: devices** (in `tddworks/claudebar-server`). Pins: an existing member's key becomes their first device, holding every row; the device that joined, then or later, is never held to the first week, and an added one is for 7 days; `X-Key` finds the device and `X-Member` is ignored then; without `X-Key`, the member by `X-Member` and the device by the key that verifies; a pending key is answered `202`, an expired one `401`; a code works once, within 10 minutes, approved only by a device of the same member past its first week; a sixth device is refused (`409 deviceLimit`); an added device in its first week can't `PATCH /me`, approve, remove another, delete a removed device's days or leave (`403 deviceTooNew`); removing revokes at once, answers the removed key `401 unauthorized` with `removedBy`, and keeps the rows; the last device can't be removed (`409 lastDevice`); only a removed device's days can be deleted, by a device past its first week, for one provider, one day or all, and an in-use device's is `403 notYours`; the cap is checked on the member's sum; a day too old, in the future or over the cap is refused alone and listed under `refused` in a `2xx`, for clients with and without `X-Key`, replacing slice 4's `400` for a future day; each device's rows count in periods ending on its own `today` while that is within a day of UTC's, and on UTC's date once it isn't; `/me` carries `username`, the devices with `removedBy`, and each row's device.
+12. **Signing with `X-Key` and `X-Client`, the member's settings from `/me`, and a refused day.** Pins: every signed request names the device's key; every request, signed or not, names the client (`claudebar-macos/<version>`); a rename on another device reaches this one's name on the next `/me` and never makes it forget its membership; visibility, globe and link follow `/me`; a day under `refused` is said, sent again with each upload until taken or 30 days old, and doesn't stop the other days; `lastUpload` moves as for a good upload.
+13. **Adding and removing devices.** Pins: the label is the Mac's model from `MachineIdentity`, "Mac" when it can't be read, never its computer name; the new device waits, names the member it joined and asks before its first upload, then uploads 30 days; approve shows the label before it adds; every other device shows the new one once, with **Remove**, and a device turned off shows it when turned on; removing another device in its first week offers *Remove and delete its days* beside *Remove*, which removes and then deletes its days, and removing an older one or itself doesn't; removing this device forgets the key only after the server's 2xx; a removed device forgets its membership on its next upload's `401` and says which device removed it.
+14. **A copied key.** Pins [§2a's copied-key rules](#a-key-copied-to-another-machine), with a faked `MachineIdentity`: a key whose `machine` hash isn't this Mac's uploads nothing and asks until answered; a key with no hash gets this Mac's; every key made on join, when added, or by *Make this Mac its own device* is recorded with this Mac's hash, so the next launch asks nothing, and leaving or being removed forgets the hash with the key; *Make this Mac its own device* gets a new key approved, forgets the copied key, its hash and the copied `refused` days, and uploads from the copied `lastUpload`'s day; *Keep the key here* records this Mac's hash and changes nothing else; the hash never leaves the device.
+15. **Surfaces**, from a mockup in `design-concept/leaderboard/` first (AGENTS.md: a UI change starts there): the Settings pane's *Devices* list (label, *This Mac*, added, removed and by which device, *Remove*, *Remove and delete its days* for a device in its first week, and *Delete its days* for a removed device), *Add a device* with the code and **Approve**, the join form's *Already a member? Add this Mac* with its code, a wait and the member's name to confirm, the notice that a device was added, and the notices for a copied key and a refused day.
 
 Each user-visible slice adds its CHANGELOG line; the feature's `README.md` lands with slice 8.
 
@@ -539,16 +505,21 @@ Each user-visible slice adds its CHANGELOG line; the feature's `README.md` lands
 
 - ~~**More than one Mac per username?**~~ Yes: several devices per member, each with its own key, added by a code another device approves ([§2a](#2a--devices-one-member-several-machines)). Asked in [#507](https://github.com/tddworks/ClaudeBar/issues/507).
 - **Losing the key.** With a second device past its first week it's a device to remove and one to approve (§2a). With one, a reinstall or a lost Keychain item still locks a member out of their name: a recovery code shown once at join, or a manual reset by an admin?
-- **A key that can't be copied.** Today the key migrates with the account (§2a), and only detection answers that. A `ThisDeviceOnly` item in the data protection keychain wouldn't migrate ([Apple](https://developer.apple.com/documentation/security/ksecattraccessibleafterfirstunlockthisdeviceonly)). That keychain needs a provisioning profile ([TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)), which the Mac App Store build has and the Developer ID build doesn't. Worth a Developer ID profile, or is detection enough?
-- **Finding partial copies.** §2a finds two devices reading the same logs only when a whole day matches, or when a folder is synced by iCloud Drive or a File Provider. A keyed MinHash of record ids on each row would find partial overlaps, but only with a key the member's devices share and the server never sees. Otherwise the server could test guessable ids, Mistral's session folders being named by time. That key would have to travel inside the add-a-device flow, encrypted to the new device. Worth it?
+- **A key that can't be copied.** Today the key migrates with the account (§2a), and the hardware UUID check answers that. A `ThisDeviceOnly` item in the data protection keychain wouldn't migrate ([Apple](https://developer.apple.com/documentation/security/ksecattraccessibleafterfirstunlockthisdeviceonly)). That keychain needs a provisioning profile ([TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)), which the Mac App Store build has and the Developer ID build doesn't. Worth a Developer ID profile, or is detection enough?
+- **Same logs on two devices, a follow-up.** The devices core leaves days two devices read from the same logs counted twice, bounded by the cap (§2a). Each of these is a feature of its own, for after the core:
+  - *A shared folder, before it counts twice:* when a provider is ticked, point out a log file iCloud Drive holds ([`isUbiquitousItem`](https://developer.apple.com/documentation/foundation/urlresourcevalues/isubiquitousitem)) or one under `~/Library/CloudStorage`, where File Provider keeps Dropbox, OneDrive and Google Drive. It misses `~/Dropbox` outside File Provider, Syncthing and rsync.
+  - *The same day, twice:* name two devices' rows for one provider and day whose five counts are all equal. A hint, not proof: small repeated days can match by chance, and partial copies never match.
+  - *Not counting days here:* let one device withhold such days, deleting its rows and never sending them again, until undone.
+  - *Partial copies:* a keyed MinHash of record ids on each row would find partial overlaps, but only with a key the member's devices share and the server never sees; otherwise the server could test guessable ids, Mistral's session folders being named by time. The key would travel inside the add-a-device flow, encrypted to the new device.
+- **Reading the Mac in the sandbox, and what changes its UUID.** The App Store build is sandboxed. Reading `IOPlatformUUID` and the model through IOKit is meant to work there; slices 13 and 14 fake `MachineIdentity`, so that is confirmed only by running an App Store-signed build on a real Mac. That a logic-board replacement changes the UUID stays an assumption, backed only by the UUID being read live from the hardware. If the UUID can't be read, that build keeps no hash and a copy goes unnoticed, as in v1; if the model can't, the label is "Mac" (§2a, §6).
 - **The first week.** Seven days is a judgment call: long enough to see the *device added* notice on a machine used weekly, short enough not to stand in the way of someone setting up a new Mac. Shorter, longer, or a choice for the member?
-- **Reviewing the board.** Nothing proves a number is real. Bounds and the maintainer's `suspended` are the defence, as on every self-reported board. Should the Worker queue members for review, as tokscale does? It flags a member's share of all tokens, a multiple of the median, two accounts with near-equal totals, and, with devices, one member's devices with equal rows. That's for `tddworks/claudebar-server`.
+- **Reviewing the board.** Nothing proves a number is real. Bounds and the maintainer's `suspended` are the defence, as on every self-reported board. Should the Worker queue members for review, as tokscale does? It flags a member's share of all tokens, a multiple of the median, and two accounts with near-equal totals. That's for `tddworks/claudebar-server`.
 - **Web login.** v1 shows your data in the app and offers Export. A one-time link from the app to a short web session is designed in outline and deferred.
 - **Spam and abuse.** Rate limit on `POST /join` per IP is designed. Cloudflare Turnstile, a username blocklist, and an admin hide are not yet decided.
 - ~~**Where does the Worker's code live?**~~ In the private repo `tddworks/claudebar-server` (moved 2026-10-04 by the maintainer). The app and the server share `vectors.json`; change both copies together.
 - ~~**Rank by what?**~~ Total tokens: input + output + cache write + cache read. Decided by the maintainer; output-only stays an option if cache-heavy totals feel unfair.
 - ~~**Codex tokens?**~~ In v1: Codex gets a `usageHistory` read from its session logs, needing the generic `inputIncludesCacheRead` rule.
-- ~~**What does "today" mean across time zones?**~~ Each device's own date: every upload carries the device's `today`, believable within a day of UTC's, and each device's rows count in periods ending on its own date.
+- ~~**What does "today" mean across time zones?**~~ Each device's own date: every upload carries the device's `today`, believable within a day of UTC's, and each device's rows count in periods ending on its own date. The board still answers in one query (§5).
 - ~~**Mistral keeps only totals?**~~ `DailyTokens.unsplit` carries tokens a log doesn't split, so they still count.
 - ~~**Where is the data stored?**~~ Cloudflare D1 behind a Worker. Settled because writes must pass server checks (a database the app writes to directly would need a secret in an open-source app), and D1's SQL answers a board view in one `GROUP BY` within the free tier.
 - ~~**Can someone use a public key to act as another member?**~~ No. A public key only verifies; signing needs the private half, which never leaves its device.
