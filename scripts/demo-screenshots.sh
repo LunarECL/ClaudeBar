@@ -21,6 +21,11 @@
 #                           setup and Settings section show. The shell lines
 #                           go to the demo home's .zshrc, never yours.
 #        DEMO_LOW=1         with in-use: "personal" is at 8%, "work" at 81%
+#        DEMO_SCENE=sections  adds Oh My Pi, read by its own script: a Claude
+#                           and a Kimi section, then today's usage from the
+#                           same sample logs
+#        DEMO_TEXT_SIZE=extraLarge  the Popover Text Size (medium, large,
+#                           extraLarge), set in the demo home's settings
 #        (the app defaults to the newest Debug build in DerivedData)
 
 set -euo pipefail
@@ -47,10 +52,10 @@ fi
 rm -rf "$DEMO_HOME"
 mkdir -p "$DEMO_HOME/.claudebar/providers" "$DEMO_HOME/sample-logs"
 
-python3 - "$DEMO_HOME" "$PORT" "$THEME" "${DEMO_SCENE:-}" <<'PY'
+python3 - "$DEMO_HOME" "$PORT" "$THEME" "${DEMO_SCENE:-}" "${DEMO_TEXT_SIZE:-medium}" <<'PY'
 import json, os, random, sys, uuid
 from datetime import datetime, timedelta, timezone
-home, port, theme, scene = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+home, port, theme, scene, text_size = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 base = f"http://127.0.0.1:{port}"
 
 def quota(kind, key, name=None):
@@ -64,14 +69,14 @@ def look(builtin):
         profile = json.load(f)["profile"]
     return profile["name"], profile["look"]
 
-def provider(order, builtin, quotas, history=None):
+def provider(order, builtin, quotas, history=None, mapping=None):
     name, face = look(builtin)
     pid = f"custom-{order}-{builtin}"
     definition = {
         "profile": {"id": pid, "name": name, "origin": "custom", "links": {}, "look": face},
         "dataSources": [{"kind": "api", "label": "API",
                          "fetch": {"http": {"url": f"{base}/{builtin}"}},
-                         "mapping": {"json": {"quotas": quotas}}}],
+                         "mapping": mapping or {"json": {"quotas": quotas}}}],
         "defaultDataSource": "api",
     }
     if history: definition["usageHistory"] = history
@@ -102,6 +107,9 @@ ids = [
     provider("d", "antigravity", [quota("model", "claude", "Claude Sonnet"), quota("model", "gemini", "Gemini Pro")]),
     provider("e", "copilot", [quota("time", "premium", "Premium requests")]),
 ]
+if scene == "sections":
+    # omp's own script groups each upstream provider's limits into a section.
+    ids.append(provider("f", "omp", [], history, {"script": {"file": "omp-usage.js"}}))
 
 # 30 days of sample Claude usage: weekdays busier, a few sessions a day.
 random.seed(7)
@@ -134,6 +142,7 @@ settings = {"providers": providers, "app": {
     # Chosen, so the Christmas theme stays outside its season.
     "userHasChosenTheme": True,
     "showDailyUsageCards": True,
+    "popoverTextSize": text_size,
     "menuBarPercentageEnabled": True,
     "menuBarPercentageProviderId": ids[0],
 }}
@@ -147,6 +156,10 @@ import http.server, json, sys, time
 low = sys.argv[2] == "1"
 H, D = 3600, 86400
 def q(used, resets): return {"used": used, "resets": int(time.time()) + resets}
+def limit(window, seconds, left, resets):
+    # One limit as `omp usage --json` reports it.
+    return {"scope": {"windowId": window}, "amount": {"remainingFraction": left},
+            "window": {"id": window, "durationMs": seconds * 1000, "resetsAt": (int(time.time()) + resets) * 1000}}
 ANSWERS = {
     "claude": {"session": q(92 if low else 15, 3 * H + 1500), "weekly": q(38, D + 19 * H), "sonnet": q(40, D + 19 * H)},
     "claude?login=work": {"session": q(19, 4 * H), "weekly": q(22, 3 * D), "sonnet": q(12, 3 * D)},
@@ -154,6 +167,10 @@ ANSWERS = {
     "gemini": {"pro": q(31, 14 * H), "flash": q(8, 14 * H)},
     "antigravity": {"claude": q(86, 2 * H), "gemini": q(35, 5 * H)},
     "copilot": {"premium": q(54, 18 * D)},
+    "omp": {"reports": [
+        {"provider": "anthropic", "limits": [limit("5h", 5 * H, 0.72, 3 * H), limit("7d", 7 * D, 0.55, 3 * D)]},
+        {"provider": "kimi-code", "limits": [limit("5h", 5 * H, 0.90, 2 * H), limit("7d", 7 * D, 0.64, 4 * D)]},
+    ]},
 }
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):

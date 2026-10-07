@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Usage Cards — Mockup</title>
+<style>
+:root{--paper:#F6F3FB;--ink:#1E1B2E;--muted:#6B6580;--faint:#9A93AE;--card:#fff;--hair:#E4DEEF;--healthy:#2E9E62;--low:#D64545;--cost:#E0A800;--tokens:#2E9E62;--time:#8E5BD6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+.wrap{max-width:1200px;margin:0 auto;padding:32px 16px 64px;display:flex;flex-direction:column;gap:28px}
+h1{margin:0;font-size:30px;letter-spacing:-.02em}
+h2{margin:0 0 10px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sub{margin:6px 0 0;color:var(--muted);max-width:760px}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+figure{margin:0;display:flex;flex-direction:column;gap:8px}
+figcaption{font-size:12px;color:var(--muted);max-width:420px}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-right:6px}
+.bad{background:#FCE4E4;color:var(--low)}.fix{background:#DFF3E7;color:var(--healthy)}
+
+/* The popover, drawn in the app's light theme. --s is the Popover Text Size
+   scale (1, 1.2, 1.4); the width grows with it, as in the app (400 × scale). */
+.pop{--s:1;width:calc(400px * var(--s) * .9);background:linear-gradient(180deg,#FBF8FF,#F3EEFA);border:1px solid var(--hair);border-radius:16px;padding:calc(14px * var(--s));display:flex;flex-direction:column;gap:calc(10px * var(--s));box-shadow:0 18px 36px rgba(30,27,46,.12)}
+.pop.xl{--s:1.4}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:calc(10px * var(--s))}
+.card{background:rgba(255,255,255,.75);border:1px solid var(--hair);border-radius:12px;padding:calc(11px * var(--s));display:flex;flex-direction:column;gap:calc(5px * var(--s));min-width:0}
+.head{display:flex;align-items:center;gap:5px;font-size:calc(8px * var(--s));font-weight:500;letter-spacing:.03em;color:var(--muted);text-transform:uppercase}
+.dot{width:calc(9px * var(--s));height:calc(9px * var(--s));border-radius:50%}
+.value{display:flex;align-items:baseline;justify-content:space-between;gap:6px;min-width:0}
+.value b{font:700 calc(24px * var(--s))/1.1 "SF Pro Rounded",-apple-system,system-ui;white-space:nowrap;overflow:hidden;min-width:0}
+.value.fits b{font-size:calc(20px * var(--s))}
+.value span{font-size:calc(11px * var(--s));font-weight:500;color:var(--faint);white-space:nowrap}
+.value i{font-style:normal;font-size:13px;color:var(--ink)}
+.value.broken b{white-space:normal;word-break:break-all}
+.bar{height:calc(5px * var(--s));border-radius:3px;background:#ECE6F5;overflow:hidden}
+.bar div{height:100%;border-radius:3px}
+.delta{font-size:calc(8px * var(--s));font-weight:500;color:#E07B1A}
+.section{display:flex;align-items:center;gap:6px;font-size:calc(9px * var(--s));font-weight:600;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
+.section.today{padding-top:calc(6px * var(--s))}
+.section.today.new{outline:2px dashed #C2507A;outline-offset:3px;border-radius:4px}
+.icon{width:calc(14px * var(--s));height:calc(14px * var(--s));border-radius:4px;background:#D8D0E8}
+.quota{font-size:calc(11px * var(--s))}
+.quota .bar{margin-top:3px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#16141F;--ink:#ECE9F5;--muted:#A49DB8;--card:#211E2E;--hair:#34304A}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Daily usage cards</h1>
+    <p class="sub">Two fixes to the <i>TODAY</i> cards (cost, tokens, working time). Mock numbers only. As built: <a href="as-built/index.html">as-built/</a>.</p>
+  </header>
+
+  <section>
+    <h2>(a) One number, on one line</h2>
+    <div class="row">
+      <figure>
+        <div class="pop">
+          <div class="grid">
+            <div class="card"><div class="head"><span class="dot" style="background:var(--cost)"></span>Cost Usage</div>
+              <div class="value broken"><i>$2,345.67</i><b>$2,345.67</b><span>Spent</span></div>
+              <div class="bar"><div style="width:70%;background:var(--cost)"></div></div></div>
+            <div class="card"><div class="head"><span class="dot" style="background:var(--tokens)"></span>Token Usage</div>
+              <div class="value broken"><i>4567.8M</i><b>4567.8M</b><span>Tokens</span></div>
+              <div class="bar"><div style="width:60%;background:var(--tokens)"></div></div></div>
+          </div>
+        </div>
+        <figcaption><span class="tag bad">before</span>Since #432: a small, unstyled copy of the number at the left, and the big one breaks over two or three lines, so a big day's card is taller than the rest.</figcaption>
+      </figure>
+      <figure>
+        <div class="pop">
+          <div class="grid">
+            <div class="card"><div class="head"><span class="dot" style="background:var(--cost)"></span>Cost Usage</div>
+              <div class="value fits"><b>$2,345.67</b><span>Spent</span></div>
+              <div class="bar"><div style="width:70%;background:var(--cost)"></div></div>
+              <div class="delta">Vs Oct 6 +$120.40 (5.4%)</div></div>
+            <div class="card"><div class="head"><span class="dot" style="background:var(--tokens)"></span>Token Usage</div>
+              <div class="value fits"><b>4567.8M</b><span>Tokens</span></div>
+              <div class="bar"><div style="width:60%;background:var(--tokens)"></div></div>
+              <div class="delta">Vs Oct 6 +310.2M (7.3%)</div></div>
+          </div>
+        </div>
+        <figcaption><span class="tag fix">after · Default</span>One number. It keeps its line and shrinks a little to fit when the day is big, like the extension metric cards.</figcaption>
+      </figure>
+      <figure>
+        <div class="pop xl">
+          <div class="grid">
+            <div class="card"><div class="head"><span class="dot" style="background:var(--cost)"></span>Cost Usage</div>
+              <div class="value fits"><b>$2,345.67</b><span>Spent</span></div>
+              <div class="bar"><div style="width:70%;background:var(--cost)"></div></div>
+              <div class="delta">Vs Oct 6 +$120.40 (5.4%)</div></div>
+            <div class="card"><div class="head"><span class="dot" style="background:var(--tokens)"></span>Token Usage</div>
+              <div class="value fits"><b>4567.8M</b><span>Tokens</span></div>
+              <div class="bar"><div style="width:60%;background:var(--tokens)"></div></div>
+              <div class="delta">Vs Oct 6 +310.2M (7.3%)</div></div>
+          </div>
+        </div>
+        <figcaption><span class="tag fix">after · Extra Large</span>The largest Popover Text Size: text and popover grow together, and the number still keeps one line.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>(b) Today titled under account sections</h2>
+    <div class="row">
+      <figure>
+        <div class="pop">
+          <div class="section"><span class="icon"></span>Claude</div>
+          <div class="grid">
+            <div class="card quota">5h · 72% left<div class="bar"><div style="width:72%;background:var(--healthy)"></div></div></div>
+            <div class="card quota">7d · 55% left<div class="bar"><div style="width:55%;background:var(--healthy)"></div></div></div>
+          </div>
+          <div class="section"><span class="icon"></span>Kimi</div>
+          <div class="grid">
+            <div class="card quota">5h · 90% left<div class="bar"><div style="width:90%;background:var(--healthy)"></div></div></div>
+            <div class="card quota">7d · 64% left<div class="bar"><div style="width:64%;background:var(--healthy)"></div></div></div>
+          </div>
+          <div class="grid">
+            <div class="card"><div class="head"><span class="dot" style="background:var(--cost)"></span>Cost Usage</div><div class="value fits"><b>$48.20</b><span>Spent</span></div><div class="bar"><div style="width:40%;background:var(--cost)"></div></div></div>
+            <div class="card"><div class="head"><span class="dot" style="background:var(--tokens)"></span>Token Usage</div><div class="value fits"><b>96.4M</b><span>Tokens</span></div><div class="bar"><div style="width:35%;background:var(--tokens)"></div></div></div>
+          </div>
+        </div>
+        <figcaption><span class="tag bad">before</span>Oh My Pi: the cards follow the last section with no title, so today's usage reads as Kimi's.</figcaption>
+      </figure>
+      <figure>
+        <div class="pop">
+          <div class="section"><span class="icon"></span>Claude</div>
+          <div class="grid">
+            <div class="card quota">5h · 72% left<div class="bar"><div style="width:72%;background:var(--healthy)"></div></div></div>
+            <div class="card quota">7d · 55% left<div class="bar"><div style="width:55%;background:var(--healthy)"></div></div></div>
+          </div>
+          <div class="section"><span class="icon"></span>Kimi</div>
+          <div class="grid">
+            <div class="card quota">5h · 90% left<div class="bar"><div style="width:90%;background:var(--healthy)"></div></div></div>
+            <div class="card quota">7d · 64% left<div class="bar"><div style="width:64%;background:var(--healthy)"></div></div></div>
+          </div>
+          <div class="section today new">Today's usage</div>
+          <div class="grid">
+            <div class="card"><div class="head"><span class="dot" style="background:var(--cost)"></span>Cost Usage</div><div class="value fits"><b>$48.20</b><span>Spent</span></div><div class="bar"><div style="width:40%;background:var(--cost)"></div></div></div>
+            <div class="card"><div class="head"><span class="dot" style="background:var(--tokens)"></span>Token Usage</div><div class="value fits"><b>96.4M</b><span>Tokens</span></div><div class="bar"><div style="width:35%;background:var(--tokens)"></div></div></div>
+          </div>
+        </div>
+        <figcaption><span class="tag fix">after</span>A <i>TODAY'S USAGE</i> title in the sections' own style (9 pt semibold, caps, secondary colour) heads the cards. Only when the provider shows sections; a provider without them looks as before.</figcaption>
+      </figure>
+    </div>
+  </section>
+</div>
+</body>
+</html>

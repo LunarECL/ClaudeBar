@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Daily usage cards**: cost, tokens and working time show one number on one line again, and Oh My Pi's get their own *TODAY'S USAGE* title instead of reading as the last account's. ([#PR](https://github.com/tddworks/ClaudeBar/pull/PR))
+
 ---
 
 ## [0.5.9] - 2026-10-07
