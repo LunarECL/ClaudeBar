@@ -83,7 +83,21 @@ public struct LeaderboardHTTPClient: LeaderboardAPI {
             let reason: String
         }
 
+        /// `nil` only when the key is missing: a server from before devices. A `refused`
+        /// that is there must be a list - `null` included fails - or the days waiting to be
+        /// sent again would be dropped as if taken.
         let refused: [Refused]?
+
+        private enum CodingKeys: String, CodingKey { case refused }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if container.contains(.refused) {
+                refused = try container.decode([Refused].self, forKey: .refused)
+            } else {
+                refused = nil
+            }
+        }
     }
 
     private struct Board: Decodable {

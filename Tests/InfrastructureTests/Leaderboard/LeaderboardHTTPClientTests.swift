@@ -108,6 +108,7 @@ struct LeaderboardHTTPClientTests {
 
     @Test(arguments: [
         #"{"refused":"cap"}"#,
+        #"{"stored":1,"refused":null}"#,
         #"{"refused":[{"provider":"claude","day":"2026-10-04"}]}"#,
         #"{"stored":1,"refused":["#,
         #"[]"#,
