@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Daily usage cards**: cost, tokens and working time show one number on one line again, and Oh My Pi's get their own *TODAY'S USAGE* title instead of reading as the last account's. ([#514](https://github.com/tddworks/ClaudeBar/pull/514))
+
 ### Added
 - **Mistral Vibe plan usage**: paste your chat.mistral.ai cookie and Mistral shows the plan's percent used and reset time beside today's spend. ([#496](https://github.com/tddworks/ClaudeBar/issues/496)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/mistral/README.md)
 

@@ -35,15 +35,18 @@ struct DailyUsageCardView: View {
             // Large value display
             HStack(alignment: .firstTextBaseline) {
                 Text(primaryValue)
-                Text(primaryValue)
                     .popoverDisplayFont(24)
                     .foregroundStyle(theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
 
                 Spacer()
 
                 Text(metric.unitLabel)
                     .popoverFont(11, weight: .medium)
                     .foregroundStyle(theme.textTertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
 
             // Optional subtitle (e.g., cache breakdown for tokens card)

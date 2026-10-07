@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Usage Cards — As Built</title>
+<style>
+:root{--paper:#F6F3FB;--ink:#1E1B2E;--muted:#6B6580;--card:#fff;--hair:#E4DEEF;--healthy:#2E9E62}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+.wrap{max-width:1200px;margin:0 auto;padding:32px 16px 64px;display:flex;flex-direction:column;gap:28px}
+h1{margin:0;font-size:30px;letter-spacing:-.02em}
+h2{margin:0 0 10px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sub{margin:6px 0 0;color:var(--muted);max-width:760px}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+figure{margin:0;display:flex;flex-direction:column;gap:8px}
+figure img{max-width:100%;height:auto;filter:drop-shadow(0 18px 36px rgba(30,27,46,.16))}
+figcaption{font-size:12px;color:var(--muted);max-width:360px}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-right:6px;background:#DFF3E7;color:var(--healthy)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#16141F;--ink:#ECE9F5;--muted:#A49DB8;--card:#211E2E;--hair:#34304A}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Daily usage cards — as built</h1>
+    <p class="sub">The real app (Debug build of <code>fix/daily-usage-cards</code>) on mock data — <code>DEMO_SCENE=sections scripts/demo-screenshots.sh</code>, with <code>DEMO_TEXT_SIZE=extraLarge</code> for the largest Popover Text Size. Sample logs and a stub server only: no real account, email or usage. The design: <a href="../index.html">the mockup</a>.</p>
+  </header>
+
+  <section>
+    <h2>(a) One number, on one line</h2>
+    <div class="row">
+      <figure>
+        <img src="popover-cards-default.png" width="400" height="844" alt="Claude's tab at the default text size: Cost Usage, Token Usage and Working Time each show one number on one line.">
+        <figcaption><span class="tag">Default</span>Each card shows its number once, on one line. Claude has no sections, so no title: as before.</figcaption>
+      </figure>
+      <figure>
+        <img src="popover-cards-extra-large.png" width="560" height="922" alt="Claude's tab at Extra Large: the same cards, larger, each number still on one line.">
+        <figcaption><span class="tag">Extra Large</span>The largest Popover Text Size: the popover grows with the text and each number keeps its line.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>(b) Today titled under account sections</h2>
+    <div class="row">
+      <figure>
+        <img src="popover-sections.png" width="400" height="927" alt="Oh My Pi's tab: Claude and Kimi sections, then a TODAY'S USAGE title above the daily usage cards.">
+        <figcaption><span class="tag">Default</span>Oh My Pi: the Claude and Kimi sections, then <i>TODAY'S USAGE</i> in the same header style, so the cards no longer read as Kimi's.</figcaption>
+      </figure>
+      <figure>
+        <img src="popover-sections-extra-large.png" width="560" height="1008" alt="Oh My Pi's tab at Extra Large, with the TODAY'S USAGE title.">
+        <figcaption><span class="tag">Extra Large</span>The title scales with the section headers.</figcaption>
+      </figure>
+    </div>
+  </section>
+</div>
+</body>
+</html>

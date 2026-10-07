@@ -951,10 +951,7 @@ struct MenuContentView: View {
                             .foregroundStyle(theme.textTertiary)
                     }
 
-                    Text((group.title ?? "Other").uppercased())
-                        .popoverFont(9, weight: .semibold)
-                        .foregroundStyle(theme.textSecondary)
-                        .tracking(0.5)
+                    sectionTitle((group.title ?? "Other").uppercased())
 
                     Spacer(minLength: 4)
 
@@ -1062,8 +1059,11 @@ struct MenuContentView: View {
                 CostStatCard(costUsage: costUsage, budget: budget, delay: Double(snapshot.quotas.count) * 0.08)
             }
 
+            // Under per-account sections, today needs its own title, or it
+            // reads as part of the last account's section.
             todaySection(account: monitor.login(id: snapshot.providerId),
-                         fallback: snapshot.dailyUsageReport, after: snapshot.quotas.count)
+                         fallback: snapshot.dailyUsageReport, after: snapshot.quotas.count,
+                         titled: snapshot.hasQuotaGroups)
 
             // Show extension metrics cards (from extension probes)
             if let extensionMetrics = snapshot.extensionMetrics?.filter({ $0.group == nil }),
@@ -1090,10 +1090,23 @@ struct MenuContentView: View {
     /// *TODAY* — the login's own daily usage cards, a card per other app on
     /// this Mac (Claude Desktop), and the thirty-day chart. Shown under the
     /// limits, and under the setup card when there are none yet (#198).
+    /// `titled` heads it *TODAY'S USAGE*, in the quota sections' style.
     @ViewBuilder
-    private func todaySection(account: Account?, fallback: DailyUsageReport?, after cards: Int) -> some View {
+    private func todaySection(account: Account?, fallback: DailyUsageReport?, after cards: Int,
+                              titled: Bool = false) -> some View {
         let history = account?.usageHistory
-        if settings.showDailyUsageCards, let report = history?.report ?? fallback {
+        let report = history?.report ?? fallback
+        let apps = history?.usedOtherApps ?? []
+        let lastThirtyDays = history?.lastThirtyDays ?? []
+        if titled, settings.showDailyUsageCards, report != nil || !apps.isEmpty || !lastThirtyDays.isEmpty {
+            HStack {
+                sectionTitle("TODAY'S USAGE")
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 6)
+        }
+
+        if settings.showDailyUsageCards, let report {
             let baseDelay = Double(cards + 1) * 0.08
             // Logs that can't be priced show no cost rather than a made-up $0.
             let knowsCost = history?.knowsCost ?? true
@@ -1112,7 +1125,7 @@ struct MenuContentView: View {
 
         // Other apps on this Mac that use the same plan (Claude Desktop):
         // a tokens card each, shown even when the login's own logs are empty.
-        if settings.showDailyUsageCards, let apps = history?.usedOtherApps, !apps.isEmpty {
+        if settings.showDailyUsageCards, !apps.isEmpty {
             let appDelay = Double(cards + 3) * 0.08
             TwoColumnCardGrid(items: apps, id: \.label) { app in
                 if let report = app.report {
@@ -1122,10 +1135,18 @@ struct MenuContentView: View {
         }
 
         // The same login's last thirty days, as a chart.
-        if settings.showDailyUsageCards, let history, !history.lastThirtyDays.isEmpty {
-            UsageHistoryChartView(days: history.lastThirtyDays, delay: Double(cards + 4) * 0.08,
+        if settings.showDailyUsageCards, let history, !lastThirtyDays.isEmpty {
+            UsageHistoryChartView(days: lastThirtyDays, delay: Double(cards + 4) * 0.08,
                                   measure: history.knowsCost ? .cost : .tokens, showsCost: history.knowsCost)
         }
+    }
+
+    /// A section's title above its cards: an account's quotas, or today.
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .popoverFont(9, weight: .semibold)
+            .foregroundStyle(theme.textSecondary)
+            .tracking(0.5)
     }
 
     /// *NOT SET UP* — nothing to read the limits with yet. Says what it
