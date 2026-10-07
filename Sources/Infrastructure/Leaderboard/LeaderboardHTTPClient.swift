@@ -6,16 +6,22 @@ import Domain
 /// point the app's key at someone else's server.
 public struct LeaderboardHTTPClient: LeaderboardAPI {
     public static let defaultHost = URL(string: "https://claudebar-api.tddworks.com")!
+    /// How this app names itself on every request (`X-Client`), so the server
+    /// can tell clients apart and refuse one broken version alone.
+    public static let macClient = "claudebar-macos/\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")"
 
     private let networkClient: any NetworkClient
     private let host: URL
+    private let client: String
     private let timeout: TimeInterval
     private let now: @Sendable () -> Date
 
     public init(networkClient: any NetworkClient = URLSession.shared, host: URL = LeaderboardHTTPClient.defaultHost,
-                timeout: TimeInterval = 15, now: @escaping @Sendable () -> Date = Date.init) {
+                client: String = LeaderboardHTTPClient.macClient, timeout: TimeInterval = 15,
+                now: @escaping @Sendable () -> Date = Date.init) {
         self.networkClient = networkClient
         self.host = host
+        self.client = client
         self.timeout = timeout
         self.now = now
     }
@@ -26,9 +32,19 @@ public struct LeaderboardHTTPClient: LeaderboardAPI {
         _ = try await send("POST", "/join", body: try JSONEncoder().encode(["username": username, "publicKey": publicKey]))
     }
 
-    public func upload(_ days: [DailyTokens], as credentials: MemberCredentials) async throws {
+    public func upload(_ days: [DailyTokens], as credentials: MemberCredentials) async throws -> [RefusedDay] {
         let body = try JSONEncoder().encode(Upload(today: DailyTokens.day(of: now()), days: days))
-        _ = try await send("PUT", "/usage", body: body, signedBy: credentials)
+        let answer = try await send("PUT", "/usage", body: body, signedBy: credentials)
+        // A server from before devices answers with no body, or with one that has no
+        // `refused`: it refused nothing alone. A `refused` that can't be read fails the
+        // upload, so the days waiting to be sent again aren't dropped as if taken.
+        guard (try? JSONSerialization.jsonObject(with: answer, options: .fragmentsAllowed)) is [String: Any] else { return [] }
+        return (try decode(UploadAnswer.self, answer).refused ?? []).compactMap { row in
+            // A row the server couldn't read as an object names no provider or day; ours
+            // are always objects, and such a row can't be sent again anyway.
+            guard let provider = row.provider, let day = row.day else { return nil }
+            return RefusedDay(provider: provider, day: day, reason: row.reason)
+        }
     }
 
     public func me(in view: BoardView, as credentials: MemberCredentials) async throws -> MemberSummary {
@@ -59,6 +75,16 @@ public struct LeaderboardHTTPClient: LeaderboardAPI {
         let days: [DailyTokens]
     }
 
+    private struct UploadAnswer: Decodable {
+        struct Refused: Decodable {
+            let provider: String?
+            let day: String?
+            let reason: String
+        }
+
+        let refused: [Refused]?
+    }
+
     private struct Board: Decodable {
         let standings: [Standing]
     }
@@ -82,6 +108,7 @@ public struct LeaderboardHTTPClient: LeaderboardAPI {
         request.httpMethod = method
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(client, forHTTPHeaderField: "X-Client")
         if let credentials {
             let headers = try RequestSigner.headers(
                 member: credentials.username, key: credentials.key, method: method, pathAndQuery: pathAndQuery,
