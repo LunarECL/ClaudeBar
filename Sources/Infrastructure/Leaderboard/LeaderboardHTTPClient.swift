@@ -35,10 +35,11 @@ public struct LeaderboardHTTPClient: LeaderboardAPI {
     public func upload(_ days: [DailyTokens], as credentials: MemberCredentials) async throws -> [RefusedDay] {
         let body = try JSONEncoder().encode(Upload(today: DailyTokens.day(of: now()), days: days))
         let answer = try await send("PUT", "/usage", body: body, signedBy: credentials)
-        // A server from before devices answers with no body, or with one that has no
-        // `refused`: it refused nothing alone. A `refused` that can't be read fails the
-        // upload, so the days waiting to be sent again aren't dropped as if taken.
-        guard (try? JSONSerialization.jsonObject(with: answer, options: .fragmentsAllowed)) is [String: Any] else { return [] }
+        // A server from before devices answers with no body, or with an object that has
+        // no `refused`: it refused nothing alone. Any other answer that can't be read -
+        // cut short, not an object, a `refused` of the wrong shape - fails the upload, so
+        // the days waiting to be sent again aren't dropped as if taken.
+        if answer.isEmpty { return [] }
         return (try decode(UploadAnswer.self, answer).refused ?? []).compactMap { row in
             // A row the server couldn't read as an object names no provider or day; ours
             // are always objects, and such a row can't be sent again anyway.

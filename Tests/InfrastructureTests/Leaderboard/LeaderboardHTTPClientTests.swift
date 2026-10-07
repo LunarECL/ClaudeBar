@@ -106,11 +106,16 @@ struct LeaderboardHTTPClientTests {
         #expect(try await client(body: #"{"ok":true}"#).upload([], as: member).isEmpty)
     }
 
-    @Test func `should fail the upload when it can't read the refused days, rather than take them as none`() async {
-        for body in [#"{"refused":"cap"}"#, #"{"refused":[{"provider":"claude","day":"2026-10-04"}]}"#] {
-            await #expect(throws: LeaderboardError.rejected("The leaderboard answered with something unreadable.")) {
-                _ = try await client(body: body).upload([], as: member)
-            }
+    @Test(arguments: [
+        #"{"refused":"cap"}"#,
+        #"{"refused":[{"provider":"claude","day":"2026-10-04"}]}"#,
+        #"{"stored":1,"refused":["#,
+        #"[]"#,
+        #""stored""#,
+    ])
+    func `should fail the upload when it can't read the answer, rather than take it as no refused days`(body: String) async {
+        await #expect(throws: LeaderboardError.rejected("The leaderboard answered with something unreadable.")) {
+            _ = try await client(body: body).upload([], as: member)
         }
     }
 
