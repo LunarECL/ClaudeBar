@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.9] - 2026-10-07
+
 ### Fixed
 - **"Support for apps for Intel processors" warning**: ClaudeBar now runs a tool's native Apple-silicon copy when one exists and asks the system shell, not an Intel-only one, for PATHs — so macOS stops naming ClaudeBar for a tool it ran. ([#251](https://github.com/tddworks/ClaudeBar/issues/251))
 
@@ -172,7 +176,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.8...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.9...HEAD
+[0.5.9]: https://github.com/tddworks/ClaudeBar/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/tddworks/ClaudeBar/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/tddworks/ClaudeBar/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/tddworks/ClaudeBar/compare/v0.5.5...v0.5.6
