@@ -1,0 +1,67 @@
+name: Windows
+
+# Phase 0 of MODULAR_DESIGN §10 (one package, two platforms): prove that the
+# Swift toolchain builds and tests a module on Windows, with Mockable resolved
+# and its macros expanded there. Quotas imports only Foundation, so it is the
+# first module to run here.
+
+on:
+  push:
+    branches: [main, develop, ci/windows-quotas]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quotas:
+    name: Quotas on Windows
+    runs-on: windows-latest
+    steps:
+      # The same Swift as the macOS jobs' Xcode, so a difference is Windows'.
+      - name: Install Swift
+        uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: swift-6.3.3-release
+          swift-build: 6.3.3-RELEASE
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get Swift version
+        run: swift --version
+
+      # Until phase 1 adds the root Package.swift, the job writes its own
+      # manifest: Quotas and its tests, and a probe that a @Mockable port and
+      # its mock work here (Quotas declares no ports). Mockable at the range
+      # the app's Tuist/Package.swift asks for.
+      - name: Write a manifest for Quotas
+        shell: bash
+        run: |
+          cat > Package.swift <<'EOF'
+          // swift-tools-version: 6.0
+          import PackageDescription
+
+          let package = Package(
+              name: "ClaudeBar",
+              dependencies: [
+                  .package(url: "https://github.com/Kolos65/Mockable.git", from: "0.5.0"),
+              ],
+              targets: [
+                  .target(name: "Quotas", path: "Modules/Quotas/Sources"),
+                  .testTarget(name: "QuotasTests", dependencies: ["Quotas"], path: "Modules/Quotas/Tests"),
+                  .testTarget(
+                      name: "MockableProbe",
+                      dependencies: [.product(name: "Mockable", package: "Mockable")],
+                      path: ".github/windows/MockableProbe",
+                      swiftSettings: [.define("MOCKING")]
+                  ),
+              ]
+          )
+          EOF
+
+      - name: Build and test
+        run: swift test
