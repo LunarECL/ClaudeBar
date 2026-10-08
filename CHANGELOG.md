@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Leaderboard uploads**: a day the server refuses on its own, such as one over the daily cap, no longer holds back the rest: the other days go through, and that day is sent again with each upload until it's taken or 30 days old. ([#522](https://github.com/tddworks/ClaudeBar/pull/522)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md#gotchas)
+- **"Rate limited" message**: the wait until the retry is rounded to the nearest minute, hour or day, so 29 min 59 s reads "Retrying in 30 minutes", not "in 29 minutes". ([#523](https://github.com/tddworks/ClaudeBar/pull/523)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-two-platforms)
 
 ### Fixed
 - **Codex stuck on *Syncing…***: when `codex app-server` stops answering, ClaudeBar gives up after 15 seconds, tries the terminal instead and keeps refreshing, so usage no longer freezes until you relaunch. ([#517](https://github.com/tddworks/ClaudeBar/issues/517))
