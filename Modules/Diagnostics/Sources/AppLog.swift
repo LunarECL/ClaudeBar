@@ -1,133 +1,130 @@
 import Foundation
-import OSLog
 
-/// Dual-output logger that writes to both OSLog (for developers) and file (for users).
+/// The app's log: one logger per category, each line sent to every `LogSink`
+/// of the platform.
 ///
-/// This facade provides category-specific loggers that output to:
-/// 1. **OSLog** - For Console.app, live streaming, and development debugging
-/// 2. **File** - For user-accessible logs at ~/Library/Logs/ClaudeBar/ClaudeBar.log
-///
-/// ## Usage Examples
+/// - **The file log**, on every platform, for people:
+///   `~/Library/Logs/ClaudeBar/ClaudeBar.log` on the Mac,
+///   `%LOCALAPPDATA%\ClaudeBar\Logs\ClaudeBar.log` on Windows. Every level
+///   but `debug`; it rotates at 5 MB.
+/// - **OSLog**, on the Mac, for developers: Console.app and `log show`, every level.
 ///
 /// ```swift
-/// // Monitor operations
 /// AppLog.monitor.info("Starting refresh for \(providers.count) providers")
-///
-/// // Probe execution
 /// AppLog.probes.debug("Executing Claude CLI probe")
 /// AppLog.probes.error("CLI probe failed: \(error.localizedDescription)")
-///
-/// // Sensitive data - use sanitized messages for file logs
-/// AppLog.credentials.info("Token loaded for provider")
 /// ```
 ///
-/// ## Log Levels
-///
-/// | Level | File Output | OSLog Persistence |
-/// |-------|-------------|-------------------|
+/// | Level | File | OSLog persistence |
+/// |-------|------|-------------------|
 /// | debug | No | Memory only |
-/// | info | Yes | With `log collect` |
+/// | info, notice | Yes, as `INFO` | With `log collect` |
 /// | warning | Yes | Always persisted |
 /// | error | Yes | Always persisted |
 ///
-/// ## Viewing Logs
-///
-/// **File logs (for users):**
-/// ```
-/// ~/Library/Logs/ClaudeBar/ClaudeBar.log
-/// ```
-///
-/// **OSLog (for developers):**
+/// OSLog, for developers:
 /// ```bash
 /// log show --predicate 'subsystem == "com.tddworks.ClaudeBar"' --info --debug --last 1h
 /// ```
 public enum AppLog {
     /// Logger for quota monitoring operations
     public static let monitor = CategoryLogger(category: "monitor")
-    
+
     /// Logger for AI provider operations
     public static let providers = CategoryLogger(category: "providers")
-    
+
     /// Logger for usage probe operations
     public static let probes = CategoryLogger(category: "probes")
-    
+
     /// Logger for network operations
     public static let network = CategoryLogger(category: "network")
-    
+
     /// Logger for credential operations
     public static let credentials = CategoryLogger(category: "credentials")
-    
+
     /// Logger for UI operations
     public static let ui = CategoryLogger(category: "ui")
-    
+
     /// Logger for notification operations
     public static let notifications = CategoryLogger(category: "notifications")
-    
+
     /// Logger for update operations
     public static let updates = CategoryLogger(category: "updates")
 
     /// Logger for hook operations (Claude Code session tracking)
     public static let hooks = CategoryLogger(category: "hooks")
-    
-    /// Open the logs directory in Finder
-    public static func openLogsDirectory() {
-        FileLogger.shared.openLogsDirectory()
-    }
-    
-    /// The URL to the logs directory
-    public static var logsDirectoryURL: URL {
-        FileLogger.shared.logsDirectory
-    }
+
+    /// The file log, which a person opens and attaches to an issue.
+    public static let logFileURL: URL = {
+        let files = FileManager.default
+        #if os(macOS)
+        let folder = files.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appending(path: "Logs/ClaudeBar", directoryHint: .isDirectory)
+        #else
+        // %LOCALAPPDATA% on Windows, where Foundation has no Library folder.
+        let folder = (files.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? files.temporaryDirectory)
+            .appending(path: "ClaudeBar/Logs", directoryHint: .isDirectory)
+        #endif
+        return folder.appending(path: "ClaudeBar.log")
+    }()
+
+    /// Where every line goes on this platform.
+    static let sinks: [any LogSink] = {
+        #if os(macOS)
+        [OSLogSink(), FileLogSink(fileURL: logFileURL)]
+        #else
+        [FileLogSink(fileURL: logFileURL)]
+        #endif
+    }()
 }
 
-/// A category-specific logger that outputs to both OSLog and file.
+/// A category's logger: each line goes to every sink of the platform.
 ///
 /// **Privacy Note**: All messages are logged publicly (no redaction).
 /// Callers must manually redact sensitive data before logging.
 /// Do NOT log tokens, API keys, passwords, or other secrets.
 public struct CategoryLogger: Sendable {
     private let category: String
-    private let osLogger: Logger
-    
-    init(category: String) {
+    private let sinks: [any LogSink]
+
+    init(category: String, sinks: [any LogSink] = AppLog.sinks) {
         self.category = category
-        let subsystem = Bundle.main.bundleIdentifier ?? "com.tddworks.ClaudeBar"
-        self.osLogger = Logger(subsystem: subsystem, category: category)
+        self.sinks = sinks
     }
-    
+
     /// Log a debug message (OSLog only, not written to file).
     /// - Note: Message is logged publicly. Caller must redact sensitive data.
     public func debug(_ message: String) {
-        osLogger.debug("\(message, privacy: .public)")
+        write(.debug, message)
     }
-    
+
     /// Log an info message (written to both OSLog and file).
     /// - Note: Message is logged publicly. Caller must redact sensitive data.
     public func info(_ message: String) {
-        osLogger.info("\(message, privacy: .public)")
-        FileLogger.shared.log(.info, category: category, message: message)
+        write(.info, message)
     }
-    
+
     /// Log a notice message (written to both OSLog and file as INFO level).
     /// - Note: Message is logged publicly. Caller must redact sensitive data.
     public func notice(_ message: String) {
-        osLogger.notice("\(message, privacy: .public)")
-        FileLogger.shared.log(.info, category: category, message: message)
+        write(.notice, message)
     }
-    
+
     /// Log a warning message (written to both OSLog and file).
     /// - Note: Message is logged publicly. Caller must redact sensitive data.
     public func warning(_ message: String) {
-        osLogger.warning("\(message, privacy: .public)")
-        FileLogger.shared.log(.warning, category: category, message: message)
+        write(.warning, message)
     }
-    
+
     /// Log an error message (written to both OSLog and file).
     /// - Note: Message is logged publicly. Caller must redact sensitive data.
     public func error(_ message: String) {
-        osLogger.error("\(message, privacy: .public)")
-        FileLogger.shared.log(.error, category: category, message: message)
+        write(.error, message)
+    }
+
+    private func write(_ level: LogLevel, _ message: String) {
+        for sink in sinks {
+            sink.write(level, category: category, message: message)
+        }
     }
 }
-
-

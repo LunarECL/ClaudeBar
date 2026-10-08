@@ -39,8 +39,10 @@ let package = Package(
         .target(name: "Quotas", path: "Modules/Quotas/Sources"),
         .testTarget(name: "QuotasTests", dependencies: ["Quotas"], path: "Modules/Quotas/Tests"),
 
-        // Diagnostics — AppLog; the only module anything may import.
+        // Diagnostics — AppLog; the only module anything may import. Each line goes to the
+        // platform's sinks: OSLog on the Mac, and the file log everywhere.
         .target(name: "Diagnostics", path: "Modules/Diagnostics/Sources"),
+        .testTarget(name: "DiagnosticsTests", dependencies: ["Diagnostics"], path: "Modules/Diagnostics/Tests"),
 
         // DataSources — DataSource, its definition, the closed sums and their workers,
         // and the ports for what lies outside (CLI, network, RPC).
@@ -107,13 +109,14 @@ let package = Package(
     ]
 )
 #else
-// What builds on Windows today (§10 phase 0): Quotas, and a probe that a @Mockable port
-// and its mock work there, since Quotas declares no ports.
+// What builds on Windows today (§10 phases 0 and 2): Quotas, Diagnostics, and a probe that a
+// @Mockable port and its mock work there, since neither module declares one.
 let package = Package(
     name: "ClaudeBarKit",
     products: [
-        .library(name: "ClaudeBarKit", targets: ["Quotas"]),
+        .library(name: "ClaudeBarKit", targets: ["Quotas", "Diagnostics"]),
         .library(name: "Quotas", targets: ["Quotas"]),
+        .library(name: "Diagnostics", targets: ["Diagnostics"]),
     ],
     dependencies: [
         .package(url: "https://github.com/Kolos65/Mockable.git", from: "0.5.0"),
@@ -121,6 +124,8 @@ let package = Package(
     targets: [
         .target(name: "Quotas", path: "Modules/Quotas/Sources"),
         .testTarget(name: "QuotasTests", dependencies: ["Quotas"], path: "Modules/Quotas/Tests"),
+        .target(name: "Diagnostics", path: "Modules/Diagnostics/Sources"),
+        .testTarget(name: "DiagnosticsTests", dependencies: ["Diagnostics"], path: "Modules/Diagnostics/Tests"),
         .testTarget(
             name: "MockableProbe",
             dependencies: [mockable],

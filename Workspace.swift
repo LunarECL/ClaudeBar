@@ -20,13 +20,13 @@ let appSchemes: [(name: String, builds: String, tests: String)] = [
 ]
 
 // The modules, in ClaudeBarKit. Each gets a scheme of its own name, as when they were targets
-// of the app's project, so `tuist test Providers` runs ProvidersTests. Diagnostics has no tests.
-let modules: [(name: String, tests: String?)] = [
+// of the app's project, so `tuist test Providers` runs ProvidersTests.
+let modules: [(name: String, tests: String)] = [
     ("DataSources", "DataSourcesTests"),
     ("AWSClients", "AWSClientsTests"),
     ("Providers", "ProvidersTests"),
     ("Quotas", "QuotasTests"),
-    ("Diagnostics", nil),
+    ("Diagnostics", "DiagnosticsTests"),
 ]
 
 let claudeBar: Scheme = .scheme(
@@ -39,7 +39,7 @@ let claudeBar: Scheme = .scheme(
             .testableTarget(target: .project(path: app, target: "DomainTests")),
             .testableTarget(target: .project(path: app, target: "InfrastructureTests")),
             .testableTarget(target: .project(path: app, target: "AppTests")),
-        ] + modules.compactMap(\.tests).map { .testableTarget(target: .project(path: kit, target: $0)) },
+        ] + modules.map { .testableTarget(target: .project(path: kit, target: $0.tests)) },
         configuration: .debug
     ),
     runAction: .runAction(configuration: .debug, executable: .project(path: app, target: "ClaudeBar")),
@@ -65,7 +65,7 @@ let workspace = Workspace(
                 name: module.name,
                 shared: true,
                 buildAction: .buildAction(targets: [.project(path: kit, target: module.name)]),
-                testAction: module.tests.map { .targets([.testableTarget(target: .project(path: kit, target: $0))], configuration: .debug) }
+                testAction: .targets([.testableTarget(target: .project(path: kit, target: module.tests))], configuration: .debug)
             )
         }
 )
