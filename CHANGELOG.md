@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Leaderboard uploads**: a day the server refuses on its own, such as one over the daily cap, no longer holds back the rest: the other days go through, and that day is sent again with each upload until it's taken or 30 days old. ([#PR](https://github.com/tddworks/ClaudeBar/pull/PR)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md#gotchas)
+
 ### Fixed
 - **Leaderboard tab while loading**: it says *Loading…* until your rank and the board come back, instead of showing 0 tokens and an empty board. ([#521](https://github.com/tddworks/ClaudeBar/pull/521))
 - **Daily usage cards**: cost, tokens and working time show one number on one line again, and Oh My Pi's get their own *TODAY'S USAGE* title instead of reading as the last account's. ([#514](https://github.com/tddworks/ClaudeBar/pull/514))
