@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- **Leaderboard uploads**: a day the server refuses on its own, such as one over the daily cap, no longer holds back the rest: the other days go through, and that day is sent again with each upload until it's taken or 30 days old. ([#PR](https://github.com/tddworks/ClaudeBar/pull/PR)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md#gotchas)
+- **Leaderboard uploads**: a day the server refuses on its own, such as one over the daily cap, no longer holds back the rest: the other days go through, and that day is sent again with each upload until it's taken or 30 days old. ([#522](https://github.com/tddworks/ClaudeBar/pull/522)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md#gotchas)
 
 ### Fixed
 - **Leaderboard tab while loading**: it says *Loading…* until your rank and the board come back, instead of showing 0 tokens and an empty board. ([#521](https://github.com/tddworks/ClaudeBar/pull/521))

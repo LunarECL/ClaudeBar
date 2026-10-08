@@ -135,7 +135,7 @@ There is no `Leaderboard` type on the app side that holds standings. The app doe
 
 ## 2a · Devices: one member, several machines
 
-**Status:** confirmed ([#512](https://github.com/tddworks/ClaudeBar/pull/512)). The server side, slice 11, is built (`tddworks/claudebar-server` #1); in the app, slice 12 is built ([#PR](https://github.com/tddworks/ClaudeBar/pull/PR)) and slices 13–15 are not.
+**Status:** confirmed ([#512](https://github.com/tddworks/ClaudeBar/pull/512)). The server side, slice 11, is built (`tddworks/claudebar-server` #1); in the app, slice 12 is built ([#522](https://github.com/tddworks/ClaudeBar/pull/522)) and slices 13–15 are not.
 
 People code on more than one machine: a MacBook, a Mac mini, a Windows PC. A tool's logs hold only what ran on that machine, so a member's day is the sum of their machines' days. v1 can't express that: the key is per install, a second Mac can't join under a name already taken, and a copy of one Mac's key on another makes their uploads replace each other's days (§9).
 
