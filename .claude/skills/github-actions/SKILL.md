@@ -21,6 +21,7 @@ Three workflows live in `.github/workflows/`. See reference files for setup and 
 |----------|---------|--------|---------|
 | `build.yml` | push/PR to main, develop | macos-15 | Debug + release build verification |
 | `tests.yml` | push/PR to main, develop | macos-26 | Unit tests + Codecov coverage upload |
+| `windows.yml` | push/PR to main, develop | windows-latest | Builds and tests `Quotas` with Swift on Windows (MODULAR_DESIGN §10, phase 0) |
 | `release.yml` | `v*` tag push OR manual | macos-15 | Sign → notarize → DMG → GitHub release → appcast |
 
 ## Create a Release
