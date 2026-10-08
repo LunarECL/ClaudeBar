@@ -1,6 +1,6 @@
 import DataSources
 import Quotas
-import CryptoKit
+import Crypto
 import Foundation
 
 /// A provider as data — what ships in `Resources/Providers/<id>.json` for a

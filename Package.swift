@@ -14,6 +14,10 @@ let mocking: [SwiftSetting] = [.define("MOCKING", .when(configuration: .debug))]
 
 let mockable: Target.Dependency = .product(name: "Mockable", package: "Mockable")
 
+// swift-crypto: CryptoKit's API on every platform, and CryptoKit itself on Apple platforms,
+// so the Mac's hashes and signatures don't change (§10).
+let crypto: Target.Dependency = .product(name: "Crypto", package: "swift-crypto")
+
 #if os(macOS)
 let package = Package(
     name: "ClaudeBarKit",
@@ -32,6 +36,7 @@ let package = Package(
         .package(url: "https://github.com/awslabs/aws-sdk-swift", exact: "1.6.99"),
         .package(url: "https://github.com/steipete/SweetCookieKit.git", from: "0.3.0"),
         .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "6.0.0"),
     ],
     targets: [
         // Quotas — the usage model every module speaks: UsageSnapshot, UsageQuota,
@@ -53,6 +58,7 @@ let package = Package(
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
                 .product(name: "Subprocess", package: "swift-subprocess"),
                 .product(name: "SweetCookieKit", package: "SweetCookieKit"),
+                crypto,
             ],
             path: "Modules/DataSources/Sources",
             swiftSettings: mocking
@@ -91,7 +97,7 @@ let package = Package(
         // built-in definitions ship in its Resources, flat in the bundle (ProviderFactory).
         .target(
             name: "Providers",
-            dependencies: ["Quotas", "DataSources", "Diagnostics", mockable],
+            dependencies: ["Quotas", "DataSources", "Diagnostics", mockable, crypto],
             path: "Modules/Providers",
             exclude: ["Tests"],
             sources: ["Sources"],
@@ -100,7 +106,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ProvidersTests",
-            dependencies: ["Providers", "DataSources", "Quotas", mockable],
+            dependencies: ["Providers", "DataSources", "Quotas", mockable, crypto],
             path: "Modules/Providers/Tests",
             swiftSettings: mocking
         ),
