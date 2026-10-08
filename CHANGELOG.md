@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.10] - 2026-10-08
+
 ### Changed
 - **Leaderboard uploads**: a day the server refuses on its own, such as one over the daily cap, no longer holds back the rest: the other days go through, and that day is sent again with each upload until it's taken or 30 days old. ([#522](https://github.com/tddworks/ClaudeBar/pull/522)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md#gotchas)
 - **"Rate limited" message**: the wait until the retry is rounded to the nearest minute, hour or day, so 29 min 59 s reads "Retrying in 30 minutes", not "in 29 minutes". ([#523](https://github.com/tddworks/ClaudeBar/pull/523)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-two-platforms)
@@ -188,7 +192,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.9...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.10...HEAD
+[0.5.10]: https://github.com/tddworks/ClaudeBar/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/tddworks/ClaudeBar/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/tddworks/ClaudeBar/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/tddworks/ClaudeBar/compare/v0.5.6...v0.5.7
