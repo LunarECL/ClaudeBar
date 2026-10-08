@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Domain
+@testable import Quotas
 
 @Suite
 struct ExtensionMetricTests {

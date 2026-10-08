@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import Domain
+@testable import Quotas
 
 /// What a provider's card says when there is no usage, and when two failures
 /// count as the same problem (so a repeat doesn't alert twice).

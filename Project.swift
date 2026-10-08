@@ -149,6 +149,18 @@ let project = Project(
         ),
 
         .target(
+            name: "QuotasTests",
+            destinations: .macOS,
+            product: .unitTests,
+            bundleId: "com.tddworks.claudebar.quotas-tests",
+            deploymentTargets: .macOS("15.0"),
+            sources: ["Modules/Quotas/Tests/**"],
+            dependencies: [
+                .target(name: "Quotas"),
+            ]
+        ),
+
+        .target(
             name: "AWSClientsTests",
             destinations: .macOS,
             product: .unitTests,
@@ -387,6 +399,7 @@ let project = Project(
                     .testableTarget(target: .target("DataSourcesTests")),
                     .testableTarget(target: .target("AWSClientsTests")),
                     .testableTarget(target: .target("ProvidersTests")),
+                    .testableTarget(target: .target("QuotasTests")),
                 ],
                 configuration: .debug
             ),

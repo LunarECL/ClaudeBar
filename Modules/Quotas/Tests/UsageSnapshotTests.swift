@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import Domain
+@testable import Quotas
 
 @Suite(.serialized)
 struct UsageSnapshotTests {

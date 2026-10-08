@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Domain
+@testable import Quotas
 
 /// One status per quota: every surface reads `status(under:)` with the
 /// person's policy — absolute thresholds, or pace-aware by projected usage.
