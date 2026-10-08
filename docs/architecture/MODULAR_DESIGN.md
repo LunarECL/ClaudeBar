@@ -334,7 +334,7 @@ Each phase leaves main shippable and the Mac app unchanged in behaviour.
 
 | # | Phase | Done when |
 |---|---|---|
-| 0 | **Prove the toolchain.** A `windows-latest` job builds and tests `Quotas` with the Swift toolchain, Mockable included | the job is green |
+| 0 | **Prove the toolchain.** A `windows-latest` job builds and tests `Quotas` with the Swift toolchain, Mockable included | the job is green — built ([#523](https://github.com/tddworks/ClaudeBar/pull/523)): Swift 6.3.3 builds and tests `Quotas`, and a `@Mockable` port's mock works there |
 | 1 | **The package.** Root `Package.swift` declares today's modules; Tuist consumes it; no source changes | `tuist test` and the macOS `swift test` are green |
 | 2 | **The leaderboard slice.** Carve `Leaderboard` (§8); `CryptoKit` → `Crypto` in `UsageLog`, `CLISession`, `ProviderDefinition`, `RequestSigner`, `SigningKey`; Diagnostics behind `LogSink`; the Mac-only files of `DataSources` move to `Internal/macOS/` | `Quotas`, `Diagnostics`, `DataSources`, `Providers` and `Leaderboard` build and pass on Windows, including the log-reading tests and `vectors.json` — the Windows client can start |
 | 3 | **Windows adapters for the slice:** `SigningKeyStore` on Credential Manager, `MachineIdentity` on the machine GUID, `LeaderboardAPI` on `URLSession` | the Windows client joins and uploads against the real server |
@@ -343,15 +343,14 @@ Each phase leaves main shippable and the Mac app unchanged in behaviour.
 
 ### Open
 
-- **Mockable and macros on Windows.** Phase 0 answers it; if they fail, the
-  ports' fakes become hand-written in `Tests/`.
 - **A root `Package.swift` beside Tuist.** Phase 1 confirms Tuist and Xcode
   open the workspace as before.
 - **The JavaScript engine on Windows.** QuickJS through a C target is the
   candidate; only `script` mappings need it, not the leaderboard.
 - **Foundation's differences on Windows** (paths, symlinks, `FileManager`,
-  date formats) are found by running the same tests there, which is why every
-  module's tests run on both.
+  date formats, and APIs it lacks outright, such as `RelativeDateTimeFormatter`)
+  are found by running the same tests there, which is why every module's tests
+  run on both. A file that imports only Foundation can still fail to build.
 - **The machine GUID** is kept by a disk image cloned to another PC, unlike a
   Mac's `IOPlatformUUID`; the leaderboard design decides whether that is
   enough for its copied-key check.
