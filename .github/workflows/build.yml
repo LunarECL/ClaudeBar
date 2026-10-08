@@ -40,7 +40,7 @@ jobs:
           path: |
             ~/Library/Caches/tuist
             Tuist/.build
-          key: tuist-v1-${{ runner.os }}-${{ hashFiles('Tuist/Package.swift', 'Tuist.swift', 'Project.swift') }}
+          key: tuist-v1-${{ runner.os }}-${{ hashFiles('Tuist/Package.swift', 'Tuist.swift', 'App/Project.swift', 'Workspace.swift', 'Package.swift') }}
           restore-keys: |
             tuist-v1-${{ runner.os }}-
 
@@ -48,12 +48,17 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .derivedData
-          key: derived-data-v1-${{ runner.os }}-${{ hashFiles('Tuist/Package.swift', 'Tuist.swift', 'Project.swift') }}
+          key: derived-data-v1-${{ runner.os }}-${{ hashFiles('Tuist/Package.swift', 'Tuist.swift', 'App/Project.swift', 'Workspace.swift', 'Package.swift') }}
           restore-keys: |
             derived-data-v1-${{ runner.os }}-
 
+      # `brew update` first: the runner image's Homebrew metadata is as old as
+      # the image, and `Tuist/Package.swift` needs Tuist 4.209 or later (AGENTS.md).
       - name: Install Tuist
-        run: brew install --cask tuist
+        run: |
+          brew update --quiet
+          brew install --cask tuist
+          tuist version
 
       - name: Install Dependencies
         run: tuist install

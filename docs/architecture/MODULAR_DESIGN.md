@@ -9,7 +9,7 @@ description: How ClaudeBar's code is cut into modules — one module per bounded
 > it may import · **Builds on:** [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md) ·
 > **Next:** [ENGINE_DESIGN.md](ENGINE_DESIGN.md)
 >
-> **Status: IN PROGRESS** — what is left is §8, and §10's phases (none built).
+> **Status: IN PROGRESS** — what is left is §8, and §10's phases 2 to 5 (0 and 1 are built).
 
 ---
 
@@ -229,8 +229,9 @@ testability" alone.
 - What each piece's tests guard: [TARGET §7](TARGET_ARCHITECTURE.md#7--testing).
 - `AcceptanceTests` stays at the App level and composes real modules with
   stubbed ports.
-- `MOCKING` is a project-level compilation condition in `Project.swift`, so
-  every new target inherits it.
+- `MOCKING` turns on the generated mocks. The modules and their tests set it
+  for debug builds in `Package.swift`'s `swiftSettings`; the app's targets
+  inherit it from `App/Project.swift`'s project settings, so a new one gets it.
 
 ## 8 · Still to carve
 
@@ -320,9 +321,13 @@ Modules/<Context>/
   Windows implementation fails as a `DataSourceError` naming the case and the
   platform; a capability with none is `nil`, as when a definition doesn't
   declare it.
-- **`MOCKING`** moves from `Project.swift` to `Package.swift`'s `swiftSettings`,
-  for debug builds and tests.
-- **The App stays a Tuist target** and depends on the package's products.
+- **`MOCKING`** is in `Package.swift`'s `swiftSettings`, for debug builds and
+  tests.
+- **The App stays a Tuist target** and depends on the package's products. Its
+  project is `App/Project.swift`, because Tuist maps one project per folder
+  and the root is the package's
+  ([tuist#4624](https://github.com/tuist/tuist/issues/4624)); `Workspace.swift`
+  at the root holds the schemes, which run both projects' tests.
   Sparkle, the notch, the Touch Bar, status-item drivers and every view stay
   in the App: they are the Mac's.
 - **What isn't here:** the Windows client's UI, its composition root and,
@@ -335,7 +340,7 @@ Each phase leaves main shippable and the Mac app unchanged in behaviour.
 | # | Phase | Done when |
 |---|---|---|
 | 0 | **Prove the toolchain.** A `windows-latest` job builds and tests `Quotas` with the Swift toolchain, Mockable included | the job is green — built ([#523](https://github.com/tddworks/ClaudeBar/pull/523)): Swift 6.3.3 builds and tests `Quotas`, and a `@Mockable` port's mock works there |
-| 1 | **The package.** Root `Package.swift` declares today's modules; Tuist consumes it; no source changes | `tuist test` and the macOS `swift test` are green |
+| 1 | **The package.** Root `Package.swift` declares today's modules; Tuist consumes it; no source changes | `tuist test` and the macOS `swift test` are green — built ([#526](https://github.com/tddworks/ClaudeBar/pull/526)): `tuist test` runs the same 3,099 tests as before, and `swift test` runs the modules' tests without Tuist |
 | 2 | **The leaderboard slice.** Carve `Leaderboard` (§8); `CryptoKit` → `Crypto` in `UsageLog`, `CLISession`, `ProviderDefinition`, `RequestSigner`, `SigningKey`; Diagnostics behind `LogSink`; the Mac-only files of `DataSources` move to `Internal/macOS/` | `Quotas`, `Diagnostics`, `DataSources`, `Providers` and `Leaderboard` build and pass on Windows, including the log-reading tests and `vectors.json` — the Windows client can start |
 | 3 | **Windows adapters for the slice:** `SigningKeyStore` on Credential Manager, `MachineIdentity` on the machine GUID, `LeaderboardAPI` on `URLSession` | the Windows client joins and uploads against the real server |
 | 4 | **Paths and shells.** The engine's Mac assumptions without an import (`/bin/zsh`, `/usr/bin/security`, `~/Library/Application Support`, `:` in `PATH`) become facts each worker receives; definitions name a platform's app-data folder through the path language ([ENGINE_DESIGN](ENGINE_DESIGN.md) changes first) | the definitions that read local files resolve on Windows |
@@ -343,8 +348,6 @@ Each phase leaves main shippable and the Mac app unchanged in behaviour.
 
 ### Open
 
-- **A root `Package.swift` beside Tuist.** Phase 1 confirms Tuist and Xcode
-  open the workspace as before.
 - **The JavaScript engine on Windows.** QuickJS through a C target is the
   candidate; only `script` mappings need it, not the leaderboard.
 - **Foundation's differences on Windows** (paths, symlinks, `FileManager`,

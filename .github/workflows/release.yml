@@ -47,8 +47,13 @@ jobs:
       # sync with those prebuilts and broke the build ("SwiftSyntax was created
       # for incompatible target").
 
+      # `brew update` first: the runner image's Homebrew metadata is as old as
+      # the image, and `Tuist/Package.swift` needs Tuist 4.209 or later (AGENTS.md).
       - name: Install Tuist
-        run: brew install tuist
+        run: |
+          brew update --quiet
+          brew install tuist
+          tuist version
 
       - name: Cache Tuist
         uses: actions/cache@v5
@@ -56,7 +61,7 @@ jobs:
           path: |
             ~/Library/Caches/tuist
             .tuist-cache
-          key: ${{ runner.os }}-tuist-${{ hashFiles('Project.swift', 'Tuist.swift', 'Package.swift') }}
+          key: ${{ runner.os }}-tuist-${{ hashFiles('App/Project.swift', 'Workspace.swift', 'Tuist.swift', 'Tuist/Package.swift', 'Package.swift') }}
           restore-keys: |
             ${{ runner.os }}-tuist-
 
