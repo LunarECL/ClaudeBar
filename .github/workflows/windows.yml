@@ -16,6 +16,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# It runs a third-party setup action and the tests; neither writes anything.
+permissions:
+  contents: read
+
 jobs:
   quotas:
     name: Quotas on Windows
