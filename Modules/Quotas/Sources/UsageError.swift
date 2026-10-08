@@ -74,10 +74,10 @@ public enum UsageError: Error, Sendable, LocalizedError {
             // Relative formatting ("in 30 minutes") is unambiguous across
             // midnight rollovers and more glance-able than an absolute clock
             // time. errorDescription is recomputed on each access, so the
-            // string updates naturally as the window ticks down.
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .full
-            let relative = formatter.localizedString(for: retryAt, relativeTo: Date())
+            // string updates naturally as the window ticks down. The format
+            // style, unlike RelativeDateTimeFormatter, is in the Foundation
+            // Swift ships on Windows.
+            let relative = Date.RelativeFormatStyle(presentation: .numeric, unitsStyle: .wide).format(retryAt)
             return "Rate limited. Retrying \(relative)."
         }
     }

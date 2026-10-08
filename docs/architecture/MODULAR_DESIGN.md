@@ -249,7 +249,7 @@ it is empty.
 | `Domain/Provider/` page state (`MenuBarLabel`, `MenuBar*Display`, `MenuBarStackedSize`, `CountdownColon`, `PopoverContentHeight`) | the App |
 | `Infrastructure/Claude/ClaudeGuestPassSource` | the App — Claude's alone, a source the composition root hands in behind `GuestPassSource` |
 | `Infrastructure/TerminalImport/` | the App — themes are presentation |
-| `Tests/DomainTests`, `InfrastructureTests` | split per module, following their sources |
+| `Tests/DomainTests`, `InfrastructureTests` | split per module, following their sources; `Quotas`' are in `QuotasTests` |
 
 The kernel still holds a few types that belong elsewhere; each carries a
 `- Note: Interim` naming its final shape, and the canonical model lists them
