@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.11] - 2026-10-09
+
 ### Fixed
 - **Codex with its login in the Keychain**: when the Codex CLI keeps its login in the macOS Keychain instead of `~/.codex/auth.json`, RPC mode now reads your usage instead of asking you to log in. ([#525](https://github.com/tddworks/ClaudeBar/issues/525))
 - **Leaderboard tab on refresh**: opening the popover, Refresh or a new upload keeps your rank and the board on screen until the new ones arrive, instead of going back to *Loading…*; if updating fails, the last board stays with a note. ([#524](https://github.com/tddworks/ClaudeBar/pull/524))
@@ -199,7 +203,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.10...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.11...HEAD
+[0.5.11]: https://github.com/tddworks/ClaudeBar/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/tddworks/ClaudeBar/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/tddworks/ClaudeBar/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/tddworks/ClaudeBar/compare/v0.5.7...v0.5.8
