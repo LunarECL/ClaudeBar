@@ -2,8 +2,11 @@ import Crypto
 import Foundation
 import Mockable
 import Testing
-@testable import Domain
-@testable import Infrastructure
+@testable import Leaderboard
+import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Suite
 struct LeaderboardHTTPClientTests {
@@ -32,7 +35,7 @@ struct LeaderboardHTTPClientTests {
     private func failing(_ error: Error) -> LeaderboardHTTPClient {
         let network = MockNetworkClient()
         given(network).request(.any).willThrow(error)
-        return LeaderboardHTTPClient(networkClient: network, host: Self.host, now: { Self.now })
+        return LeaderboardHTTPClient(networkClient: network, host: Self.host, client: Self.clientName, now: { Self.now })
     }
 
     private func isSigned(_ request: URLRequest, by key: SigningKey) throws -> Bool {
@@ -271,13 +274,5 @@ struct LeaderboardHTTPClientTests {
         await #expect(throws: LeaderboardError.unreachable) {
             try await failing(URLError(.notConnectedToInternet)).board(period: .today, provider: nil)
         }
-    }
-}
-
-extension Data {
-    init?(base64URL text: String) {
-        var base64 = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
-        base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
-        self.init(base64Encoded: base64)
     }
 }

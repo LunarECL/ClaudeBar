@@ -46,7 +46,7 @@ struct ClaudeBarApp: App {
     /// Publishes quota state to a linked Notify! device. Comes up and goes down
     /// with `notify.enabled`; does nothing until a device is linked.
     private let notifyDriver: NotifyPublishDriver
-    private let leaderboard: Leaderboard
+    private let leaderboard: AppLeaderboard
 
     /// Binding required by `.menuBarExtraAccess`; also enables programmatic
     /// dropdown control if ever needed.
@@ -197,7 +197,7 @@ struct ClaudeBarApp: App {
         notifyDriver.start()
 
         // Uploads only once the user joined; until then it reads nothing.
-        leaderboard = Leaderboard(monitor: monitor)
+        leaderboard = AppLeaderboard(monitor: monitor)
         leaderboard.start()
 
         // Start hook server if hooks are enabled

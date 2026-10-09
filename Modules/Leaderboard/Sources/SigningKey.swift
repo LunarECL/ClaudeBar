@@ -31,7 +31,7 @@ public struct SigningKey: Sendable {
     }
 }
 
-/// Where this Mac keeps the private half of its key.
+/// Where this machine keeps the private half of its key.
 @Mockable
 public protocol SigningKeyStore: Sendable {
     func load() -> Data?

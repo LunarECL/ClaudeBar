@@ -33,6 +33,8 @@ ignore:
   - "Modules/DataSources/Sources/Internal/macOS/Network/InsecureLocalhostNetworkClient.swift"  # URLSession
   - "Modules/DataSources/Sources/Internal/macOS/Lookup/SystemBrowserCookies.swift"  # browser cookie stores
   - "Modules/DataSources/Sources/Internal/macOS/Lookup/SystemBrowserStorage.swift"  # browser profiles
+  - "Modules/Leaderboard/Sources/Internal/macOS/Platform+macOS.swift"  # hands out the key store below
+  - "Modules/Leaderboard/Sources/Internal/macOS/KeychainSigningKeyStore.swift"  # Keychain
   - "Sources/Infrastructure/Hooks/HookHTTPServer.swift"  # a local socket server
   - "Sources/Infrastructure/Shared/SystemAlertSender.swift"  # NSAlert, notifications
   - "Sources/Infrastructure/Shared/SystemPowerStateProvider.swift"  # IOKit

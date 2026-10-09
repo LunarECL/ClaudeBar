@@ -3,9 +3,8 @@ import Testing
 @testable import Domain
 @testable import Infrastructure
 
-/// The membership's record in `settings.json`, and the private key beside the
-/// other secrets — in the Keychain, or the fallback store when the Keychain
-/// refuses a locally built app.
+/// The membership's record in `settings.json`. The private key isn't here:
+/// the `Leaderboard` module keeps it (`FallbackSigningKeyStoreTests`).
 @Suite
 struct LeaderboardStorageTests {
     /// A credential store that keeps what it's given.
@@ -15,14 +14,6 @@ struct LeaderboardStorageTests {
         func get(forKey key: String) -> String? { values[key] }
         @discardableResult func delete(forKey key: String) -> Bool { values[key] = nil; return true }
         func exists(forKey key: String) -> Bool { values[key] != nil }
-    }
-
-    /// The Keychain as an ad-hoc signed build sees it: every call "succeeds", nothing is kept.
-    private final class RefusingCredentials: CredentialRepository, @unchecked Sendable {
-        func save(_ value: String, forKey key: String) {}
-        func get(forKey key: String) -> String? { nil }
-        @discardableResult func delete(forKey key: String) -> Bool { true }
-        func exists(forKey key: String) -> Bool { false }
     }
 
     private func repository() -> (JSONSettingsRepository, URL) {
@@ -82,44 +73,5 @@ struct LeaderboardStorageTests {
         let (settings, _) = repository()
 
         #expect(settings.isLeaderboardOn())
-    }
-
-    // MARK: - The key
-
-    @Test func `should keep the signing key in the Keychain when the Keychain accepts it`() {
-        let secure = KeepingCredentials()
-        let fallback = KeepingCredentials()
-        let store = CredentialSigningKeyStore(secure: secure, fallback: fallback)
-
-        store.save(Data([1, 2, 3]))
-
-        #expect(store.load() == Data([1, 2, 3]))
-        #expect(secure.values.count == 1)
-        #expect(fallback.values.isEmpty)
-        #expect(store.isSecure)
-    }
-
-    @Test func `should keep the signing key in the fallback store when the Keychain refuses it`() {
-        let fallback = KeepingCredentials()
-        let store = CredentialSigningKeyStore(secure: RefusingCredentials(), fallback: fallback)
-
-        store.save(Data([1, 2, 3]))
-
-        #expect(store.load() == Data([1, 2, 3]))
-        #expect(fallback.values.count == 1)
-        #expect(!store.isSecure)
-    }
-
-    @Test func `should forget the signing key from both stores when it is deleted`() {
-        let secure = KeepingCredentials()
-        let fallback = KeepingCredentials()
-        secure.values[CredentialKey.leaderboardSigningKey] = Data([9]).base64EncodedString()
-        fallback.values[CredentialKey.leaderboardSigningKey] = Data([8]).base64EncodedString()
-        let store = CredentialSigningKeyStore(secure: secure, fallback: fallback)
-
-        store.delete()
-
-        #expect(store.load() == nil)
-        #expect(secure.values.isEmpty && fallback.values.isEmpty)
     }
 }

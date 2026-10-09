@@ -3,7 +3,7 @@ import Domain
 
 /// The popover's *LEADERBOARD* tab: join with a username, or see your rank.
 struct LeaderboardPopoverView: View {
-    let leaderboard: Leaderboard
+    let leaderboard: AppLeaderboard
     let monitor: QuotaMonitor
 
     var body: some View {
@@ -56,7 +56,7 @@ private struct CardLabel: View {
 // MARK: - Join
 
 struct LeaderboardJoinView: View {
-    let leaderboard: Leaderboard
+    let leaderboard: AppLeaderboard
     let monitor: QuotaMonitor
     /// *Not for me · hide Leaderboard*, under the form: only in the popover,
     /// since Settings has its own switch.
@@ -245,14 +245,14 @@ extension BoardPeriod: Identifiable {
 }
 
 struct LeaderboardStandingsView: View {
-    let leaderboard: Leaderboard
+    let leaderboard: AppLeaderboard
     let monitor: QuotaMonitor
 
     @Environment(\.appTheme) private var theme
     @State private var globe: GlobeSummary?
     @State private var settings = AppSettings.shared
 
-    /// The board you're looking at, kept by `Leaderboard` with its last
+    /// The board you're looking at, kept by `AppLeaderboard` with its last
     /// answer, so a rebuilt tab draws it at once.
     private var board: Board { leaderboard.board }
     private var membership: LeaderboardMembership { leaderboard.membership }

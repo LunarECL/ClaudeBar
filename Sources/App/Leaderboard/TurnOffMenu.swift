@@ -15,7 +15,7 @@ struct TurnOffAnchorKey: PreferenceKey {
 /// globe (while it's on), the whole Leaderboard paused and hidden, or
 /// leaving, set apart. A card in the current theme, as the mockup draws it.
 struct TurnOffMenu: View {
-    let leaderboard: Leaderboard
+    let leaderboard: AppLeaderboard
     /// *Leave and delete my data…*: confirmed in Settings → Leaderboard.
     let onLeave: () -> Void
 
