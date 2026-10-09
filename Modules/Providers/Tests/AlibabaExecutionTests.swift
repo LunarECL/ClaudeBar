@@ -4,6 +4,9 @@ import Mockable
 import Providers
 import Quotas
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Alibaba on stubbed connections: an API key, or the console session — a
 /// pasted cookie or the browser's — whose `sec_token` comes from the cookie
@@ -36,7 +39,7 @@ struct AlibabaExecutionTests {
         if let mode { settings.setDataSourceKind(mode, forProvider: "alibaba") }
         let definition = try ProviderFactory.builtIn("alibaba")
         return Provider(definition: definition, settings: settings, accounts: settings.accounts(forProvider: "alibaba"), makeDataSource: { source, login in
-            DataSources.make(source, providerId: definition.id, makeCLIExecutor: { _ in MockCLIExecutor() }, makeCommandExecutor: { _ in MockCLIExecutor() },
+            DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(),
                              network: network, makeTransport: { _, _, _, _ in MockRPCTransport() }, security: { _ in (1, "") },
                              scripts: ProviderFactory.builtInScripts, secrets: vault.scoped(to: login), browserCookies: cookies,
                              environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
@@ -52,7 +55,7 @@ struct AlibabaExecutionTests {
 
     // MARK: - API key
 
-    @Test func `should show the plan from the region's gateway when the person has an API key`() async throws {
+    @Test(.needsScriptEngine) func `should show the plan from the region's gateway when the person has an API key`() async throws {
         let sent = Sent()
         let snapshot = try await make(vault: MemoryVault(["alibaba.apiKey": "sk-1"]), sent: sent).refreshPlain()
         #expect(snapshot.quotas.map(\.quotaType) == [.session, .weekly, .timeLimit("Monthly")])
@@ -65,7 +68,7 @@ struct AlibabaExecutionTests {
         #expect(String(decoding: request.httpBody ?? Data(), as: UTF8.self).contains("sfm_codingplan_public_intl"))
     }
 
-    @Test func `should ask China Mainland's own gateway, commodity and dashboard when that region is chosen`() async throws {
+    @Test(.needsScriptEngine) func `should ask China Mainland's own gateway, commodity and dashboard when that region is chosen`() async throws {
         let sent = Sent()
         let provider = try make(region: "cn", vault: MemoryVault(["alibaba.apiKey": "sk-1"]), sent: sent)
         _ = try await provider.refreshPlain()
@@ -75,13 +78,13 @@ struct AlibabaExecutionTests {
         #expect(provider.plainDashboardURL?.host == "bailian.console.aliyun.com")
     }
 
-    @Test func `should give the billing month the length of the month ending on its reset`() async throws {
+    @Test(.needsScriptEngine) func `should give the billing month the length of the month ending on its reset`() async throws {
         let snapshot = try await make(vault: MemoryVault(["alibaba.apiKey": "sk-1"])).refreshPlain()
         let month = try #require(snapshot.quota(for: .timeLimit("Monthly")))
         #expect(month.window?.length == TimeInterval(28 * 86400))
     }
 
-    @Test(arguments: [("2024-03-01T00:00:00Z", 29), ("2026-03-31T00:00:00Z", 31), ("2026-01-31T00:00:00Z", 31)])
+    @Test(.needsScriptEngine, arguments: [("2024-03-01T00:00:00Z", 29), ("2026-03-31T00:00:00Z", 31), ("2026-01-31T00:00:00Z", 31)])
     func `should measure billing months in UTC and clamp the previous month end`(_ fixture: (String, Int)) async throws {
         let quota = Self.quota.replacingOccurrences(of: "2026-03-01T00:00:00Z", with: fixture.0)
         let snapshot = try await make(vault: MemoryVault(["alibaba.apiKey": "fake"]), quota: quota).refreshPlain()
@@ -90,7 +93,7 @@ struct AlibabaExecutionTests {
 
     // MARK: - Console cookie
 
-    @Test func `should use the browser's console session when there is no API key`() async throws {
+    @Test(.needsScriptEngine) func `should use the browser's console session when there is no API key`() async throws {
         let sent = Sent()
         let browser = [BrowserCookie(name: "login_aliyunid_ticket", value: "t"), BrowserCookie(name: "login_aliyunid_csrf", value: "c-1"),
                        BrowserCookie(name: "sec_token", value: "s-1")]
@@ -107,7 +110,7 @@ struct AlibabaExecutionTests {
         #expect(body.removingPercentEncoding?.contains(#""commodityCode":"sfm_codingplan_public_intl""#) == true)
     }
 
-    @Test func `should take the console token from the console page when the pasted cookie has none`() async throws {
+    @Test(.needsScriptEngine) func `should take the console token from the console page when the pasted cookie has none`() async throws {
         let sent = Sent()
         let provider = try make(mode: "cookie", vault: MemoryVault(["alibaba.cookie": "login_aliyunid_ticket=t"]),
                                 page: #"<script>window.ALIYUN = {"sec_token": "page-9"}</script>"#, sent: sent)
@@ -120,7 +123,7 @@ struct AlibabaExecutionTests {
         #expect(request.value(forHTTPHeaderField: "x-csrf-token") == nil)
     }
 
-    @Test func `should send the pasted cookie before the browser's`() async throws {
+    @Test(.needsScriptEngine) func `should send the pasted cookie before the browser's`() async throws {
         let sent = Sent()
         _ = try await make(mode: "cookie", vault: MemoryVault(["alibaba.cookie": "sec_token=pasted"]),
                            browser: [BrowserCookie(name: "sec_token", value: "browser")], sent: sent).refreshPlain()
@@ -144,7 +147,7 @@ struct AlibabaExecutionTests {
         #expect(try make(mode: "cookie").accounts.form.map(\.id) == ["cookie", "region"])
     }
 
-    @Test func `should use an added cookie account's own cookie, never the browser's`() async throws {
+    @Test(.needsScriptEngine) func `should use an added cookie account's own cookie, never the browser's`() async throws {
         let sent = Sent()
         let provider = try make(mode: "cookie", browser: [BrowserCookie(name: "sec_token", value: "browser")], sent: sent)
         let work = try provider.accounts.add(filling: ["cookie": "sec_token=work", "region": "cn"])

@@ -2,6 +2,9 @@ import Diagnostics
 import Quotas
 import Foundation
 import Synchronization
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Fills `{{name}}` from a credential. `nil` when a placeholder has no value,
 /// so a header like `ChatGPT-Account-Id: {{account}}` is simply left out.
@@ -293,9 +296,6 @@ struct CommandFetcher: Fetching {
         AppLog.probes.debug("\(call.cli) answered (\(result.output.count) chars)")
         return Response(text: result.output)
     }
-
-    /// Plain pipes, with a PATH that finds the tools a login shell would.
-    static let system: MakeExecutor = { environment in PipeCLIExecutor(environment: environment) }
 }
 
 /// `script` — the person's own script, run with `/bin/sh` from its folder,
@@ -343,13 +343,17 @@ struct ScriptFetcher: Fetching {
 }
 
 /// `cli` — drives a CLI in a terminal and answers with what the screen
-/// showed, drawn by a terminal emulator first when the session asks for it.
+/// showed, drawn by the platform's screen renderer first when the session
+/// asks for it.
 struct CLIFetcher: Fetching {
     /// The executor for one session: its environment changes and ready markers.
     typealias MakeExecutor = @Sendable (CLICall) -> any CLIExecutor
 
     let call: CLICall
     let makeExecutor: MakeExecutor
+    /// The screen a run's output shows: the output as it is for a `raw`
+    /// screen, the platform's renderer for a `rendered` one.
+    var screen: @Sendable (String) -> String = { $0 }
     /// The session this worker runs in — one per worker, and the provider
     /// makes a worker per login, so each login keeps its own (#132).
     private let session = SessionMemory()
@@ -389,22 +393,7 @@ struct CLIFetcher: Fetching {
             throw UsageError.executionFailed(error.localizedDescription)
         }
         AppLog.probes.debug("\(call.cli) screen captured (\(result.output.count) chars)")
-        switch call.screen {
-        case .raw: return Response(text: result.output)
-        case .rendered: return Response(text: TerminalRenderer(cols: 160, rows: 50).render(result.output))
-        }
-    }
-
-    /// The real terminal: `DefaultCLIExecutor` with the session's environment and ready markers.
-    static let system: MakeExecutor = { call in
-        DefaultCLIExecutor(
-            environmentExclusions: call.environment.unset,
-            environmentAdditions: call.environment.set,
-            completionRule: call.readyWhen.isEmpty
-                ? nil
-                : CLICompletionRule(readyMarkers: call.readyWhen.map { CLICompletionRule.Marker($0.text, endsRow: $0.endsRow) }),
-            inputDelay: call.inputDelay ?? 0.4
-        )
+        return Response(text: screen(result.output))
     }
 }
 

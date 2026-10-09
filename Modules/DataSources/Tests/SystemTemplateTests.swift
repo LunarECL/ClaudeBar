@@ -3,6 +3,9 @@ import Mockable
 import Quotas
 import Testing
 @testable import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// `{{system.x}}` — values the engine computes, from the fetch's `now`
 /// (ENGINE_DESIGN §2.9): the time zone, the OS version, now, and a day

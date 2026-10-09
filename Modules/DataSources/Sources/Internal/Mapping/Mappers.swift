@@ -182,7 +182,7 @@ struct JSONMapper: Reading {
         case .string(let text): return value as? String == text
         case .number(let number): return JSONPath.number(value) == number && !(value is String)
         case .bool(let flag):
-            guard let value = value as? NSNumber, CFGetTypeID(value) == CFBooleanGetTypeID() else { return false }
+            guard let value = value as? NSNumber, value.isBoolean else { return false }
             return value.boolValue == flag
         case .null: return value == nil || value is NSNull
         case .object, .array:
@@ -268,7 +268,7 @@ struct JSONMapper: Reading {
                 case .constant(let value):
                     return Decimal(string: String(value), locale: Locale(identifier: "en_US_POSIX"))
                 case .path(let path):
-                    if let number = scope.value(path) as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
+                    if let number = scope.value(path) as? NSNumber, !number.isBoolean {
                         return Decimal(string: number.stringValue, locale: Locale(identifier: "en_US_POSIX"))
                     }
                     // An amount sent as text stays exact — decimal text only, never hex.
@@ -281,7 +281,7 @@ struct JSONMapper: Reading {
             return nil
         case .minorUnits(let path, let decimals):
             guard let number = scope.value(path) as? NSNumber,
-                  CFGetTypeID(number) != CFBooleanGetTypeID(),
+                  !number.isBoolean,
                   let minor = Decimal(string: number.stringValue, locale: Locale(identifier: "en_US_POSIX")),
                   minor >= 0,
                   let places = first(decimals, in: scope),

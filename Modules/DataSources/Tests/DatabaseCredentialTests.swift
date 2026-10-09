@@ -3,6 +3,9 @@ import Mockable
 import Quotas
 import Testing
 @testable import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// `sqlite` — a key another app keeps in its own database, read without
 /// ever writing to it; and `{{token#jwt.claim}}` for what the key says.
@@ -46,7 +49,7 @@ struct DatabaseCredentialTests {
         return (file, { try? FileManager.default.removeItem(at: root) })
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should use a key kept in another app's database without ever changing that database`() async throws {
         let (file, cleanUp) = try database("CREATE TABLE items(key TEXT, value TEXT); INSERT INTO items VALUES ('auth', '\(Self.token)');")
         defer { cleanUp() }
@@ -59,7 +62,7 @@ struct DatabaseCredentialTests {
         #expect(try Data(contentsOf: file) == before)
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should refuse, at finding the key, a lookup that would change the other app's database`() async throws {
         let (file, cleanUp) = try database("CREATE TABLE items(value TEXT);")
         defer { cleanUp() }
@@ -68,7 +71,7 @@ struct DatabaseCredentialTests {
         await #expect { try await source.fetchResponse() } throws: { ($0 as? DataSourceError)?.step == .lookup }
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should ask to sign in when the other app's database holds no key`() async throws {
         let (file, cleanUp) = try database("CREATE TABLE items(key TEXT, value TEXT);")
         defer { cleanUp() }

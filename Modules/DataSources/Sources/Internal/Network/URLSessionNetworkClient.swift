@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 extension URLSession: NetworkClient {
     public func request(_ request: URLRequest) async throws -> (Data, URLResponse) {

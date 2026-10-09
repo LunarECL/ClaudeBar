@@ -4,6 +4,9 @@ import Mockable
 import Providers
 import Quotas
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Mistral's web source: the Vibe Coding Plan usage chat.mistral.ai knows —
 /// a percent used and a reset date inside an NDJSON answer — beside the local
@@ -51,7 +54,7 @@ struct MistralWebExecutionTests {
         if let mode { settings.setDataSourceKind(mode, forProvider: "mistral") }
         let definition = try ProviderFactory.builtIn("mistral")
         return Provider(definition: definition, settings: settings, accounts: settings.accounts(forProvider: "mistral"), makeDataSource: { source, login in
-            DataSources.make(source, providerId: definition.id, makeCLIExecutor: { _ in MockCLIExecutor() }, makeCommandExecutor: { _ in MockCLIExecutor() },
+            DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(),
                              network: network, makeTransport: { _, _, _, _ in MockRPCTransport() }, security: { _ in (1, "") },
                              scripts: ProviderFactory.builtInScripts, secrets: vault.scoped(to: login), browserCookies: browser,
                              environment: { environment[$0] }, homeDirectory: home, now: { Date() })
@@ -67,7 +70,7 @@ struct MistralWebExecutionTests {
         #expect(definition.together)
     }
 
-    @Test func `should show the plan on the default source once the cookie is pasted`() async throws {
+    @Test(.needsScriptEngine) func `should show the plan on the default source once the cookie is pasted`() async throws {
         let sent = Sent()
         let snapshot = try await make(vault: MemoryVault(["mistral.cookie": "ory_session_test=s; csrftoken=c"]), sent: sent).refreshPlain()
         let plan = try #require(snapshot.quota(for: .timeLimit("Vibe plan")))
@@ -86,7 +89,7 @@ struct MistralWebExecutionTests {
 
     // MARK: - Reading the Vibe plan
 
-    @Test func `should show the Vibe plan's percent and reset when the web source answers`() async throws {
+    @Test(.needsScriptEngine) func `should show the Vibe plan's percent and reset when the web source answers`() async throws {
         let sent = Sent()
         let snapshot = try await make(mode: "web", vault: MemoryVault(["mistral.cookie": "ory_session_test=s; csrftoken=c"]), sent: sent).refreshPlain()
         let plan = try #require(snapshot.quota(for: .timeLimit("Vibe plan")))
@@ -105,13 +108,13 @@ struct MistralWebExecutionTests {
 
     // MARK: - Where the session comes from
 
-    @Test func `should use MISTRAL_CHAT_COOKIE when no cookie is pasted`() async throws {
+    @Test(.needsScriptEngine) func `should use MISTRAL_CHAT_COOKIE when no cookie is pasted`() async throws {
         let sent = Sent()
         _ = try await make(mode: "web", environment: ["MISTRAL_CHAT_COOKIE": "ory_session_env=e"], sent: sent).refreshPlain()
         #expect(sent.requests.first?.value(forHTTPHeaderField: "Cookie") == "ory_session_env=e")
     }
 
-    @Test func `should send the pasted cookie before the environment's and the browser's`() async throws {
+    @Test(.needsScriptEngine) func `should send the pasted cookie before the environment's and the browser's`() async throws {
         let sent = Sent()
         let browser = [BrowserCookie(name: "csrftoken", value: "browser")]
         _ = try await make(mode: "web", vault: MemoryVault(["mistral.cookie": "ory_session_pasted=p"]),
@@ -119,7 +122,7 @@ struct MistralWebExecutionTests {
         #expect(sent.requests.first?.value(forHTTPHeaderField: "Cookie") == "ory_session_pasted=p")
     }
 
-    @Test func `should read the browser's chat.mistral.ai cookies when there is no pasted or env cookie`() async throws {
+    @Test(.needsScriptEngine) func `should read the browser's chat.mistral.ai cookies when there is no pasted or env cookie`() async throws {
         // The engine matches cookie names exactly: of the Ory names the research
         // documents, only `csrftoken` can ever match today — the session cookie's
         // exact name is per-project and unknown (docs/providers/mistral/design.md).
@@ -139,7 +142,7 @@ struct MistralWebExecutionTests {
     // and its failure shows as fetch health on the login — the refresh only
     // fails when both sources do, so these read the login's `lastError`.
 
-    @Test(arguments: [401, 403]) func `should ask to sign in again when chat.mistral.ai refuses the cookie`(_ code: Int) async throws {
+    @Test(.needsScriptEngine, arguments: [401, 403]) func `should ask to sign in again when chat.mistral.ai refuses the cookie`(_ code: Int) async throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: home) }
         let provider = try make(mode: "web", status: code, vault: MemoryVault(["mistral.cookie": "ory_session_old=o"]),
@@ -149,7 +152,7 @@ struct MistralWebExecutionTests {
         #expect(login.lastError as? UsageError == UsageError.sessionExpired(hint: "Sign in to chat.mistral.ai again, then paste a fresh cookie."))
     }
 
-    @Test func `should report the error the answer carries`() async throws {
+    @Test(.needsScriptEngine) func `should report the error the answer carries`() async throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: home) }
         let provider = try make(mode: "web", vault: MemoryVault(["mistral.cookie": "ory_session_old=o"]),
@@ -159,7 +162,7 @@ struct MistralWebExecutionTests {
         #expect(login.lastError as? UsageError == UsageError.executionFailed("Mistral API error: Unauthorized"))
     }
 
-    @Test func `should say there is no data when the answer carries no usage`() async throws {
+    @Test(.needsScriptEngine) func `should say there is no data when the answer carries no usage`() async throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: home) }
         let provider = try make(mode: "web", vault: MemoryVault(["mistral.cookie": "ory_session_old=o"]),
@@ -176,7 +179,7 @@ struct MistralWebExecutionTests {
         #expect(try make().accounts.form.map(\.id) == ["cookie"])
     }
 
-    @Test func `should use an added login's own cookie, never the browser's`() async throws {
+    @Test(.needsScriptEngine) func `should use an added login's own cookie, never the browser's`() async throws {
         let sent = Sent()
         let provider = try make(mode: "web", cookies: [BrowserCookie(name: "csrftoken", value: "browser")], sent: sent)
         let work = try provider.accounts.add(filling: ["cookie": "ory_session_work=w"])

@@ -3,6 +3,9 @@ import Quotas
 import Foundation
 import Mockable
 import Providers
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Runs `claude.json`'s real data sources — and the JavaScript its mappings
 /// name — over stubbed connections and a temporary home directory. What the
@@ -80,12 +83,6 @@ struct ClaudeHarness {
     /// `UsageError` the screen means, as the old probe did.
     func readUsageScreen(_ screen: String) throws -> UsageSnapshot {
         try unwrapped { try dataSource("cli").read(Response(text: screen)) }
-    }
-
-    /// Raw terminal bytes, drawn by the terminal emulator first — what the
-    /// `cli` fetch does with `"screen": "rendered"`.
-    func readRawUsageScreen(_ raw: String) throws -> UsageSnapshot {
-        try readUsageScreen(TerminalRenderer(cols: 160, rows: 50).render(raw))
     }
 
     /// The `/cost` screen through `claude-cost-screen.js`.

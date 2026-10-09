@@ -51,3 +51,12 @@ public enum JSONValue: Sendable, Equatable, Codable {
         }
     }
 }
+
+extension NSNumber {
+    /// Whether `JSONSerialization` read this from `true` or `false` rather than
+    /// a number: it hands both back as an `NSNumber`, and a boolean's type
+    /// encoding is `c` on the Mac and on Windows alike.
+    public var isBoolean: Bool {
+        String(cString: objCType) == "c"
+    }
+}

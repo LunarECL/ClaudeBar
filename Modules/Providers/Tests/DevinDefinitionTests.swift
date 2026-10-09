@@ -4,6 +4,9 @@ import Mockable
 import Providers
 import Quotas
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Devin as data: the organization's daily and weekly quota from
 /// `app.devin.ai`, with the browser's sign-in, or a pasted session token and
@@ -67,7 +70,7 @@ struct DevinDefinitionTests {
         #expect(devin.definition.profile.look.icon == "DevinIcon")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should ask for the organization's quota with the pasted token`() async throws {
         let seen = Seen()
         _ = try await make(seen: seen).refreshPlain()
@@ -77,7 +80,7 @@ struct DevinDefinitionTests {
         #expect(request.value(forHTTPHeaderField: "x-cog-org-id") == "org_abc123")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the daily and weekly quota, reading a fraction as a percentage`() async throws {
         let usage = try await make().refreshPlain()
         let daily = try #require(usage.quotas.first { $0.quotaType == .timeLimit("Daily") })
@@ -88,14 +91,14 @@ struct DevinDefinitionTests {
         #expect(weekly.resetsAt == ISO8601DateFormatter().date(from: "2026-06-14T08:00:00Z"))
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should leave out the daily quota when Devin hides it`() async throws {
         let body = #"{"daily_percentage":10,"weekly_percentage":42,"hide_daily_quota":true}"#
         let usage = try await make(body: body).refreshPlain()
         #expect(usage.quotas.map(\.quotaType) == [.weekly])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should read the nested quota answer, its plan and the extra usage balance`() async throws {
         let body = #"{"plan_name":"pro","overage_balance":70.87,"quota_usage":{"daily_quota":{"used":3,"limit":10,"reset_at":"2026-06-01T08:00:00Z"},"weekly_quota":{"remaining_percent":0.25,"next_reset_at":1780560000}}}"#
         let usage = try await make(body: body).refreshPlain()
@@ -107,7 +110,7 @@ struct DevinDefinitionTests {
         #expect(extra.left == .money(Money(Decimal(string: "70.87")!, currency: "USD"), of: nil))
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should use the token from the environment before the pasted one`() async throws {
         let seen = Seen()
         _ = try await make(environment: ["DEVIN_BEARER_TOKEN": "auth1_environment"], seen: seen).refreshPlain()
@@ -143,7 +146,7 @@ struct DevinDefinitionTests {
     private static let signedIn = ["persist:auth1_session": #"{"token":"auth1_browser"}"#,
                                    "last-internal-org-for-external-org-v1-acme": #""org_browser""#]
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should use the app.devin.ai sign-in in the browser before anything pasted`() async throws {
         let seen = Seen()
         _ = try await make(environment: ["DEVIN_BEARER_TOKEN": "auth1_environment"], browser: [Self.signedIn], seen: seen).refreshPlain()
@@ -153,7 +156,7 @@ struct DevinDefinitionTests {
         #expect(request.value(forHTTPHeaderField: "x-cog-org-id") == "org_browser")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should use the pasted token with the pasted organization when the browser has no sign-in`() async throws {
         let seen = Seen()
         _ = try await make(browser: [["unrelated": "x"]], seen: seen).refreshPlain()
@@ -168,7 +171,7 @@ struct DevinDefinitionTests {
         #expect(lookup.lookupOrder == ["Browser storage · app.devin.ai", "$DEVIN_BEARER_TOKEN", "API key saved in ClaudeBar"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should read an added login only with its own pasted token, never the browser's`() async throws {
         let settings = Self.organization("org_abc123")
         let vault = MemoryVault(["devin.token": "auth1_pasted-session-token"])

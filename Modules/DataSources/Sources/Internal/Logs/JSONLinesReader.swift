@@ -134,7 +134,7 @@ actor JSONLinesReader {
     /// fragments, isn't JSON, or isn't a record.
     private nonisolated func parseLine(_ line: UnsafeRawBufferPointer) -> LogRecord? {
         guard let base = line.baseAddress,
-              fragments?.contains(where: { fragment in memmem(base, line.count, fragment, fragment.count) != nil }) ?? true,
+              fragments?.contains(where: { ByteSearch.contains($0, in: line) }) ?? true,
               let json = try? JSONSerialization.jsonObject(with: Data(bytes: base, count: line.count))
         else { return nil }
         return shapes.record(from: json)
@@ -191,21 +191,13 @@ actor JSONLinesReader {
     }
 }
 
-/// File metadata that changes whenever the file's content does.
+/// File metadata that changes whenever the file's content does. Each
+/// platform reads it its own way (`FileStamp+macOS`, `FileStamp+Windows`).
 struct FileStamp: Equatable, Sendable {
     let inode: UInt64
     let size: UInt64
     let modifiedNanos: Int64
     let changedNanos: Int64
-
-    init?(url: URL) {
-        var info = stat()
-        guard stat(url.path, &info) == 0 else { return nil }
-        inode = UInt64(info.st_ino)
-        size = UInt64(info.st_size)
-        modifiedNanos = Int64(info.st_mtimespec.tv_sec) * 1_000_000_000 + Int64(info.st_mtimespec.tv_nsec)
-        changedNanos = Int64(info.st_ctimespec.tv_sec) * 1_000_000_000 + Int64(info.st_ctimespec.tv_nsec)
-    }
 
     /// Whether the stamp can tell two versions of a file apart. A filesystem
     /// that keeps whole-second times could change a file twice with an

@@ -181,7 +181,8 @@ public struct Setting: Sendable, Equatable, Codable, Identifiable {
             return options.contains { $0.id == value } ? nil : "Choose a \(label) from the list."
         case .path(let mustExist):
             let value = paths.expanded(value)
-            guard value.hasPrefix("/") || value.hasPrefix("~") else { return "Enter a full path for \(label)." }
+            // `/…` or `~…` on the Mac, and a drive or share on Windows as well.
+            guard NSString(string: value).isAbsolutePath else { return "Enter a full path for \(label)." }
             return mustExist && !paths.isFolder(value) ? "Choose an existing folder for \(label)." : nil
         }
     }

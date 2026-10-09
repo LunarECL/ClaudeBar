@@ -3,6 +3,9 @@ import Mockable
 import Quotas
 import Testing
 @testable import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// A login file owned by a CLI is renewed by running that CLI once the token
 /// is refused: the CLI writes its own file, which is read again — ClaudeBar
@@ -40,9 +43,8 @@ struct CLIRefreshTests {
             let status = token == "fresh" ? 200 : 401
             return (Data(#"{"used":20}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
         }
-        return DataSources.make(definition, providerId: "acme", makeCLIExecutor: { _ in cli }, makeCommandExecutor: { _ in cli },
+        return DataSources.make(definition, providerId: "acme", cliExecutor: cli,
                                 network: network, makeTransport: { _, _, _, _ in MockRPCTransport() }, security: { _ in (1, "") },
-                                scripts: { _ in nil }, secrets: nil, browserCookies: SystemBrowserCookies(),
                                 environment: { _ in nil }, homeDirectory: home, now: { Date() })
     }
 

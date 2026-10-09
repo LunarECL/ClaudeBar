@@ -3,6 +3,9 @@ import Mockable
 import Quotas
 import Testing
 @testable import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// `browserStorage` — a value a browser keeps for a site, read like a cookie
 /// (ENGINE_DESIGN §2.9): every value from one browser profile, the first

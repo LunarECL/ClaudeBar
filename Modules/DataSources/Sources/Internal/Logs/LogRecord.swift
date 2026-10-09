@@ -146,7 +146,7 @@ struct RecordShape: Sendable {
     /// ISO 8601 text, or epoch seconds.
     static func date(_ value: Any?) -> Date? {
         if let text = value as? String { return ISO8601Instant.parse(text) }
-        if let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
+        if let number = value as? NSNumber, !number.isBoolean {
             return Date(timeIntervalSince1970: number.doubleValue)
         }
         return nil
@@ -157,7 +157,7 @@ struct RecordShape: Sendable {
         let text: String
         switch value {
         case let string as String: text = string
-        case let number as NSNumber where CFGetTypeID(number) != CFBooleanGetTypeID(): text = number.stringValue
+        case let number as NSNumber where !number.isBoolean: text = number.stringValue
         default: return nil
         }
         return Decimal(string: text, locale: Locale(identifier: "en_US_POSIX"))

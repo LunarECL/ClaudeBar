@@ -95,7 +95,7 @@ enum JSONPath {
 
     static func number(_ value: Any?) -> Double? {
         switch value {
-        case let number as NSNumber where CFGetTypeID(number) != CFBooleanGetTypeID():
+        case let number as NSNumber where !number.isBoolean:
             let double = number.doubleValue
             return double.isFinite ? double : nil
         case let string as String:

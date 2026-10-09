@@ -1,6 +1,9 @@
 import Diagnostics
 import Quotas
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// `localServer` — an app's own server on this Mac. Its process is found by
 /// name and command line, the values it started with are read from that

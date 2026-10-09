@@ -4,6 +4,9 @@ import Mockable
 import Providers
 import Quotas
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// *Add Account* by its form: a provider whose key is the person's own — an
 /// API someone added — takes a second account by a second key. That key lives

@@ -93,7 +93,7 @@ enum Paths {
             found = found.flatMap { folder -> [String] in
                 guard name.contains("*") else { return [folder + name + "/"] }
                 let entries = (try? FileManager.default.contentsOfDirectory(atPath: folder.isEmpty ? "." : folder)) ?? []
-                return entries.filter { fnmatch(name, $0, 0) == 0 }.sorted().map { folder + $0 + "/" }
+                return entries.filter { Wildcard.matches(name, $0) }.sorted().map { folder + $0 + "/" }
             }
         }
         return found.map { String($0.dropLast()) }.filter { FileManager.default.fileExists(atPath: $0) }

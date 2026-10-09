@@ -1,9 +1,9 @@
 name: Windows
 
-# Phase 0 of MODULAR_DESIGN §10 (one package, two platforms): prove that the
-# Swift toolchain builds and tests a module on Windows, with Mockable resolved
-# and its macros expanded there. Quotas imports only Foundation, so it is the
-# first module to run here.
+# MODULAR_DESIGN §10 (one package, two platforms): the modules build and pass
+# their tests on Windows with the same Swift as the Mac, so a day of logs
+# counts the same on both. A test that needs what Windows lacks yet is
+# skipped there, saying why (§10, "The shape").
 
 on:
   push:
@@ -21,8 +21,8 @@ permissions:
   contents: read
 
 jobs:
-  quotas:
-    name: Quotas on Windows
+  kit:
+    name: ClaudeBarKit on Windows
     runs-on: windows-latest
     steps:
       # The same Swift as the macOS jobs' Xcode, so a difference is Windows'.
@@ -39,7 +39,6 @@ jobs:
         run: swift --version
 
       # The root Package.swift declares, on Windows, what builds there today:
-      # Quotas and its tests, and a probe that a @Mockable port and its mock
-      # work here (Quotas declares no ports).
+      # Quotas, Diagnostics, DataSources and Providers, and their tests.
       - name: Build and test
         run: swift test

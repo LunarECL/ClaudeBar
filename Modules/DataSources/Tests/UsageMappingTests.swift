@@ -23,7 +23,7 @@ struct UsageMappingTests {
         return try await DataSources.make(definition, providerId: "ext-acme").fetchUsage()
     }
 
-    @Test
+    @Test(.needsProcesses)
     func `should show each quota an extension prints as the kind its type names`() async throws {
         let usage = try await usage("""
         {"quotas":[{"type":"session","percentRemaining":85,"resetsAt":"2026-03-17T23:00:00Z"},
@@ -39,14 +39,14 @@ struct UsageMappingTests {
         #expect(usage.quota(for: .timeLimit("Requests"))?.resetText == "Resets monthly")
     }
 
-    @Test
+    @Test(.needsProcesses)
     func `should give a quota its conventional window, as extensions always had`() async throws {
         let usage = try await usage(#"{"quotas":[{"type":"session","percentRemaining":85}]}"#)
 
         #expect(usage.quota(for: .session)?.windowDuration == QuotaType.session.conventionalWindow.seconds)
     }
 
-    @Test
+    @Test(.needsProcesses)
     func `should show an extension's cost as money spent against its budget`() async throws {
         let usage = try await usage(#"{"costUsage":{"totalCost":10.26,"budget":50,"apiDuration":120}}"#)
 
@@ -55,7 +55,7 @@ struct UsageMappingTests {
         #expect(usage.costUsage?.apiDuration == 120)
     }
 
-    @Test
+    @Test(.needsProcesses)
     func `should fail at the mapping step when an extension prints neither quotas nor a cost`() async throws {
         await #expect { try await usage(#"{"metrics":[]}"#) } throws: { ($0 as? DataSourceError)?.step == .mapping }
     }

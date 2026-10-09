@@ -72,7 +72,7 @@ struct JetBrainsDefinitionTests {
         #expect(source.fetch.connection.commands.isEmpty)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the AI credits left this month and when they refill`() async throws {
         defer { try? FileManager.default.removeItem(at: home) }
         try ide("JetBrains/IntelliJIdea2025.3", Self.quota(current: "250000", maximum: "1000000"))
@@ -87,7 +87,7 @@ struct JetBrainsDefinitionTests {
         #expect((credits.windowDuration ?? -1) == 2_592_000)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should read the IDE used last, Android Studio included`() async throws {
         defer { try? FileManager.default.removeItem(at: home) }
         try ide("JetBrains/IntelliJIdea2025.3", Self.quota(current: "100000"), ago: 3600)
@@ -99,7 +99,7 @@ struct JetBrainsDefinitionTests {
         #expect(usage.quotas.first?.percentRemaining == 50)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the quota with no refill time when the IDE saved none`() async throws {
         defer { try? FileManager.default.removeItem(at: home) }
         try ide("JetBrains/GoLand2025.3", Self.quota(current: "0", next: nil))
@@ -138,7 +138,7 @@ struct JetBrainsDefinitionTests {
         """
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should ask to sign in to JetBrains AI when the IDE knows no quota`() async throws {
         defer { try? FileManager.default.removeItem(at: home) }
         try ide("JetBrains/IntelliJIdea2026.1", Self.state("{&#10;  &quot;type&quot;: &quot;Unknown&quot;&#10;}"))
@@ -148,7 +148,7 @@ struct JetBrainsDefinitionTests {
         }
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should say the IDE couldn't get the quota when it saved an error`() async throws {
         defer { try? FileManager.default.removeItem(at: home) }
         try ide("JetBrains/IntelliJIdea2025.1", Self.state("{&#10;  &quot;type&quot;: &quot;Error&quot;,&#10;  &quot;exception&quot;: &quot;&quot;&#10;}"))

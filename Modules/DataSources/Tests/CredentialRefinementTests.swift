@@ -3,6 +3,9 @@ import Mockable
 import Quotas
 import Testing
 @testable import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// A key lookup that answers only when what it found matches (`match`),
 /// adds fixed values to it (`with`), and reads a field from the first of
