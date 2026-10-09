@@ -3,6 +3,9 @@ import Foundation
 import Mockable
 import Testing
 @testable import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// A data source's memory between refreshes — the cached usage (`cache.ttl`)
 /// and a rate limit's end — seen through `fetchUsage()`.

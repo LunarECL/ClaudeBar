@@ -50,7 +50,7 @@ public struct ResponseFields: RandomAccessCollection, Sendable, Equatable {
                 walk(element, path: "\(path).\(index)", into: &fields)
             }
         case let number as NSNumber:
-            let isBool = CFGetTypeID(number) == CFBooleanGetTypeID()
+            let isBool = number.isBoolean
             fields.append(Field(path: path, value: isBool ? (number.boolValue ? "true" : "false") : number.stringValue, isNumber: !isBool))
         case let text as String:
             fields.append(Field(path: path, value: text, isNumber: false))

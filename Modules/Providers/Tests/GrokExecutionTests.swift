@@ -4,6 +4,9 @@ import Mockable
 import Providers
 import DataSources
 import Quotas
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Grok's login file, refresh and accounts through the definition.
 @MainActor @Suite("Grok definition execution")
@@ -120,7 +123,7 @@ struct GrokExecutionTests {
         }
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the login's email, weekly credits and Build when Grok answers`() async throws {
         let tempDir = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -140,7 +143,7 @@ struct GrokExecutionTests {
         #expect(snapshot.quota(for: .modelSpecific("Build"))?.percentRemaining == 16.0)
     }
 
-    @Test(arguments: [401,403])
+    @Test(.needsScriptEngine, arguments: [401,403])
     func `should renew a refused login, show the usage and save the new tokens back to Grok's file`(_ rejectedStatus: Int) async throws {
         let tempDir = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -174,7 +177,7 @@ struct GrokExecutionTests {
         #expect(try saved("refresh_token",in:tempDir) == "fresh-refresh-token")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should renew an expired login before asking and save it back`() async throws {
         let tempDir = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -283,7 +286,7 @@ struct GrokExecutionTests {
             try await provider.refreshPlain()
         }
     }
-    @Test func `should read each added login from its own Grok folder, keep its name, and never fall back to the default login`() async throws {
+    @Test(.needsScriptEngine) func `should read each added login from its own Grok folder, keep its name, and never fall back to the default login`() async throws {
         let personal = try makeTemporaryDirectory(), work = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at:personal); try? FileManager.default.removeItem(at:work) }
         try createAuthFile(at:personal,accessToken:"personal-token")
@@ -319,7 +322,7 @@ struct GrokExecutionTests {
         #expect(settings.accounts(forProvider:"grok").isEmpty)
     }
 
-    @Test func `should renew a login with its own issuer, and keep its renewal token when none comes back`() async throws {
+    @Test(.needsScriptEngine) func `should renew a login with its own issuer, and keep its renewal token when none comes back`() async throws {
         let root=try makeTemporaryDirectory()
         defer {try? FileManager.default.removeItem(at:root)}
         try createAuthFile(at:root,accessToken:"old",refreshToken:"refresh&a+b",expiresAt:"2020-01-01T00:00:00Z")

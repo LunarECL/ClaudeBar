@@ -1,5 +1,8 @@
 import Diagnostics
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// The module's factory: the only place a case of `Fetch`, `Mapping` or
 /// `CredentialLookup` meets the one connection it needs. Callers get a
@@ -20,7 +23,14 @@ public enum DataSources {
         Paths.expand(path, homeDirectory: homeDirectory, environment: environment)
     }
 
-    /// A data source on the real network, CLI, Keychain and file system.
+    /// Where this platform finds a CLI by name: its full path, or `nil` when
+    /// it isn't installed or the platform can't look (§10).
+    public static func locate(_ cli: String) -> String? {
+        Platform.current.binaryLocator?.locate(cli)
+    }
+
+    /// A data source on this machine: the real network and this platform's
+    /// connections.
     public static func make(
         _ definition: DataSourceDefinition,
         providerId: String,
@@ -34,19 +44,12 @@ public enum DataSources {
         make(
             definition,
             providerId: providerId,
-            makeCLIExecutor: CLIFetcher.system,
-            makeCommandExecutor: CommandFetcher.system,
+            platform: .current,
             network: URLSession.shared,
             cloudWatch: cloudWatch,
             priceCatalog: priceCatalog,
-            makeTransport: { executable, arguments, environment, directory in
-                try ProcessRPCTransport(executable: executable, arguments: arguments, environment: environment, workingDirectory: directory)
-            },
-            security: KeychainReader.system,
             scripts: scripts,
             secrets: secrets,
-            browserCookies: SystemBrowserCookies(),
-            browserStorage: SystemBrowserStorage(),
             loginShell: loginShell,
             environment: environment,
             homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
@@ -56,7 +59,10 @@ public enum DataSources {
 
     /// The same, with each connection handed in — how tests, here and in the
     /// modules above, run real definitions over stubbed connections. Every
-    /// CLI and command runs on `cliExecutor`, whatever environment it asks for.
+    /// CLI and command runs on `cliExecutor`, whatever environment it asks
+    /// for, and `network` also answers for servers on this machine. This
+    /// platform's script engine, screen renderer and SQLite stay; a `nil`
+    /// browser store means none.
     public static func make(
         _ definition: DataSourceDefinition,
         providerId: String,
@@ -66,8 +72,8 @@ public enum DataSources {
         security: @escaping @Sendable ([String]) -> (status: Int32, output: String) = { _ in (1, "") },
         scripts: @escaping ScriptSource = { _ in nil },
         secrets: (any SecretStore)? = nil,
-        browserCookies: any BrowserCookieReading = SystemBrowserCookies(),
-        browserStorage: any BrowserStorageReading = SystemBrowserStorage(),
+        browserCookies: (any BrowserCookieReading)? = nil,
+        browserStorage: (any BrowserStorageReading)? = nil,
         loginShell: (@Sendable (String) -> String?)? = nil,
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
@@ -76,22 +82,24 @@ public enum DataSources {
         priceCatalog: (any PriceCatalog)? = nil,
         now: @escaping @Sendable () -> Date
     ) -> DataSource {
-        make(
+        var platform = Platform.current
+        platform.runCLI = { _ in cliExecutor }
+        platform.runCommand = { _ in cliExecutor }
+        platform.rpcTransport = makeTransport
+        platform.keychain = security
+        platform.browserCookies = browserCookies
+        platform.browserStorage = browserStorage
+        platform.localNetwork = network
+        platform.processList = processPaths
+        return make(
             definition,
             providerId: providerId,
-            makeCLIExecutor: { _ in cliExecutor },
-            makeCommandExecutor: { _ in cliExecutor },
+            platform: platform,
             network: network,
-            localNetwork: network,
-            processPaths: processPaths,
             cloudWatch: cloudWatch,
             priceCatalog: priceCatalog,
-            makeTransport: makeTransport,
-            security: security,
             scripts: scripts,
             secrets: secrets,
-            browserCookies: browserCookies,
-            browserStorage: browserStorage,
             loginShell: loginShell,
             environment: environment,
             homeDirectory: homeDirectory,
@@ -99,73 +107,49 @@ public enum DataSources {
         )
     }
 
+    /// Each case meets the one connection it needs from `platform`, and a
+    /// case whose connection is `nil` fails as `Unavailable` (§10).
     static func make(
         _ definition: DataSourceDefinition,
         providerId: String,
-        makeCLIExecutor: @escaping CLIFetcher.MakeExecutor,
-        makeCommandExecutor: @escaping CommandFetcher.MakeExecutor,
+        platform: Platform,
         network: any NetworkClient,
-        localNetwork: any NetworkClient = InsecureLocalhostNetworkClient(),
-        processPaths: @escaping @Sendable () -> [String] = RunningProcesses.system,
         cloudWatch: (any CloudWatchClient)? = nil,
         priceCatalog: (any PriceCatalog)? = nil,
-        makeTransport: @escaping TransportFactory,
-        security: @escaping KeychainReader.Security,
-        scripts: @escaping ScriptSource,
-        secrets: (any SecretStore)?,
-        browserCookies: any BrowserCookieReading,
-        browserStorage: any BrowserStorageReading = SystemBrowserStorage(),
+        scripts: @escaping ScriptSource = { _ in nil },
+        secrets: (any SecretStore)? = nil,
         loginShell: (@Sendable (String) -> String?)? = nil,
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
         now: @escaping @Sendable () -> Date
     ) -> DataSource {
-        let fetcher: any Fetching = switch definition.fetch {
-        case .http(let request):
-            HTTPFetcher(request: request, network: network, now: now)
-        case .httpSteps(let steps):
-            HTTPStepsFetcher(steps: steps, network: network, now: now)
-        case .jsonRpc(let call):
-            JSONRPCFetcher(call: call, cliExecutor: makeCLIExecutor(CLICall(cli: call.cli)), makeTransport: makeTransport)
-        case .cli(let call):
-            CLIFetcher(call: call, makeExecutor: makeCLIExecutor)
-        case .command(let call):
-            CommandFetcher(call: call, makeExecutor: makeCommandExecutor)
-        case .file(let call):
-            FileFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
-        case .localServer(let call):
-            LocalServerFetcher(call: call, commands: makeCommandExecutor(ProcessEnvironment()), network: localNetwork,
-                               processPaths: processPaths)
-        case .cloudWatch(let call):
-            CloudWatchFetcher(call: call, client: cloudWatch, catalog: priceCatalog, now: now)
-        case .directory(let call):
-            DirectoryFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
-        case .sqlite(let call):
-            SQLiteFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
-        case .script(let call):
-            ScriptFetcher(call: call, providerId: providerId, secrets: secrets, makeExecutor: makeCommandExecutor)
-        }
+        let fetcher = fetcher(definition.fetch, providerId: providerId, platform: platform, network: network,
+                              cloudWatch: cloudWatch, priceCatalog: priceCatalog, secrets: secrets,
+                              environment: environment, homeDirectory: homeDirectory, now: now)
 
         let mapper: any Reading = switch definition.mapping {
         case .json(let mapping): JSONMapper(mapping: mapping, now: now)
         case .text(let mapping): TextMapper(mapping: mapping, now: now)
-        case .script(let mapping): ScriptMapper(file: mapping.file, source: scripts(mapping.file), values: mapping.values, now: now)
+        case .script(let mapping): scriptMapper(mapping, source: scripts(mapping.file), platform: platform, now: now)
         case .usage: UsageMapper(now: now)
         }
 
         var refresher: (any CredentialRefreshing)?
         var lookup = definition.credential
         if case .refreshing(let base, let refresh)? = lookup {
-            refresher = switch refresh {
-            case .oauth2(let oauth): OAuth2Refresher(refresh: oauth, network: network, now: now)
-            case .cli(let call): CLIRefresher(call: call, executor: makeCLIExecutor(call))
+            switch refresh {
+            case .oauth2(let oauth):
+                refresher = OAuth2Refresher(refresh: oauth, network: network, now: now)
+            case .cli(let call):
+                // No CLI on this platform: no renewal, as when a definition
+                // declares none (§10). A refused token reads as refused.
+                refresher = platform.runCLI.map { CLIRefresher(call: call, executor: $0(call)) }
             }
             lookup = base
         }
 
-        let readers = Readers(environment: environment, homeDirectory: homeDirectory, security: security,
-                              secrets: secrets, providerId: providerId, browserCookies: browserCookies,
-                              browserStorage: browserStorage, loginShell: loginShell)
+        let readers = Readers(environment: environment, homeDirectory: homeDirectory, secrets: secrets,
+                              providerId: providerId, platform: platform, loginShell: loginShell)
         return DataSource(
             definition: definition,
             providerId: providerId,
@@ -189,41 +173,119 @@ public enum DataSources {
         )
     }
 
+    /// The worker for a fetch case. `cli`, `command`, `jsonRpc`, `script` and
+    /// `localServer` run a program, so a platform that runs none fails them at
+    /// fetching, naming what they would run, never as a program that isn't
+    /// installed.
+    private static func fetcher(
+        _ fetch: Fetch,
+        providerId: String,
+        platform: Platform,
+        network: any NetworkClient,
+        cloudWatch: (any CloudWatchClient)?,
+        priceCatalog: (any PriceCatalog)?,
+        secrets: (any SecretStore)?,
+        environment: @escaping @Sendable (String) -> String?,
+        homeDirectory: URL,
+        now: @escaping @Sendable () -> Date
+    ) -> any Fetching {
+        func unavailable(_ what: String) -> any Fetching {
+            Unavailable(.fetch, what, on: platform.name)
+        }
+        switch fetch {
+        case .http(let request):
+            return HTTPFetcher(request: request, network: network, now: now)
+        case .httpSteps(let steps):
+            return HTTPStepsFetcher(steps: steps, network: network, now: now)
+        case .jsonRpc(let call):
+            guard let runCLI = platform.runCLI, let transport = platform.rpcTransport else {
+                return unavailable("Running \(call.cli)")
+            }
+            return JSONRPCFetcher(call: call, cliExecutor: runCLI(CLICall(cli: call.cli)), makeTransport: transport)
+        case .cli(let call):
+            guard let runCLI = platform.runCLI else { return unavailable("Running \(call.cli)") }
+            switch call.screen {
+            case .raw:
+                return CLIFetcher(call: call, makeExecutor: runCLI)
+            case .rendered:
+                guard let render = platform.screenRenderer else { return unavailable("Rendering \(call.cli)'s screen") }
+                return CLIFetcher(call: call, makeExecutor: runCLI, screen: render)
+            }
+        case .command(let call):
+            guard let runCommand = platform.runCommand else { return unavailable("Running \(call.cli)") }
+            return CommandFetcher(call: call, makeExecutor: runCommand)
+        case .file(let call):
+            return FileFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
+        case .localServer(let call):
+            guard let runCommand = platform.runCommand, let localNetwork = platform.localNetwork,
+                  let processList = platform.processList else {
+                return unavailable("Reading a local server")
+            }
+            return LocalServerFetcher(call: call, commands: runCommand(ProcessEnvironment()), network: localNetwork,
+                                      processPaths: processList)
+        case .cloudWatch(let call):
+            return CloudWatchFetcher(call: call, client: cloudWatch, catalog: priceCatalog, now: now)
+        case .directory(let call):
+            return DirectoryFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
+        case .sqlite(let call):
+            guard let sqlite = platform.sqlite else { return unavailable("Reading a SQLite database") }
+            return SQLiteFetcher(call: call, homeDirectory: homeDirectory, environment: environment, rows: sqlite)
+        case .script(let call):
+            guard let runCommand = platform.runCommand else { return unavailable("Running a script") }
+            return ScriptFetcher(call: call, providerId: providerId, secrets: secrets, makeExecutor: runCommand)
+        }
+    }
+
+    /// A `script` mapping runs on the platform's script engine.
+    private static func scriptMapper(_ mapping: ScriptMapping, source: String?, platform: Platform,
+                                     now: @escaping @Sendable () -> Date) -> any Reading {
+        guard let engine = platform.scriptEngine else {
+            return Unavailable(.mapping, "Running a mapping script", on: platform.name)
+        }
+        return ScriptMapper(file: mapping.file, source: source, values: mapping.values, engine: engine, now: now)
+    }
+
     private struct Readers {
         let environment: @Sendable (String) -> String?
         let homeDirectory: URL
-        let security: KeychainReader.Security
         let secrets: (any SecretStore)?
         let providerId: String
-        let browserCookies: any BrowserCookieReading
-        let browserStorage: any BrowserStorageReading
+        let platform: Platform
         let loginShell: (@Sendable (String) -> String?)?
 
         func reader(for lookup: CredentialLookup) -> any CredentialFinding {
             switch lookup {
             case .environment(let name, let asksShell):
-                EnvironmentReader(name: name, environment: environment, loginShell: asksShell ? loginShell : nil)
+                return EnvironmentReader(name: name, environment: environment, loginShell: asksShell ? loginShell : nil)
             case .jsonFile(let file):
-                JSONFileReader(file: file, homeDirectory: homeDirectory, environment: environment)
+                return JSONFileReader(file: file, homeDirectory: homeDirectory, environment: environment)
             case .keychain(let item):
-                KeychainReader(item: item, security: security)
+                guard let keychain = platform.keychain else { return unavailable("Reading a Keychain item") }
+                return KeychainReader(item: item, security: keychain)
             case .setting(let name):
-                SettingReader(name: name, providerId: providerId, secrets: secrets)
+                return SettingReader(name: name, providerId: providerId, secrets: secrets)
             case .refined(let base, let refinement):
-                RefinedReader(base: reader(for: base), refinement: refinement)
+                return RefinedReader(base: reader(for: base), refinement: refinement)
             case .sqlite(let database):
-                SQLiteReader(file: database, homeDirectory: homeDirectory, environment: environment)
+                guard let sqlite = platform.sqlite else { return unavailable("Reading a SQLite database") }
+                return SQLiteReader(file: database, homeDirectory: homeDirectory, environment: environment, rows: sqlite)
             case .browserCookies(let query):
-                BrowserCookieReader(query: query, cookies: browserCookies)
+                guard let cookies = platform.browserCookies else { return unavailable("Reading a browser's cookies") }
+                return BrowserCookieReader(query: query, cookies: cookies)
             case .browserStorage(let query):
-                BrowserStorageReader(query: query, storage: browserStorage)
+                guard let storage = platform.browserStorage else { return unavailable("Reading a browser's storage") }
+                return BrowserStorageReader(query: query, storage: storage)
             case .firstOf(let lookups):
-                FirstOfReader(readers: lookups.map { reader(for: $0) })
+                return FirstOfReader(readers: lookups.map { reader(for: $0) })
             case .refreshing(let base, _):
                 // A refresh nested inside `firstOf` is refreshed by the outer
                 // data source only; reading still works.
-                reader(for: base)
+                return reader(for: base)
             }
+        }
+
+        private func unavailable(_ what: String) -> any CredentialFinding {
+            Unavailable(.lookup, what, on: platform.name)
         }
     }
 }

@@ -31,7 +31,7 @@ struct BrowserStorageReader: CredentialFinding {
     /// The first key, in name order, the rule's pattern matches, read at its
     /// path when it has one; a JSON string is unquoted.
     private static func value(_ rule: BrowserStorageCredential.Value, in store: [String: String]) -> String? {
-        let keys = store.keys.filter { fnmatch(rule.key, $0, 0) == 0 }.sorted()
+        let keys = store.keys.filter { Wildcard.matches(rule.key, $0) }.sorted()
         for key in keys {
             guard let raw = store[key] else { continue }
             let json = try? JSONSerialization.jsonObject(with: Data(raw.utf8), options: [.fragmentsAllowed])

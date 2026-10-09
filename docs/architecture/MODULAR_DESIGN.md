@@ -422,7 +422,7 @@ Each phase leaves main shippable and the Mac app unchanged in behaviour.
 | 2 | **The leaderboard slice.** Carve `Leaderboard` (§8); `CryptoKit` → `Crypto` in `UsageLog`, `CLISession`, `ProviderDefinition`, `RequestSigner`, `SigningKey`; Diagnostics behind `LogSink`; the Mac-only files of `DataSources` move to `Internal/macOS/` | `Quotas`, `Diagnostics`, `DataSources`, `Providers` and `Leaderboard` build and pass on Windows, including the log-reading tests and `vectors.json` — the Windows client can start |
 | 3 | **Windows adapters for the slice:** `SigningKeyStore` on Credential Manager, `MachineIdentity` on the machine GUID, `LeaderboardAPI` on `URLSession` | the Windows client joins and uploads against the real server |
 | 4 | **Paths and shells.** The engine's Mac assumptions without an import (`/bin/zsh` and `/bin/sh` in `LoginShellEnvironment`, `Connection` and the `file` fetch; `/usr/sbin/lsof` and `/usr/bin/pgrep` in `LocalServerFetcher`; `/usr/bin/security`; `~/Library/Application Support`; `:` in `PATH`) become facts of the module's `Platform` that the factory hands each worker; definitions name a platform's app-data folder through the path language ([ENGINE_DESIGN](ENGINE_DESIGN.md) changes first) | the definitions that read local files resolve on Windows |
-| 5 | **Quotas on Windows.** The rest of `Internal/Windows/`: processes, the pseudo-terminal, the JS engine, `Monitoring`, `Alerting`, `Storage` | the Windows client shows quotas |
+| 5 | **Quotas on Windows.** The rest of `Internal/Windows/`: processes, the pseudo-terminal, the JS engine, SQLite as a bundled package, `Monitoring`, `Alerting`, `Storage` | the Windows client shows quotas, and Windows skips no test |
 
 ### Open
 

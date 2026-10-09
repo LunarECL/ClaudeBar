@@ -3,6 +3,9 @@ import Foundation
 import Mockable
 import Testing
 @testable import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// `"http": { "steps": […] }` — call A, then B with something A said.
 @Suite

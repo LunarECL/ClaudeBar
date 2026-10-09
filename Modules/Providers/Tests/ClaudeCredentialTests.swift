@@ -3,6 +3,9 @@ import Quotas
 import Foundation
 import Mockable
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Where the `api` data source finds Claude's OAuth credentials — the file,
 /// then the Keychain, then `CLAUDE_CODE_OAUTH_TOKEN` — and how a refreshed

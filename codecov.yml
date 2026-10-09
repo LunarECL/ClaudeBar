@@ -22,15 +22,17 @@ ignore:
   # each through its port, so a test of the real one would test macOS or the SDK.
   - "Modules/AWSClients/Sources/**/*"  # AWS SDK
   - "Modules/Diagnostics/Sources/Internal/macOS/OSLogSink.swift"  # OSLog
-  - "Modules/DataSources/Sources/Internal/Process/ProcessRPCTransport.swift"  # stdio pipe
-  - "Modules/DataSources/Sources/Internal/Process/RunningProcesses.swift"  # ps
-  - "Modules/DataSources/Sources/Internal/Process/DefaultCLIExecutor.swift"  # Process
-  - "Modules/DataSources/Sources/Internal/Process/PipeCLIExecutor.swift"  # Process
+  - "Modules/DataSources/Sources/Internal/macOS/Platform+macOS.swift"  # hands out the system workers below
+  - "Modules/DataSources/Sources/Internal/macOS/Lookup/SystemKeychain.swift"  # the security tool
+  - "Modules/DataSources/Sources/Internal/macOS/Process/ProcessRPCTransport.swift"  # stdio pipe
+  - "Modules/DataSources/Sources/Internal/macOS/Process/RunningProcesses.swift"  # ps
+  - "Modules/DataSources/Sources/Internal/macOS/Process/DefaultCLIExecutor.swift"  # Process
+  - "Modules/DataSources/Sources/Internal/macOS/Process/PipeCLIExecutor.swift"  # Process
   - "Modules/DataSources/Sources/Internal/Process/FoundationSignInProcess.swift"  # Process
   - "Modules/DataSources/Sources/Internal/Network/URLSessionNetworkClient.swift"  # URLSession
-  - "Modules/DataSources/Sources/Internal/Network/InsecureLocalhostNetworkClient.swift"  # URLSession
-  - "Modules/DataSources/Sources/Internal/Lookup/BrowserCookieReader.swift"  # browser cookie stores
-  - "Modules/DataSources/Sources/Internal/Lookup/SystemBrowserStorage.swift"  # browser profiles
+  - "Modules/DataSources/Sources/Internal/macOS/Network/InsecureLocalhostNetworkClient.swift"  # URLSession
+  - "Modules/DataSources/Sources/Internal/macOS/Lookup/SystemBrowserCookies.swift"  # browser cookie stores
+  - "Modules/DataSources/Sources/Internal/macOS/Lookup/SystemBrowserStorage.swift"  # browser profiles
   - "Sources/Infrastructure/Hooks/HookHTTPServer.swift"  # a local socket server
   - "Sources/Infrastructure/Shared/SystemAlertSender.swift"  # NSAlert, notifications
   - "Sources/Infrastructure/Shared/SystemPowerStateProvider.swift"  # IOKit

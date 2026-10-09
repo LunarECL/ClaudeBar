@@ -4,6 +4,9 @@ import Mockable
 import Providers
 import Quotas
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// THE lifecycle, once for every provider — pinned on a provider no vendor
 /// ships: "Acme", whose `api` falls back to a `backup` the person can switch

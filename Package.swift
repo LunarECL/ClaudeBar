@@ -115,28 +115,59 @@ let package = Package(
     ]
 )
 #else
-// What builds on Windows today (§10 phases 0 and 2): Quotas, Diagnostics, and a probe that a
-// @Mockable port and its mock work there, since neither module declares one.
+// What builds on Windows today (§10 phases 0 and 2): Quotas, Diagnostics, DataSources and
+// Providers. SwiftTerm, SweetCookieKit and the AWS SDK are the Mac's.
 let package = Package(
     name: "ClaudeBarKit",
     products: [
-        .library(name: "ClaudeBarKit", targets: ["Quotas", "Diagnostics"]),
+        .library(name: "ClaudeBarKit", targets: ["Quotas", "Diagnostics", "DataSources", "Providers"]),
         .library(name: "Quotas", targets: ["Quotas"]),
         .library(name: "Diagnostics", targets: ["Diagnostics"]),
+        .library(name: "DataSources", targets: ["DataSources"]),
+        .library(name: "Providers", targets: ["Providers"]),
     ],
     dependencies: [
         .package(url: "https://github.com/Kolos65/Mockable.git", from: "0.5.0"),
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "6.0.0"),
     ],
     targets: [
         .target(name: "Quotas", path: "Modules/Quotas/Sources"),
         .testTarget(name: "QuotasTests", dependencies: ["Quotas"], path: "Modules/Quotas/Tests"),
         .target(name: "Diagnostics", path: "Modules/Diagnostics/Sources"),
         .testTarget(name: "DiagnosticsTests", dependencies: ["Diagnostics"], path: "Modules/Diagnostics/Tests"),
+        .target(
+            name: "DataSources",
+            dependencies: [
+                "Quotas",
+                "Diagnostics",
+                mockable,
+                .product(name: "Subprocess", package: "swift-subprocess"),
+                crypto,
+            ],
+            path: "Modules/DataSources/Sources",
+            swiftSettings: mocking
+        ),
         .testTarget(
-            name: "MockableProbe",
-            dependencies: [mockable],
-            path: ".github/windows/MockableProbe",
-            swiftSettings: [.define("MOCKING")]
+            name: "DataSourcesTests",
+            dependencies: ["DataSources", "Quotas", mockable],
+            path: "Modules/DataSources/Tests",
+            swiftSettings: mocking
+        ),
+        .target(
+            name: "Providers",
+            dependencies: ["Quotas", "DataSources", "Diagnostics", mockable, crypto],
+            path: "Modules/Providers",
+            exclude: ["Tests"],
+            sources: ["Sources"],
+            resources: [.process("Resources")],
+            swiftSettings: mocking
+        ),
+        .testTarget(
+            name: "ProvidersTests",
+            dependencies: ["Providers", "DataSources", "Quotas", mockable, crypto],
+            path: "Modules/Providers/Tests",
+            swiftSettings: mocking
         ),
     ]
 )

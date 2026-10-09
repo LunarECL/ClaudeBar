@@ -1,6 +1,9 @@
 import Diagnostics
 import Quotas
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// OAuth 2's refresh-token grant (RFC 6749 §6): trades `refreshToken` for a
 /// new `token`, and stamps `refreshedAt`. Which provider it serves is data.

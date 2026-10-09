@@ -3,6 +3,9 @@ import Quotas
 import Foundation
 import Mockable
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// `claude.json`'s `api` data source — the key lookup, the OAuth refresh, the
 /// usage request and its JSON mapping — over stubbed connections.

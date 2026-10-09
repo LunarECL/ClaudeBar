@@ -117,7 +117,7 @@ struct OmpDefinitionTests {
 
     // MARK: - Quota Mapping
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show a quota for every limit omp reports, all as Oh My Pi's`() throws {
         let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
@@ -126,7 +126,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotas.allSatisfy { $0.providerId == "omp" })
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the percent left that omp reports as a fraction`() throws {
         let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
@@ -136,7 +136,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quota(for: .timeLimit("Z.ai 5h"))?.percentRemaining == 75.0)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should name each quota by its provider, tier and window`() throws {
         let snapshot = try OmpFixtures.parse(Self.sampleResponse)
         let labels = snapshot.quotas.map(\.quotaType.displayName)
@@ -147,7 +147,7 @@ struct OmpDefinitionTests {
         #expect(labels.contains("Z.ai 1mo"))
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the reset time omp gives in epoch milliseconds`() throws {
         let snapshot = try OmpFixtures.parse(Self.sampleResponse)
         let claude = try #require(snapshot.quota(for: .timeLimit("Claude 5h")))
@@ -155,7 +155,7 @@ struct OmpDefinitionTests {
         #expect(claude.resetsAt == Date(timeIntervalSince1970: 1_783_885_200))
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should keep each limit's window length so pace can be shown`() throws {
         let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
@@ -163,7 +163,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quota(for: .timeLimit("Codex 7d"))?.windowDuration == 604_800)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show no reset when a limit has no reset time`() throws {
         let snapshot = try OmpFixtures.parse(Self.sampleResponse)
         let zai = try #require(snapshot.quota(for: .timeLimit("Z.ai 5h")))
@@ -173,7 +173,7 @@ struct OmpDefinitionTests {
 
     // MARK: - Monetary Limits
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show a capped spend limit with nothing spent as a full dollar quota in its provider's group`() throws {
         let json = """
         { "reports": [ {
@@ -203,7 +203,7 @@ struct OmpDefinitionTests {
         #expect(quota.group == "Claude")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show a capped spend limit as dollars left of its cap, in rounded dollars`() throws {
         let json = """
         { "reports": [ {
@@ -231,7 +231,7 @@ struct OmpDefinitionTests {
         #expect(quota.dollarCap == 500)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should round spend to the cent exactly when it sits on a cent boundary`() throws {
         // Decimal decodes straight from the JSON number token: 1.005 rounds
         // to $1.01. A Double round-trip would decode 1.00499… and show $1.00.
@@ -255,7 +255,7 @@ struct OmpDefinitionTests {
         #expect(abs(percent - 91.92) < 0.0001)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should name a spend limit after its window when omp gives it no label`() throws {
         let json = """
         { "reports": [ {
@@ -273,7 +273,7 @@ struct OmpDefinitionTests {
         #expect(quota.dollarCap == 500)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show uncapped spend as a note in its provider's group, not a quota`() throws {
         let json = """
         { "reports": [ {
@@ -299,7 +299,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotaGroups.first?.note == "Extra usage $1,234.56 spent · no cap")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should name Cursor's windowless spend limits Spend, never USD`() throws {
         let json = """
         { "reports": [ {
@@ -328,7 +328,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotas.first?.dollarCap == 5000)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show a spend limit and a window limit of one account in one group`() throws {
         let json = """
         { "reports": [ {
@@ -355,7 +355,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotaGroups[0].quotas.count == 2)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should tell apart the uncapped spend notes of two accounts on one provider`() throws {
         let json = """
         { "reports": [
@@ -392,14 +392,14 @@ struct OmpDefinitionTests {
 
     // MARK: - Account Email
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show no email when the accounts have different emails`() throws {
         let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
         #expect(snapshot.accountEmail == nil)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the email when there is a single account`() throws {
         let json = """
         { "reports": [ {
@@ -419,7 +419,7 @@ struct OmpDefinitionTests {
 
     // MARK: - Multiple Accounts on One Provider
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should tell apart two accounts on the same provider, each quota unique`() throws {
         let json = """
         { "reports": [
@@ -454,7 +454,7 @@ struct OmpDefinitionTests {
         #expect(keys.count == snapshot.quotas.count)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should tell apart two meters sharing one window by what they meter`() throws {
         // Z.ai can meter tokens and requests over the same window; both
         // must stay distinguishable without degrading to bare ordinals.
@@ -515,14 +515,14 @@ struct OmpDefinitionTests {
 
     // MARK: - Accounts Without Usage
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show no account rows when every account reported usage`() throws {
         let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
         #expect(snapshot.extensionMetrics == nil)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the quotas and a no-usage row for an account that reported none`() throws {
         let json = """
         { "reports": [ {
@@ -546,7 +546,7 @@ struct OmpDefinitionTests {
         #expect(metrics[0].value == "No usage reported")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show a no-usage row for each account, not no data, when none reported usage`() throws {
         let json = """
         { "reports": [],
@@ -563,7 +563,7 @@ struct OmpDefinitionTests {
         #expect(metrics.allSatisfy { $0.value == "No usage reported" })
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should give each anonymous account on one provider its own row name`() throws {
         // MenuContentView keys these cards by label — collisions would
         // hide or reuse rows.
@@ -581,7 +581,7 @@ struct OmpDefinitionTests {
         #expect(Set(labels).count == labels.count)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the email of the single account even when it reported no usage`() throws {
         let json = """
         { "reports": [],
@@ -594,7 +594,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.accountEmail == "solo@example.com")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show no no-usage row for an account that also reported usage under the same account id`() throws {
         let json = """
         { "reports": [ {
@@ -616,7 +616,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics == nil)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show no no-usage row for an account whose id a limit already reported`() throws {
         let json = """
         { "reports": [ {
@@ -644,7 +644,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics == nil)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the no-usage row when the same account id reported usage on another provider`() throws {
         let json = """
         { "reports": [ {
@@ -669,7 +669,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Copilot · shared-account-id"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show no no-usage row when the same email, in any case or spacing, reported usage`() throws {
         let json = """
         { "reports": [ {
@@ -690,7 +690,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics == nil)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show no no-usage row when the same email reported usage under another credential`() throws {
         let json = """
         { "reports": [ {
@@ -717,7 +717,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics == nil)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the no-usage row when the same email reported usage for another organization`() throws {
         let json = """
         { "reports": [ {
@@ -744,7 +744,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · alice@example.com"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the no-usage row when omp reports it even for the same email and organization`() throws {
         // omp's org gate normally absorbs this identity into the same-org
         // report. If it still reaches ClaudeBar, preserve omp's decision to
@@ -774,7 +774,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · alice@example.com"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the no-usage row when the matching account id belongs to an organization`() throws {
         let json = """
         { "reports": [ {
@@ -798,7 +798,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · shared-account-id"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the no-usage row when the same email reported usage on another provider`() throws {
         let json = """
         { "reports": [ {
@@ -819,7 +819,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Copilot · shared@example.com"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show both a reported account and an unreported one on the same provider`() throws {
         let json = """
         { "reports": [ {
@@ -848,7 +848,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotaGroups.map(\.title) == ["Claude", "Claude · bob"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the no-usage row when the emails differ even though the account id matches`() throws {
         let json = """
         { "reports": [ {
@@ -875,7 +875,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · bob@example.com"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show the no-usage row when only a project id is shared`() throws {
         let json = """
         { "reports": [ {
@@ -898,7 +898,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Gemini · shared-project"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show two rows for blank-email accounts with different account ids`() throws {
         let json = """
         { "reports": [],
@@ -922,7 +922,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.count == 2)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show one row for blank-email accounts with the same account id`() throws {
         let json = """
         { "reports": [],
@@ -946,7 +946,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.count == 1)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show one row for unreported accounts with the same email`() throws {
         let json = """
         { "reports": [],
@@ -972,7 +972,7 @@ struct OmpDefinitionTests {
         #expect(metrics[0].label == "Claude · alice@example.com")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show a row for each organization when one email has two`() throws {
         let json = """
         { "reports": [],
@@ -998,7 +998,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.count == 2)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show an organization account and a legacy one with the same email as two rows, in either order`() throws {
         let organizationFirst = """
         { "reports": [],
@@ -1044,7 +1044,7 @@ struct OmpDefinitionTests {
         #expect(legacyFirstSnapshot.extensionMetrics?.count == 2)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show one row when an account with no limits is also listed as unreported`() throws {
         let json = """
         { "reports": [ {
@@ -1062,7 +1062,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotaGroups.map(\.title) == ["Ollama · local"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show an anonymous unreported account apart from an anonymous report`() throws {
         let json = """
         { "reports": [ {
@@ -1081,7 +1081,7 @@ struct OmpDefinitionTests {
         ])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show one group per account and no stale rows when each account reported under a new credential`() throws {
         let json = """
         { "reports": [
@@ -1134,7 +1134,7 @@ struct OmpDefinitionTests {
 
     // MARK: - Reports Without Usable Limits
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should still list an account whose report has no limits`() throws {
         // Ollama's usage provider deliberately reports `limits: []` (no
         // standalone quota API); a report exists, so the account never
@@ -1165,7 +1165,7 @@ struct OmpDefinitionTests {
         #expect(metrics[0].value == "No usage reported")
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show account rows, not no data, when every report has no limits`() throws {
         let json = """
         { "reports": [ { "provider": "ollama", "limits": [] } ] }
@@ -1176,7 +1176,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Ollama · account 1"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should name an account after its limits when its report carries no identity`() throws {
         // Gemini/Kimi-style reports carry identity in limit scopes rather
         // than metadata; a report whose limits are all unusable must still
@@ -1195,7 +1195,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.extensionMetrics?.map(\.label) == ["Gemini · my-gcp-project"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show anonymous accounts with no limits on one provider as numbered sections`() throws {
         let json = """
         { "reports": [
@@ -1218,7 +1218,7 @@ struct OmpDefinitionTests {
 
     // MARK: - Grouping Metadata
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should group quotas into one section per provider, in the order omp reports them`() throws {
         let snapshot = try OmpFixtures.parse(Self.sampleResponse)
 
@@ -1234,7 +1234,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotaGroups.map(\.title) == ["Codex", "Claude", "Z.ai"])
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show a section per account when one provider has two`() throws {
         let json = """
         { "reports": [
@@ -1264,7 +1264,7 @@ struct OmpDefinitionTests {
         // Card titles inside a section drop the account context entirely.
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show no-usage accounts as their own sections, named by short identities`() throws {
         let json = """
         { "reports": [ {
@@ -1288,7 +1288,7 @@ struct OmpDefinitionTests {
 
     // MARK: - Upstream Display Names
 
-    @Test(arguments: [
+    @Test(.needsScriptEngine, arguments: [
         // Every id omp v16.4.6's usage registry emits (@oh-my-pi/pi-ai/src/usage/*).
         ("anthropic", "Claude"),
         ("openai-codex", "Codex"),
@@ -1309,7 +1309,7 @@ struct OmpDefinitionTests {
 
     // MARK: - Robustness
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should read the usage when omp prints other lines around it`() throws {
         let noisy = "Synced 3 accounts\n\(Self.sampleResponse)\nDone."
         let snapshot = try OmpFixtures.parse(noisy)
@@ -1317,7 +1317,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotas.count == 7)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should skip a limit with no usable amount`() throws {
         let json = """
         { "reports": [ {
@@ -1340,7 +1340,7 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotas.count == 1)
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should fail to read usage when omp prints something that is not usage`() throws {
         // Pin the exact error so a regression to `noData` (or any other
         // case) fails instead of passing as "some UsageError".
@@ -1362,7 +1362,7 @@ struct OmpDefinitionTests {
         }
     }
 
-    @Test
+    @Test(.needsScriptEngine)
     func `should show no data when no account is signed in`() {
         #expect(throws: UsageError.noData) {
             try OmpFixtures.parse("{ \"reports\": [] }")

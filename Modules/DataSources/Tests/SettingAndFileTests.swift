@@ -3,6 +3,9 @@ import Foundation
 import Mockable
 import Quotas
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Two cases *Add Provider* needs: a key the person pasted into ClaudeBar
 /// (`setting`, kept in its vault, never in a file), and a usage file on disk

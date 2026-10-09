@@ -68,7 +68,7 @@ public final class Provider {
         vault: (any SecretVault)? = nil,
         paths: any PathChecking = DiskPaths(),
         isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
-        locate: @escaping @Sendable (String) -> String? = { BinaryLocator.which($0) }
+        locate: @escaping @Sendable (String) -> String? = { DataSources.locate($0) }
     ) {
         self.definition = definition
         self.settings = settings
@@ -124,7 +124,7 @@ public final class Provider {
         folders: any LoginFolders = DiskLoginFolders(),
         loginsInUse: (any LoginsInUse)? = nil,
         isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
-        locate: @escaping @Sendable (String) -> String? = { BinaryLocator.which($0) }
+        locate: @escaping @Sendable (String) -> String? = { DataSources.locate($0) }
     ) {
         self.init(definition: definition, settings: settings, accounts: accounts,
                   makeDataSource: { source, _ in makeDataSource(source) },

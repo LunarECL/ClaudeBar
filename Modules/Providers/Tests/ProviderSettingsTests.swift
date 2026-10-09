@@ -4,6 +4,9 @@ import Mockable
 import Providers
 import Quotas
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// *REGION*, *API KEY*, *CLI DATA FOLDER* on a provider no vendor ships: one
 /// form, two scopes, filled into each login's data sources.

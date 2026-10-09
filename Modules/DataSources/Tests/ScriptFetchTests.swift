@@ -32,7 +32,7 @@ struct ScriptFetchTests {
         return DataSources.make(definition, providerId: "ext-acme", secrets: Vault(secrets))
     }
 
-    @Test
+    @Test(.needsProcesses)
     func `should show what a script prints when it runs from its own folder`() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }
         try script("probe.sh", #"cat left.json"#)
@@ -43,7 +43,7 @@ struct ScriptFetchTests {
         #expect(usage.quota(for: .weekly)?.percentRemaining == 62)
     }
 
-    @Test
+    @Test(.needsProcesses)
     func `should hand a script its settings as environment variables and its secrets from the vault`() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }
         try script("probe.sh", #"echo "{\"weekly\":{\"left\":${#CLAUDEBAR_API_KEY}$CLAUDEBAR_REGION}}""#)
@@ -65,7 +65,7 @@ struct ScriptFetchTests {
         }
     }
 
-    @Test
+    @Test(.needsProcesses)
     func `should not be ready when the script is not there`() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

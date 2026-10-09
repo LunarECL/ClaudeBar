@@ -3,6 +3,9 @@ import Foundation
 import Mockable
 import Testing
 @testable import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// A worker reports a fact; the data source's `errors` says what it means.
 @Suite

@@ -39,7 +39,7 @@ struct WindsurfDefinitionTests {
         })
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should be Windsurf, off until turned on, with its dashboard and icon`() throws {
         let windsurf = try make()
         #expect(windsurf.id == "windsurf")
@@ -49,7 +49,7 @@ struct WindsurfDefinitionTests {
         #expect(windsurf.definition.profile.look.icon == "WindsurfIcon")
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should read Windsurf's own database, without running anything`() throws {
         let windsurf = try make()
         let source = try #require(windsurf.definition.dataSources.first)
@@ -60,7 +60,7 @@ struct WindsurfDefinitionTests {
         #expect(source.fetch.connection.urls.isEmpty)
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should show the daily and weekly quota left, the reset times and the plan`() async throws {
         let usage = try await make().refreshPlain()
         let daily = try #require(usage.quotas.first { $0.quotaType == .timeLimit("Daily") })
@@ -72,7 +72,7 @@ struct WindsurfDefinitionTests {
         #expect(usage.accountTier == .custom("Pro"))
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should show messages and flow actions when the plan has no daily or weekly quota`() async throws {
         let output = #"{"planName":"Teams","endTimestamp":1774029950000,"usage":{"messages":50000,"usedMessages":35650,"flowActions":150000,"remainingFlowActions":120000}}"#
         let usage = try await make(output).refreshPlain()
@@ -84,7 +84,7 @@ struct WindsurfDefinitionTests {
         #expect(flow.percentRemaining == 80)
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should say the saved plan is out of date when its period has ended, instead of showing old numbers`() async throws {
         let output = #"{"planName":"Pro","endTimestamp":1749360995879,"usage":{"messages":2500,"usedMessages":0}}"#
         let windsurf = try make(output, now: Date(timeIntervalSince1970: 1760000000))
@@ -95,13 +95,13 @@ struct WindsurfDefinitionTests {
         #expect(account.lastFailedStep == .mapping)
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should report no data on a free plan with nothing to measure`() async throws {
         let windsurf = try make(#"{"planName":"Free"}"#)
         await #expect(throws: UsageError.noData) { try await windsurf.refresh(windsurf.defaultAccount) }
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should ask to open Windsurf when it has saved no plan`() async throws {
         let windsurf = try make("")
         await #expect(throws: UsageError.sessionExpired(hint: "Open Windsurf and sign in, so it saves your plan on this Mac.")) {
@@ -109,7 +109,7 @@ struct WindsurfDefinitionTests {
         }
     }
 
-    @Test
+    @Test(.needsSQLite)
     func `should not be set up when Windsurf has never run on this Mac`() async throws {
         let windsurf = try make(nil)
         #expect(await windsurf.isAvailable(windsurf.defaultAccount) == false)

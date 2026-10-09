@@ -75,7 +75,7 @@ public struct AccountSignIn: Sendable {
     public init(
         process: any SignInProcess = FoundationSignInProcess(),
         folders: any LoginFolders = DiskLoginFolders(),
-        locate: @escaping @Sendable (String) -> String? = { BinaryLocator.which($0) },
+        locate: @escaping @Sendable (String) -> String? = { DataSources.locate($0) },
         environment: @escaping @Sendable () -> [String: String] = { ProcessInfo.processInfo.environment }
     ) {
         self.process = process

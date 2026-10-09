@@ -1,5 +1,8 @@
 import Foundation
 import Mockable
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Mockable
 public protocol NetworkClient: Sendable {

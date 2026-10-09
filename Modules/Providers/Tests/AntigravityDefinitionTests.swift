@@ -4,6 +4,9 @@ import Providers
 @testable import DataSources
 import Quotas
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Antigravity as data: the running app's own server, found through its
 /// process, or — with the app closed — Google's quota with the login it saved
@@ -40,16 +43,16 @@ struct AntigravityDefinitionTests {
         }
         let definition = try ProviderFactory.builtIn("antigravity")
         return Provider(definition: definition, settings: InMemoryProviderSettings(), makeDataSource: { source, _ in
-            DataSources.make(source, providerId: definition.id, makeCLIExecutor: { _ in commands }, makeCommandExecutor: { _ in commands },
-                             network: network, localNetwork: network,
-                             processPaths: { running ? ["/Applications/Antigravity.app/Contents/Resources/app/extensions/antigravity/bin/language_server_macos_arm"] : [] },
+            DataSources.make(source, providerId: definition.id, cliExecutor: commands, network: network,
                              makeTransport: { _, _, _, _ in MockRPCTransport() },
                              security: { @Sendable arguments in
                                  guard let keychain, arguments.contains("gemini"), arguments.contains("antigravity") else { return (44, "") }
                                  return (0, "go-keyring-base64:" + Data(keychain.utf8).base64EncodedString())
                              },
-                             scripts: ProviderFactory.builtInScripts, secrets: nil, browserCookies: SystemBrowserCookies(),
-                             environment: { _ in nil }, homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
+                             scripts: ProviderFactory.builtInScripts, environment: { _ in nil },
+                             homeDirectory: FileManager.default.temporaryDirectory,
+                             processPaths: { running ? ["/Applications/Antigravity.app/Contents/Resources/app/extensions/antigravity/bin/language_server_macos_arm"] : [] },
+                             now: { Date() })
         })
     }
 
@@ -63,7 +66,7 @@ struct AntigravityDefinitionTests {
 
     // MARK: - The running app
 
-    @Test func `should show the running app's shared pools with their stated windows`() async throws {
+    @Test(.needsScriptEngine) func `should show the running app's shared pools with their stated windows`() async throws {
         let seen = Seen()
         let provider = try make(answers: ["RetrieveUserQuotaSummary": (200, #"{"response":\#(Self.summary)}"#)], seen: seen)
         let quotas = try await provider.refreshPlain().quotas
@@ -76,7 +79,7 @@ struct AntigravityDefinitionTests {
         #expect(request.value(forHTTPHeaderField: "X-Codeium-Csrf-Token") == "9f808dbe-cb96-4829")
     }
 
-    @Test func `should show a quota per model with the plan and email when an older app answers`() async throws {
+    @Test(.needsScriptEngine) func `should show a quota per model with the plan and email when an older app answers`() async throws {
         let snapshot = try await make(answers: ["GetUserStatus": (200, Self.userStatus)]).refreshPlain()
         #expect(snapshot.quotas.map(\.quotaType) == [.modelSpecific("Claude Sonnet"), .modelSpecific("Gemini Pro")])
         #expect(snapshot.quotas.map(\.percentRemaining) == [75, 50])
@@ -87,7 +90,7 @@ struct AntigravityDefinitionTests {
 
     // MARK: - The app closed: Google, with its saved login
 
-    @Test func `should show Google's quota with the saved login when the app is closed`() async throws {
+    @Test(.needsScriptEngine) func `should show Google's quota with the saved login when the app is closed`() async throws {
         let seen = Seen()
         let provider = try make(running: false, answers: [
             "retrieveUserQuotaSummary": (200, Self.summary),

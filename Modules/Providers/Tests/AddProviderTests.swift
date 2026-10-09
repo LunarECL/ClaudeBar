@@ -4,6 +4,9 @@ import Mockable
 import Providers
 import Quotas
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// *Add Provider* (USER_JOURNEYS moments 5–9): the sheet's answers become a
 /// definition — the same data the built-ins are — and run on the same

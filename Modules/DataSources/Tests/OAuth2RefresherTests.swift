@@ -3,6 +3,9 @@ import Foundation
 import Mockable
 import Testing
 @testable import DataSources
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @Suite
 struct OAuth2RefresherTests {

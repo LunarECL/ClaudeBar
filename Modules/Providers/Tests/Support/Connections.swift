@@ -4,6 +4,9 @@ import Foundation
 import Mockable
 import Providers
 import Testing
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Builds a built-in `Provider` whose data sources run on stubbed connections,
 /// so a definition is tested end to end — lookup, fetch, mapping, lifecycle —

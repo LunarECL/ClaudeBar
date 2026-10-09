@@ -21,7 +21,8 @@ public enum ProviderFactory {
 
     /// Every built-in definition, by id — read once from `Resources/Providers/`.
     public static let builtInDefinitions: [String: ProviderDefinition] = {
-        let urls = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: nil) ?? []
+        // `as URL`: Windows' Foundation still answers this with `NSURL`s.
+        let urls = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: nil) ?? []).map { $0 as URL }
         var definitions: [String: ProviderDefinition] = [:]
         for url in urls {
             guard let data = try? Data(contentsOf: url), let definition = try? ProviderDefinition.parse(data) else { continue }
