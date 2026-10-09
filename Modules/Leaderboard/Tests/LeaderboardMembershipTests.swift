@@ -1,7 +1,7 @@
 import Foundation
 import Mockable
 import Testing
-@testable import Domain
+@testable import Leaderboard
 
 @MainActor
 @Suite

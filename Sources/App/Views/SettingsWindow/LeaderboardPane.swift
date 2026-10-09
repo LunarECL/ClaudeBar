@@ -7,7 +7,7 @@ import Infrastructure
 /// *SETTINGS → LEADERBOARD*: your name, whether you're shown, what you share,
 /// your own data, and leaving. Joining is here or in the popover's tab.
 struct LeaderboardPane: View {
-    let leaderboard: Leaderboard
+    let leaderboard: AppLeaderboard
     let monitor: QuotaMonitor
 
     @Environment(\.appTheme) private var theme

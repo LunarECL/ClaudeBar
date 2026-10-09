@@ -13,7 +13,7 @@ struct SettingsWindowView: View {
     /// so a button press and the background publish cannot both start a tile.
     let notifyDriver: NotifyPublishDriver
 
-    let leaderboard: Leaderboard
+    let leaderboard: AppLeaderboard
 
     var onHookSettingsChanged: ((Bool) -> Void)?
 

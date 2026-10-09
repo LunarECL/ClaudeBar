@@ -69,7 +69,7 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 | `Monitoring` | Monitoring · conductor | `QuotaMonitor`, `MonitoringEvent`, `RefreshInterval`, `RefreshKind`, `Clock`, `PowerStateProvider` | `SystemClock`, `SystemPowerStateProvider`, `SingleFlightCache` |
 | `Alerting` | Alerting | `QuotaAlerter`, Notify! values, `NotifySettingsRepository` | `NotificationAlerter`, `SystemAlertSender`, `NotifyGatewayClient` |
 | `Activity` | Activity | `ClaudeSession`, `SessionEvent`, `SessionMonitor`, `NotchActivity`, `HookSettingsRepository` | `HookHTTPServer`, `HookInstaller`, `PortDiscovery`, `SessionEventParser` |
-| `Leaderboard` | Leaderboard | `LeaderboardMembership`, `DailyTokens`, `Username`, `RequestSigner`, `LeaderboardUploader`, the devices' values, the ports `LeaderboardAPI` · `SigningKeyStore` · `MachineIdentity` · `TokenLogs` ([its design §7](../features/leaderboard/design.md#7--architecture)) | `LeaderboardHTTPClient`, `CredentialSigningKeyStore`, `IOKitMachineIdentity` (macOS) and their Windows twins (§10) |
+| `Leaderboard` | Leaderboard | `LeaderboardMembership`, `DailyTokens`, `Username`, `RequestSigner`, `LeaderboardUploader`, the devices' values, the ports `LeaderboardAPI` · `SigningKeyStore` · `MachineIdentity` · `TokenLogs` ([its design §7](../features/leaderboard/design.md#7--architecture)); the factory `Leaderboard.makeAPI(client:)` · `makeKeyStore()` | `LeaderboardHTTPClient`; `FallbackSigningKeyStore` over `KeychainSigningKeyStore` (macOS) and `DefaultsSigningKeyStore`; `IOKitMachineIdentity` (macOS); Windows' own in `Internal/Windows/` (§10, phase 3) |
 | `Storage` | Vault & Settings · generic | `Storage.makeSettings()`, `Storage.makeVault()`, `AppSettingsRepository` | `JSONSettingsRepository`, `JSONSettingsStore`, `KeychainCredentialRepository`, `UserDefaults…`, `SecureCredentialMigration` |
 | `Diagnostics` | — cross-cutting | `AppLog` and its categories | the `LogSink`s: `FileLogSink`, `OSLogSink` (macOS) |
 | `ClaudeBar` (App) | — the composition root | SwiftUI views, themes, menu-bar label, page state, the Add Provider sheet | — |
@@ -239,14 +239,13 @@ testability" alone.
 
 ## 8 · Still to carve
 
-`Quotas`, `Diagnostics`, `DataSources`, `AWSClients` and `Providers` are
-built. `Domain` and `Infrastructure` re-export them (`@_exported import`), so
+`Quotas`, `Diagnostics`, `DataSources`, `AWSClients`, `Providers` and
+`Leaderboard` are built. `Domain` and `Infrastructure` re-export them (`@_exported import`), so
 no call site changes while files move, and each old target is deleted once
 it is empty.
 
 | Today | Goes to |
 |---|---|
-| `Domain/Leaderboard/`, `Infrastructure/Leaderboard/` | `Leaderboard` — carved first, because ClaudeBar for Windows needs it first (§10, phase 2) |
 | `Domain/Monitor/` | `Monitoring` (`QuotaAlerter` → `Alerting`) |
 | `Domain/Notify/`, `Infrastructure/Notifications/`, `Notify/` | `Alerting` |
 | `Domain/Session/`, `Domain/Notch/`, `Infrastructure/Hooks/` | `Activity` (`NSScreen+NotchMetrics` → App) |
@@ -254,7 +253,7 @@ it is empty.
 | `Domain/Provider/` page state (`MenuBarLabel`, `MenuBar*Display`, `MenuBarStackedSize`, `CountdownColon`, `PopoverContentHeight`) | the App |
 | `Infrastructure/Claude/ClaudeGuestPassSource` | the App — Claude's alone, a source the composition root hands in behind `GuestPassSource` |
 | `Infrastructure/TerminalImport/` | the App — themes are presentation |
-| `Tests/DomainTests`, `InfrastructureTests` | split per module, following their sources; `Quotas`' are in `QuotasTests` |
+| `Tests/DomainTests`, `InfrastructureTests` | split per module, following their sources; `Quotas`' are in `QuotasTests`, the leaderboard's in `LeaderboardTests` |
 
 The kernel still holds a few types that belong elsewhere; each carries a
 `- Note: Interim` naming its final shape, and the canonical model lists them
@@ -419,7 +418,7 @@ Each phase leaves main shippable and the Mac app unchanged in behaviour.
 |---|---|---|
 | 0 | **Prove the toolchain.** A `windows-latest` job builds and tests `Quotas` with the Swift toolchain, Mockable included | the job is green — built ([#523](https://github.com/tddworks/ClaudeBar/pull/523)): Swift 6.3.3 builds and tests `Quotas`, and a `@Mockable` port's mock works there |
 | 1 | **The package.** Root `Package.swift` declares today's modules; Tuist consumes it; no source changes | `tuist test` and the macOS `swift test` are green — built ([#526](https://github.com/tddworks/ClaudeBar/pull/526)): `tuist test` runs the same 3,099 tests as before, and `swift test` runs the modules' tests without Tuist |
-| 2 | **The leaderboard slice.** Carve `Leaderboard` (§8); `CryptoKit` → `Crypto` in `UsageLog`, `CLISession`, `ProviderDefinition`, `RequestSigner`, `SigningKey`; Diagnostics behind `LogSink`; the Mac-only files of `DataSources` move to `Internal/macOS/` | `Quotas`, `Diagnostics`, `DataSources`, `Providers` and `Leaderboard` build and pass on Windows, including the log-reading tests and `vectors.json` — the Windows client can start |
+| 2 | **The leaderboard slice.** Carve `Leaderboard` (§8); `CryptoKit` → `Crypto` in `UsageLog`, `CLISession`, `ProviderDefinition`, `RequestSigner`, `SigningKey`; Diagnostics behind `LogSink`; the Mac-only files of `DataSources` move to `Internal/macOS/` | `Quotas`, `Diagnostics`, `DataSources`, `Providers` and `Leaderboard` build and pass on Windows, including the log-reading tests and `vectors.json` — the Windows client can start — built ([#527](https://github.com/tddworks/ClaudeBar/pull/527), [#528](https://github.com/tddworks/ClaudeBar/pull/528), [#529](https://github.com/tddworks/ClaudeBar/pull/529), [#537](https://github.com/tddworks/ClaudeBar/pull/537)): Windows runs 1,355 of the 1,746 tests and skips the rest, each saying why; the leaderboard's run in full |
 | 3 | **Windows adapters for the slice:** `SigningKeyStore` on Credential Manager, `MachineIdentity` on the machine GUID, `LeaderboardAPI` on `URLSession` | the Windows client joins and uploads against the real server |
 | 4 | **Paths and shells.** The engine's Mac assumptions without an import (`/bin/zsh` and `/bin/sh` in `LoginShellEnvironment`, `Connection` and the `file` fetch; `/usr/sbin/lsof` and `/usr/bin/pgrep` in `LocalServerFetcher`; `/usr/bin/security`; `~/Library/Application Support`; `:` in `PATH`) become facts of the module's `Platform` that the factory hands each worker; definitions name a platform's app-data folder through the path language ([ENGINE_DESIGN](ENGINE_DESIGN.md) changes first) | the definitions that read local files resolve on Windows |
 | 5 | **Quotas on Windows.** The rest of `Internal/Windows/`: processes, the pseudo-terminal, the JS engine, SQLite as a bundled package, `Monitoring`, `Alerting`, `Storage` | the Windows client shows quotas, and Windows skips no test |

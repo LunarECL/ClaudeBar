@@ -30,5 +30,4 @@ public enum CredentialKey {
     public static let vercelApiKey = "vercel-ai-gateway-api-key"
     public static let zaiApiKey = "zai-glm-api-key"
     public static let notifyDeviceToken = "notify-device-token"
-    public static let leaderboardSigningKey = "leaderboard-signing-key"
 }

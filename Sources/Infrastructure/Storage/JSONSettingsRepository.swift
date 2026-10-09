@@ -804,7 +804,7 @@ extension JSONSettingsRepository: MultiAccountSettingsRepository {
 // MARK: - LeaderboardSettingsRepository
 
 // A destination's own namespace, `leaderboard.*`, beside `notify.*`. The
-// private key is not here: it lives in `CredentialSigningKeyStore`.
+// private key is not here: the `Leaderboard` module's `SigningKeyStore` keeps it.
 extension JSONSettingsRepository: LeaderboardSettingsRepository {
     public func leaderboardRecord() -> LeaderboardRecord? {
         guard let username: String = store.read(key: "leaderboard.username") else { return nil }

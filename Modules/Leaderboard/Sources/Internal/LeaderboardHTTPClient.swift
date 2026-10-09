@@ -1,24 +1,25 @@
+import DataSources
 import Foundation
-import Domain
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// The leaderboard server (`claudebar-api.tddworks.com`) over HTTPS. Signed calls are
 /// signed over the exact bytes sent; the host is fixed, so a setting can't
 /// point the app's key at someone else's server.
-public struct LeaderboardHTTPClient: LeaderboardAPI {
-    public static let defaultHost = URL(string: "https://claudebar-api.tddworks.com")!
-    /// How this app names itself on every request (`X-Client`), so the server
-    /// can tell clients apart and refuse one broken version alone.
-    public static let macClient = "claudebar-macos/\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")"
+struct LeaderboardHTTPClient: LeaderboardAPI {
+    static let defaultHost = URL(string: "https://claudebar-api.tddworks.com")!
 
     private let networkClient: any NetworkClient
     private let host: URL
+    /// How the app names itself on every request (`X-Client`), so the server
+    /// can tell clients apart and refuse one broken version alone.
     private let client: String
     private let timeout: TimeInterval
     private let now: @Sendable () -> Date
 
-    public init(networkClient: any NetworkClient = URLSession.shared, host: URL = LeaderboardHTTPClient.defaultHost,
-                client: String = LeaderboardHTTPClient.macClient, timeout: TimeInterval = 15,
-                now: @escaping @Sendable () -> Date = Date.init) {
+    init(networkClient: any NetworkClient = URLSession.shared, host: URL = LeaderboardHTTPClient.defaultHost,
+         client: String, timeout: TimeInterval = 15, now: @escaping @Sendable () -> Date = Date.init) {
         self.networkClient = networkClient
         self.host = host
         self.client = client
@@ -28,11 +29,11 @@ public struct LeaderboardHTTPClient: LeaderboardAPI {
 
     // MARK: - LeaderboardAPI
 
-    public func join(username: String, publicKey: String) async throws {
+    func join(username: String, publicKey: String) async throws {
         _ = try await send("POST", "/join", body: try JSONEncoder().encode(["username": username, "publicKey": publicKey]))
     }
 
-    public func upload(_ days: [DailyTokens], as credentials: MemberCredentials) async throws -> [RefusedDay] {
+    func upload(_ days: [DailyTokens], as credentials: MemberCredentials) async throws -> [RefusedDay] {
         let body = try JSONEncoder().encode(Upload(today: DailyTokens.day(of: now()), days: days))
         let answer = try await send("PUT", "/usage", body: body, signedBy: credentials)
         // A server from before devices answers with no body, or with an object that has
@@ -48,24 +49,24 @@ public struct LeaderboardHTTPClient: LeaderboardAPI {
         }
     }
 
-    public func me(period: BoardPeriod, provider: String?, as credentials: MemberCredentials) async throws -> MemberSummary {
+    func me(period: BoardPeriod, provider: String?, as credentials: MemberCredentials) async throws -> MemberSummary {
         let data = try await send("GET", "/me", query: Self.query(period, provider), signedBy: credentials)
         return try decode(MemberSummary.self, data)
     }
 
-    public func update(_ change: MemberChange, as credentials: MemberCredentials) async throws {
+    func update(_ change: MemberChange, as credentials: MemberCredentials) async throws {
         _ = try await send("PATCH", "/me", body: try JSONEncoder().encode(change), signedBy: credentials)
     }
 
-    public func leave(as credentials: MemberCredentials) async throws {
+    func leave(as credentials: MemberCredentials) async throws {
         _ = try await send("DELETE", "/me", signedBy: credentials)
     }
 
-    public func board(period: BoardPeriod, provider: String?) async throws -> [Board.Member] {
+    func board(period: BoardPeriod, provider: String?) async throws -> [Board.Member] {
         try decode(BoardAnswer.self, try await send("GET", "/board", query: Self.query(period, provider))).standings
     }
 
-    public func globe(period: BoardPeriod) async throws -> GlobeSummary {
+    func globe(period: BoardPeriod) async throws -> GlobeSummary {
         try decode(GlobeSummary.self, try await send("GET", "/globe", query: Self.query(period, nil)))
     }
 

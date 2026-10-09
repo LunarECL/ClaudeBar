@@ -9,7 +9,10 @@ import Infrastructure
 /// and keeps the boards for the app run, so they outlive the popover.
 @MainActor
 @Observable
-final class Leaderboard {
+final class AppLeaderboard {
+    /// How the Mac app names itself on every request (`X-Client`).
+    static let client = "claudebar-macos/\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")"
+
     let membership: LeaderboardMembership
     let uploader: LeaderboardUploader
     let boardPage = URL(string: "https://claudebar.tddworks.com/leaderboard/")!
@@ -29,9 +32,11 @@ final class Leaderboard {
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var boards: [Board] = []
 
+    /// The key store is the Mac's Keychain, with the app's fallback: the
+    /// factory has none only where ClaudeBar keeps no key yet (Windows).
     init(monitor: QuotaMonitor,
-         api: any LeaderboardAPI = LeaderboardHTTPClient(),
-         keys: any SigningKeyStore = CredentialSigningKeyStore(),
+         api: any LeaderboardAPI = Leaderboard.makeAPI(client: AppLeaderboard.client),
+         keys: any SigningKeyStore = Leaderboard.makeKeyStore()!,
          settings: any LeaderboardSettingsRepository = JSONSettingsRepository.shared) {
         let logs = MonitorTokenLogs(monitor: monitor)
         self.api = api

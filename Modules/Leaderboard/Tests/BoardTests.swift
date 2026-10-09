@@ -1,7 +1,7 @@
 import Foundation
 import Mockable
 import Testing
-@testable import Domain
+@testable import Leaderboard
 
 /// A board as this app last read it: what the person saw stays on screen
 /// until a newer answer replaces it.

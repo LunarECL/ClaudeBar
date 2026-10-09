@@ -467,7 +467,7 @@ Hiding, suspending, renaming and leaving change who is shown, not a total, so th
 
 Counting on every read made a read cost every stored row, history included, so D1's rows read grew with members × members × days. With 64 members and under 2,000 rows it reached 75% of the free plan's 5M a day (2026-10-07).
 
-The Worker verifies with WebCrypto's Ed25519 against the public key `X-Key` names, over **the exact bytes received**, never re-serialised JSON. The canonical string is pinned by `Tests/DomainTests/Leaderboard/vectors.json`, of which the server keeps an identical copy.
+The Worker verifies with WebCrypto's Ed25519 against the public key `X-Key` names, over **the exact bytes received**, never re-serialised JSON. The canonical string is pinned by `Modules/Leaderboard/Tests/vectors.json`, of which the server keeps an identical copy.
 
 CryptoKit's Ed25519 signatures are randomised, so the shared vectors are **verified** on both sides, never compared byte for byte.
 
@@ -501,12 +501,12 @@ The server's own threat model (rate limits, caching, moderation, logging) is in 
 
 A destination, not a provider, so it sits beside Notify! (AGENTS.md: destinations get standalone repositories, never under `ProviderSettingsRepository`).
 
-Its code moves to the `Leaderboard` module of the package that also builds on Windows, so ClaudeBar for Windows counts and signs a day with the same code as the Mac ([MODULAR_DESIGN §10](../../architecture/MODULAR_DESIGN.md#10--one-package-two-platforms), phase 2). The homes below are today's.
+Its code is the `Leaderboard` module of the package that also builds on Windows, so ClaudeBar for Windows counts and signs a day with the same code as the Mac ([MODULAR_DESIGN §10](../../architecture/MODULAR_DESIGN.md#10--one-package-two-platforms)).
 
 ```
 ┌──────────────────────────────────────────── THIS MAC (Swift) ─────────────────────────────────────────────┐
 │                                                                                                           │
-│  Modules (data + generic engine)               Sources/Domain/Leaderboard              Sources/App        │
+│  Modules (data + generic engine)               Modules/Leaderboard                     Sources/App        │
 │  ┌─────────────────────────────────┐          ┌────────────────────────────────┐     ┌────────────────┐  │
 │  │ codex.json  + usageHistory      │          │ LeaderboardMembership (root)   │◀────│ Leaderboard    │  │
 │  │  sessions/**/rollout-*.jsonl,   │          │  username, sharing, visible,   │     │  popover tab   │  │
@@ -523,7 +523,7 @@ Its code moves to the `Leaderboard` module of the package that also builds on Wi
 │                                               │ SigningKeyStore                │                         │
 │                                               │ LeaderboardSettingsRepository  │                         │
 │                                               └───────────────┬────────────────┘                         │
-│  Sources/Infrastructure/Leaderboard                           │                                          │
+│  Modules/Leaderboard/Sources/Internal                         │                                          │
 │   LeaderboardHTTPClient (NetworkClient) · KeychainSigningKeyStore (+ UserDefaults fallback)             │
 │   JSONSettingsRepository: leaderboard.* keys in ~/.claudebar/settings.json                               │
 └───────────────────────────────────────────────────────────────┼──────────────────────────────────────────┘
@@ -539,18 +539,21 @@ Its code moves to the `Leaderboard` module of the package that also builds on Wi
 | Codex `usageHistory` (JSON) | Codex daily tokens from its session logs | Each `token_count` line's `last_token_usage`, deduplicated by the session's running total (Codex writes some lines twice). No cost: the lines name no model |
 | `UsageLog.Tokens.inputIncludesCacheRead` | Generic engine rule | A log whose input count already holds its cache reads; the engine takes them out, so input means the same for every provider |
 | `LeaderboardMembership` | The laws of §4 on this device | Only ticked providers leave; only providers with usage history can be ticked; a provider's logins are summed; the member's settings follow `/me`; a key whose `machine` hash isn't this Mac's never uploads; refused days are tried again |
-| `RequestSigner` | The canonical string, signed with Ed25519 from `Crypto` (swift-crypto, which is CryptoKit on Apple platforms) | Pinned by `Tests/DomainTests/Leaderboard/vectors.json`; the server checks an identical copy |
+| `RequestSigner` | The canonical string, signed with Ed25519 from `Crypto` (swift-crypto, which is CryptoKit on Apple platforms) | Pinned by `Modules/Leaderboard/Tests/vectors.json`; the server checks an identical copy |
 | `LeaderboardUploader` + App driver | Uploads 30 days on join, then hourly from `lastUpload` with the refused days, and now when you ask; an hourly upload identical to the last one sent is skipped while no refused day waits | `lastUpload` moves only on success, or on a skipped upload the server already holds. The driver asks `uploadDue()` every 5 minutes and on `NSWorkspace.didWakeNotification`; a `Timer`'s clock stops while the Mac sleeps, so the hour is the uploader's to judge |
 | Server | The server's laws of §4 | Private repo `tddworks/claudebar-server`; deployed with the `cf` CLI |
 
 | Piece | Home |
 |---|---|
-| `LeaderboardMembership`, `Board` and `Board.Member`, `DailyTokens`, `Username`, `RankCard`, `LeaderboardUploader` | `Sources/Domain/Leaderboard/` |
-| `@Mockable` ports `LeaderboardAPI`, `SigningKeyStore` and `MachineIdentity` (this Mac's hardware UUID and model, faked in tests to stand for another Mac); plain `LeaderboardSettingsRepository` (like Notify!'s, now also keeping `refused`, the `machine` hash and the devices already shown) and `@MainActor` `TokenLogs`, faked in tests | `Sources/Domain/Leaderboard/` |
-| `Device`, `DeviceCode`, `DeviceLabel` | `Sources/Domain/Leaderboard/` |
-| `IOKitMachineIdentity`: `MachineIdentity` read through IOKit (`IOPlatformUUID`, the model) | `Sources/Infrastructure/` |
-| `LeaderboardHTTPClient`, `CredentialSigningKeyStore`; settings as `leaderboard.*` in `JSONSettingsRepository` | `Sources/Infrastructure/` |
-| `Leaderboard` (wiring, `board` and `board(period:provider:)`, so a board outlives the popover, the 5-minute check and the wake observer, `refresh()` for the popover's Refresh, `share(_:)` for *Share my rank*, `turnOff()`/`turnOn()` and the one-time `offNotice`), `MonitorTokenLogs`, popover tab, `RankCardImage` (the image, in the member's theme) and `RankShareOverlay`, `TurnOffMenu` (the tab's *Turn off ▾*, drawn in the popover's top layer so the scroll view never clips it), `LeaderboardPane` (with its *Devices* list, *Add a device*, and the notices for a device added, a copied key and a refused day), the join form's *Already a member? Add this Mac* | `Sources/App/` |
+| `LeaderboardMembership`, `Board` and `Board.Member`, `DailyTokens`, `Username`, `RankCard`, `LeaderboardUploader` | `Modules/Leaderboard/Sources/` |
+| `@Mockable` ports `LeaderboardAPI` and `SigningKeyStore`, and, with slices 13–15, `MachineIdentity` (this Mac's hardware UUID and model, faked in tests to stand for another Mac); plain `LeaderboardSettingsRepository` (like Notify!'s, now also keeping `refused`, the `machine` hash and the devices already shown) and `@MainActor` `TokenLogs`, faked in tests | `Modules/Leaderboard/Sources/` |
+| `Device`, `DeviceCode`, `DeviceLabel` (slices 13–15, not built yet) | `Modules/Leaderboard/Sources/` |
+| The factory, `Leaderboard.makeAPI(client:)` and `Leaderboard.makeKeyStore()`: the server, and the key store of the platform the module is built for | `Modules/Leaderboard/Sources/` |
+| `LeaderboardHTTPClient`; `FallbackSigningKeyStore`, the key in the Keychain first and in UserDefaults when the Keychain refuses it (`DefaultsSigningKeyStore`) | `Modules/Leaderboard/Sources/Internal/` |
+| `KeychainSigningKeyStore`, the same Keychain item as before the module | `Modules/Leaderboard/Sources/Internal/macOS/` |
+| `IOKitMachineIdentity` (slices 13–15, not built yet): `MachineIdentity` read through IOKit (`IOPlatformUUID`, the model) | `Modules/Leaderboard/Sources/Internal/macOS/` |
+| Settings as `leaderboard.*` in `JSONSettingsRepository` | `Sources/Infrastructure/` |
+| `AppLeaderboard` (wiring through the factory with the app's `X-Client` name, `board` and `board(period:provider:)`, so a board outlives the popover, the 5-minute check and the wake observer, `refresh()` for the popover's Refresh, `share(_:)` for *Share my rank*, `turnOff()`/`turnOn()` and the one-time `offNotice`), `MonitorTokenLogs`, popover tab, `RankCardImage` (the image, in the member's theme) and `RankShareOverlay`, `TurnOffMenu` (the tab's *Turn off ▾*, drawn in the popover's top layer so the scroll view never clips it), `LeaderboardPane` (with its *Devices* list, *Add a device*, and the notices for a device added, a copied key and a refused day), the join form's *Already a member? Add this Mac* | `Sources/App/` |
 | Server and board page | Private repo `tddworks/claudebar-server` |
 
 ## 8 · Build sequence

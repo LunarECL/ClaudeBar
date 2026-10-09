@@ -23,11 +23,12 @@ let package = Package(
     name: "ClaudeBarKit",
     platforms: [.macOS(.v15)],
     products: [
-        .library(name: "ClaudeBarKit", targets: ["Quotas", "Diagnostics", "DataSources", "Providers", "AWSClients"]),
+        .library(name: "ClaudeBarKit", targets: ["Quotas", "Diagnostics", "DataSources", "Providers", "Leaderboard", "AWSClients"]),
         .library(name: "Quotas", targets: ["Quotas"]),
         .library(name: "Diagnostics", targets: ["Diagnostics"]),
         .library(name: "DataSources", targets: ["DataSources"]),
         .library(name: "Providers", targets: ["Providers"]),
+        .library(name: "Leaderboard", targets: ["Leaderboard"]),
         .library(name: "AWSClients", targets: ["AWSClients"]),
     ],
     dependencies: [
@@ -112,19 +113,37 @@ let package = Package(
             path: "Modules/Providers/Tests",
             swiftSettings: mocking
         ),
+
+        // Leaderboard — the membership, its days and their signing, the board as last read,
+        // and the ports for the board's server and where the key is kept. `vectors.json`,
+        // which the server shares, is read by the tests from beside them.
+        .target(
+            name: "Leaderboard",
+            dependencies: ["Quotas", "Diagnostics", "DataSources", mockable, crypto],
+            path: "Modules/Leaderboard/Sources",
+            swiftSettings: mocking
+        ),
+        .testTarget(
+            name: "LeaderboardTests",
+            dependencies: ["Leaderboard", "DataSources", "Quotas", mockable, crypto],
+            path: "Modules/Leaderboard/Tests",
+            exclude: ["vectors.json"],
+            swiftSettings: mocking
+        ),
     ]
 )
 #else
-// What builds on Windows today (§10 phases 0 and 2): Quotas, Diagnostics, DataSources and
-// Providers. SwiftTerm, SweetCookieKit and the AWS SDK are the Mac's.
+// What builds on Windows today (§10 phases 0 and 2): Quotas, Diagnostics, DataSources,
+// Providers and Leaderboard. SwiftTerm, SweetCookieKit and the AWS SDK are the Mac's.
 let package = Package(
     name: "ClaudeBarKit",
     products: [
-        .library(name: "ClaudeBarKit", targets: ["Quotas", "Diagnostics", "DataSources", "Providers"]),
+        .library(name: "ClaudeBarKit", targets: ["Quotas", "Diagnostics", "DataSources", "Providers", "Leaderboard"]),
         .library(name: "Quotas", targets: ["Quotas"]),
         .library(name: "Diagnostics", targets: ["Diagnostics"]),
         .library(name: "DataSources", targets: ["DataSources"]),
         .library(name: "Providers", targets: ["Providers"]),
+        .library(name: "Leaderboard", targets: ["Leaderboard"]),
     ],
     dependencies: [
         .package(url: "https://github.com/Kolos65/Mockable.git", from: "0.5.0"),
@@ -167,6 +186,19 @@ let package = Package(
             name: "ProvidersTests",
             dependencies: ["Providers", "DataSources", "Quotas", mockable, crypto],
             path: "Modules/Providers/Tests",
+            swiftSettings: mocking
+        ),
+        .target(
+            name: "Leaderboard",
+            dependencies: ["Quotas", "Diagnostics", "DataSources", mockable, crypto],
+            path: "Modules/Leaderboard/Sources",
+            swiftSettings: mocking
+        ),
+        .testTarget(
+            name: "LeaderboardTests",
+            dependencies: ["Leaderboard", "DataSources", "Quotas", mockable, crypto],
+            path: "Modules/Leaderboard/Tests",
+            exclude: ["vectors.json"],
             swiftSettings: mocking
         ),
     ]

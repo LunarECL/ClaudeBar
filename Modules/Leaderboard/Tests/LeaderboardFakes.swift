@@ -1,6 +1,7 @@
 import Foundation
 import Mockable
-@testable import Domain
+@testable import Leaderboard
+import Quotas
 
 final class InMemorySigningKeyStore: SigningKeyStore, @unchecked Sendable {
     var stored: Data?

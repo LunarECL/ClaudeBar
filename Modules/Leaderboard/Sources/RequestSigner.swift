@@ -4,7 +4,7 @@ import Foundation
 /// Signs a request the way the Worker checks it: over the method, the path
 /// and query, the time, a nonce and the body's SHA-256, joined by newlines.
 /// The server verifies the exact bytes it received, so the body signed here
-/// must be the body sent. Pinned by `Tests/DomainTests/Leaderboard/vectors.json`,
+/// must be the body sent. Pinned by `Modules/Leaderboard/Tests/vectors.json`,
 /// which the server checks an identical copy of.
 public enum RequestSigner {
     public static func canonical(method: String, pathAndQuery: String, timestamp: Int, nonce: String, body: Data) -> String {
