@@ -21,7 +21,7 @@ ignore:
   # Thin wrappers whose only job is I/O or a system call. Tests stand in for
   # each through its port, so a test of the real one would test macOS or the SDK.
   - "Modules/AWSClients/Sources/**/*"  # AWS SDK
-  - "Modules/Diagnostics/Sources/FileLogger.swift"  # the log file
+  - "Modules/Diagnostics/Sources/Internal/macOS/OSLogSink.swift"  # OSLog
   - "Modules/DataSources/Sources/Internal/Process/ProcessRPCTransport.swift"  # stdio pipe
   - "Modules/DataSources/Sources/Internal/Process/RunningProcesses.swift"  # ps
   - "Modules/DataSources/Sources/Internal/Process/DefaultCLIExecutor.swift"  # Process

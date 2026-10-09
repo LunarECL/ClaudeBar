@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Domain
 import Infrastructure
@@ -17,7 +18,7 @@ struct LogsPane: View {
                     subtitle: "Opens ClaudeBar.log in TextEdit. Attach it when reporting issues."
                 ) {
                     Button {
-                        FileLogger.shared.openCurrentLogFile()
+                        NSWorkspace.shared.open(AppLog.logFileURL)
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "doc.text")

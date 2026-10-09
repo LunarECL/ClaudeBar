@@ -1,0 +1,77 @@
+import Foundation
+import Testing
+@testable import Diagnostics
+
+/// The file log a person opens and attaches to an issue: the same lines on
+/// the Mac and on Windows.
+@Suite
+struct FileLogSinkTests {
+    private let folder = FileManager.default.temporaryDirectory
+        .appending(path: "FileLogSinkTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+
+    private var file: URL { folder.appending(path: "Logs/ClaudeBar.log") }
+
+    private func lines(of url: URL) throws -> [String] {
+        try String(contentsOf: url, encoding: .utf8).split(separator: "\n").map(String.init)
+    }
+
+    @Test
+    func `should create the log's folder on first use`() throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let sink = FileLogSink(fileURL: file)
+
+        sink.write(.info, category: "monitor", message: "started")
+        sink.flush()
+
+        #expect(try lines(of: file).count == 1)
+    }
+
+    @Test
+    func `should write each line with its time, level and category, in the order written`() throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let sink = FileLogSink(fileURL: file)
+
+        sink.write(.info, category: "probes", message: "Starting probe")
+        sink.write(.warning, category: "network", message: "Slow answer")
+        sink.write(.error, category: "probes", message: "Probe failed")
+        sink.flush()
+
+        let lines = try lines(of: file)
+        #expect(lines.count == 3)
+        #expect(lines[0].hasSuffix("] [INFO] [probes] Starting probe"))
+        #expect(lines[1].hasSuffix("] [WARNING] [network] Slow answer"))
+        #expect(lines[2].hasSuffix("] [ERROR] [probes] Probe failed"))
+        let time = try #require(lines[0].split(separator: "]").first?.dropFirst())
+        #expect((try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(String(time))) != nil)
+    }
+
+    @Test
+    func `should keep debug lines out of the file and write a notice as info`() throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let sink = FileLogSink(fileURL: file)
+
+        sink.write(.debug, category: "ui", message: "Only for developers")
+        sink.write(.notice, category: "ui", message: "Attached to the status item")
+        sink.flush()
+
+        let lines = try lines(of: file)
+        #expect(lines.count == 1)
+        #expect(lines[0].hasSuffix("] [INFO] [ui] Attached to the status item"))
+    }
+
+    @Test
+    func `should start a new file once the log passes its size, keeping the last one beside it`() throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let sink = FileLogSink(fileURL: file, maxFileSize: 100)
+
+        sink.write(.info, category: "monitor", message: String(repeating: "a", count: 120))
+        sink.write(.info, category: "monitor", message: "after the rotation")
+        sink.flush()
+
+        let old = folder.appending(path: "Logs/ClaudeBar.old.log")
+        #expect(try lines(of: old).count == 1)
+        #expect(try lines(of: old)[0].hasSuffix(String(repeating: "a", count: 120)))
+        #expect(try lines(of: file).count == 1)
+        #expect(try lines(of: file)[0].hasSuffix("] [INFO] [monitor] after the rotation"))
+    }
+}
