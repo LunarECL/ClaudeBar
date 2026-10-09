@@ -37,6 +37,7 @@ let project = Project(
                 .external(name: "DataSources"),
                 .external(name: "Providers"),
                 .external(name: "Mockable"),
+                .external(name: "Crypto"),
             ],
             settings: .settings(
                 base: [
@@ -128,6 +129,7 @@ let project = Project(
                 .target(name: "Domain"),
                 .target(name: "Infrastructure"),
                 .external(name: "Mockable"),
+                .external(name: "Crypto"),
                 .external(name: "AWSCloudWatch"),
                 .external(name: "AWSSTS"),
                 .external(name: "AWSPricing"),
@@ -156,6 +158,7 @@ let project = Project(
                 .external(name: "Diagnostics"),
                 .target(name: "Domain"),
                 .external(name: "Mockable"),
+                .external(name: "Crypto"),
                 .external(name: "AWSCloudWatch"),
                 .external(name: "AWSSTS"),
                 .external(name: "AWSPricing"),

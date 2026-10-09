@@ -440,7 +440,7 @@ Host: `https://claudebar-api.tddworks.com`; the public board page is `https://cl
 | `GET /globe?period=30d` | none | every country opted-in members share; members and tokens (`countries`) only where at least 3 are, the rest named without a number (`present`, A–Z) |
 | `GET /board?period=7d&provider=claude` | none | standings of visible members, up to 100, a member's days summed over their devices, each in its own periods, cached at the edge for two minutes, dropped from the uploader's data centre by each `PUT /usage`; the app reads it without its local HTTP cache |
 
-**Signing.** On join, or when it asks to be added, a device makes a `Curve25519.Signing.PrivateKey` (CryptoKit) and sends its public half. Every signed request carries:
+**Signing.** On join, or when it asks to be added, a device makes a `Curve25519.Signing.PrivateKey` (`Crypto`, which is CryptoKit on Apple platforms) and sends its public half. Every signed request carries:
 
 ```
 X-Key:       <the device's public key, base64url, as sent on join>

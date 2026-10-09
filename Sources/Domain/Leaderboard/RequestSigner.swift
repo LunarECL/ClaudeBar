@@ -1,4 +1,4 @@
-import CryptoKit
+import Crypto
 import Foundation
 
 /// Signs a request the way the Worker checks it: over the method, the path
