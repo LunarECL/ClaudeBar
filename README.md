@@ -168,6 +168,9 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/JawsomeJason"><img src="https://avatars.githubusercontent.com/u/787276?v=4?s=80" width="80px;" alt="Jason Featheringham ⊙ω⊙"/><br /><sub><b>Jason Featheringham ⊙ω⊙</b></sub></a><br /><a href="https://github.com/tddworks/claudebar/commits?author=JawsomeJason" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/brandonpierce"><img src="https://avatars.githubusercontent.com/u/10343786?v=4?s=80" width="80px;" alt="Brandon Pierce"/><br /><sub><b>Brandon Pierce</b></sub></a><br /><a href="https://github.com/tddworks/claudebar/commits?author=brandonpierce" title="Code">💻</a></td>
     </tr>
+    <tr>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/boogle42"><img src="https://avatars.githubusercontent.com/u/5807520?v=4?s=80" width="80px;" alt="Jamie Goodfellow"/><br /><sub><b>Jamie Goodfellow</b></sub></a><br /><a href="https://github.com/tddworks/claudebar/commits?author=boogle42" title="Code">💻</a></td>
+    </tr>
   </tbody>
   <tfoot>
     <tr>
