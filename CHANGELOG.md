@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.12] - 2026-10-10
+
 ### Changed
 - **Claude Code card**: finished sessions no longer take a row each. The card shows a count (*1 needs you · 2 working · 5 done*) and rows only for sessions still going; ▾ shows the Done ones, one row per repo. *Needs you* is now red and *Done* grey, in the menu bar and notch too. ([#534](https://github.com/tddworks/ClaudeBar/pull/534)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/session-hooks/README.md)
 
@@ -213,7 +217,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.11...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.12...HEAD
+[0.5.12]: https://github.com/tddworks/ClaudeBar/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/tddworks/ClaudeBar/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/tddworks/ClaudeBar/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/tddworks/ClaudeBar/compare/v0.5.8...v0.5.9
