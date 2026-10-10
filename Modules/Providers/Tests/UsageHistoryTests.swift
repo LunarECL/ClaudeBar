@@ -195,6 +195,86 @@ struct UsageHistoryTests {
         #expect(store.keys.sorted() == ["acme", "acme/Desk"])
     }
 
+    // MARK: - A custom provider's own logs (the demo home)
+
+    /// `scripts/demo-screenshots.sh` writes a custom provider into the demo
+    /// home's `~/.claudebar/providers`, with a `usageHistory` over thirty-one
+    /// days of sample logs — the definition, not a built-in, is what says
+    /// where they are. Written as a value, not as text: the folder is a
+    /// Windows path there, and a backslash in a JSON string is an escape.
+    private func writeDemoProvider() throws {
+        let dir = home.appendingPathComponent(".claudebar/providers")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let profile: [String: Any] = ["id": "custom-a-claude", "name": "Claude", "origin": "custom",
+                                      "links": [String: Any](), "look": [String: Any]()]
+        let records: [String: Any] = ["files": home.appendingPathComponent("sample-logs/*.jsonl").path,
+                                      "format": "jsonLines", "at": "$.at", "id": ["$.id"], "model": "$.model",
+                                      "tokens": ["input": "$.input", "output": "$.output", "cacheRead": "$.cacheRead"],
+                                      "cost": "$.cost"]
+        let quotaSource: [String: Any] = ["kind": "api", "label": "API",
+                                          "fetch": ["http": ["url": "http://127.0.0.1:1/"]],
+                                          "mapping": ["json": ["quotas": [Any]()]]]
+        let definition: [String: Any] = [
+            "profile": profile,
+            "dataSources": [quotaSource],
+            "defaultDataSource": "api",
+            "usageHistory": ["records": records, "sessionGap": 1800],
+        ]
+        try JSONSerialization.data(withJSONObject: definition, options: [.prettyPrinted, .sortedKeys])
+            .write(to: dir.appendingPathComponent("custom-a-claude.json"))
+    }
+
+    /// Thirty-one days of the demo's sample sessions, one file, as it writes
+    /// them. Today's are at `now`, the way `log(_:)` above does: the demo
+    /// anchors them seven hours back, which before 07:00 is yesterday's day,
+    /// and a fixture that emptied today's cards at four in the morning would
+    /// be testing the clock rather than the days.
+    private func writeSampleLogs() throws {
+        let dir = home.appendingPathComponent("sample-logs")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let calendar = Calendar.current
+        let formatter = ISO8601DateFormatter()
+        var lines: [String] = []
+        for daysAgo in 0...30 {
+            let start = calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: Date()))!
+            for step in 0..<3 {
+                let at = daysAgo == 0 ? Date() : start.addingTimeInterval(9 * 3600 + Double(step) * 3600)
+                lines.append("""
+                {"at":"\(formatter.string(from: at))","id":"sample-\(daysAgo)-\(step)",\
+                "model":"claude-sonnet-sample","input":12000,"output":3000,"cacheRead":200000,"cost":0.42}
+                """)
+            }
+        }
+        try lines.joined(separator: "\n").write(to: dir.appendingPathComponent("sample.jsonl"),
+                                                atomically: true, encoding: .utf8)
+    }
+
+    /// The demo home's own history, made the way the factory makes one.
+    private func demoHistory() throws -> UsageHistory {
+        try writeDemoProvider()
+        let found = try #require(ProviderCatalog(directory: home.appendingPathComponent(".claudebar/providers"))
+            .custom().first { $0.id == "custom-a-claude" })
+        return UsageHistory(try #require(found.usageHistory), login: "custom-a-claude",
+                            log: { DataSources.makeUsageLog($0, environment: { _ in nil }, homeDirectory: home) },
+                            ledger: { _ in nil })
+    }
+
+    @Test
+    func `should show a custom provider's last thirty days from its own sample logs`() async throws {
+        try writeSampleLogs()
+        let history = try demoHistory()
+
+        await history.read()
+
+        #expect(history.report?.today.isEmpty == false)
+        let days = try #require(history.lastThirtyDays)
+        #expect(days.stats.count == 30)
+        #expect(days.stats.allSatisfy { !$0.isEmpty }, "the demo writes a session every day of the month")
+        // The demo's records name a model, so the chart offers its split.
+        #expect(days.hasModels)
+        #expect(days.lines(of: days.stats[29]).map(\.model) == ["claude-sonnet-sample"])
+    }
+
     // MARK: - Kept days
 
     /// A usage history's fingerprint names how its days were summed: when it

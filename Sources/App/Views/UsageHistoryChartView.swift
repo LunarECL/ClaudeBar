@@ -9,21 +9,16 @@ import Domain
 /// Everything it says, `Days` answers.
 struct UsageHistoryChartView: View {
     let days: Days
-    let delay: Double
     @State private var count: Count
     @State private var split: Split
     @State private var selectedDate: Date?
-    @State private var isVisible: Bool
 
     @Environment(\.appTheme) private var theme
 
-    /// - Parameter shown: starts visible instead of fading in — for a still image.
-    init(days: Days, delay: Double, shown: Bool = false) {
+    init(days: Days) {
         self.days = days
-        self.delay = delay
         _count = State(initialValue: days.knowsCost ? .cost : .tokens)
         _split = State(initialValue: .kind)
-        _isVisible = State(initialValue: shown)
     }
 
     /// What is counted — cost only when the login is priced.
@@ -115,10 +110,6 @@ struct UsageHistoryChartView: View {
             }
         )
         .themeRivets()
-        .opacity(isVisible ? 1 : 0)
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.4).delay(delay)) { isVisible = true }
-        }
     }
 
     // MARK: - Header

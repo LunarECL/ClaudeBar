@@ -1137,7 +1137,7 @@ struct MenuContentView: View {
 
         // The same login's last thirty days, as a chart.
         if settings.showDailyUsageCards, let lastThirtyDays {
-            UsageHistoryChartView(days: lastThirtyDays, delay: Double(cards + 4) * 0.08)
+            UsageHistoryChartView(days: lastThirtyDays)
         }
     }
 
