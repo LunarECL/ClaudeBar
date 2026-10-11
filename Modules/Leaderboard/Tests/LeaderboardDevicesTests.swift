@@ -130,6 +130,25 @@ struct LeaderboardDevicesTests {
         #expect(!membership.isJoined)
     }
 
+    @Test func `should stay approved, keeping no key, when this Mac can't store its key, and join on a second try`() async throws {
+        let membership = membership()
+        server.approvals = [.success(.approved(server.summary))]
+        let request = try await membership.requestToJoin()
+        let member = try await request.waitForApproval()
+        keys.refusesSaving = true
+
+        #expect(throws: LeaderboardError.keyNotKept) { try membership.join(through: request, sharing: ["claude"]) }
+
+        #expect(request.stage == .approved(member: member))
+        #expect(!membership.isJoined)
+        #expect(keys.stored == nil && settings.record == nil)
+
+        keys.refusesSaving = false
+        try membership.join(through: request, sharing: ["claude"])
+
+        #expect(membership.isJoined)
+    }
+
     @Test func `should not ask to be added to a member while this Mac is already one`() async throws {
         let membership = try await joined()
 

@@ -197,6 +197,10 @@ public enum LeaderboardError: Error, Sendable, Equatable, LocalizedError {
     case notJoined
     /// This Mac is already a member's device, so it doesn't ask to be added.
     case alreadyJoined
+    /// This device's key store refused the key (the Keychain and its fallback
+    /// on a Mac, Credential Manager on Windows), so it didn't join: it
+    /// couldn't sign after a relaunch.
+    case keyNotKept
     /// A removal the dialog didn't offer for that device.
     case notOffered
     /// The server refused the signature: the key no longer matches the name.
@@ -225,6 +229,7 @@ public enum LeaderboardError: Error, Sendable, Equatable, LocalizedError {
         case .nothingShared: "Pick at least one provider to share."
         case .notJoined: "You haven't joined the leaderboard."
         case .alreadyJoined: "This \(machine) is already on the leaderboard."
+        case .keyNotKept: "This \(machine) couldn't store its leaderboard key, so it didn't join. Try again."
         case .notOffered: "That isn't offered for this device."
         case .unauthorized: "The leaderboard didn't accept this \(machine)'s key for your username."
         case .removed(let device): "\(device.label) removed this \(machine) from your leaderboard devices."
