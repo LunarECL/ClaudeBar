@@ -16,7 +16,7 @@ final class DeviceServer: LeaderboardAPI, @unchecked Sendable {
     /// `GET /me` from a waiting key, answered in turn; the last answer repeats.
     var approvals: [Result<DeviceApproval, LeaderboardError>] = []
     var pending = PendingDevice(label: DeviceLabel("Mac mini")!, requestedAt: Date(timeIntervalSince1970: 1_791_106_200))
-    var approved = Device(publicKey: "newkey", label: DeviceLabel("Mac mini")!, addedAt: Date(timeIntervalSince1970: 1_791_106_260))
+    var approved = Device(publicKey: DeviceKey("newkey"), label: DeviceLabel("Mac mini")!, addedAt: Date(timeIntervalSince1970: 1_791_106_260))
     var removeFailure: LeaderboardError?
     var deleteDaysFailure: LeaderboardError?
 

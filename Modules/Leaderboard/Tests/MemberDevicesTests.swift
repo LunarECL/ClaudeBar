@@ -10,7 +10,7 @@ struct MemberDevicesTests {
     private let today = LeaderboardFixtures.date(20)
 
     private func device(_ key: String, addedOn day: Int, removedOn removed: Int? = nil) -> Device {
-        Device(publicKey: key, label: DeviceLabel("Mac \(key)")!, addedAt: LeaderboardFixtures.date(day),
+        Device(publicKey: DeviceKey(key), label: DeviceLabel("Mac \(key)")!, addedAt: LeaderboardFixtures.date(day),
                removedAt: removed.map { LeaderboardFixtures.date($0) })
     }
 
@@ -19,7 +19,7 @@ struct MemberDevicesTests {
     @Test func `should take the earliest device as the one that joined, though it was removed`() {
         let devices = MemberDevices([device("k2", addedOn: 5), device("k1", addedOn: 1, removedOn: 3)])
 
-        #expect(devices.joined?.publicKey == "k1")
+        #expect(devices.joined?.publicKey == DeviceKey("k1"))
     }
 
     // MARK: - The first week
@@ -59,14 +59,14 @@ struct MemberDevicesTests {
 
     @Test func `should say which device removed one, and when`() {
         let older = device("k2", addedOn: 5)
-        let by = DeviceRef(publicKey: "k1", label: DeviceLabel("MacBook Pro")!)
+        let by = DeviceRef(publicKey: DeviceKey("k1"), label: DeviceLabel("MacBook Pro")!)
 
         let devices = MemberDevices([device("k1", addedOn: 1), older]).removing(older, by: by, at: today)
 
-        let removed = devices.device(withKey: "k2")
+        let removed = devices.device(withKey: DeviceKey("k2"))
         #expect(removed?.removedAt == today)
         #expect(removed?.removedBy == by)
-        #expect(devices.device(withKey: "k1")?.isRemoved == false)
+        #expect(devices.device(withKey: DeviceKey("k1"))?.isRemoved == false)
     }
 
     @Test func `should add a device once, however often it is added`() {
@@ -74,6 +74,6 @@ struct MemberDevicesTests {
 
         let devices = MemberDevices([device("k1", addedOn: 1)]).adding(new).adding(new)
 
-        #expect(devices.map(\.publicKey) == ["k1", "k2"])
+        #expect(devices.map(\.publicKey) == [DeviceKey("k1"), DeviceKey("k2")])
     }
 }

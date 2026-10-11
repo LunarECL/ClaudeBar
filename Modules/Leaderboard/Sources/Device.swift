@@ -3,15 +3,15 @@ import Foundation
 /// *DEVICE* (design §2a): one of a member's machines, which is one key. `/me`
 /// lists them, removed ones included; a removed device's days stay and count.
 public struct Device: Sendable, Equatable, Codable {
-    /// The device's public key, base64url, as `X-Key` names it.
-    public let publicKey: String
+    /// The key it signs with: the device, as the server knows it.
+    public let publicKey: DeviceKey
     public let label: DeviceLabel
     public let addedAt: Date
     public let removedAt: Date?
     /// The device that removed it, `nil` while it's in use.
     public let removedBy: DeviceRef?
 
-    public init(publicKey: String, label: DeviceLabel, addedAt: Date, removedAt: Date? = nil, removedBy: DeviceRef? = nil) {
+    public init(publicKey: DeviceKey, label: DeviceLabel, addedAt: Date, removedAt: Date? = nil, removedBy: DeviceRef? = nil) {
         self.publicKey = publicKey
         self.label = label
         self.addedAt = addedAt
@@ -30,7 +30,7 @@ public struct Device: Sendable, Equatable, Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        publicKey = try container.decode(String.self, forKey: .publicKey)
+        publicKey = try container.decode(DeviceKey.self, forKey: .publicKey)
         label = try container.decode(DeviceLabel.self, forKey: .label)
         addedAt = try ServerTime.decode(from: container, forKey: .addedAt)
         removedAt = try ServerTime.decodeIfPresent(from: container, forKey: .removedAt)
@@ -51,13 +51,40 @@ public struct Device: Sendable, Equatable, Codable {
 
 /// A device named in passing: the one that removed another.
 public struct DeviceRef: Sendable, Equatable, Codable {
-    public let publicKey: String
+    public let publicKey: DeviceKey
     public let label: DeviceLabel
 
-    public init(publicKey: String, label: DeviceLabel) {
+    public init(publicKey: DeviceKey, label: DeviceLabel) {
         self.publicKey = publicKey
         self.label = label
     }
+}
+
+/// A device, as the server knows it: the public half of the key it signs
+/// with, base64url, as `X-Key` names it. Only the wire and the stored record
+/// hold it as text.
+public struct DeviceKey: Sendable, Hashable, Codable, CustomStringConvertible {
+    public let value: String
+
+    public init(_ value: String) {
+        self.value = value
+    }
+
+    public init(from decoder: Decoder) throws {
+        value = try decoder.singleValueContainer().decode(String.self)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(value)
+    }
+
+    public var description: String { value }
+}
+
+extension SigningKey {
+    /// The device this key signs as.
+    public var deviceKey: DeviceKey { DeviceKey(publicKey) }
 }
 
 /// What a device is called on the member's list: the label the person typed

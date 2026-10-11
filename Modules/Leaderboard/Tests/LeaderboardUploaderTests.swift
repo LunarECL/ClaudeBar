@@ -105,12 +105,12 @@ struct LeaderboardUploaderTests {
         let membership = try await joined()
         logs.logins = [LoginDays(providerId: "claude", days: [LeaderboardFixtures.stat(day: 4, input: 10)])]
         api.reset([.given])
-        given(api).upload(.any, as: .any).willThrow(LeaderboardError.removed(by: DeviceRef(publicKey: "k2", label: DeviceLabel("Mac mini")!)))
+        given(api).upload(.any, as: .any).willThrow(LeaderboardError.removed(by: DeviceRef(publicKey: DeviceKey("k2"), label: DeviceLabel("Mac mini")!)))
 
         await uploader(membership).uploadDue()
 
         #expect(!membership.isJoined)
-        #expect(membership.removedBy == DeviceRef(publicKey: "k2", label: DeviceLabel("Mac mini")!))
+        #expect(membership.removedBy == DeviceRef(publicKey: DeviceKey("k2"), label: DeviceLabel("Mac mini")!))
         #expect(keys.stored == nil)
         #expect(settings.record == nil)
     }

@@ -56,13 +56,13 @@ struct DeviceTests {
 
         let devices = try JSONDecoder().decode([Device].self, from: Data(json.utf8))
 
-        #expect(devices[0].publicKey == "k1")
+        #expect(devices[0].publicKey == DeviceKey("k1"))
         #expect(devices[0].label == DeviceLabel("MacBook Pro"))
         #expect(devices[0].addedAt == Date(timeIntervalSince1970: 1_790_841_600))
         #expect(devices[0].removedAt == nil && devices[0].removedBy == nil)
         #expect(devices[1].addedAt == Date(timeIntervalSince1970: 1_791_014_400.25))
         #expect(devices[1].removedAt == Date(timeIntervalSince1970: 1_791_106_200))
-        #expect(devices[1].removedBy == DeviceRef(publicKey: "k1", label: DeviceLabel("MacBook Pro")!))
+        #expect(devices[1].removedBy == DeviceRef(publicKey: DeviceKey("k1"), label: DeviceLabel("MacBook Pro")!))
     }
 
     /// The server writes every time as JavaScript's `toISOString()` (§5).

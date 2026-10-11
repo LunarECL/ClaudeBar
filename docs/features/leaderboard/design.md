@@ -96,7 +96,7 @@ Leaderboard (app)                          ClaudeBar's side of the leaderboard (
  │       ├─ lastUpload : Date?             the last good upload: v1 resumes there, devices time the hour by it
  │       ├─ refused : Set<provider · day>  DAYS THE SERVER REFUSED, LAST 30 DAYS: SENT AGAIN WITH EACH UPLOAD
  │       ├─ machine : hash?                THIS MAC'S HARDWARE UUID, HASHED WITH THE KEY'S PUBLIC HALF
- │       └─ shownDevices : Set<key>        devices added that this one has already shown, once
+ │       └─ shownDevices : Set<DeviceKey>  devices added that this one has already shown, once
  ├─ board : Board                          the one you're looking at; picking changes it
  └─ board(period, provider) → Board        THE SAME BOARD EACH TIME. MIRRORS THE SERVER'S board(period, provider)
      ├─ period : BoardPeriod               Today · 7 days · 30 days
@@ -611,7 +611,7 @@ Its code is the `Leaderboard` module of the package that also builds on Windows,
 |---|---|
 | `LeaderboardMembership`, `Board` and `Board.Member`, `DailyTokens`, `Username`, `RankCard`, `LeaderboardUploader` | `Modules/Leaderboard/Sources/` |
 | `@Mockable` ports `LeaderboardAPI`, `SigningKeyStore` and `MachineIdentity` (this Mac's model, and with slice 14 its hardware UUID, faked in tests to stand for another Mac); plain `LeaderboardSettingsRepository` (like Notify!'s, now also keeping `refused`, the devices already shown and, with slice 14, the `machine` hash) and `@MainActor` `TokenLogs`, faked in tests | `Modules/Leaderboard/Sources/` |
-| `Device`, `MemberDevices`, `DeviceCode`, `DeviceLabel` | `Modules/Leaderboard/Sources/` |
+| `Device`, `DeviceKey` (the key a device signs with: text only on the wire and in `settings.json`), `MemberDevices`, `DeviceCode`, `DeviceLabel` | `Modules/Leaderboard/Sources/` |
 | The factory, `Leaderboard.makeAPI(client:)`, `makeKeyStore()` and `makeMachineIdentity()`: the server, and the key store and machine of the platform the module is built for | `Modules/Leaderboard/Sources/` |
 | `LeaderboardHTTPClient`; `FallbackSigningKeyStore`, the key in the Keychain first and in UserDefaults when the Keychain refuses it (`DefaultsSigningKeyStore`) | `Modules/Leaderboard/Sources/Internal/` |
 | `KeychainSigningKeyStore`, the same Keychain item as before the module | `Modules/Leaderboard/Sources/Internal/macOS/` |

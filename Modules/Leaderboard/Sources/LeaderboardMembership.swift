@@ -34,7 +34,7 @@ public final class LeaderboardMembership {
     public private(set) var removedBy: DeviceRef?
     private var key: SigningKey?
     /// Devices already shown as added, by key: each is shown once.
-    private var shownDevices: Set<String> = []
+    private var shownDevices: Set<DeviceKey> = []
     /// A new device on its way in, with the key it asked with; `nil` otherwise.
     private var joiningState: JoiningState?
     /// Changes made here, counted, so a `/me` answer that crossed one is
@@ -73,10 +73,13 @@ public final class LeaderboardMembership {
     @ObservationIgnored private let machine: any MachineIdentity
     @ObservationIgnored private let calendar: Calendar
     @ObservationIgnored private let now: () -> Date
+    /// Waits this long: between a new device's asks whether it was approved.
+    @ObservationIgnored private let sleep: @MainActor (TimeInterval) async throws -> Void
 
     public init(api: any LeaderboardAPI, keys: any SigningKeyStore, settings: any LeaderboardSettingsRepository,
                 logs: any TokenLogs, machine: any MachineIdentity, calendar: Calendar = .current,
-                now: @escaping () -> Date = Date.init) {
+                now: @escaping () -> Date = Date.init,
+                sleep: @escaping @MainActor (TimeInterval) async throws -> Void = { try await Task.sleep(for: .seconds($0)) }) {
         self.api = api
         self.keys = keys
         self.settings = settings
@@ -84,6 +87,7 @@ public final class LeaderboardMembership {
         self.machine = machine
         self.calendar = calendar
         self.now = now
+        self.sleep = sleep
         restore()
     }
 
@@ -158,7 +162,7 @@ public final class LeaderboardMembership {
             }
             switch approval {
             case .waiting:
-                try await Task.sleep(for: .seconds(interval))
+                try await sleep(interval)
             case .approved(let summary):
                 guard let member = summary.username.flatMap(Username.init) else {
                     throw LeaderboardError.rejected("The leaderboard answered with something unreadable.")
@@ -369,7 +373,7 @@ public final class LeaderboardMembership {
 
     /// This device as `/me` lists it, once read.
     public var thisDevice: Device? {
-        key.flatMap { devices.device(withKey: $0.publicKey) }
+        key.flatMap { devices.device(withKey: $0.deviceKey) }
     }
 
     /// What approving `code` would add, shown above *Approve* so a code read
@@ -418,16 +422,16 @@ public final class LeaderboardMembership {
     /// Removing this device forgets the membership once the server confirmed.
     public func remove(device: Device, deletingDays: Bool = false) async throws {
         guard let credentials else { throw LeaderboardError.notJoined }
-        try await api.removeDevice(device.publicKey, as: credentials)
-        if device.publicKey == credentials.key.publicKey {
+        try await api.removeDevice(device.publicKey.value, as: credentials)
+        if device.publicKey == credentials.key.deviceKey {
             forget()
             return
         }
-        let by = DeviceRef(publicKey: credentials.key.publicKey, label: thisDevice?.label ?? suggestedLabel)
+        let by = DeviceRef(publicKey: credentials.key.deviceKey, label: thisDevice?.label ?? suggestedLabel)
         devices = devices.removing(device, by: by, at: now())
         changesMadeHere += 1
         if deletingDays {
-            try await api.deleteDays(of: device.publicKey, provider: nil, day: nil, as: credentials)
+            try await api.deleteDays(of: device.publicKey.value, provider: nil, day: nil, as: credentials)
         }
     }
 
@@ -435,7 +439,7 @@ public final class LeaderboardMembership {
     /// one day's. Never a side effect of removing it.
     public func deleteDays(of device: Device, provider: String? = nil, day: String? = nil) async throws {
         guard let credentials else { throw LeaderboardError.notJoined }
-        try await api.deleteDays(of: device.publicKey, provider: provider, day: day, as: credentials)
+        try await api.deleteDays(of: device.publicKey.value, provider: provider, day: day, as: credentials)
     }
 
     // MARK: - Private
@@ -459,7 +463,7 @@ public final class LeaderboardMembership {
         globeHintDismissed = record.globeHintDismissed
         link = record.link
         refused = record.refused
-        shownDevices = Set(record.shownDevices)
+        shownDevices = Set(record.shownDevices.map(DeviceKey.init))
     }
 
     private func save() {
@@ -467,6 +471,6 @@ public final class LeaderboardMembership {
         settings.saveLeaderboardRecord(LeaderboardRecord(username: username.value, sharing: Array(sharing),
                                                          visible: isVisible, lastUpload: lastUpload,
                                                          sharesCountry: sharesCountry, globeHintDismissed: globeHintDismissed,
-                                                         link: link, refused: refused, shownDevices: Array(shownDevices)))
+                                                         link: link, refused: refused, shownDevices: shownDevices.map(\.value)))
     }
 }

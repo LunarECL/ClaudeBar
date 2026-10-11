@@ -24,7 +24,7 @@ public struct MemberDevices: Sendable, Equatable, RandomAccessCollection {
         devices.min { $0.addedAt < $1.addedAt }
     }
 
-    public func device(withKey publicKey: String) -> Device? {
+    public func device(withKey publicKey: DeviceKey) -> Device? {
         devices.first { $0.publicKey == publicKey }
     }
 

@@ -17,11 +17,14 @@ struct LeaderboardDevicesTests {
     private let logs = FakeTokenLogs(providersWithLogs: ["claude", "codex"])
     /// Day 20: devices added on day 13 or before are past their first week.
     private let today = LeaderboardFixtures.date(20)
+    /// Each wait a new device took between asking whether it was approved.
+    private let waits = Waits()
 
     private func membership(machine: String = "MacBook Pro") -> LeaderboardMembership {
         let today = today
+        let waits = waits
         return LeaderboardMembership(api: server, keys: keys, settings: settings, logs: logs, machine: MockMachineIdentity.named(machine),
-                                     calendar: LeaderboardFixtures.calendar, now: { today })
+                                     calendar: LeaderboardFixtures.calendar, now: { today }, sleep: { waits.taken.append($0) })
     }
 
     private func joined() async throws -> LeaderboardMembership {
@@ -33,7 +36,7 @@ struct LeaderboardDevicesTests {
     /// This device, as `/me` lists it once it reads it.
     private func thisDevice(_ membership: LeaderboardMembership, addedOn day: Int) throws -> Device {
         let key = try SigningKey(rawRepresentation: #require(keys.stored)).publicKey
-        return Device(publicKey: key, label: DeviceLabel("MacBook Pro")!, addedAt: LeaderboardFixtures.date(day))
+        return Device(publicKey: DeviceKey(key), label: DeviceLabel("MacBook Pro")!, addedAt: LeaderboardFixtures.date(day))
     }
 
     /// `/me` lists `devices`, and this device reads it.
@@ -43,7 +46,7 @@ struct LeaderboardDevicesTests {
     }
 
     private func device(_ key: String, addedOn day: Int, removedOn removed: Int? = nil) -> Device {
-        Device(publicKey: key, label: DeviceLabel("Mac \(key)")!, addedAt: LeaderboardFixtures.date(day),
+        Device(publicKey: DeviceKey(key), label: DeviceLabel("Mac \(key)")!, addedAt: LeaderboardFixtures.date(day),
                removedAt: removed.map { LeaderboardFixtures.date($0) })
     }
 
@@ -88,6 +91,17 @@ struct LeaderboardDevicesTests {
         #expect(!membership.isJoined)
         #expect(membership.uploadCredentials == nil)
         #expect(keys.stored == nil && settings.record == nil)
+    }
+
+    @Test func `should wait the interval the server gave before asking again whether it was approved`() async throws {
+        let membership = membership()
+        server.authorization = DeviceAuthorization(code: server.authorization.code, expiresIn: 600, interval: 5)
+        server.approvals = [.success(.waiting), .success(.waiting), .success(.approved(server.summary))]
+        _ = try await membership.requestToJoin()
+
+        _ = try await membership.waitForApproval()
+
+        #expect(waits.taken == [5, 5])
     }
 
     @Test func `should join as the member it was added to once the person agrees, with nothing uploaded yet`() async throws {
@@ -239,7 +253,7 @@ struct LeaderboardDevicesTests {
 
         #expect(server.removed == ["k2"])
         #expect(server.deletedDays.isEmpty)
-        #expect(membership.devices.first { $0.publicKey == "k2" }?.removedBy == DeviceRef(publicKey: me.publicKey, label: me.label))
+        #expect(membership.devices.first { $0.publicKey == DeviceKey("k2") }?.removedBy == DeviceRef(publicKey: me.publicKey, label: me.label))
         #expect(membership.isJoined)
     }
 
@@ -263,7 +277,7 @@ struct LeaderboardDevicesTests {
         await #expect(throws: LeaderboardError.unreachable) { try await membership.remove(device: recent, deletingDays: true) }
 
         #expect(server.removed == ["k3"])
-        #expect(membership.devices.first { $0.publicKey == "k3" }?.isRemoved == true)
+        #expect(membership.devices.first { $0.publicKey == DeviceKey("k3") }?.isRemoved == true)
     }
 
     @Test func `should forget this device's key only once the server removed it`() async throws {
@@ -273,7 +287,7 @@ struct LeaderboardDevicesTests {
 
         try await membership.remove(device: me)
 
-        #expect(server.removed == [me.publicKey])
+        #expect(server.removed == [me.publicKey.value])
         #expect(!membership.isJoined)
         #expect(keys.stored == nil && settings.record == nil)
     }
@@ -299,4 +313,10 @@ struct LeaderboardDevicesTests {
 
         #expect(server.deletedDays == [.init(publicKey: "k2", provider: "claude", day: "2026-10-06")])
     }
+}
+
+/// The waits a membership took, in order.
+@MainActor
+final class Waits {
+    var taken: [TimeInterval] = []
 }
