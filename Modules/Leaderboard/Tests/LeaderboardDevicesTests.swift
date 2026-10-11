@@ -227,16 +227,16 @@ struct LeaderboardDevicesTests {
 
     // MARK: - Removing a device
 
-    @Test func `should offer to delete the days only of another device still in its first week`() async throws {
+    @Test func `should offer deleting its days only when removing another device still in its first week`() async throws {
         let membership = try await joined()
         let me = try thisDevice(membership, addedOn: 1)
         let older = device("k2", addedOn: 5)
         let recent = device("k3", addedOn: 17)
         try await read([me, older, recent], into: membership)
 
-        #expect(membership.offersDeletingDays(whenRemoving: recent))
-        #expect(!membership.offersDeletingDays(whenRemoving: older))
-        #expect(!membership.offersDeletingDays(whenRemoving: me))
+        #expect(membership.removals(of: recent) == [.keepingItsDays, .deletingItsDays])
+        #expect(membership.removals(of: older) == [.keepingItsDays])
+        #expect(membership.removals(of: me) == [.keepingItsDays])
     }
 
     @Test func `should never count the device that joined as in its first week`() async throws {
@@ -246,7 +246,26 @@ struct LeaderboardDevicesTests {
         // This device was added a day ago, so it is the one in its first week; the one that joined isn't.
         try await read([joinedDevice, me], into: membership)
 
-        #expect(!membership.offersDeletingDays(whenRemoving: joinedDevice))
+        #expect(membership.removals(of: joinedDevice) == [.keepingItsDays])
+    }
+
+    @Test func `should offer nothing for a device already removed`() async throws {
+        let membership = try await joined()
+        let removed = device("k2", addedOn: 5, removedOn: 9)
+        try await read([thisDevice(membership, addedOn: 1), removed], into: membership)
+
+        #expect(membership.removals(of: removed).isEmpty)
+    }
+
+    @Test func `should refuse to delete the days of a device it didn't offer that for, and keep it in use`() async throws {
+        let membership = try await joined()
+        let older = device("k2", addedOn: 5)
+        try await read([thisDevice(membership, addedOn: 1), older], into: membership)
+
+        await #expect(throws: LeaderboardError.notOffered) { try await membership.remove(older, .deletingItsDays) }
+
+        #expect(server.removed.isEmpty && server.deletedDays.isEmpty)
+        #expect(membership.devices.first { $0.publicKey == DeviceKey("k2") }?.isRemoved == false)
     }
 
     @Test func `should remove another device and keep its days`() async throws {
@@ -255,7 +274,7 @@ struct LeaderboardDevicesTests {
         let older = device("k2", addedOn: 5)
         try await read([me, older], into: membership)
 
-        try await membership.remove(device: older, deletingDays: false)
+        try await membership.remove(older, .keepingItsDays)
 
         #expect(server.removed == ["k2"])
         #expect(server.deletedDays.isEmpty)
@@ -268,7 +287,7 @@ struct LeaderboardDevicesTests {
         let recent = device("k3", addedOn: 17)
         try await read([thisDevice(membership, addedOn: 1), recent], into: membership)
 
-        try await membership.remove(device: recent, deletingDays: true)
+        try await membership.remove(recent, .deletingItsDays)
 
         #expect(server.removed == ["k3"])
         #expect(server.deletedDays == [.init(publicKey: "k3", provider: nil, day: nil)])
@@ -280,7 +299,7 @@ struct LeaderboardDevicesTests {
         try await read([thisDevice(membership, addedOn: 1), recent], into: membership)
         server.deleteDaysFailure = .unreachable
 
-        await #expect(throws: LeaderboardError.unreachable) { try await membership.remove(device: recent, deletingDays: true) }
+        await #expect(throws: LeaderboardError.unreachable) { try await membership.remove(recent, .deletingItsDays) }
 
         #expect(server.removed == ["k3"])
         #expect(membership.devices.first { $0.publicKey == DeviceKey("k3") }?.isRemoved == true)
@@ -291,7 +310,7 @@ struct LeaderboardDevicesTests {
         let me = try thisDevice(membership, addedOn: 1)
         try await read([me, device("k2", addedOn: 5)], into: membership)
 
-        try await membership.remove(device: me)
+        try await membership.remove(me)
 
         #expect(server.removed == [me.publicKey.value])
         #expect(!membership.isJoined)
@@ -304,7 +323,7 @@ struct LeaderboardDevicesTests {
         try await read([me], into: membership)
         server.removeFailure = .lastDevice
 
-        await #expect(throws: LeaderboardError.lastDevice) { try await membership.remove(device: me) }
+        await #expect(throws: LeaderboardError.lastDevice) { try await membership.remove(me) }
 
         #expect(membership.isJoined)
         #expect(keys.stored != nil)

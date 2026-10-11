@@ -169,8 +169,8 @@ The person thinks of the board as something their app has: what they saw a minut
 | **Owns: only shareable providers can be shared** | `share(_:)` refuses a provider with no usage history; the ability is absent, not ignored |
 | **Owns: a turned-off Leaderboard uploads nothing** | `uploadCredentials` is `nil` while off, so the uploader has nothing to sign with and `lastUpload` stays where uploads stopped |
 | **Owns: a copied key it detects never uploads unasked** | at launch, a key whose `machine` hash isn't this Mac's uploads nothing until the member answers: this Mac gets its own key, or keeps this one and records its hash ([§2a](#2a--devices-one-member-several-machines)); every key made here is recorded with this Mac's hash, and forgetting a key forgets its hash |
-| **Tell it** | `join(as:sharing:)` · `share(_:)` · `stopSharing(_:)` · `setVisible(_:)` · `rename(to:)` · `leave()` · `turnOff()` · `turnOn()` · `requestToJoin(label:)` (answers a `DeviceRequest`) · `join(through:sharing:)` · `pendingDevice(code:)` · `approve(code:)` · `markShown(_:)` · `remove(device:deletingDays:)` · `deleteDays(of:provider:day:)` · `becomeOwnDevice()` · `keepKeyHere()` |
-| **It answers** | `isJoined` · `isOn` · `sharing` · `country` · `devices` · `addedDevices` · `offersDeletingDays(whenRemoving:)` · `removedBy` · `summary(period:provider:)` (the signed `/me` read, which it follows; `Board.read()` and Settings' export use it, and the tab never calls it) · `refused` (days the server refused, tried again) · `holdsCopiedKey` (this Mac's key came from another Mac) |
+| **Tell it** | `join(as:sharing:)` · `share(_:)` · `stopSharing(_:)` · `setVisible(_:)` · `rename(to:)` · `leave()` · `turnOff()` · `turnOn()` · `requestToJoin(label:)` (answers a `DeviceRequest`) · `join(through:sharing:)` · `pendingDevice(code:)` · `approve(code:)` · `markShown(_:)` · `remove(_:_:)` (one of its `removals(of:)`) · `deleteDays(of:provider:day:)` · `becomeOwnDevice()` · `keepKeyHere()` |
+| **It answers** | `isJoined` · `isOn` · `sharing` · `country` · `devices` · `addedDevices` · `removals(of:)` (the dialog's choices for a device) · `removedBy` · `summary(period:provider:)` (the signed `/me` read, which it follows; `Board.read()` and Settings' export use it, and the tab never calls it) · `refused` (days the server refused, tried again) · `holdsCopiedKey` (this Mac's key came from another Mac) |
 | **Never** | holds a ranking · sends a provider it was not told to share · forgets its key before the server confirmed the leave or the removal · keeps a member setting the server has changed since |
 
 ### `MemberDevices`: the member's devices, as `/me` last listed them
@@ -182,7 +182,7 @@ The person thinks of the board as something their app has: what they saw a minut
 | **Owns: the device that joined is never held to a first week** | `joined` is the earliest device, removed or not: every other one was added after it, and `/me` lists removed devices too |
 | **Owns: an added device is in its first week for 7 days** | `isInFirstWeek(_:at:)`; a device in its own first week reads only itself, so it asks this about others only |
 | **Owns: what is news to a device** | `added(since:)`: the devices still in use added after it |
-| **Tell it** | `removing(_:by:at:)` (a device's removal, as `/me` will list it) · `adding(_:)` (a device just approved, once) |
+| **Tell it** (only `LeaderboardMembership` does: its rules are the module's, never a view's) | `removing(_:by:at:)` (a device's removal, as `/me` will list it) · `adding(_:)` (a device just approved, once) |
 | **Never** | decides what was already shown: that is this device's own, `LeaderboardMembership.shownDevices` |
 
 ### `DeviceRequest`: this Mac asking to be added to a member
@@ -423,8 +423,10 @@ try await request.decline()                                          // or not: 
 let pending = try await membership.pendingDevice(code: request.code)         // on a joined device: the label and when it asked
 try await membership.approve(code: request.code)                     // from a device past its first week
 membership.addedDevices                                              // each device added since this one last looked, once
-try await membership.remove(device: oldMac, deletingDays: false)     // revokes its key; its days stay
-try await membership.remove(device: stranger, deletingDays: true)    // another device in its first week: removes, then deletes its days
+membership.removals(of: stranger)                                    // [.keepingItsDays, .deletingItsDays]: another device in its first week
+membership.removals(of: oldMac)                                      // [.keepingItsDays]; none for a device already removed
+try await membership.remove(oldMac, .keepingItsDays)                 // revokes its key; its days stay
+try await membership.remove(stranger, .deletingItsDays)              // removes, then deletes its days; refused when not offered
 try await membership.deleteDays(of: oldMac, provider: "claude", day: nil) // a removed device's; never a side effect
 try await membership.becomeOwnDevice()                               // the key's machine hash isn't this Mac's: Make this Mac its own device
 try await membership.keepKeyHere()                                   // or: the other Mac is gone, or this is the same Mac after a repair
@@ -483,7 +485,7 @@ let days = membership.dailyTokens(from: usageHistories, in: range)
 | A member has at most 5 devices that aren't removed | Server |
 | A device is added only when another device of the member, past its first week, approves the code it shows, within 10 minutes, once; the new device names the member and asks before it uploads | Server, and the new device: `DeviceRequest` (waits, names the member, keeps nothing), then `LeaderboardMembership.join(through:sharing:)` |
 | For its first 7 days an added device changes and reads only its own days and settings, with the member's settings and place: `/me` leaves out the other devices and their rows, and `/me/export` is refused; it can't rename or hide the member, change its globe or link, approve a device, remove another, delete a removed device's days, or leave. After that, and from the start for the device that joined, it may do what the member may | Server |
-| Removing a device revokes its key at once and says which device removed it; its days stay and count until deleted; removing another device in its first week, the app offers *Remove and delete its days* beside *Remove*; the last device can't be removed | Server, and `LeaderboardMembership.offersDeletingDays(whenRemoving:)` for the dialog, from `MemberDevices.isInFirstWeek(_:at:)` |
+| Removing a device revokes its key at once and says which device removed it; its days stay and count until deleted; removing another device in its first week, the app offers *Remove and delete its days* beside *Remove*; the last device can't be removed | Server, and `LeaderboardMembership.removals(of:)` for the dialog's choices, from `MemberDevices.isInFirstWeek(_:at:)`; `remove(_:_:)` refuses a removal it didn't offer |
 | Only a removed device's days can be deleted, by another device of the member past its first week, for one provider, one day or all | Server |
 | Every device in use past its first week shows, once, each device added since it last read `/me`, with **Remove**; a device in its first week sees only itself | `LeaderboardMembership.addedDevices`: `MemberDevices.added(since:)` this device, less the ones kept as `shownDevices` |
 | A device whose key the server no longer knows forgets its membership; one another device removed also says which | `LeaderboardUploader`, as for a member the server forgot; `LeaderboardMembership.removedBy`, the `DeviceRef` the server named |

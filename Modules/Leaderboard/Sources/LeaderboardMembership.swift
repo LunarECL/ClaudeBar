@@ -339,19 +339,24 @@ public final class LeaderboardMembership {
         save()
     }
 
-    /// Whether removing `device` offers *Remove and delete its days* beside
-    /// *Remove*: only for another device still in its first week, which a
-    /// stranger's device approved by mistake would be.
-    public func offersDeletingDays(whenRemoving device: Device) -> Bool {
-        device.publicKey != thisDevice?.publicKey && devices.isInFirstWeek(device, at: now())
+    /// How removing `device` may go, as the dialog offers it: *Remove*, and
+    /// beside it *Remove and delete its days* only for another device still
+    /// in its first week, which a stranger's device approved by mistake would
+    /// be. Nothing for a device already removed.
+    public func removals(of device: Device) -> [Removal] {
+        guard !device.isRemoved else { return [] }
+        let isAnother = device.publicKey != thisDevice?.publicKey
+        return isAnother && devices.isInFirstWeek(device, at: now()) ? [.keepingItsDays, .deletingItsDays] : [.keepingItsDays]
     }
 
-    /// Removes `device`: its key is revoked, and its days stay unless
-    /// `deletingDays`, which deletes them once it is removed. If deleting
-    /// fails, the device is removed all the same and the error says why.
-    /// Removing this device forgets the membership once the server confirmed.
-    public func remove(device: Device, deletingDays: Bool = false) async throws {
+    /// Removes `device` as `removal` says, one of its `removals(of:)`: its key
+    /// is revoked, and its days stay unless `deletingItsDays`, which deletes
+    /// them once it is removed. If deleting fails, the device is removed all
+    /// the same and the error says why. Removing this device forgets the
+    /// membership once the server confirmed.
+    public func remove(_ device: Device, _ removal: Removal = .keepingItsDays) async throws {
         guard let credentials else { throw LeaderboardError.notJoined }
+        guard removals(of: device).contains(removal) else { throw LeaderboardError.notOffered }
         try await api.removeDevice(device.publicKey.value, as: credentials)
         if device.publicKey == credentials.key.deviceKey {
             forget()
@@ -360,7 +365,7 @@ public final class LeaderboardMembership {
         let by = DeviceRef(publicKey: credentials.key.deviceKey, label: thisDevice?.label ?? suggestedLabel)
         devices = devices.removing(device, by: by, at: now())
         changesMadeHere += 1
-        if deletingDays {
+        if removal == .deletingItsDays {
             try await api.deleteDays(of: device.publicKey.value, provider: nil, day: nil, as: credentials)
         }
     }

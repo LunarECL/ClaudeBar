@@ -22,7 +22,7 @@ public struct Device: Sendable, Equatable, Codable {
     public var isRemoved: Bool { removedAt != nil }
 
     /// This device once `by` removed it at `time`, as `/me` will list it.
-    public func removed(by: DeviceRef, at time: Date) -> Device {
+    func removed(by: DeviceRef, at time: Date) -> Device {
         Device(publicKey: publicKey, label: label, addedAt: addedAt, removedAt: time, removedBy: by)
     }
 
@@ -209,4 +209,13 @@ enum ServerTime {
         iso.formatOptions.remove(.withFractionalSeconds)
         return iso.date(from: text)
     }
+}
+
+/// How a device is removed, as the dialog offers it (design §2a): its key is
+/// revoked either way; its days stay, or are deleted once it is removed.
+public enum Removal: Sendable, Equatable, CaseIterable {
+    /// *Remove*: its days stay and count until deleted.
+    case keepingItsDays
+    /// *Remove and delete its days*: offered only for another device in its first week.
+    case deletingItsDays
 }
