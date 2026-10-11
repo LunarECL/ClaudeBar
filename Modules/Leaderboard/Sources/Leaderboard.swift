@@ -11,15 +11,14 @@ public enum Leaderboard {
         LeaderboardHTTPClient(client: client)
     }
 
-    /// Where this machine keeps the key's private half, or `nil` where
-    /// ClaudeBar keeps none yet: Windows, until MODULAR_DESIGN §10's phase 3.
-    public static func makeKeyStore() -> (any SigningKeyStore)? {
+    /// Where this machine keeps the key's private half: the Keychain on a Mac,
+    /// Credential Manager on Windows.
+    public static func makeKeyStore() -> any SigningKeyStore {
         Platform.current.signingKeyStore
     }
 
-    /// This machine as the leaderboard knows it, or `nil` where ClaudeBar reads
-    /// none yet: Windows, until MODULAR_DESIGN §10's phase 3.
-    public static func makeMachineIdentity() -> (any MachineIdentity)? {
+    /// This machine as the leaderboard knows it.
+    public static func makeMachineIdentity() -> any MachineIdentity {
         Platform.current.machineIdentity
     }
 }

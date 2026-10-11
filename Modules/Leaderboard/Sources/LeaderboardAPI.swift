@@ -216,16 +216,18 @@ public enum LeaderboardError: Error, Sendable, Equatable, LocalizedError {
     case rejected(String)
     case unreachable
 
+    /// In the platform's words: "this Mac" on a Mac, "this PC" on Windows.
     public var errorDescription: String? {
-        switch self {
+        let machine = Platform.current.deviceName
+        return switch self {
         case .usernameTaken: "That username is taken. Try another."
-        case .notShareable(let provider): "\(provider) has no token logs on this Mac, so it can't be shared."
+        case .notShareable(let provider): "\(provider) has no token logs on this \(machine), so it can't be shared."
         case .nothingShared: "Pick at least one provider to share."
         case .notJoined: "You haven't joined the leaderboard."
-        case .alreadyJoined: "This Mac is already on the leaderboard."
+        case .alreadyJoined: "This \(machine) is already on the leaderboard."
         case .notOffered: "That isn't offered for this device."
-        case .unauthorized: "The leaderboard didn't accept this Mac's key for your username."
-        case .removed(let device): "\(device.label) removed this Mac from your leaderboard devices."
+        case .unauthorized: "The leaderboard didn't accept this \(machine)'s key for your username."
+        case .removed(let device): "\(device.label) removed this \(machine) from your leaderboard devices."
         case .codeExpired: "The code expired before it was approved. Ask for a new one."
         case .unknownCode: "No device is waiting with that code. Check it, or ask for a new one."
         case .deviceLimit: "You already have five devices. Remove one to add another."
