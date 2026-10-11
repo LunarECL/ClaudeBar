@@ -33,7 +33,7 @@ struct LeaderboardDevicesTests {
     /// This device, as `/me` lists it once it reads it.
     private func thisDevice(_ membership: LeaderboardMembership, addedOn day: Int) throws -> Device {
         let key = try SigningKey(rawRepresentation: #require(keys.stored)).publicKey
-        return Device(publicKey: key, label: "MacBook Pro", addedAt: LeaderboardFixtures.date(day))
+        return Device(publicKey: key, label: DeviceLabel("MacBook Pro")!, addedAt: LeaderboardFixtures.date(day))
     }
 
     /// `/me` lists `devices`, and this device reads it.
@@ -43,7 +43,7 @@ struct LeaderboardDevicesTests {
     }
 
     private func device(_ key: String, addedOn day: Int, removedOn removed: Int? = nil) -> Device {
-        Device(publicKey: key, label: "Mac \(key)", addedAt: LeaderboardFixtures.date(day),
+        Device(publicKey: key, label: DeviceLabel("Mac \(key)")!, addedAt: LeaderboardFixtures.date(day),
                removedAt: removed.map { LeaderboardFixtures.date($0) })
     }
 

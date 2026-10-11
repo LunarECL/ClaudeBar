@@ -230,7 +230,7 @@ struct LeaderboardHTTPClient: LeaderboardAPI {
     private static func error(status: Int, data: Data) -> LeaderboardError {
         let failure = try? JSONDecoder().decode(Failure.self, from: data)
         switch (status, failure?.error) {
-        case (401, "unauthorized"), (401, nil): return failure?.removedBy.map { .removed(by: $0.label) } ?? .unauthorized
+        case (401, "unauthorized"), (401, nil): return failure?.removedBy.map { .removed(by: $0) } ?? .unauthorized
         case (409, "usernameTaken"), (409, nil): return .usernameTaken
         case (409, "deviceLimit"): return .deviceLimit
         case (409, "lastDevice"): return .lastDevice

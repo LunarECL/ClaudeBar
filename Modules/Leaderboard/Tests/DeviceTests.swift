@@ -20,6 +20,15 @@ struct DeviceTests {
         #expect(DeviceLabel(String(repeating: "a", count: 40)) != nil)
     }
 
+    /// The server counts a label's characters as JavaScript does, in UTF-16
+    /// units: a family emoji is one character to the person and 11 to it.
+    @Test func `should count a label's characters as the server does, so an emoji counts as more than one`() {
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}"
+
+        #expect(DeviceLabel(String(repeating: "a", count: 29) + family) != nil)
+        #expect(DeviceLabel(String(repeating: "a", count: 30) + family) == nil)
+    }
+
     // MARK: - The code
 
     @Test(arguments: ["WDJB-MJHT", "wdjbmjht", "wdjb mjht", " WDJB-mjht "])
@@ -48,19 +57,17 @@ struct DeviceTests {
         let devices = try JSONDecoder().decode([Device].self, from: Data(json.utf8))
 
         #expect(devices[0].publicKey == "k1")
-        #expect(devices[0].label == "MacBook Pro")
+        #expect(devices[0].label == DeviceLabel("MacBook Pro"))
         #expect(devices[0].addedAt == Date(timeIntervalSince1970: 1_790_841_600))
         #expect(devices[0].removedAt == nil && devices[0].removedBy == nil)
         #expect(devices[1].addedAt == Date(timeIntervalSince1970: 1_791_014_400.25))
         #expect(devices[1].removedAt == Date(timeIntervalSince1970: 1_791_106_200))
-        #expect(devices[1].removedBy == DeviceRef(publicKey: "k1", label: "MacBook Pro"))
+        #expect(devices[1].removedBy == DeviceRef(publicKey: "k1", label: DeviceLabel("MacBook Pro")!))
     }
 
-    /// §5 doesn't say how the server writes a time, so the forms a Worker
-    /// on D1 is likely to send all read as the same instant.
-    @Test(arguments: [#""2026-10-01T08:00:00Z""#, #""2026-10-01T08:00:00.000Z""#, #""2026-10-01 08:00:00""#,
-                      "1790841600", "1790841600000"])
-    func `should read a time however the server writes it`(written: String) throws {
+    /// The server writes every time as JavaScript's `toISOString()` (§5).
+    @Test(arguments: [#""2026-10-01T08:00:00.000Z""#, #""2026-10-01T08:00:00Z""#])
+    func `should read a time as the server writes it`(written: String) throws {
         let json = #"{"publicKey":"k1","label":"Mac","addedAt":"# + written + "}"
 
         let device = try JSONDecoder().decode(Device.self, from: Data(json.utf8))
@@ -68,19 +75,26 @@ struct DeviceTests {
         #expect(device.addedAt == Date(timeIntervalSince1970: 1_790_841_600))
     }
 
-    @Test func `should refuse a device whose time it can't read, rather than guess one`() {
-        let json = #"{"publicKey":"k1","label":"Mac","addedAt":"last Tuesday"}"#
+    @Test(arguments: [#""last Tuesday""#, #""2026-10-01 08:00:00""#, "1790841600", "1790841600000"])
+    func `should refuse a time the server never writes, rather than guess one`(written: String) {
+        let json = #"{"publicKey":"k1","label":"Mac","addedAt":"# + written + "}"
+
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(Device.self, from: Data(json.utf8)) }
+    }
+
+    @Test func `should refuse a device whose label the server would never send`() {
+        let json = #"{"publicKey":"k1","label":"","addedAt":"2026-10-01T08:00:00.000Z"}"#
 
         #expect(throws: DecodingError.self) { try JSONDecoder().decode(Device.self, from: Data(json.utf8)) }
     }
 
     /// Settings' *Export…* writes `/me`'s answer with a plain `JSONEncoder`; read
     /// back, every device keeps the times the server gave it.
-    @Test func `should write a member's devices so their times read back as the same instants`() throws {
+    @Test func `should write a member's devices so they read back as the server gave them`() throws {
         let json = #"""
         {"username":"tokenwhale","visible":true,"standing":null,"days":[],"devices":[
          {"publicKey":"k1","label":"MacBook Pro","addedAt":"2026-10-01T08:00:00Z","removedAt":null,"removedBy":null},
-         {"publicKey":"k2","label":"Mac mini","addedAt":1791014400123,"removedAt":"2026-10-04 09:30:00",
+         {"publicKey":"k2","label":"Mac mini","addedAt":"2026-10-03T08:00:00.123Z","removedAt":"2026-10-04T09:30:00.000Z",
           "removedBy":{"publicKey":"k1","label":"MacBook Pro"}}]}
         """#
         let summary = try JSONDecoder().decode(MemberSummary.self, from: Data(json.utf8))

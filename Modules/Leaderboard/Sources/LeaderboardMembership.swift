@@ -28,20 +28,15 @@ public final class LeaderboardMembership {
     /// upload until the server takes them or they are 30 days old.
     public private(set) var refused: [RefusedDay] = []
     /// The member's devices as `/me` last listed them: a copy, like the name.
-    public private(set) var devices: [Device] = []
-    /// A new device on its way in: the code it shows, then the member a device
-    /// of theirs added it to, until the person agrees. `nil` otherwise.
-    public private(set) var joining: Joining?
+    public private(set) var devices = MemberDevices()
     /// The device that removed this one, once its key was refused for that:
     /// the membership is forgotten, and this says why.
-    public private(set) var removedBy: String?
+    public private(set) var removedBy: DeviceRef?
     private var key: SigningKey?
     /// Devices already shown as added, by key: each is shown once.
     private var shownDevices: Set<String> = []
-    /// A new device's key and what the server said, while it is joining.
-    private var joiningKey: SigningKey?
-    private var joiningInterval: TimeInterval = 5
-    private var approvedSummary: MemberSummary?
+    /// A new device on its way in, with the key it asked with; `nil` otherwise.
+    private var joiningState: JoiningState?
     /// Changes made here, counted, so a `/me` answer that crossed one is
     /// not taken over it.
     private var changesMadeHere = 0
@@ -54,8 +49,22 @@ public final class LeaderboardMembership {
         case approved(member: Username)
     }
 
-    /// A device added less than this long ago can't yet act for the member.
-    static let firstWeek: TimeInterval = 7 * 24 * 60 * 60
+    /// `Joining`, with what each step holds: the key the new device asked
+    /// with, and the server's interval, then the member's `/me` answer.
+    private enum JoiningState {
+        case waiting(code: DeviceCode, key: SigningKey, interval: TimeInterval)
+        case approved(member: Username, key: SigningKey, summary: MemberSummary)
+    }
+
+    /// A new device on its way in: the code it shows, then the member a device
+    /// of theirs added it to, until the person agrees. `nil` otherwise.
+    public var joining: Joining? {
+        switch joiningState {
+        case .waiting(let code, _, _): .waiting(code: code)
+        case .approved(let member, _, _): .approved(member: member)
+        case nil: nil
+        }
+    }
 
     @ObservationIgnored private let api: any LeaderboardAPI
     @ObservationIgnored private let keys: any SigningKeyStore
@@ -129,10 +138,7 @@ public final class LeaderboardMembership {
     public func requestToJoin(label: DeviceLabel? = nil) async throws -> DeviceCode {
         let key = SigningKey.generate()
         let authorization = try await api.requestDevice(publicKey: key.publicKey, label: (label ?? suggestedLabel).value)
-        joiningKey = key
-        joiningInterval = authorization.interval
-        approvedSummary = nil
-        joining = .waiting(code: authorization.code)
+        joiningState = .waiting(code: authorization.code, key: key, interval: authorization.interval)
         return authorization.code
     }
 
@@ -141,7 +147,7 @@ public final class LeaderboardMembership {
     /// sent until the person agrees (`confirmJoining`): a code that leaked
     /// could have been approved by someone else.
     public func waitForApproval() async throws -> Username {
-        guard case .waiting = joining, let key = joiningKey else { throw LeaderboardError.notJoined }
+        guard case .waiting(_, let key, let interval) = joiningState else { throw LeaderboardError.notJoined }
         while true {
             let approval: DeviceApproval
             do {
@@ -152,13 +158,12 @@ public final class LeaderboardMembership {
             }
             switch approval {
             case .waiting:
-                try await Task.sleep(for: .seconds(joiningInterval))
+                try await Task.sleep(for: .seconds(interval))
             case .approved(let summary):
                 guard let member = summary.username.flatMap(Username.init) else {
                     throw LeaderboardError.rejected("The leaderboard answered with something unreadable.")
                 }
-                approvedSummary = summary
-                joining = .approved(member: member)
+                joiningState = .approved(member: member, key: key, summary: summary)
                 return member
             }
         }
@@ -168,9 +173,7 @@ public final class LeaderboardMembership {
     /// member, sharing `providers`, with nothing uploaded yet, so its first
     /// upload sends the last thirty days.
     public func confirmJoining(sharing providers: Set<String>) throws {
-        guard case .approved(let member) = joining, let key = joiningKey, let summary = approvedSummary else {
-            throw LeaderboardError.notJoined
-        }
+        guard case .approved(let member, let key, let summary) = joiningState else { throw LeaderboardError.notJoined }
         guard !providers.isEmpty else { throw LeaderboardError.nothingShared }
         try requireShareable(providers)
         keys.save(key.rawRepresentation)
@@ -191,21 +194,19 @@ public final class LeaderboardMembership {
     /// The person doesn't know the member this device was added to: it removes
     /// itself from that member, and keeps nothing.
     public func declineJoining() async throws {
-        guard case .approved(let member) = joining, let key = joiningKey else { throw LeaderboardError.notJoined }
+        guard case .approved(let member, let key, _) = joiningState else { throw LeaderboardError.notJoined }
         try await api.removeDevice(key.publicKey, as: MemberCredentials(username: member, key: key))
         endJoining()
     }
 
     private func endJoining() {
-        joining = nil
-        joiningKey = nil
-        approvedSummary = nil
+        joiningState = nil
     }
 
     /// A membership this device starts: no devices known or shown yet, and no
     /// word of an earlier one's removal.
     private func startFresh() {
-        devices = []
+        devices = MemberDevices()
         shownDevices = []
         removedBy = nil
     }
@@ -228,9 +229,9 @@ public final class LeaderboardMembership {
 
     /// Another device of the member removed this one: its key is revoked, so
     /// the membership is forgotten here, and `removedBy` says which device did it.
-    func forgetRemoved(by label: String) {
+    func forgetRemoved(by device: DeviceRef) {
         forget()
-        removedBy = label
+        removedBy = device
     }
 
     private func forget() {
@@ -244,7 +245,7 @@ public final class LeaderboardMembership {
         sharesCountry = false
         globeHintDismissed = false
         link = nil
-        devices = []
+        devices = MemberDevices()
         shownDevices = []
         settings.saveLeaderboardRecord(nil)
     }
@@ -360,7 +361,7 @@ public final class LeaderboardMembership {
             country = summary.country
         }
         if summary.reportsLink { link = summary.link }
-        devices = summary.devices
+        devices = MemberDevices(summary.devices)
         save()
     }
 
@@ -368,7 +369,7 @@ public final class LeaderboardMembership {
 
     /// This device as `/me` lists it, once read.
     public var thisDevice: Device? {
-        key.flatMap { key in devices.first { $0.publicKey == key.publicKey } }
+        key.flatMap { devices.device(withKey: $0.publicKey) }
     }
 
     /// What approving `code` would add, shown above *Approve* so a code read
@@ -384,7 +385,7 @@ public final class LeaderboardMembership {
         guard let credentials else { throw LeaderboardError.notJoined }
         let device = try await api.approveDevice(code: code, as: credentials)
         shownDevices.insert(device.publicKey)
-        if !devices.contains(where: { $0.publicKey == device.publicKey }) { devices.append(device) }
+        devices = devices.adding(device)
         save()
     }
 
@@ -395,9 +396,7 @@ public final class LeaderboardMembership {
     /// aren't news.
     public var addedDevices: [Device] {
         guard isOn, let me = thisDevice else { return [] }
-        return devices.filter {
-            !$0.isRemoved && $0.publicKey != me.publicKey && $0.addedAt > me.addedAt && !shownDevices.contains($0.publicKey)
-        }
+        return devices.added(since: me).filter { !shownDevices.contains($0.publicKey) }
     }
 
     /// `device` was shown as added, so it isn't again.
@@ -410,7 +409,7 @@ public final class LeaderboardMembership {
     /// *Remove*: only for another device still in its first week, which a
     /// stranger's device approved by mistake would be.
     public func offersDeletingDays(whenRemoving device: Device) -> Bool {
-        device.publicKey != thisDevice?.publicKey && isInFirstWeek(device)
+        device.publicKey != thisDevice?.publicKey && devices.isInFirstWeek(device, at: now())
     }
 
     /// Removes `device`: its key is revoked, and its days stay unless
@@ -424,12 +423,8 @@ public final class LeaderboardMembership {
             forget()
             return
         }
-        let by = DeviceRef(publicKey: credentials.key.publicKey, label: thisDevice?.label ?? suggestedLabel.value)
-        devices = devices.map {
-            $0.publicKey == device.publicKey
-                ? Device(publicKey: $0.publicKey, label: $0.label, addedAt: $0.addedAt, removedAt: now(), removedBy: by)
-                : $0
-        }
+        let by = DeviceRef(publicKey: credentials.key.publicKey, label: thisDevice?.label ?? suggestedLabel)
+        devices = devices.removing(device, by: by, at: now())
         changesMadeHere += 1
         if deletingDays {
             try await api.deleteDays(of: device.publicKey, provider: nil, day: nil, as: credentials)
@@ -441,13 +436,6 @@ public final class LeaderboardMembership {
     public func deleteDays(of device: Device, provider: String? = nil, day: String? = nil) async throws {
         guard let credentials else { throw LeaderboardError.notJoined }
         try await api.deleteDays(of: device.publicKey, provider: provider, day: day, as: credentials)
-    }
-
-    /// Added less than a week ago, and not the device that joined, which is
-    /// never held to a first week: that one is the member's earliest.
-    private func isInFirstWeek(_ device: Device) -> Bool {
-        let joined = devices.min { $0.addedAt < $1.addedAt }
-        return device.publicKey != joined?.publicKey && now().timeIntervalSince(device.addedAt) < Self.firstWeek
     }
 
     // MARK: - Private

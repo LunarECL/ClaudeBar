@@ -5,13 +5,13 @@ import Foundation
 public struct Device: Sendable, Equatable, Codable {
     /// The device's public key, base64url, as `X-Key` names it.
     public let publicKey: String
-    public let label: String
+    public let label: DeviceLabel
     public let addedAt: Date
     public let removedAt: Date?
     /// The device that removed it, `nil` while it's in use.
     public let removedBy: DeviceRef?
 
-    public init(publicKey: String, label: String, addedAt: Date, removedAt: Date? = nil, removedBy: DeviceRef? = nil) {
+    public init(publicKey: String, label: DeviceLabel, addedAt: Date, removedAt: Date? = nil, removedBy: DeviceRef? = nil) {
         self.publicKey = publicKey
         self.label = label
         self.addedAt = addedAt
@@ -21,18 +21,23 @@ public struct Device: Sendable, Equatable, Codable {
 
     public var isRemoved: Bool { removedAt != nil }
 
+    /// This device once `by` removed it at `time`, as `/me` will list it.
+    public func removed(by: DeviceRef, at time: Date) -> Device {
+        Device(publicKey: publicKey, label: label, addedAt: addedAt, removedAt: time, removedBy: by)
+    }
+
     private enum CodingKeys: String, CodingKey { case publicKey, label, addedAt, removedAt, removedBy }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         publicKey = try container.decode(String.self, forKey: .publicKey)
-        label = try container.decode(String.self, forKey: .label)
+        label = try container.decode(DeviceLabel.self, forKey: .label)
         addedAt = try ServerTime.decode(from: container, forKey: .addedAt)
         removedAt = try ServerTime.decodeIfPresent(from: container, forKey: .removedAt)
         removedBy = try container.decodeIfPresent(DeviceRef.self, forKey: .removedBy)
     }
 
-    /// Written as `ServerTime` reads it, so an exported `/me` answer reads back
+    /// Written as the server writes it, so an exported `/me` answer reads back
     /// as the same instants; `JSONEncoder`'s own form counts from 2001.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -47,9 +52,9 @@ public struct Device: Sendable, Equatable, Codable {
 /// A device named in passing: the one that removed another.
 public struct DeviceRef: Sendable, Equatable, Codable {
     public let publicKey: String
-    public let label: String
+    public let label: DeviceLabel
 
-    public init(publicKey: String, label: String) {
+    public init(publicKey: String, label: DeviceLabel) {
         self.publicKey = publicKey
         self.label = label
     }
@@ -58,15 +63,30 @@ public struct DeviceRef: Sendable, Equatable, Codable {
 /// What a device is called on the member's list: the label the person typed
 /// when it joined or was added, filled in with the machine's model and never
 /// its computer name, which is often a person's (design §6). The server takes
-/// 1–40 characters without control characters.
-public struct DeviceLabel: Sendable, Hashable, CustomStringConvertible {
+/// 1–40 characters without control characters, counting them as JavaScript
+/// does, in UTF-16 units: an emoji can count as several.
+public struct DeviceLabel: Sendable, Hashable, Codable, CustomStringConvertible {
     public let value: String
 
     public init?(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard (1...40).contains(trimmed.count),
+        guard (1...40).contains(trimmed.utf16.count),
               !trimmed.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }) else { return nil }
         value = trimmed
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let text = try container.decode(String.self)
+        guard let label = DeviceLabel(text) else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Not a device's label: \(text)")
+        }
+        self = label
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(value)
     }
 
     public var description: String { value }
@@ -93,10 +113,10 @@ public struct DeviceCode: Sendable, Hashable, CustomStringConvertible {
 /// when, shown above *Approve* so a code read out to a stranger isn't
 /// approved blind (RFC 8628 §5.4).
 public struct PendingDevice: Sendable, Equatable, Decodable {
-    public let label: String
+    public let label: DeviceLabel
     public let requestedAt: Date
 
-    public init(label: String, requestedAt: Date) {
+    public init(label: DeviceLabel, requestedAt: Date) {
         self.label = label
         self.requestedAt = requestedAt
     }
@@ -105,7 +125,7 @@ public struct PendingDevice: Sendable, Equatable, Decodable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        label = try container.decode(String.self, forKey: .label)
+        label = try container.decode(DeviceLabel.self, forKey: .label)
         requestedAt = try ServerTime.decode(from: container, forKey: .requestedAt)
     }
 }
@@ -132,16 +152,11 @@ public enum DeviceApproval: Sendable, Equatable {
     case approved(MemberSummary)
 }
 
-/// A time as the server writes it. §5 doesn't fix the form, so the ones a
-/// Worker on D1 is likely to send are read: ISO 8601 with or without
-/// fractional seconds, SQLite's `YYYY-MM-DD HH:MM:SS` in UTC, and Unix time in
-/// seconds or milliseconds. Anything else fails the answer rather than guess.
-/// Written back as ISO 8601 in UTC with milliseconds.
+/// A time as the server writes it: JavaScript's `toISOString()`, UTC with
+/// milliseconds (§5). Read without the milliseconds too; anything else fails
+/// the answer rather than guess.
 enum ServerTime {
     static func decode<Key: CodingKey>(from container: KeyedDecodingContainer<Key>, forKey key: Key) throws -> Date {
-        if let seconds = try? container.decode(Double.self, forKey: key) {
-            return Date(timeIntervalSince1970: seconds > 100_000_000_000 ? seconds / 1000 : seconds)
-        }
         let text = try container.decode(String.self, forKey: key)
         guard let date = date(text) else {
             throw DecodingError.dataCorruptedError(forKey: key, in: container, debugDescription: "Not a time: \(text)")
@@ -162,13 +177,9 @@ enum ServerTime {
 
     private static func date(_ text: String) -> Date? {
         let iso = ISO8601DateFormatter()
-        if let date = iso.date(from: text) { return date }
         iso.formatOptions.insert(.withFractionalSeconds)
         if let date = iso.date(from: text) { return date }
-        let sqlite = DateFormatter()
-        sqlite.locale = Locale(identifier: "en_US_POSIX")
-        sqlite.timeZone = TimeZone(identifier: "UTC")
-        sqlite.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return sqlite.date(from: text)
+        iso.formatOptions.remove(.withFractionalSeconds)
+        return iso.date(from: text)
     }
 }

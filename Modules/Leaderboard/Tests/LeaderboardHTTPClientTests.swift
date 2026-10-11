@@ -307,7 +307,7 @@ struct LeaderboardHTTPClientTests {
         #expect(request.url?.path == "/me/devices/pending/WDJBMJHT")
         #expect(request.httpMethod == "GET")
         #expect(try isSigned(request, by: key))
-        #expect(pending == PendingDevice(label: "Mac mini", requestedAt: Date(timeIntervalSince1970: 1_791_106_200)))
+        #expect(pending == PendingDevice(label: DeviceLabel("Mac mini")!, requestedAt: Date(timeIntervalSince1970: 1_791_106_200)))
     }
 
     @Test func `should approve a code, signed, and read the device it added`() async throws {
@@ -323,7 +323,7 @@ struct LeaderboardHTTPClientTests {
         #expect(request.httpMethod == "POST")
         #expect(sentBody == ["code": "WDJBMJHT"])
         #expect(try isSigned(request, by: key))
-        #expect(device == Device(publicKey: "newkey", label: "Mac mini", addedAt: Date(timeIntervalSince1970: 1_791_106_260)))
+        #expect(device == Device(publicKey: "newkey", label: DeviceLabel("Mac mini")!, addedAt: Date(timeIntervalSince1970: 1_791_106_260)))
     }
 
     @Test func `should remove a device by its key, signed`() async throws {
@@ -365,7 +365,7 @@ struct LeaderboardHTTPClientTests {
 
         let summary = try await client(body: body).me(period: .sevenDays, provider: nil, as: member)
 
-        #expect(summary.devices == [Device(publicKey: "k1", label: "MacBook Pro", addedAt: Date(timeIntervalSince1970: 1_790_841_600))])
+        #expect(summary.devices == [Device(publicKey: "k1", label: DeviceLabel("MacBook Pro")!, addedAt: Date(timeIntervalSince1970: 1_790_841_600))])
     }
 
     @Test(arguments: [
@@ -382,7 +382,7 @@ struct LeaderboardHTTPClientTests {
     @Test func `should say which device removed this one when the server refuses its key`() async {
         let body = #"{"error":"unauthorized","message":"This device was removed.","removedBy":{"publicKey":"k1","label":"MacBook Pro"}}"#
 
-        await #expect(throws: LeaderboardError.removed(by: "MacBook Pro")) {
+        await #expect(throws: LeaderboardError.removed(by: DeviceRef(publicKey: "k1", label: DeviceLabel("MacBook Pro")!))) {
             _ = try await client(status: 401, body: body).upload([], as: member)
         }
     }
