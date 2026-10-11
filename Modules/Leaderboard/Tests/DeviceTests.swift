@@ -87,23 +87,4 @@ struct DeviceTests {
 
         #expect(throws: DecodingError.self) { try JSONDecoder().decode(Device.self, from: Data(json.utf8)) }
     }
-
-    /// Settings' *Export…* writes `/me`'s answer with a plain `JSONEncoder`; read
-    /// back, every device keeps the times the server gave it.
-    @Test func `should write a member's devices so they read back as the server gave them`() throws {
-        let json = #"""
-        {"username":"tokenwhale","visible":true,"standing":null,"days":[],"devices":[
-         {"publicKey":"k1","label":"MacBook Pro","addedAt":"2026-10-01T08:00:00Z","removedAt":null,"removedBy":null},
-         {"publicKey":"k2","label":"Mac mini","addedAt":"2026-10-03T08:00:00.123Z","removedAt":"2026-10-04T09:30:00.000Z",
-          "removedBy":{"publicKey":"k1","label":"MacBook Pro"}}]}
-        """#
-        let summary = try JSONDecoder().decode(MemberSummary.self, from: Data(json.utf8))
-
-        let exported = try JSONEncoder().encode(summary)
-
-        let readBack = try JSONDecoder().decode(MemberSummary.self, from: exported).devices
-        #expect(readBack.map(\.addedAt) == [Date(timeIntervalSince1970: 1_790_841_600), Date(timeIntervalSince1970: 1_791_014_400.123)])
-        #expect(readBack.map(\.removedAt) == [nil, Date(timeIntervalSince1970: 1_791_106_200)])
-        #expect(readBack == summary.devices)
-    }
 }

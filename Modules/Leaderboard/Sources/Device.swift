@@ -2,7 +2,7 @@ import Foundation
 
 /// *DEVICE* (design §2a): one of a member's machines, which is one key. `/me`
 /// lists them, removed ones included; a removed device's days stay and count.
-public struct Device: Sendable, Equatable, Codable {
+public struct Device: Sendable, Equatable, Decodable {
     /// The key it signs with: the device, as the server knows it.
     public let publicKey: DeviceKey
     public let label: DeviceLabel
@@ -36,21 +36,10 @@ public struct Device: Sendable, Equatable, Codable {
         removedAt = try ServerTime.decodeIfPresent(from: container, forKey: .removedAt)
         removedBy = try container.decodeIfPresent(DeviceRef.self, forKey: .removedBy)
     }
-
-    /// Written as the server writes it, so an exported `/me` answer reads back
-    /// as the same instants; `JSONEncoder`'s own form counts from 2001.
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(publicKey, forKey: .publicKey)
-        try container.encode(label, forKey: .label)
-        try container.encode(ServerTime.string(addedAt), forKey: .addedAt)
-        try container.encodeIfPresent(removedAt.map(ServerTime.string), forKey: .removedAt)
-        try container.encodeIfPresent(removedBy, forKey: .removedBy)
-    }
 }
 
 /// A device named in passing: the one that removed another.
-public struct DeviceRef: Sendable, Equatable, Codable {
+public struct DeviceRef: Sendable, Equatable, Decodable {
     public let publicKey: DeviceKey
     public let label: DeviceLabel
 
@@ -63,7 +52,7 @@ public struct DeviceRef: Sendable, Equatable, Codable {
 /// A device, as the server knows it: the public half of the key it signs
 /// with, base64url, as `X-Key` names it. Only the wire and the stored record
 /// hold it as text.
-public struct DeviceKey: Sendable, Hashable, Codable, CustomStringConvertible {
+public struct DeviceKey: Sendable, Hashable, Decodable, CustomStringConvertible {
     public let value: String
 
     public init(_ value: String) {
@@ -72,11 +61,6 @@ public struct DeviceKey: Sendable, Hashable, Codable, CustomStringConvertible {
 
     public init(from decoder: Decoder) throws {
         value = try decoder.singleValueContainer().decode(String.self)
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(value)
     }
 
     public var description: String { value }
@@ -92,7 +76,7 @@ extension SigningKey {
 /// its computer name, which is often a person's (design §6). The server takes
 /// 1–40 characters without control characters, counting them as JavaScript
 /// does, in UTF-16 units: an emoji can count as several.
-public struct DeviceLabel: Sendable, Hashable, Codable, CustomStringConvertible {
+public struct DeviceLabel: Sendable, Hashable, Decodable, CustomStringConvertible {
     public let value: String
 
     public init?(_ text: String) {
@@ -109,11 +93,6 @@ public struct DeviceLabel: Sendable, Hashable, Codable, CustomStringConvertible 
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Not a device's label: \(text)")
         }
         self = label
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(value)
     }
 
     public var description: String { value }
@@ -194,12 +173,6 @@ enum ServerTime {
     static func decodeIfPresent<Key: CodingKey>(from container: KeyedDecodingContainer<Key>, forKey key: Key) throws -> Date? {
         guard container.contains(key), try !container.decodeNil(forKey: key) else { return nil }
         return try decode(from: container, forKey: key)
-    }
-
-    static func string(_ date: Date) -> String {
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions.insert(.withFractionalSeconds)
-        return iso.string(from: date)
     }
 
     private static func date(_ text: String) -> Date? {

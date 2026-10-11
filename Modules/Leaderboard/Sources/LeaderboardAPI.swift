@@ -20,7 +20,7 @@ public enum BoardPeriod: String, Sendable, CaseIterable, Codable {
 /// What the server holds about you: your name, you on the board asked for,
 /// whether you're shown, whether your country is on the globe, every day
 /// you uploaded, and your devices.
-public struct MemberSummary: Sendable, Equatable, Codable {
+public struct MemberSummary: Sendable, Equatable, Decodable {
     /// The member's name on the server, which another device may have changed.
     /// `nil` from a server that doesn't say it.
     public let username: String?
