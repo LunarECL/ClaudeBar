@@ -5,9 +5,11 @@ import Quotas
 
 final class InMemorySigningKeyStore: SigningKeyStore, @unchecked Sendable {
     var stored: Data?
+    /// A store that refuses the key, as a Keychain or Credential Manager can.
+    var refusesSaving = false
 
     func load() -> Data? { stored }
-    func save(_ rawKey: Data) { stored = rawKey }
+    func save(_ rawKey: Data) { if !refusesSaving { stored = rawKey } }
     func delete() { stored = nil }
 }
 

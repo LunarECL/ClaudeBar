@@ -49,6 +49,30 @@ struct LeaderboardMembershipTests {
         #expect(settings.record == nil)
     }
 
+    @Test func `should not join, nor tell the server, when this Mac can't store its key`() async throws {
+        keys.refusesSaving = true
+        let membership = membership()
+
+        await #expect(throws: LeaderboardError.keyNotKept) {
+            try await membership.join(as: #require(Username("tokenwhale")), sharing: ["claude"])
+        }
+        verify(api).join(username: .any, publicKey: .any, label: .any).called(0)
+        #expect(!membership.isJoined)
+        #expect(settings.record == nil)
+    }
+
+    @Test func `should refuse to join again while a member, keeping this Mac's key`() async throws {
+        let membership = try await joined()
+        let key = keys.stored
+
+        await #expect(throws: LeaderboardError.alreadyJoined) {
+            try await membership.join(as: #require(Username("otherwhale")), sharing: ["claude"])
+        }
+        verify(api).join(username: .any, publicKey: .any, label: .any).called(1)
+        #expect(keys.stored == key)
+        #expect(membership.username?.value == "tokenwhale")
+    }
+
     @Test func `should refuse to join sharing a provider that keeps no token logs`() async throws {
         let membership = membership()
 

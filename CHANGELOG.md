@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Leaderboard joining**: when the leaderboard key can't be stored, joining now stops and says so, instead of joining anyway and dropping out at the next launch with the username taken. ([#548](https://github.com/tddworks/ClaudeBar/pull/548))
+
 ---
 
 ## [0.5.14] - 2026-10-11
