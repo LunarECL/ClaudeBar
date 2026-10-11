@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.14] - 2026-10-11
+
 ### Fixed
 - **Leaderboard export**: *Export my data* in Settings → Leaderboard saves everything the server holds about you, every day you ever uploaded and which Mac sent it, as the server sent it. Before, it saved only the last 31 days, without which Mac sent each one. ([#544](https://github.com/tddworks/ClaudeBar/pull/544)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md)
 
@@ -234,7 +238,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.13...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.14...HEAD
+[0.5.14]: https://github.com/tddworks/ClaudeBar/compare/v0.5.13...v0.5.14
 [0.5.13]: https://github.com/tddworks/ClaudeBar/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/tddworks/ClaudeBar/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/tddworks/ClaudeBar/compare/v0.5.10...v0.5.11
