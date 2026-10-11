@@ -195,6 +195,8 @@ public enum LeaderboardError: Error, Sendable, Equatable, LocalizedError {
     case notShareable(String)
     case nothingShared
     case notJoined
+    /// This Mac is already a member's device, so it doesn't ask to be added.
+    case alreadyJoined
     /// The server refused the signature: the key no longer matches the name.
     case unauthorized
     /// Another device of the member removed this one: its key is revoked.
@@ -218,6 +220,7 @@ public enum LeaderboardError: Error, Sendable, Equatable, LocalizedError {
         case .notShareable(let provider): "\(provider) has no token logs on this Mac, so it can't be shared."
         case .nothingShared: "Pick at least one provider to share."
         case .notJoined: "You haven't joined the leaderboard."
+        case .alreadyJoined: "This Mac is already on the leaderboard."
         case .unauthorized: "The leaderboard didn't accept this Mac's key for your username."
         case .removed(let device): "\(device.label) removed this Mac from your leaderboard devices."
         case .codeExpired: "The code expired before it was approved. Ask for a new one."

@@ -69,11 +69,11 @@ struct LeaderboardDevicesTests {
     @Test func `should show the code the server gave, and stay outside while it waits`() async throws {
         let membership = membership(machine: "Mac mini")
 
-        let code = try await membership.requestToJoin()
+        let request = try await membership.requestToJoin()
 
-        #expect(code == server.authorization.code)
+        #expect(request.code == server.authorization.code)
         #expect(server.requested?.label == "Mac mini")
-        #expect(membership.joining == .waiting(code: code))
+        #expect(request.stage == .waiting)
         #expect(!membership.isJoined)
         #expect(keys.stored == nil)
     }
@@ -81,13 +81,13 @@ struct LeaderboardDevicesTests {
     @Test func `should name the member it joined once approved, and send nothing before the person agrees`() async throws {
         let membership = membership()
         server.approvals = [.success(.waiting), .success(.waiting), .success(.approved(server.summary))]
-        _ = try await membership.requestToJoin()
+        let request = try await membership.requestToJoin()
 
-        let member = try await membership.waitForApproval()
+        let member = try await request.waitForApproval()
 
         #expect(member.value == "tokenwhale")
         #expect(server.approvalsAsked == 3)
-        #expect(membership.joining == .approved(member: member))
+        #expect(request.stage == .approved(member: member))
         #expect(!membership.isJoined)
         #expect(membership.uploadCredentials == nil)
         #expect(keys.stored == nil && settings.record == nil)
@@ -97,9 +97,9 @@ struct LeaderboardDevicesTests {
         let membership = membership()
         server.authorization = DeviceAuthorization(code: server.authorization.code, expiresIn: 600, interval: 5)
         server.approvals = [.success(.waiting), .success(.waiting), .success(.approved(server.summary))]
-        _ = try await membership.requestToJoin()
+        let request = try await membership.requestToJoin()
 
-        _ = try await membership.waitForApproval()
+        _ = try await request.waitForApproval()
 
         #expect(waits.taken == [5, 5])
     }
@@ -107,13 +107,13 @@ struct LeaderboardDevicesTests {
     @Test func `should join as the member it was added to once the person agrees, with nothing uploaded yet`() async throws {
         let membership = membership()
         server.approvals = [.success(.approved(MemberSummary(username: "tokenwhale", onBoard: nil, days: [], visible: false)))]
-        _ = try await membership.requestToJoin()
-        _ = try await membership.waitForApproval()
+        let request = try await membership.requestToJoin()
+        _ = try await request.waitForApproval()
 
-        try membership.confirmJoining(sharing: ["codex"])
+        try membership.join(through: request, sharing: ["codex"])
 
         #expect(membership.isJoined)
-        #expect(membership.joining == nil)
+        #expect(request.stage == .joined)
         #expect(membership.username?.value == "tokenwhale")
         #expect(membership.sharing == ["codex"])
         #expect(!membership.isVisible)
@@ -122,26 +122,56 @@ struct LeaderboardDevicesTests {
         #expect(settings.record?.username == "tokenwhale")
     }
 
+    @Test func `should not join through a request no one has approved yet`() async throws {
+        let membership = membership()
+        let request = try await membership.requestToJoin()
+
+        #expect(throws: LeaderboardError.notJoined) { try membership.join(through: request, sharing: ["claude"]) }
+
+        #expect(!membership.isJoined)
+        #expect(request.stage == .waiting)
+    }
+
+    @Test func `should stay approved when what the person picked can't be shared, so they can pick again`() async throws {
+        let membership = membership()
+        server.approvals = [.success(.approved(server.summary))]
+        let request = try await membership.requestToJoin()
+        let member = try await request.waitForApproval()
+
+        #expect(throws: LeaderboardError.nothingShared) { try membership.join(through: request, sharing: []) }
+
+        #expect(request.stage == .approved(member: member))
+        #expect(!membership.isJoined)
+    }
+
+    @Test func `should not ask to be added to a member while this Mac is already one`() async throws {
+        let membership = try await joined()
+
+        await #expect(throws: LeaderboardError.alreadyJoined) { _ = try await membership.requestToJoin() }
+
+        #expect(server.requested == nil)
+    }
+
     @Test func `should forget the code when it expires before anyone approves it`() async throws {
         let membership = membership()
         server.approvals = [.success(.waiting), .failure(.codeExpired)]
-        _ = try await membership.requestToJoin()
+        let request = try await membership.requestToJoin()
 
-        await #expect(throws: LeaderboardError.codeExpired) { _ = try await membership.waitForApproval() }
-        #expect(membership.joining == nil)
+        await #expect(throws: LeaderboardError.codeExpired) { _ = try await request.waitForApproval() }
+        #expect(request.stage == .expired)
         #expect(!membership.isJoined)
     }
 
     @Test func `should remove itself and keep nothing when the person doesn't know the member it was added to`() async throws {
         let membership = membership()
         server.approvals = [.success(.approved(server.summary))]
-        _ = try await membership.requestToJoin()
-        _ = try await membership.waitForApproval()
+        let request = try await membership.requestToJoin()
+        _ = try await request.waitForApproval()
 
-        try await membership.declineJoining()
+        try await request.decline()
 
         #expect(server.removed == [server.requested?.publicKey])
-        #expect(membership.joining == nil)
+        #expect(request.stage == .declined)
         #expect(!membership.isJoined)
         #expect(keys.stored == nil && settings.record == nil)
     }

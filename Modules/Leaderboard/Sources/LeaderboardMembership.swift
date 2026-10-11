@@ -35,36 +35,9 @@ public final class LeaderboardMembership {
     private var key: SigningKey?
     /// Devices already shown as added, by key: each is shown once.
     private var shownDevices: Set<DeviceKey> = []
-    /// A new device on its way in, with the key it asked with; `nil` otherwise.
-    private var joiningState: JoiningState?
     /// Changes made here, counted, so a `/me` answer that crossed one is
     /// not taken over it.
     private var changesMadeHere = 0
-
-    /// Where a new device stands on its way in (design §2a).
-    public enum Joining: Sendable, Equatable {
-        /// It shows `code` until a device of the member approves it.
-        case waiting(code: DeviceCode)
-        /// A device of `member` approved it; nothing is sent until the person agrees.
-        case approved(member: Username)
-    }
-
-    /// `Joining`, with what each step holds: the key the new device asked
-    /// with, and the server's interval, then the member's `/me` answer.
-    private enum JoiningState {
-        case waiting(code: DeviceCode, key: SigningKey, interval: TimeInterval)
-        case approved(member: Username, key: SigningKey, summary: MemberSummary)
-    }
-
-    /// A new device on its way in: the code it shows, then the member a device
-    /// of theirs added it to, until the person agrees. `nil` otherwise.
-    public var joining: Joining? {
-        switch joiningState {
-        case .waiting(let code, _, _): .waiting(code: code)
-        case .approved(let member, _, _): .approved(member: member)
-        case nil: nil
-        }
-    }
 
     @ObservationIgnored private let api: any LeaderboardAPI
     @ObservationIgnored private let keys: any SigningKeyStore
@@ -73,7 +46,7 @@ public final class LeaderboardMembership {
     @ObservationIgnored private let machine: any MachineIdentity
     @ObservationIgnored private let calendar: Calendar
     @ObservationIgnored private let now: () -> Date
-    /// Waits this long: between a new device's asks whether it was approved.
+    /// Waits this long: between a device request's asks whether it was approved.
     @ObservationIgnored private let sleep: @MainActor (TimeInterval) async throws -> Void
 
     public init(api: any LeaderboardAPI, keys: any SigningKeyStore, settings: any LeaderboardSettingsRepository,
@@ -138,46 +111,20 @@ public final class LeaderboardMembership {
     // MARK: - Joining as a new device of a member (design §2a)
 
     /// *Already a member? Add this Mac*: makes this device's key and asks the
-    /// server to add it; answers the code to type on a device the member has.
-    public func requestToJoin(label: DeviceLabel? = nil) async throws -> DeviceCode {
+    /// server to add it; answers the request, with the code to type on a
+    /// device the member has. Never while this Mac is a member.
+    public func requestToJoin(label: DeviceLabel? = nil) async throws -> DeviceRequest {
+        guard !isJoined else { throw LeaderboardError.alreadyJoined }
         let key = SigningKey.generate()
         let authorization = try await api.requestDevice(publicKey: key.publicKey, label: (label ?? suggestedLabel).value)
-        joiningState = .waiting(code: authorization.code, key: key, interval: authorization.interval)
-        return authorization.code
+        return DeviceRequest(code: authorization.code, key: key, interval: authorization.interval, api: api, sleep: sleep)
     }
 
-    /// Asks, at the interval the server gave, until a device of the member
-    /// approves the code; answers the member it joined. Nothing is kept or
-    /// sent until the person agrees (`confirmJoining`): a code that leaked
-    /// could have been approved by someone else.
-    public func waitForApproval() async throws -> Username {
-        guard case .waiting(_, let key, let interval) = joiningState else { throw LeaderboardError.notJoined }
-        while true {
-            let approval: DeviceApproval
-            do {
-                approval = try await api.approval(of: key)
-            } catch LeaderboardError.codeExpired {
-                endJoining()
-                throw LeaderboardError.codeExpired
-            }
-            switch approval {
-            case .waiting:
-                try await sleep(interval)
-            case .approved(let summary):
-                guard let member = summary.username.flatMap(Username.init) else {
-                    throw LeaderboardError.rejected("The leaderboard answered with something unreadable.")
-                }
-                joiningState = .approved(member: member, key: key, summary: summary)
-                return member
-            }
-        }
-    }
-
-    /// The person knows the member this device was added to: it joins as that
-    /// member, sharing `providers`, with nothing uploaded yet, so its first
-    /// upload sends the last thirty days.
-    public func confirmJoining(sharing providers: Set<String>) throws {
-        guard case .approved(let member, let key, let summary) = joiningState else { throw LeaderboardError.notJoined }
+    /// The person knows the member `request` was added to: this Mac joins as
+    /// that member's device, sharing `providers`, with nothing uploaded yet,
+    /// so its first upload sends the last thirty days.
+    public func join(through request: DeviceRequest, sharing providers: Set<String>) throws {
+        guard let (member, key, summary) = request.approval else { throw LeaderboardError.notJoined }
         guard !providers.isEmpty else { throw LeaderboardError.nothingShared }
         try requireShareable(providers)
         keys.save(key.rawRepresentation)
@@ -192,19 +139,7 @@ public final class LeaderboardMembership {
         link = nil
         startFresh()
         follow(summary)
-        endJoining()
-    }
-
-    /// The person doesn't know the member this device was added to: it removes
-    /// itself from that member, and keeps nothing.
-    public func declineJoining() async throws {
-        guard case .approved(let member, let key, _) = joiningState else { throw LeaderboardError.notJoined }
-        try await api.removeDevice(key.publicKey, as: MemberCredentials(username: member, key: key))
-        endJoining()
-    }
-
-    private func endJoining() {
-        joiningState = nil
+        request.markJoined()
     }
 
     /// A membership this device starts: no devices known or shown yet, and no

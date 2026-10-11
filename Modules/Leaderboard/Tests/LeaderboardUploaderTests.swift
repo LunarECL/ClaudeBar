@@ -120,9 +120,9 @@ struct LeaderboardUploaderTests {
         server.approvals = [.success(.approved(server.summary))]
         let membership = LeaderboardMembership(api: server, keys: keys, settings: settings, logs: logs,
                                                machine: MockMachineIdentity.named("Mac mini"), calendar: calendar)
-        _ = try await membership.requestToJoin()
-        _ = try await membership.waitForApproval()
-        try membership.confirmJoining(sharing: ["claude"])
+        let request = try await membership.requestToJoin()
+        _ = try await request.waitForApproval()
+        try membership.join(through: request, sharing: ["claude"])
         logs.logins = [LoginDays(providerId: "claude", days: [LeaderboardFixtures.stat(day: 4, input: 10)])]
 
         let now = now
