@@ -1,6 +1,6 @@
 # Rich Domain Model Patterns
 
-The basic patterns. Before any change, think how the domain should be: [domain-shape.md](domain-shape.md) (from the root problem to the concepts, the shape rules, refining as you go).
+The basic patterns. Before any change, think how the domain should be: [domain-shape.md](domain-shape.md) (five questions for a domain easy to understand).
 
 ## User's Mental Model
 

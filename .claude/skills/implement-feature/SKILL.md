@@ -70,8 +70,8 @@ behind; don't bend the design to it.
 
 Before components, ask how the domain should be: from the root problem (the
 issue, the journey) to the facts it must respect, to the concepts those force,
-then compare with the code. Check every type the feature touches against the
-shape rules, and draw now beside proposed →
+then compare with the code. Ask the five questions of every type the feature
+touches, and draw now beside proposed →
 [domain-shape.md](references/domain-shape.md). A new aggregate, a moved law or
 a changed owner goes into the docs in Step 0's change.
 
@@ -327,7 +327,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 - [Architecture diagram patterns](references/architecture-diagrams.md) - ASCII diagram examples for different scenarios
 - [Swift 6.2 @Observable patterns](references/swift-observable.md)
 - [Rich domain model patterns](references/domain-models.md)
-- [Think the domain first](references/domain-shape.md) - from the root problem to the concepts; the shape rules; refining as you go
+- [Think the domain first](references/domain-shape.md) - from the root problem to the concepts; five questions for a domain easy to understand; keeping it in scope
 - [TDD test patterns](references/tdd-patterns.md)
 
 ## Checklist
@@ -335,7 +335,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 ### Architecture Design (Phase 0)
 - [ ] Read CANONICAL_MODEL, TARGET_ARCHITECTURE and the feature's design.md
 - [ ] Place it: owner, capability (handle `nil` when not declared), extension point
-- [ ] Thought the domain first: root problem → concepts, touched types against the shape rules, now/proposed drawn ([domain-shape.md](references/domain-shape.md))
+- [ ] Thought the domain first: root problem → concepts, the five questions asked of touched types, now/proposed drawn ([domain-shape.md](references/domain-shape.md))
 - [ ] Write the design change into the docs first
 - [ ] Analyze requirements and identify components
 - [ ] Create ASCII architecture diagram with component interactions
