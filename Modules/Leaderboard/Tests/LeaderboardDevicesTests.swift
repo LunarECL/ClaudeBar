@@ -149,6 +149,38 @@ struct LeaderboardDevicesTests {
         #expect(membership.isJoined)
     }
 
+    @Test func `should not join through a request once this Mac is a member, and keep the member's key`() async throws {
+        let membership = membership()
+        server.approvals = [.success(.approved(server.summary))]
+        let request = try await membership.requestToJoin()
+        _ = try await request.waitForApproval()
+        try await membership.join(as: #require(Username("tokenwhale")), sharing: ["claude"])
+        let key = keys.stored
+        keys.refusesSaving = true
+
+        #expect(throws: LeaderboardError.alreadyJoined) { try membership.join(through: request, sharing: ["claude"]) }
+
+        #expect(keys.stored == key)
+        #expect(membership.isJoined)
+    }
+
+    @Test func `should refuse a second join while the first waits for the server, and keep the first one's key`() async throws {
+        let membership = membership()
+        server.holdsFirstJoin = true
+        server.laterJoinFailure = .usernameTaken
+        let first = Task { try await membership.join(as: #require(Username("tokenwhale")), sharing: ["claude"]) }
+        while !server.isHoldingJoin { await Task.yield() }
+
+        await #expect(throws: LeaderboardError.alreadyJoined) {
+            try await membership.join(as: #require(Username("otherwhale")), sharing: ["claude"])
+        }
+        server.releaseJoin()
+        try await first.value
+
+        #expect(membership.username?.value == "tokenwhale")
+        #expect(try SigningKey(rawRepresentation: #require(keys.stored)).publicKey == server.joinedKey)
+    }
+
     @Test func `should not ask to be added to a member while this Mac is already one`() async throws {
         let membership = try await joined()
 

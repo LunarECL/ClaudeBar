@@ -38,6 +38,9 @@ public final class LeaderboardMembership {
     /// Changes made here, counted, so a `/me` answer that crossed one is
     /// not taken over it.
     private var changesMadeHere = 0
+    /// A direct join waiting for the server. No other join starts until it
+    /// ends, so none replaces, or deletes, the key it kept.
+    @ObservationIgnored private var isJoining = false
 
     @ObservationIgnored private let api: any LeaderboardAPI
     @ObservationIgnored private let keys: any SigningKeyStore
@@ -87,9 +90,11 @@ public final class LeaderboardMembership {
     /// sign as after a relaunch; a join the server refuses keeps no key.
     public func join(as username: Username, sharing providers: Set<String>, sharesCountry: Bool = false,
                      link: ProfileLink? = nil, label: DeviceLabel? = nil) async throws {
-        guard !isJoined else { throw LeaderboardError.alreadyJoined }
+        guard !isJoined, !isJoining else { throw LeaderboardError.alreadyJoined }
         guard !providers.isEmpty else { throw LeaderboardError.nothingShared }
         try requireShareable(providers)
+        isJoining = true
+        defer { isJoining = false }
         let key = SigningKey.generate()
         try keep(key)
         do {
@@ -130,6 +135,7 @@ public final class LeaderboardMembership {
     /// so its first upload sends the last thirty days. The key is kept first:
     /// if this Mac can't keep it, the request stays approved to try again.
     public func join(through request: DeviceRequest, sharing providers: Set<String>) throws {
+        guard !isJoined, !isJoining else { throw LeaderboardError.alreadyJoined }
         guard !providers.isEmpty else { throw LeaderboardError.nothingShared }
         try requireShareable(providers)
         guard case .approved = request.stage else { throw LeaderboardError.notJoined }

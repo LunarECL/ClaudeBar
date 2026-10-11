@@ -19,16 +19,38 @@ final class DeviceServer: LeaderboardAPI, @unchecked Sendable {
     var approved = Device(publicKey: DeviceKey("newkey"), label: DeviceLabel("Mac mini")!, addedAt: Date(timeIntervalSince1970: 1_791_106_260))
     var removeFailure: LeaderboardError?
     var deleteDaysFailure: LeaderboardError?
+    /// When set, the first `join` waits until `releaseJoin()`, as a slow
+    /// server does; a join after it fails with `laterJoinFailure`, if set.
+    var holdsFirstJoin = false
+    var laterJoinFailure: LeaderboardError?
 
     private(set) var joinedLabel: String?
+    private(set) var joinedKey: String?
+    private(set) var isHoldingJoin = false
     private(set) var requested: (publicKey: String, label: String)?
     private(set) var approvalsAsked = 0
     private(set) var approvedCode: DeviceCode?
     private(set) var removed: [String] = []
     private(set) var deletedDays: [DeletedDays] = []
+    private var joins = 0
+    private var heldJoin: CheckedContinuation<Void, Never>?
 
     func join(username: String, publicKey: String, label: String) async throws {
+        joins += 1
+        if joins > 1, let laterJoinFailure { throw laterJoinFailure }
         joinedLabel = label
+        joinedKey = publicKey
+        guard holdsFirstJoin, joins == 1 else { return }
+        await withCheckedContinuation { continuation in
+            heldJoin = continuation
+            isHoldingJoin = true
+        }
+    }
+
+    func releaseJoin() {
+        isHoldingJoin = false
+        heldJoin?.resume()
+        heldJoin = nil
     }
 
     func requestDevice(publicKey: String, label: String) async throws -> DeviceAuthorization {
