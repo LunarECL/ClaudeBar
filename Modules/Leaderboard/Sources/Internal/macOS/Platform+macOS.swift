@@ -6,6 +6,7 @@ extension Platform {
     /// Keychain refuses a locally built, ad-hoc signed app; the machine through
     /// the I/O Registry.
     static let current = Platform(
+        deviceName: "Mac",
         signingKeyStore: FallbackSigningKeyStore(secure: KeychainSigningKeyStore(), fallback: DefaultsSigningKeyStore()),
         machineIdentity: IOKitMachineIdentity()
     )

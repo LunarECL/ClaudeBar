@@ -32,12 +32,11 @@ final class AppLeaderboard {
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var boards: [Board] = []
 
-    /// The key store and the machine are the Mac's: the factory has none only
-    /// where ClaudeBar keeps no key and reads no machine yet (Windows).
+    /// The key store and the machine are the Mac's, from the factory.
     init(monitor: QuotaMonitor,
          api: any LeaderboardAPI = Leaderboard.makeAPI(client: AppLeaderboard.client),
-         keys: any SigningKeyStore = Leaderboard.makeKeyStore()!,
-         machine: any MachineIdentity = Leaderboard.makeMachineIdentity()!,
+         keys: any SigningKeyStore = Leaderboard.makeKeyStore(),
+         machine: any MachineIdentity = Leaderboard.makeMachineIdentity(),
          settings: any LeaderboardSettingsRepository = JSONSettingsRepository.shared) {
         let logs = MonitorTokenLogs(monitor: monitor)
         self.api = api
