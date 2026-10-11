@@ -66,6 +66,15 @@ laws with owners, a pieces table, a TARGET section) — that doc change is the
 architecture you present in Step 4. Code that disagrees with the docs is
 behind; don't bend the design to it.
 
+### Step 0b: Think the domain first
+
+Before components, ask how the domain should be: from the root problem (the
+issue, the journey) to the facts it must respect, to the concepts those force,
+then compare with the code. Check every type the feature touches against the
+shape rules, and draw now beside proposed →
+[domain-shape.md](references/domain-shape.md). A new aggregate, a moved law or
+a changed owner goes into the docs in Step 0's change.
+
 ### Step 1: Analyze Requirements
 
 Identify:
@@ -318,6 +327,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 - [Architecture diagram patterns](references/architecture-diagrams.md) - ASCII diagram examples for different scenarios
 - [Swift 6.2 @Observable patterns](references/swift-observable.md)
 - [Rich domain model patterns](references/domain-models.md)
+- [Think the domain first](references/domain-shape.md) - from the root problem to the concepts; the shape rules; refining as you go
 - [TDD test patterns](references/tdd-patterns.md)
 
 ## Checklist
@@ -325,6 +335,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 ### Architecture Design (Phase 0)
 - [ ] Read CANONICAL_MODEL, TARGET_ARCHITECTURE and the feature's design.md
 - [ ] Place it: owner, capability (handle `nil` when not declared), extension point
+- [ ] Thought the domain first: root problem → concepts, touched types against the shape rules, now/proposed drawn ([domain-shape.md](references/domain-shape.md))
 - [ ] Write the design change into the docs first
 - [ ] Analyze requirements and identify components
 - [ ] Create ASCII architecture diagram with component interactions
@@ -342,6 +353,7 @@ xcodebuild test -workspace ClaudeBar.xcworkspace -scheme ClaudeBar-Workspace \
 - [ ] Implement ports in the module's `Internal/`
 - [ ] Create views consuming domain models directly
 - [ ] Views render and tell only — no comparing, counting or reading quotas to decide
+- [ ] Public surface is tells and answers; rules `internal`; no Bool flag the caller decides; each aggregate changes only its own state
 - [ ] Docs updated in the same change (status, build truth, laws)
 - [ ] Real UI screenshots on mock data (`scripts/demo-screenshots.sh`) for UI changes
 - [ ] Full `xcodebuild test` green (`tuist test` skips cached targets)

@@ -66,6 +66,17 @@ at a call site. If the right fix changes a law or moves it to another owner, tha
 design change: update the doc and ask the user to confirm before fixing. If no law covers
 it, propose the law first.
 
+### Think how the domain should be
+
+A bug is often a shape that let it happen: a rule a view could call and decide
+for itself, two lifecycles in one class whose optionals disagree, a `String`
+where a type would have refused the bad value, a boundary that guessed the
+other side's format. Before fixing, ask how the domain should be, from the
+person's problem, and check the types the bug touches against the shape rules
+→ [domain-shape.md](../implement-feature/references/domain-shape.md). Fix the
+shape when it is the cause, in the same change, test first; a new aggregate or
+a moved owner is a design change, confirmed first.
+
 ### Locate in Architecture
 
 > **Reference:** [MODULAR_DESIGN.md](../../../docs/architecture/MODULAR_DESIGN.md) (modules) ·
@@ -187,6 +198,7 @@ when the reading changed, and the CHANGELOG line.
 
 - [ ] Bug reproduced and understood
 - [ ] Root cause identified in code
+- [ ] Domain thought through: is the bug a shape the [rules](../implement-feature/references/domain-shape.md) would have refused? Fixed there if so
 - [ ] Failing test written (exposes bug)
 - [ ] Test FAILS before fix
 - [ ] Minimal fix implemented

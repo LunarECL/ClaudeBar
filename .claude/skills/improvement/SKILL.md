@@ -30,6 +30,7 @@ Make improvements to existing functionality using TDD and rich domain design.
 │  0. CHECK THE DESIGN (docs are the source of truth)          │
 ├─────────────────────────────────────────────────────────────┤
 │  • Read USER_JOURNEYS, CANONICAL, TARGET, design.md          │
+│  • Think the domain: how should it be? (domain-shape.md)     │
 │  • Does the improvement change a law, an owner, a word?      │
 │  • If so: write it into the docs, ask the user to confirm    │
 └─────────────────────────────────────────────────────────────┘
@@ -70,6 +71,14 @@ Read the design in order — [USER_JOURNEYS.md](../../../docs/architecture/USER_
 feature's `design.md`. An improvement that only makes the code match the docs needs no
 approval. One that changes a law, its owner, a word the screen prints, or adds a piece is a
 design change: write it into the docs and ask the user to confirm before coding.
+
+**Think the domain first.** Before changing code, ask how the domain should be,
+from the person's problem rather than the class at hand. Check the types the
+improvement touches against the shape rules (one aggregate per lifecycle, each
+changing only its own state, abilities not rules, choices not flags, pointable
+types) and refine them in the same change → [domain-shape.md](../implement-feature/references/domain-shape.md).
+An improvement is the usual moment to fit a type to its shape; a new aggregate
+or a moved owner is a design change, confirmed first.
 
 ## Types of Improvements
 
@@ -215,6 +224,7 @@ never with a line in `ClaudeBarApp` that names it (providers are found by
 ## Checklist
 
 - [ ] Current behavior understood
+- [ ] Domain thought through: the touched types checked against [the shape rules](../implement-feature/references/domain-shape.md), refined in scope
 - [ ] Improvement scope defined (minimal)
 - [ ] Test for improved behavior written
 - [ ] Test FAILS before implementation
