@@ -27,7 +27,14 @@ public final class LeaderboardMembership {
     /// Days the server refused, each alone, with why: sent again with each
     /// upload until the server takes them or they are 30 days old.
     public private(set) var refused: [RefusedDay] = []
+    /// The member's devices as `/me` last listed them: a copy, like the name.
+    public private(set) var devices = MemberDevices()
+    /// The device that removed this one, once its key was refused for that:
+    /// the membership is forgotten, and this says why.
+    public private(set) var removedBy: DeviceRef?
     private var key: SigningKey?
+    /// Devices already shown as added, by key: each is shown once.
+    private var shownDevices: Set<DeviceKey> = []
     /// Changes made here, counted, so a `/me` answer that crossed one is
     /// not taken over it.
     private var changesMadeHere = 0
@@ -36,15 +43,20 @@ public final class LeaderboardMembership {
     @ObservationIgnored private let keys: any SigningKeyStore
     @ObservationIgnored private let settings: any LeaderboardSettingsRepository
     @ObservationIgnored private let logs: any TokenLogs
+    @ObservationIgnored private let machine: any MachineIdentity
     @ObservationIgnored private let calendar: Calendar
+    @ObservationIgnored private let now: () -> Date
 
     public init(api: any LeaderboardAPI, keys: any SigningKeyStore, settings: any LeaderboardSettingsRepository,
-                logs: any TokenLogs, calendar: Calendar = .current) {
+                logs: any TokenLogs, machine: any MachineIdentity, calendar: Calendar = .current,
+                now: @escaping () -> Date = Date.init) {
         self.api = api
         self.keys = keys
         self.settings = settings
         self.logs = logs
+        self.machine = machine
         self.calendar = calendar
+        self.now = now
         restore()
     }
 
@@ -66,12 +78,16 @@ public final class LeaderboardMembership {
 
     // MARK: - Joining and leaving
 
+    /// What this device is called unless the person types another name: the
+    /// machine's model, never its computer name.
+    public var suggestedLabel: DeviceLabel { machine.model }
+
     public func join(as username: Username, sharing providers: Set<String>, sharesCountry: Bool = false,
-                     link: ProfileLink? = nil) async throws {
+                     link: ProfileLink? = nil, label: DeviceLabel? = nil) async throws {
         guard !providers.isEmpty else { throw LeaderboardError.nothingShared }
         try requireShareable(providers)
         let key = SigningKey.generate()
-        try await api.join(username: username.value, publicKey: key.publicKey)
+        try await api.join(username: username.value, publicKey: key.publicKey, label: (label ?? suggestedLabel).value)
         keys.save(key.rawRepresentation)
         self.key = key
         self.username = username
@@ -82,9 +98,51 @@ public final class LeaderboardMembership {
         self.sharesCountry = false
         globeHintDismissed = false
         self.link = nil
+        startFresh()
         save()
         if sharesCountry { try? await setSharesCountry(true) }
         if let link { try? await setLink(link) }
+    }
+
+    // MARK: - Joining as a new device of a member (design §2a)
+
+    /// *Already a member? Add this Mac*: makes this device's key and asks the
+    /// server to add it; answers the request, with the code to type on a
+    /// device the member has. Never while this Mac is a member.
+    public func requestToJoin(label: DeviceLabel? = nil) async throws -> DeviceRequest {
+        guard !isJoined else { throw LeaderboardError.alreadyJoined }
+        let key = SigningKey.generate()
+        let authorization = try await api.requestDevice(publicKey: key.publicKey, label: (label ?? suggestedLabel).value)
+        return DeviceRequest(code: authorization.code, key: key, interval: authorization.interval, api: api)
+    }
+
+    /// The person knows the member `request` was added to: this Mac joins as
+    /// that member's device, sharing `providers`, with nothing uploaded yet,
+    /// so its first upload sends the last thirty days.
+    public func join(through request: DeviceRequest, sharing providers: Set<String>) throws {
+        guard !providers.isEmpty else { throw LeaderboardError.nothingShared }
+        try requireShareable(providers)
+        let approval = try request.handOver()
+        keys.save(approval.key.rawRepresentation)
+        key = approval.key
+        username = approval.member
+        sharing = providers
+        isVisible = true
+        lastUpload = nil
+        refused = []
+        sharesCountry = false
+        globeHintDismissed = false
+        link = nil
+        startFresh()
+        follow(approval.summary)
+    }
+
+    /// A membership this device starts: no devices known or shown yet, and no
+    /// word of an earlier one's removal.
+    private func startFresh() {
+        devices = MemberDevices()
+        shownDevices = []
+        removedBy = nil
     }
 
     /// Deletes the member and every row on the server first; the key is
@@ -103,6 +161,13 @@ public final class LeaderboardMembership {
         forget()
     }
 
+    /// Another device of the member removed this one: its key is revoked, so
+    /// the membership is forgotten here, and `removedBy` says which device did it.
+    func forgetRemoved(by device: DeviceRef) {
+        forget()
+        removedBy = device
+    }
+
     private func forget() {
         keys.delete()
         key = nil
@@ -114,6 +179,8 @@ public final class LeaderboardMembership {
         sharesCountry = false
         globeHintDismissed = false
         link = nil
+        devices = MemberDevices()
+        shownDevices = []
         settings.saveLeaderboardRecord(nil)
     }
 
@@ -228,7 +295,86 @@ public final class LeaderboardMembership {
             country = summary.country
         }
         if summary.reportsLink { link = summary.link }
+        devices = MemberDevices(summary.devices)
         save()
+    }
+
+    // MARK: - Devices (design §2a)
+
+    /// This device as `/me` lists it, once read.
+    public var thisDevice: Device? {
+        key.flatMap { devices.device(withKey: $0.deviceKey) }
+    }
+
+    /// What approving `code` would add, shown above *Approve* so a code read
+    /// out to a stranger isn't approved blind.
+    public func pendingDevice(code: DeviceCode) async throws -> PendingDevice {
+        guard let credentials else { throw LeaderboardError.notJoined }
+        return try await api.pendingDevice(code: code, as: credentials)
+    }
+
+    /// Adds the device that shows `code`. This device approved it, so it
+    /// isn't shown here as one added since this device last looked.
+    public func approve(code: DeviceCode) async throws {
+        guard let credentials else { throw LeaderboardError.notJoined }
+        let device = try await api.approveDevice(code: code, as: credentials)
+        shownDevices.insert(device.publicKey)
+        devices = devices.adding(device)
+        save()
+    }
+
+    /// Each device added since this one, in use and not yet shown: shown once,
+    /// with *Remove* beside it. A device turned off shows them once it is
+    /// turned on, and one in its own first week once `/me` lists the others,
+    /// which is when that week ends. Devices the member had before this one
+    /// aren't news.
+    public var addedDevices: [Device] {
+        guard isOn, let me = thisDevice else { return [] }
+        return devices.added(since: me).filter { !shownDevices.contains($0.publicKey) }
+    }
+
+    /// `device` was shown as added, so it isn't again.
+    public func markShown(_ device: Device) {
+        shownDevices.insert(device.publicKey)
+        save()
+    }
+
+    /// How removing `device` may go, as the dialog offers it: *Remove*, and
+    /// beside it *Remove and delete its days* only for another device still
+    /// in its first week, which a stranger's device approved by mistake would
+    /// be. Nothing for a device already removed.
+    public func removals(of device: Device) -> [Removal] {
+        guard !device.isRemoved else { return [] }
+        let isAnother = device.publicKey != thisDevice?.publicKey
+        return isAnother && devices.isInFirstWeek(device, at: now()) ? [.keepingItsDays, .deletingItsDays] : [.keepingItsDays]
+    }
+
+    /// Removes `device` as `removal` says, one of its `removals(of:)`: its key
+    /// is revoked, and its days stay unless `deletingItsDays`, which deletes
+    /// them once it is removed. If deleting fails, the device is removed all
+    /// the same and the error says why. Removing this device forgets the
+    /// membership once the server confirmed.
+    public func remove(_ device: Device, _ removal: Removal = .keepingItsDays) async throws {
+        guard let credentials else { throw LeaderboardError.notJoined }
+        guard removals(of: device).contains(removal) else { throw LeaderboardError.notOffered }
+        try await api.removeDevice(device.publicKey.value, as: credentials)
+        if device.publicKey == credentials.key.deviceKey {
+            forget()
+            return
+        }
+        let by = DeviceRef(publicKey: credentials.key.deviceKey, label: thisDevice?.label ?? suggestedLabel)
+        devices = devices.removing(device, by: by, at: now())
+        changesMadeHere += 1
+        if removal == .deletingItsDays {
+            try await api.deleteDays(of: device.publicKey.value, provider: nil, day: nil, as: credentials)
+        }
+    }
+
+    /// Deletes a removed device's days: all of them, or one provider's, or
+    /// one day's. Never a side effect of removing it.
+    public func deleteDays(of device: Device, provider: String? = nil, day: String? = nil) async throws {
+        guard let credentials else { throw LeaderboardError.notJoined }
+        try await api.deleteDays(of: device.publicKey.value, provider: provider, day: day, as: credentials)
     }
 
     // MARK: - Private
@@ -252,6 +398,7 @@ public final class LeaderboardMembership {
         globeHintDismissed = record.globeHintDismissed
         link = record.link
         refused = record.refused
+        shownDevices = Set(record.shownDevices.map(DeviceKey.init))
     }
 
     private func save() {
@@ -259,6 +406,6 @@ public final class LeaderboardMembership {
         settings.saveLeaderboardRecord(LeaderboardRecord(username: username.value, sharing: Array(sharing),
                                                          visible: isVisible, lastUpload: lastUpload,
                                                          sharesCountry: sharesCountry, globeHintDismissed: globeHintDismissed,
-                                                         link: link, refused: refused))
+                                                         link: link, refused: refused, shownDevices: shownDevices.map(\.value)))
     }
 }

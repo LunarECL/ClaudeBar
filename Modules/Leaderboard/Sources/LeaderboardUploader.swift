@@ -84,6 +84,10 @@ public final class LeaderboardUploader {
             membership.forgetUnknownMember()
             lastError = nil
             AppLog.network.info("Leaderboard no longer knows this member; forgot the membership here")
+        } catch LeaderboardError.removed(let device) {
+            membership.forgetRemoved(by: device)
+            lastError = nil
+            AppLog.network.info("Another device of this member removed this one; forgot the membership here")
         } catch {
             lastError = error as? LeaderboardError ?? .unreachable
             AppLog.network.info("Leaderboard upload failed: \(lastError?.localizedDescription ?? "")")
