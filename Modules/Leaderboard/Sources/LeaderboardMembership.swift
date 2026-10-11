@@ -46,13 +46,10 @@ public final class LeaderboardMembership {
     @ObservationIgnored private let machine: any MachineIdentity
     @ObservationIgnored private let calendar: Calendar
     @ObservationIgnored private let now: () -> Date
-    /// Waits this long: between a device request's asks whether it was approved.
-    @ObservationIgnored private let sleep: @MainActor (TimeInterval) async throws -> Void
 
     public init(api: any LeaderboardAPI, keys: any SigningKeyStore, settings: any LeaderboardSettingsRepository,
                 logs: any TokenLogs, machine: any MachineIdentity, calendar: Calendar = .current,
-                now: @escaping () -> Date = Date.init,
-                sleep: @escaping @MainActor (TimeInterval) async throws -> Void = { try await Task.sleep(for: .seconds($0)) }) {
+                now: @escaping () -> Date = Date.init) {
         self.api = api
         self.keys = keys
         self.settings = settings
@@ -60,7 +57,6 @@ public final class LeaderboardMembership {
         self.machine = machine
         self.calendar = calendar
         self.now = now
-        self.sleep = sleep
         restore()
     }
 
@@ -117,19 +113,19 @@ public final class LeaderboardMembership {
         guard !isJoined else { throw LeaderboardError.alreadyJoined }
         let key = SigningKey.generate()
         let authorization = try await api.requestDevice(publicKey: key.publicKey, label: (label ?? suggestedLabel).value)
-        return DeviceRequest(code: authorization.code, key: key, interval: authorization.interval, api: api, sleep: sleep)
+        return DeviceRequest(code: authorization.code, key: key, interval: authorization.interval, api: api)
     }
 
     /// The person knows the member `request` was added to: this Mac joins as
     /// that member's device, sharing `providers`, with nothing uploaded yet,
     /// so its first upload sends the last thirty days.
     public func join(through request: DeviceRequest, sharing providers: Set<String>) throws {
-        guard let (member, key, summary) = request.approval else { throw LeaderboardError.notJoined }
         guard !providers.isEmpty else { throw LeaderboardError.nothingShared }
         try requireShareable(providers)
-        keys.save(key.rawRepresentation)
-        self.key = key
-        username = member
+        let approval = try request.handOver()
+        keys.save(approval.key.rawRepresentation)
+        key = approval.key
+        username = approval.member
         sharing = providers
         isVisible = true
         lastUpload = nil
@@ -138,8 +134,7 @@ public final class LeaderboardMembership {
         globeHintDismissed = false
         link = nil
         startFresh()
-        follow(summary)
-        request.markJoined()
+        follow(approval.summary)
     }
 
     /// A membership this device starts: no devices known or shown yet, and no

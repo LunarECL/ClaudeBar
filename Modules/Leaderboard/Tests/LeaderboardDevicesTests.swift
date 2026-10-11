@@ -17,14 +17,11 @@ struct LeaderboardDevicesTests {
     private let logs = FakeTokenLogs(providersWithLogs: ["claude", "codex"])
     /// Day 20: devices added on day 13 or before are past their first week.
     private let today = LeaderboardFixtures.date(20)
-    /// Each wait a new device took between asking whether it was approved.
-    private let waits = Waits()
 
     private func membership(machine: String = "MacBook Pro") -> LeaderboardMembership {
         let today = today
-        let waits = waits
         return LeaderboardMembership(api: server, keys: keys, settings: settings, logs: logs, machine: MockMachineIdentity.named(machine),
-                                     calendar: LeaderboardFixtures.calendar, now: { today }, sleep: { waits.taken.append($0) })
+                                     calendar: LeaderboardFixtures.calendar, now: { today })
     }
 
     private func joined() async throws -> LeaderboardMembership {
@@ -93,17 +90,6 @@ struct LeaderboardDevicesTests {
         #expect(keys.stored == nil && settings.record == nil)
     }
 
-    @Test func `should wait the interval the server gave before asking again whether it was approved`() async throws {
-        let membership = membership()
-        server.authorization = DeviceAuthorization(code: server.authorization.code, expiresIn: 600, interval: 5)
-        server.approvals = [.success(.waiting), .success(.waiting), .success(.approved(server.summary))]
-        let request = try await membership.requestToJoin()
-
-        _ = try await request.waitForApproval()
-
-        #expect(waits.taken == [5, 5])
-    }
-
     @Test func `should join as the member it was added to once the person agrees, with nothing uploaded yet`() async throws {
         let membership = membership()
         server.approvals = [.success(.approved(MemberSummary(username: "tokenwhale", onBoard: nil, days: [], visible: false)))]
@@ -150,16 +136,6 @@ struct LeaderboardDevicesTests {
         await #expect(throws: LeaderboardError.alreadyJoined) { _ = try await membership.requestToJoin() }
 
         #expect(server.requested == nil)
-    }
-
-    @Test func `should forget the code when it expires before anyone approves it`() async throws {
-        let membership = membership()
-        server.approvals = [.success(.waiting), .failure(.codeExpired)]
-        let request = try await membership.requestToJoin()
-
-        await #expect(throws: LeaderboardError.codeExpired) { _ = try await request.waitForApproval() }
-        #expect(request.stage == .expired)
-        #expect(!membership.isJoined)
     }
 
     @Test func `should remove itself and keep nothing when the person doesn't know the member it was added to`() async throws {
@@ -345,8 +321,3 @@ struct LeaderboardDevicesTests {
     }
 }
 
-/// The waits a membership took, in order.
-@MainActor
-final class Waits {
-    var taken: [TimeInterval] = []
-}

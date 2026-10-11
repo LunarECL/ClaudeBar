@@ -24,6 +24,14 @@ public final class DeviceRequest {
         case declined
     }
 
+    /// What an approved request hands to the membership it joins: the member,
+    /// the key it asked with, and the member's `/me` answer.
+    struct Approval {
+        let member: Username
+        let key: SigningKey
+        let summary: MemberSummary
+    }
+
     /// `Stage`, with what an approved request holds: the member's `/me` answer.
     private enum State {
         case waiting
@@ -42,7 +50,7 @@ public final class DeviceRequest {
     @ObservationIgnored private let sleep: @MainActor (TimeInterval) async throws -> Void
 
     init(code: DeviceCode, key: SigningKey, interval: TimeInterval, api: any LeaderboardAPI,
-         sleep: @escaping @MainActor (TimeInterval) async throws -> Void) {
+         sleep: @escaping @MainActor (TimeInterval) async throws -> Void = { try await Task.sleep(for: .seconds($0)) }) {
         self.code = code
         self.key = key
         self.interval = interval
@@ -95,15 +103,12 @@ public final class DeviceRequest {
         state = .declined
     }
 
-    /// What joining takes from an approved request: the member, the key and
-    /// the member's `/me` answer. `nil` until approved, and once taken.
-    var approval: (member: Username, key: SigningKey, summary: MemberSummary)? {
-        guard case .approved(let member, let summary) = state else { return nil }
-        return (member, key, summary)
-    }
-
-    /// The membership took it: this Mac is the member's device now.
-    func markJoined() {
+    /// The person agreed, and the membership joins through it: hands over
+    /// what joining takes, once, and this Mac is the member's device from
+    /// here. Refused until approved, and once handed over.
+    func handOver() throws -> Approval {
+        guard case .approved(let member, let summary) = state else { throw LeaderboardError.notJoined }
         state = .joined
+        return Approval(member: member, key: key, summary: summary)
     }
 }
