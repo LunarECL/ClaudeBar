@@ -50,6 +50,11 @@ struct LeaderboardCopiedKeyTests {
         return LeaderboardUploader(membership: membership, logs: logs, api: server, calendar: calendar, now: { today })
     }
 
+    /// Yields until the server holds a call, so the test acts while it is in flight.
+    private func heldAtServer() async {
+        for _ in 0..<1000 where !server.isHolding { await Task.yield() }
+    }
+
     private var storedKey: String {
         get throws { try SigningKey(rawRepresentation: #require(keys.stored)).publicKey }
     }
@@ -277,6 +282,158 @@ struct LeaderboardCopiedKeyTests {
 
         #expect(!copy.holdsCopiedKey)
         #expect(server.requests == 2)
+    }
+
+    // MARK: - One answer at a time
+
+    @Test func `should carry out one switch at a time: a second ask while the first waits for the server adds no device`() async throws {
+        let copy = try await copied()
+        server.holdsRequests = true
+        server.approvals = [.success(.approved(server.summary))]
+        let first = Task { try await copy.becomeOwnDevice() }
+        await heldAtServer()
+        #expect(server.isHolding, "the first ask is at the server")
+
+        let second = Task { try await copy.becomeOwnDevice() }
+        for _ in 0..<100 { await Task.yield() }
+
+        #expect(server.heldCalls == 1, "the second ask never reached the server")
+        server.holdsRequests = false
+        server.release()
+        try await first.value
+        await #expect(throws: LeaderboardError.notOffered) { try await second.value }
+
+        #expect(!copy.holdsCopiedKey)
+        #expect(server.requests == 1, "one device was added, not two")
+        #expect(try storedKey == server.requested?.publicKey)
+    }
+
+    @Test func `should add nothing when the person chose to keep the key while the switch asked the server for a code`() async throws {
+        let copy = try await copied()
+        let copiedKey = try storedKey
+        server.holdsRequests = true
+        server.approvals = [.success(.approved(server.summary))]
+        let switching = Task { try await copy.becomeOwnDevice() }
+        await heldAtServer()
+        #expect(server.isHolding)
+
+        try copy.keepKeyHere()
+        server.holdsRequests = false
+        server.release()
+        await #expect(throws: LeaderboardError.notOffered) { try await switching.value }
+
+        #expect(!copy.holdsCopiedKey, "the person's answer stands")
+        #expect(copy.ownDeviceRequest == nil)
+        #expect(try storedKey == copiedKey)
+        #expect(server.approvedCode == nil, "the code was never approved, so there is no device to remove")
+        #expect(!launch(on: Self.otherMac).holdsCopiedKey, "the hash recorded is the copied key's on this Mac")
+    }
+
+    @Test func `should remove the device it added when the person chose to keep the key while the switch waited for its approval`() async throws {
+        let copy = try await copied()
+        let copiedKey = try storedKey
+        server.holdsApprovals = true
+        server.approvals = [.success(.approved(server.summary))]
+        let switching = Task { try await copy.becomeOwnDevice() }
+        await heldAtServer()
+        #expect(server.isHolding, "the copied key approved the code; the switch waits for the server to say so")
+        #expect(server.approvedBy == copiedKey)
+
+        try copy.keepKeyHere()
+        server.holdsApprovals = false
+        server.release()
+        await #expect(throws: LeaderboardError.notOffered) { try await switching.value }
+
+        #expect(!copy.holdsCopiedKey, "the person's answer stands")
+        #expect(copy.ownDeviceRequest == nil)
+        #expect(try storedKey == copiedKey)
+        #expect(copy.uploadCredentials?.key.publicKey == copiedKey)
+        let newKey = try #require(server.requested?.publicKey)
+        #expect(newKey != copiedKey)
+        #expect(server.removed == [newKey], "the device the switch had added is removed again")
+    }
+
+    @Test func `should say the device is on the stranger's member when their approval was overtaken by keeping the key, and can't be removed`() async throws {
+        let copy = try await copied()
+        let copiedKey = try storedKey
+        server.approveFailure = .deviceTooNew
+        await #expect(throws: LeaderboardError.deviceTooNew) { try await copy.becomeOwnDevice() }
+        server.holdsApprovals = true
+        server.approvals = [.success(.approved(MemberSummary(username: "stranger", onBoard: nil, days: [], visible: true)))]
+        let finishing = Task { try await copy.becomeOwnDevice() }
+        await heldAtServer()
+        try copy.keepKeyHere()
+        server.removeFailure = .unreachable
+        server.holdsApprovals = false
+        server.release()
+
+        let newKey = try #require(server.requested?.publicKey)
+        await #expect(throws: LeaderboardError.deviceLeftBehind(DeviceKey(newKey), ours: false)) { try await finishing.value }
+
+        #expect(!copy.holdsCopiedKey)
+        #expect(copy.username?.value == "tokenwhale")
+        #expect(try storedKey == copiedKey)
+    }
+
+    @Test func `should remove the device another Mac approved when the person had chosen to keep the key meanwhile`() async throws {
+        let copy = try await copied()
+        let copiedKey = try storedKey
+        server.approveFailure = .deviceTooNew
+        await #expect(throws: LeaderboardError.deviceTooNew) { try await copy.becomeOwnDevice() }
+        server.holdsApprovals = true
+        server.approvals = [.success(.approved(server.summary))]
+        let finishing = Task { try await copy.becomeOwnDevice() }
+        await heldAtServer()
+        #expect(server.isHolding, "waiting for another device to approve the code")
+
+        try copy.keepKeyHere()
+        server.holdsApprovals = false
+        server.release()
+        await #expect(throws: LeaderboardError.notOffered) { try await finishing.value }
+
+        #expect(!copy.holdsCopiedKey)
+        #expect(try storedKey == copiedKey)
+        #expect(server.removed == [server.requested?.publicKey])
+    }
+
+    /// A device the switch added stays on the member when the server won't
+    /// remove it: the person is told whose member it is on, and who can
+    /// remove it, since this Mac kept no key for it.
+    @Test func `should say which device stayed on the member when a late switch can't remove the one it added`() async throws {
+        let copy = try await copied()
+        let copiedKey = try storedKey
+        server.holdsApprovals = true
+        server.approvals = [.success(.approved(server.summary))]
+        let switching = Task { try await copy.becomeOwnDevice() }
+        await heldAtServer()
+        try copy.keepKeyHere()
+        server.removeFailure = .unreachable
+        server.holdsApprovals = false
+        server.release()
+
+        let newKey = try #require(server.requested?.publicKey)
+        await #expect(throws: LeaderboardError.deviceLeftBehind(DeviceKey(newKey), ours: true)) { try await switching.value }
+
+        #expect(!copy.holdsCopiedKey, "the person's answer stands")
+        #expect(try storedKey == copiedKey)
+        #expect(server.removed.isEmpty)
+    }
+
+    @Test func `should say so when it can't remove itself from the stranger a leaked code was approved by`() async throws {
+        let copy = try await copied()
+        let copiedKey = try storedKey
+        server.approveFailure = .deviceTooNew
+        await #expect(throws: LeaderboardError.deviceTooNew) { try await copy.becomeOwnDevice() }
+        server.approvals = [.success(.approved(MemberSummary(username: "stranger", onBoard: nil, days: [], visible: true)))]
+        server.removeFailure = .unreachable
+
+        let newKey = try #require(server.requested?.publicKey)
+        await #expect(throws: LeaderboardError.deviceLeftBehind(DeviceKey(newKey), ours: false)) { try await copy.becomeOwnDevice() }
+
+        #expect(copy.holdsCopiedKey)
+        #expect(copy.username?.value == "tokenwhale")
+        #expect(try storedKey == copiedKey)
+        #expect(copy.ownDeviceRequest == nil)
     }
 
     @Test func `should stay a copy, with its key, when the server refuses the new device`() async throws {

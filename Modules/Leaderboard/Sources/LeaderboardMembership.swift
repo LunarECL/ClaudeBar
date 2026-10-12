@@ -220,8 +220,17 @@ public final class LeaderboardMembership {
     /// own, and any other is declined, the new key removing itself from
     /// there. A new key this machine can't keep leaves the request approved,
     /// to try again; a code that expired is dropped, for a new one.
+    ///
+    /// One switch runs at a time: a second ask while one waits for the
+    /// server is refused, so two keys are never registered. The person may
+    /// answer *Keep the key here* while a switch waits: their answer stands,
+    /// and the switch, finding the key no longer a copy or its request no
+    /// longer the one asked for, adds nothing, removing from the member a
+    /// device it had already added.
     public func becomeOwnDevice() async throws {
-        guard holdsCopiedKey, let credentials else { throw LeaderboardError.notOffered }
+        guard holdsCopiedKey, !isSwitching, let credentials else { throw LeaderboardError.notOffered }
+        isSwitching = true
+        defer { isSwitching = false }
         let request: DeviceRequest
         if let pending = ownDeviceRequest {
             request = pending
@@ -229,6 +238,7 @@ public final class LeaderboardMembership {
             let key = SigningKey.generate()
             let authorization = try await api.requestDevice(publicKey: key.publicKey, label: suggestedLabel.value)
             request = DeviceRequest(code: authorization.code, key: key, interval: authorization.interval, api: api)
+            guard holdsCopiedKey else { throw LeaderboardError.notOffered }
             ownDeviceRequest = request
             _ = try await api.approveDevice(code: request.code, as: credentials)
         }
@@ -236,15 +246,17 @@ public final class LeaderboardMembership {
         do {
             member = try await request.waitForApproval()
         } catch LeaderboardError.codeExpired {
-            ownDeviceRequest = nil
+            if ownDeviceRequest === request { ownDeviceRequest = nil }
             throw LeaderboardError.codeExpired
         }
+        try await requireSwitching(request, approvedBy: member)
         // The member as the copied key reads it now, so a rename on another
         // device doesn't refuse the right approval. Names are unique ignoring case.
         _ = try await summary(period: .sevenDays)
+        try await requireSwitching(request, approvedBy: member)
         guard let username, member.value.lowercased() == username.value.lowercased() else {
             ownDeviceRequest = nil
-            try? await request.decline()
+            try await withdraw(request, ours: false)
             throw LeaderboardError.approvedByStranger
         }
         keys.save(request.key.rawRepresentation)
@@ -267,6 +279,36 @@ public final class LeaderboardMembership {
         refused = []
         startFresh()
         follow(approval.summary)
+    }
+
+    /// A switch in flight, so a second ask is refused and the person's
+    /// *Keep the key here* isn't undone by a switch that finishes after it.
+    @ObservationIgnored private var isSwitching = false
+
+    /// Whether `request` is still the switch asked for, after an await: the
+    /// key is still a copy and no answer replaced the request. When not, a
+    /// device the switch added is removed from the member again, whichever
+    /// member `approvedBy` says that is: a stranger's approval overtaken by
+    /// *Keep the key here* left the device on the stranger's, not this one.
+    private func requireSwitching(_ request: DeviceRequest, approvedBy member: Username? = nil) async throws {
+        guard !holdsCopiedKey || ownDeviceRequest !== request else { return }
+        let ours = member.map { $0.value.lowercased() == username?.value.lowercased() } ?? true
+        try await withdraw(request, ours: ours)
+        throw LeaderboardError.notOffered
+    }
+
+    /// Removes from the member a device `request` added that this machine
+    /// has no use for. A removal the server didn't take is said, not
+    /// swallowed: the device stays on that member under a key this machine
+    /// doesn't keep, and `ours` says whose member that is.
+    private func withdraw(_ request: DeviceRequest, ours: Bool) async throws {
+        guard case .approved = request.stage else { return }
+        do {
+            try await request.decline()
+        } catch {
+            AppLog.network.error("Leaderboard couldn't remove the device a switch added: \(error.localizedDescription)")
+            throw LeaderboardError.deviceLeftBehind(request.key.deviceKey, ours: ours)
+        }
     }
 
     /// Which machine `key` is on: its hardware UUID hashed with the key's
