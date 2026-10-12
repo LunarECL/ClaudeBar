@@ -1,3 +1,5 @@
+import Crypto
+import Diagnostics
 import Foundation
 import Quotas
 import Observation
@@ -35,6 +37,18 @@ public final class LeaderboardMembership {
     private var key: SigningKey?
     /// Devices already shown as added, by key: each is shown once.
     private var shownDevices: Set<DeviceKey> = []
+    /// Which machine made the key: its hardware UUID hashed with the key's
+    /// public half (design §2a). `nil` for a key from before this, or made
+    /// where the UUID can't be read.
+    private var machineHash: String?
+    /// The key beside the hash came from another machine (design §2a): found
+    /// at launch, when the hash isn't this machine's. Nothing uploads under
+    /// it until the member answers: `becomeOwnDevice()` or `keepKeyHere()`.
+    public private(set) var holdsCopiedKey = false
+    /// This machine asking to be its own device while the copied key, in its
+    /// first week, can't approve it: shows the code for another device of
+    /// the member to approve, and `becomeOwnDevice()` finishes once it is.
+    public private(set) var ownDeviceRequest: DeviceRequest?
     /// Changes made here, counted, so a `/me` answer that crossed one is
     /// not taken over it.
     private var changesMadeHere = 0
@@ -73,10 +87,11 @@ public final class LeaderboardMembership {
         return MemberCredentials(username: username, key: key)
     }
 
-    /// What an upload is signed with: nothing while not joined or turned
-    /// off, so nothing leaves the Mac and `lastUpload` stays where it stopped.
+    /// What an upload is signed with: nothing while not joined, turned off
+    /// or holding a copied key, so nothing leaves the Mac and `lastUpload`
+    /// stays where it stopped.
     var uploadCredentials: MemberCredentials? {
-        isOn ? credentials : nil
+        isOn && !holdsCopiedKey ? credentials : nil
     }
 
     // MARK: - Joining and leaving
@@ -104,6 +119,7 @@ public final class LeaderboardMembership {
             throw error
         }
         self.key = key
+        machineHash = machineHash(for: key)
         self.username = username
         sharing = providers
         isVisible = true
@@ -142,6 +158,7 @@ public final class LeaderboardMembership {
         try keep(request.key)
         let approval = try request.handOver()
         key = approval.key
+        machineHash = machineHash(for: approval.key)
         username = approval.member
         sharing = providers
         isVisible = true
@@ -170,6 +187,95 @@ public final class LeaderboardMembership {
         devices = MemberDevices()
         shownDevices = []
         removedBy = nil
+    }
+
+    // MARK: - A key copied from another machine (design §2a)
+
+    /// *Keep the key here*: the other machine is gone, or this is the same
+    /// one after a repair. Records this machine beside the key and changes
+    /// nothing else. Chosen while the other machine is still in use, it
+    /// leaves two machines on one key, which replace each other's days.
+    public func keepKeyHere() throws {
+        guard holdsCopiedKey, let key else { throw LeaderboardError.notOffered }
+        machineHash = machineHash(for: key)
+        holdsCopiedKey = false
+        ownDeviceRequest = nil
+        save()
+    }
+
+    /// *Make this machine its own device*: a new key, added as a device of
+    /// the member, which the copied key, still signing, approves, as *Add a
+    /// device* does. The copied key, its hash and its refused days are
+    /// forgotten, which are the other machine's to retry; `lastUpload` is
+    /// kept, so the first upload under the new key starts the day the other
+    /// machine's left off, not thirty days back. The new key is an added
+    /// device, held to its first week.
+    ///
+    /// A copied key in its first week can't approve: the request then stays
+    /// in `ownDeviceRequest`, showing the code for another device of the
+    /// member to approve, and calling this again finishes it. That code is on
+    /// screen, and one that leaked could be approved by a stranger's device,
+    /// which would make this machine the stranger's and send its days there:
+    /// an approval is taken only for the member the copied key reads as its
+    /// own, and any other is declined, the new key removing itself from
+    /// there. A new key this machine can't keep leaves the request approved,
+    /// to try again; a code that expired is dropped, for a new one.
+    public func becomeOwnDevice() async throws {
+        guard holdsCopiedKey, let credentials else { throw LeaderboardError.notOffered }
+        let request: DeviceRequest
+        if let pending = ownDeviceRequest {
+            request = pending
+        } else {
+            let key = SigningKey.generate()
+            let authorization = try await api.requestDevice(publicKey: key.publicKey, label: suggestedLabel.value)
+            request = DeviceRequest(code: authorization.code, key: key, interval: authorization.interval, api: api)
+            ownDeviceRequest = request
+            _ = try await api.approveDevice(code: request.code, as: credentials)
+        }
+        let member: Username
+        do {
+            member = try await request.waitForApproval()
+        } catch LeaderboardError.codeExpired {
+            ownDeviceRequest = nil
+            throw LeaderboardError.codeExpired
+        }
+        // The member as the copied key reads it now, so a rename on another
+        // device doesn't refuse the right approval. Names are unique ignoring case.
+        _ = try await summary(period: .sevenDays)
+        guard let username, member.value.lowercased() == username.value.lowercased() else {
+            ownDeviceRequest = nil
+            try? await request.decline()
+            throw LeaderboardError.approvedByStranger
+        }
+        keys.save(request.key.rawRepresentation)
+        guard keys.load() == request.key.rawRepresentation else {
+            // The copied key goes back, read back as `keep(_:)` does. Not
+            // deleted first: a store that refuses writes still holds it, and
+            // deleting would leave nothing. A store that keeps neither is
+            // logged: this session signs with the copied key, the next may not.
+            keys.save(credentials.key.rawRepresentation)
+            if keys.load() != credentials.key.rawRepresentation {
+                AppLog.credentials.error("Leaderboard key store kept neither the new key nor the copied one; the membership may not survive a relaunch")
+            }
+            throw LeaderboardError.keyNotKept
+        }
+        let approval = try request.handOver()
+        key = approval.key
+        machineHash = machineHash(for: approval.key)
+        holdsCopiedKey = false
+        ownDeviceRequest = nil
+        refused = []
+        startFresh()
+        follow(approval.summary)
+    }
+
+    /// Which machine `key` is on: its hardware UUID hashed with the key's
+    /// public half, so one machine's two keys don't match and the UUID never
+    /// reaches a settings file. `nil` where the UUID can't be read.
+    private func machineHash(for key: SigningKey) -> String? {
+        guard let uuid = machine.hardwareUUID else { return nil }
+        let digest = SHA256.hash(data: Data("\(key.publicKey)\n\(uuid)".utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     /// Deletes the member and every row on the server first; the key is
@@ -208,6 +314,9 @@ public final class LeaderboardMembership {
         link = nil
         devices = MemberDevices()
         shownDevices = []
+        machineHash = nil
+        holdsCopiedKey = false
+        ownDeviceRequest = nil
         settings.saveLeaderboardRecord(nil)
     }
 
@@ -434,6 +543,26 @@ public final class LeaderboardMembership {
         link = record.link
         refused = record.refused
         shownDevices = Set(record.shownDevices.map(DeviceKey.init))
+        machineHash = record.machine
+        checkMachine()
+    }
+
+    /// Whether the key is this machine's (design §2a): a hash that isn't this
+    /// machine's is a copy, which uploads nothing until answered; a key with
+    /// no hash, from before hashes were kept, gets this machine's now, so a
+    /// copy made before then goes unnoticed. A machine whose UUID can't be
+    /// read keeps what it has and asks nothing.
+    private func checkMachine() {
+        guard let key, let thisMachine = machineHash(for: key) else { return }
+        switch machineHash {
+        case nil:
+            machineHash = thisMachine
+            save()
+        case thisMachine:
+            break
+        default:
+            holdsCopiedKey = true
+        }
     }
 
     private func save() {
@@ -441,6 +570,7 @@ public final class LeaderboardMembership {
         settings.saveLeaderboardRecord(LeaderboardRecord(username: username.value, sharing: Array(sharing),
                                                          visible: isVisible, lastUpload: lastUpload,
                                                          sharesCountry: sharesCountry, globeHintDismissed: globeHintDismissed,
-                                                         link: link, refused: refused, shownDevices: shownDevices.map(\.value)))
+                                                         link: link, refused: refused, shownDevices: shownDevices.map(\.value),
+                                                         machine: machineHash))
     }
 }
