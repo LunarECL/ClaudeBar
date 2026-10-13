@@ -17,10 +17,10 @@
     {
       "kind": "local",
       "label": "Windsurf app",
-      "summary": "Reads the plan Windsurf saves on this Mac, read-only. It updates while Windsurf runs.",
+      "summary": "Reads the plan Windsurf saves on this computer, read-only. It updates while Windsurf runs.",
       "fetch": {
         "sqlite": {
-          "path": "~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb",
+          "path": "{{platform.appData}}/Windsurf/User/globalStorage/state.vscdb",
           "query": "SELECT value FROM ItemTable WHERE key = 'windsurf.settings.cachedPlanInfo' LIMIT 1"
         }
       },

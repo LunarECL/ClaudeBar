@@ -14,13 +14,35 @@ public enum DataSources {
     /// The text of a mapping script, by the file name a definition gives.
     public typealias ScriptSource = @Sendable (_ file: String) -> String?
 
-    /// A definition's path as the app sees it: `~` and `${VARIABLE:-default}` filled in.
+    /// A definition's path as the app sees it: platform app-data, `~` and
+    /// `${VARIABLE:-default}` filled in by the same rule as file readers.
     public static func expandPath(
         _ path: String,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] }
     ) -> String {
-        Paths.expand(path, homeDirectory: homeDirectory, environment: environment)
+        expandPath(path, platform: .current, homeDirectory: homeDirectory, environment: environment)
+    }
+
+    static func expandPath(_ path: String, platform: Platform, homeDirectory: URL,
+                           environment: @escaping @Sendable (String) -> String?) -> String {
+        Paths.expand(path, homeDirectory: homeDirectory,
+                     environment: pathEnvironment(platform: platform, homeDirectory: homeDirectory, environment: environment))
+    }
+
+    /// Facts read only by path workers, separate from credential environment
+    /// lookups. A process variable never overrides a reserved platform fact.
+    static func pathEnvironment(platform: Platform, homeDirectory: URL,
+                                environment: @escaping @Sendable (String) -> String?) -> @Sendable (String) -> String? {
+        let appData = platform.applicationData?(homeDirectory, environment)?.path
+        let separator = platform.pathSeparator
+        return { name in
+            switch name {
+            case "platform.appData": appData
+            case "platform.pathSeparator": separator
+            default: environment(name)
+            }
+        }
     }
 
     /// Where this platform finds a CLI by name: its full path, or `nil` when
@@ -123,9 +145,10 @@ public enum DataSources {
         homeDirectory: URL,
         now: @escaping @Sendable () -> Date
     ) -> DataSource {
+        let pathsEnvironment = pathEnvironment(platform: platform, homeDirectory: homeDirectory, environment: environment)
         let fetcher = fetcher(definition.fetch, providerId: providerId, platform: platform, network: network,
                               cloudWatch: cloudWatch, priceCatalog: priceCatalog, secrets: secrets,
-                              environment: environment, homeDirectory: homeDirectory, now: now)
+                              environment: pathsEnvironment, homeDirectory: homeDirectory, now: now)
 
         let mapper: any Reading = switch definition.mapping {
         case .json(let mapping): JSONMapper(mapping: mapping, now: now)
@@ -143,13 +166,17 @@ public enum DataSources {
             case .cli(let call):
                 // No CLI on this platform: no renewal, as when a definition
                 // declares none (§10). A refused token reads as refused.
-                refresher = platform.runCLI.map { CLIRefresher(call: call, executor: $0(call)) }
+                refresher = platform.runCLI.map {
+                    CLIRefresher(call: call, executor: $0(call),
+                                 directory: workingDirectory(call.workingDirectory, platform: platform,
+                                                             homeDirectory: homeDirectory, environment: environment))
+                }
             }
             lookup = base
         }
 
-        let readers = Readers(environment: environment, homeDirectory: homeDirectory, secrets: secrets,
-                              providerId: providerId, platform: platform, loginShell: loginShell)
+        let readers = Readers(environment: environment, pathEnvironment: pathsEnvironment, homeDirectory: homeDirectory,
+                              secrets: secrets, providerId: providerId, platform: platform, loginShell: loginShell)
         return DataSource(
             definition: definition,
             providerId: providerId,
@@ -158,16 +185,17 @@ public enum DataSources {
             fetcher: fetcher,
             mapper: mapper,
             contextFiles: definition.context.mapValues {
-                JSONFileReader(file: $0, homeDirectory: homeDirectory, environment: environment)
+                JSONFileReader(file: $0, homeDirectory: homeDirectory, environment: pathsEnvironment)
             },
             recoveries: definition.recover.mapValues { recovery -> any Recovering in
                 switch recovery {
                 case .patchJSONFile(let path, let keys, let value):
-                    JSONFilePatch(path: path, keys: keys, value: value, homeDirectory: homeDirectory, environment: environment)
+                    JSONFilePatch(path: path, keys: keys, value: value, homeDirectory: homeDirectory, environment: pathsEnvironment,
+                                  directory: { cliWorkingDirectory(platform: platform, homeDirectory: homeDirectory, environment: environment) })
                 }
             },
             requiredFiles: definition.requiresFiles.map {
-                Paths.expand($0, homeDirectory: homeDirectory, environment: environment)
+                Paths.expand($0, homeDirectory: homeDirectory, environment: pathsEnvironment)
             },
             now: now
         )
@@ -201,28 +229,35 @@ public enum DataSources {
             guard let runCLI = platform.runCLI, let transport = platform.rpcTransport else {
                 return unavailable("Running \(call.cli)")
             }
-            return JSONRPCFetcher(call: call, cliExecutor: runCLI(CLICall(cli: call.cli)), makeTransport: transport)
+            return JSONRPCFetcher(call: call, cliExecutor: runCLI(CLICall(cli: call.cli)), makeTransport: transport,
+                                  directory: workingDirectory(call.workingDirectory, platform: platform,
+                                                              homeDirectory: homeDirectory, environment: environment))
         case .cli(let call):
             guard let runCLI = platform.runCLI else { return unavailable("Running \(call.cli)") }
             switch call.screen {
             case .raw:
-                return CLIFetcher(call: call, makeExecutor: runCLI)
+                return CLIFetcher(call: call, makeExecutor: runCLI,
+                                  directory: workingDirectory(call.workingDirectory, platform: platform,
+                                                              homeDirectory: homeDirectory, environment: environment))
             case .rendered:
                 guard let render = platform.screenRenderer else { return unavailable("Rendering \(call.cli)'s screen") }
-                return CLIFetcher(call: call, makeExecutor: runCLI, screen: render)
+                return CLIFetcher(call: call, makeExecutor: runCLI,
+                                  directory: workingDirectory(call.workingDirectory, platform: platform,
+                                                              homeDirectory: homeDirectory, environment: environment), screen: render)
             }
         case .command(let call):
             guard let runCommand = platform.runCommand else { return unavailable("Running \(call.cli)") }
-            return CommandFetcher(call: call, makeExecutor: runCommand)
+            return CommandFetcher(call: call, makeExecutor: runCommand,
+                                  directory: workingDirectory(call.workingDirectory, platform: platform,
+                                                              homeDirectory: homeDirectory, environment: environment))
         case .file(let call):
             return FileFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
         case .localServer(let call):
             guard let runCommand = platform.runCommand, let localNetwork = platform.localNetwork,
-                  let processList = platform.processList else {
+                  let processList = platform.processList, let localServer = platform.localServer else {
                 return unavailable("Reading a local server")
             }
-            return LocalServerFetcher(call: call, commands: runCommand(ProcessEnvironment()), network: localNetwork,
-                                      processPaths: processList)
+            return localServer(call, runCommand(ProcessEnvironment()), localNetwork, processList)
         case .cloudWatch(let call):
             return CloudWatchFetcher(call: call, client: cloudWatch, catalog: priceCatalog, now: now)
         case .directory(let call):
@@ -231,9 +266,18 @@ public enum DataSources {
             guard let sqlite = platform.sqlite else { return unavailable("Reading a SQLite database") }
             return SQLiteFetcher(call: call, homeDirectory: homeDirectory, environment: environment, rows: sqlite)
         case .script(let call):
-            guard let runCommand = platform.runCommand else { return unavailable("Running a script") }
-            return ScriptFetcher(call: call, providerId: providerId, secrets: secrets, makeExecutor: runCommand)
+            guard let runCommand = platform.runCommand, let command = platform.scriptCommand else { return unavailable("Running a script") }
+            return ScriptFetcher(call: call, providerId: providerId, secrets: secrets, makeExecutor: runCommand, command: command,
+                                 directory: URL(fileURLWithPath: Paths.expand(call.folder, homeDirectory: homeDirectory, environment: environment),
+                                                isDirectory: true))
         }
+    }
+
+    /// Resolve the trusted directory only when the CLI actually starts, as
+    /// before; a source that hasn't been checked creates nothing on disk.
+    private static func workingDirectory(_ directory: WorkingDirectory?, platform: Platform, homeDirectory: URL,
+                                         environment: @escaping @Sendable (String) -> String?) -> @Sendable () -> URL? {
+        { directory.map { _ in cliWorkingDirectory(platform: platform, homeDirectory: homeDirectory, environment: environment) } }
     }
 
     /// A `script` mapping runs on the platform's script engine.
@@ -247,6 +291,7 @@ public enum DataSources {
 
     private struct Readers {
         let environment: @Sendable (String) -> String?
+        let pathEnvironment: @Sendable (String) -> String?
         let homeDirectory: URL
         let secrets: (any SecretStore)?
         let providerId: String
@@ -258,7 +303,7 @@ public enum DataSources {
             case .environment(let name, let asksShell):
                 return EnvironmentReader(name: name, environment: environment, loginShell: asksShell ? loginShell : nil)
             case .jsonFile(let file):
-                return JSONFileReader(file: file, homeDirectory: homeDirectory, environment: environment)
+                return JSONFileReader(file: file, homeDirectory: homeDirectory, environment: pathEnvironment)
             case .keychain(let item):
                 guard let keychain = platform.keychain else { return unavailable("Reading a Keychain item") }
                 return KeychainReader(item: item, security: keychain)
@@ -268,7 +313,7 @@ public enum DataSources {
                 return RefinedReader(base: reader(for: base), refinement: refinement)
             case .sqlite(let database):
                 guard let sqlite = platform.sqlite else { return unavailable("Reading a SQLite database") }
-                return SQLiteReader(file: database, homeDirectory: homeDirectory, environment: environment, rows: sqlite)
+                return SQLiteReader(file: database, homeDirectory: homeDirectory, environment: pathEnvironment, rows: sqlite)
             case .browserCookies(let query):
                 guard let cookies = platform.browserCookies else { return unavailable("Reading a browser's cookies") }
                 return BrowserCookieReader(query: query, cookies: cookies)
@@ -299,12 +344,13 @@ struct JSONFilePatch: Recovering {
     let value: JSONValue
     let homeDirectory: URL
     let environment: @Sendable (String) -> String?
+    let directory: @Sendable () -> URL
 
     func recover() -> Bool {
         let url = URL(fileURLWithPath: Paths.expand(path, homeDirectory: homeDirectory, environment: environment))
         guard let data = try? Data(contentsOf: url),
               let document = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return false }
-        let cliDirectory = CLIWorkingDirectory.resolve().path
+        let cliDirectory = directory().path
         let keys = keys.map { $0.replacingOccurrences(of: "{{cliDirectory}}", with: cliDirectory) }
         guard let patched = Self.set(value.foundationObject, at: keys[...], in: document) else { return false }
         do {

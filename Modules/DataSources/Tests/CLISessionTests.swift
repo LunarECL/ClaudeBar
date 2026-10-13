@@ -369,7 +369,7 @@ struct CLISessionTests {
                 recreateOn: [],
                 unsupportedOn: []
             )),
-            makeExecutor: { _ in executor }
+            makeExecutor: { _ in executor }, directory: { nil }
         )
 
         _ = try await fetcher.fetch(with: nil)
@@ -386,8 +386,8 @@ struct CLISessionTests {
         let executor = MockCLIExecutor()
         screen(usageScreen, executor: executor, launches: launches)
         let plan = CLICall.Session(create: ["--session-id", "{{id}}"], resume: ["--resume", "{{id}}"])
-        let mine = CLIFetcher(call: call(session: plan), makeExecutor: { _ in executor })
-        let work = CLIFetcher(call: call(session: plan), makeExecutor: { _ in executor })
+        let mine = CLIFetcher(call: call(session: plan), makeExecutor: { _ in executor }, directory: { nil })
+        let work = CLIFetcher(call: call(session: plan), makeExecutor: { _ in executor }, directory: { nil })
 
         _ = try await mine.fetch(with: nil)
         _ = try await work.fetch(with: nil)
@@ -404,7 +404,7 @@ struct CLISessionTests {
         screen(usageScreen, executor: executor, launches: launches)
         let fetcher = CLIFetcher(
             call: CLICall(cli: "claude", args: ["/usage", "--allowed-tools", ""], timeout: 20),
-            makeExecutor: { _ in executor }
+            makeExecutor: { _ in executor }, directory: { nil }
         )
 
         let response = try await fetcher.fetch(with: nil)

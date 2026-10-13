@@ -1,11 +1,11 @@
-import DataSources
+@testable import DataSources
 import Foundation
 import Mockable
 import Providers
 import Quotas
 import Testing
 
-/// JetBrains AI as data: the AI quota a JetBrains IDE saves on this Mac, from
+/// JetBrains AI as data: the AI quota a JetBrains IDE saves on this computer, from
 /// the IDE used last, read by `jetbrains-quota.js`.
 @MainActor @Suite
 struct JetBrainsDefinitionTests {
@@ -54,15 +54,18 @@ struct JetBrainsDefinitionTests {
     private func make() throws -> Provider {
         let definition = try ProviderFactory.builtIn("jetbrains")
         let folder = home
+        var platform = Platform.current
+        platform.applicationData = { home, _ in home.appendingPathComponent("Library/Application Support") }
+        let fixturePlatform = platform
         return Provider(definition: definition, settings: InMemoryProviderSettings(), makeDataSource: { source, _ in
-            DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: MockNetworkClient(),
-                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
-                             environment: { _ in nil }, homeDirectory: folder, now: { Date() })
+            DataSources.make(source, providerId: definition.id, platform: fixturePlatform, network: MockNetworkClient(),
+                             scripts: ProviderFactory.builtInScripts, environment: { _ in nil },
+                             homeDirectory: folder, now: { Date() })
         })
     }
 
     @Test
-    func `should be JetBrains AI, off until turned on, reading only this Mac`() throws {
+    func `should be JetBrains AI, off until turned on, reading only local files`() throws {
         let jetbrains = try make()
         #expect(jetbrains.id == "jetbrains")
         #expect(jetbrains.name == "JetBrains AI")
@@ -157,4 +160,62 @@ struct JetBrainsDefinitionTests {
             try await jetbrains.refresh(jetbrains.defaultAccount)
         }
     }
+
+    /// Reads the real definition's XML before mapping, so it needs no JavaScript engine.
+    @Test
+    func `should read the newest IDE quota from the app data folder supplied to the factory`() async throws {
+        let appData = home.appendingPathComponent("Controlled App Data")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let old = appData.appendingPathComponent("JetBrains/PyCharm2025.2/options/AIAssistantQuotaManager2.xml")
+        let newest = appData.appendingPathComponent("Google/AndroidStudio2025.1/options/AIAssistantQuotaManager2.xml")
+        for (file, xml, age) in [(old, Self.quota(current: "900000"), 3600.0),
+                                  (newest, Self.quota(current: "250000"), 60.0)] {
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(xml.utf8).write(to: file)
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: file.path)
+        }
+        // A newer quota at the old Mac location must not override the supplied fact.
+        try ide("JetBrains/IntelliJIdea2025.3", Self.quota(current: "100000"))
+        var platform = Platform.current
+        platform.applicationData = { _, _ in appData }
+        let definition = try #require(try ProviderFactory.builtIn("jetbrains").dataSources.first)
+        let source = DataSources.make(definition, providerId: "jetbrains", platform: platform,
+                                     network: MockNetworkClient(), environment: { _ in nil },
+                                     homeDirectory: home, now: { Date() })
+
+        #expect(await source.isReady())
+        let response = try await source.fetchResponse()
+        #expect(response.text == Self.quota(current: "250000"))
+    }
+
+    #if os(Windows)
+    @Test(arguments: [nil, "", "redirected"] as [String?])
+    func `should read the newest IDE quota from Windows app data including redirected APPDATA`(_ appDataValue: String?) async throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        let appData = appDataValue == "redirected"
+            ? home.appendingPathComponent("Redirected App Data")
+            : home.appendingPathComponent("AppData/Roaming")
+        let environment: @Sendable (String) -> String? = { name in
+            guard name == "APPDATA" else { return nil }
+            return appDataValue == "redirected" ? appData.path : appDataValue
+        }
+        let older = appData.appendingPathComponent("JetBrains/IntelliJIdea2025.3/options/AIAssistantQuotaManager2.xml")
+        let newest = appData.appendingPathComponent("Google/AndroidStudio2025.1/options/AIAssistantQuotaManager2.xml")
+        for (file, xml, age) in [(older, Self.quota(current: "900000"), 3600.0),
+                                  (newest, Self.quota(current: "500000"), 60.0)] {
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(xml.utf8).write(to: file)
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: file.path)
+        }
+        try ide("JetBrains/WebStorm2025.3", Self.quota(current: "100000"))
+        let definition = try #require(try ProviderFactory.builtIn("jetbrains").dataSources.first)
+        let source = DataSources.make(definition, providerId: "jetbrains", platform: .current,
+                                     network: MockNetworkClient(), environment: environment,
+                                     homeDirectory: home, now: { Date() })
+
+        #expect(await source.isReady())
+        let response = try await source.fetchResponse()
+        #expect(response.text == Self.quota(current: "500000"))
+    }
+    #endif
 }

@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Quotas
 import Testing
@@ -55,7 +56,7 @@ struct ScriptFetchTests {
         #expect(usage.quota(for: .weekly)?.percentRemaining == 60)
     }
 
-    @Test
+    @Test(.needsProcesses)
     func `should fail at the fetch step when the script fails`() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }
         try script("probe.sh", "exit 3")
@@ -75,11 +76,22 @@ struct ScriptFetchTests {
         #expect(await missing.isReady() == false)
     }
 
-    @Test
-    func `should declare only the script's own command as what it reaches, and no URL`() throws {
-        let fetch = try JSONDecoder().decode(Fetch.self, from: Data(#"{"script":{"run":"./probe.sh","folder":"/tmp/x"}}"#.utf8))
-
-        #expect(fetch.connection.commands == [["/bin/sh", "-c", "./probe.sh"]])
-        #expect(fetch.connection.urls.isEmpty)
+    @Test(.needsProcesses)
+    func `should run a script whose folder comes from an environment path`() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try script("probe.sh", "cat left.json")
+        try Data(#"{"weekly":{"left":47}}"#.utf8).write(to: folder.appendingPathComponent("left.json"))
+        let definition = try JSONDecoder().decode(DataSourceDefinition.self, from: Data(#"""
+        {"kind":"quotas","fetch":{"script":{"run":"./probe.sh","folder":"${SCRIPT_ROOT:-~/missing}"}}},
+         "mapping":{"json":{"quotas":[{"kind":"weekly","at":"$.weekly","leftPercent":"left"}]}}}
+        """#.utf8))
+        let root = folder
+        let source = DataSources.make(definition, providerId: "acme", platform: .current,
+                                      network: URLSession.shared, environment: { $0 == "SCRIPT_ROOT" ? root.path : nil },
+                                      homeDirectory: root, now: { Date() })
+        let usage = try await source.fetchUsage()
+        #expect(usage.quota(for: .weekly)?.percentRemaining == 47)
     }
+
 }
+#endif

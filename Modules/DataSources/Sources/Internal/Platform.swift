@@ -34,6 +34,14 @@ struct Platform: Sendable {
     var binaryLocator: (any BinaryLocating)?
     /// Runs a read-only query against an app's own database: `sqlite`.
     var sqlite: SQLiteRows?
+    /// The app-data folder for paths, using the caller's home and environment.
+    var applicationData: (@Sendable (URL, @Sendable (String) -> String?) -> URL)?
+    /// The separator accepted in this platform's filesystem paths.
+    var pathSeparator: String
+    var scriptCommand: ScriptCommand?
+    var loginShellCommand: LoginShellCommand?
+    var localServer: LocalServerFactory?
+    var localServerCommands: LocalServerCommands?
 
     init(
         name: String,
@@ -48,7 +56,13 @@ struct Platform: Sendable {
         processList: (@Sendable () -> [String])? = nil,
         screenRenderer: (@Sendable (String) -> String)? = nil,
         binaryLocator: (any BinaryLocating)? = nil,
-        sqlite: SQLiteRows? = nil
+        sqlite: SQLiteRows? = nil,
+        applicationData: (@Sendable (URL, @Sendable (String) -> String?) -> URL)? = nil,
+        pathSeparator: String = "/",
+        scriptCommand: ScriptCommand? = nil,
+        loginShellCommand: LoginShellCommand? = nil,
+        localServer: LocalServerFactory? = nil,
+        localServerCommands: LocalServerCommands? = nil
     ) {
         self.name = name
         self.runCLI = runCLI
@@ -63,6 +77,12 @@ struct Platform: Sendable {
         self.screenRenderer = screenRenderer
         self.binaryLocator = binaryLocator
         self.sqlite = sqlite
+        self.applicationData = applicationData
+        self.pathSeparator = pathSeparator
+        self.scriptCommand = scriptCommand
+        self.loginShellCommand = loginShellCommand
+        self.localServer = localServer
+        self.localServerCommands = localServerCommands
     }
 
     /// This platform's name and no connection: what a test hands the factory

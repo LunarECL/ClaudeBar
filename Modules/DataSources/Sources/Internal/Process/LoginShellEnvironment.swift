@@ -1,17 +1,18 @@
 import Diagnostics
 import Foundation
 
-/// Resolves environment variables through the user's login shell.
+/// Resolves environment variables through a supplied login-shell command.
 ///
-/// GUI apps launched from Finder or login inherit launchd's environment, which
-/// does not include variables exported in `~/.zshrc` / `~/.zprofile`. When a
-/// `ProcessInfo` lookup misses, ask the user's login shell for the value.
+/// A GUI app may not inherit the variables a shell profile exports. The
+/// factory supplies the shell connection when this platform offers one.
 public struct LoginShellEnvironment: Sendable {
     private let cliExecutor: any CLIExecutor
+    private let command: LoginShellCommand
     private let timeout: TimeInterval
 
-    public init(cliExecutor: any CLIExecutor, timeout: TimeInterval = 10.0) {
+    public init(cliExecutor: any CLIExecutor, command: @escaping LoginShellCommand, timeout: TimeInterval = 10.0) {
         self.cliExecutor = cliExecutor
+        self.command = command
         self.timeout = timeout
     }
 
@@ -22,9 +23,7 @@ public struct LoginShellEnvironment: Sendable {
         return name.dropFirst().allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
     }
 
-    /// Wraps the requested value in delimiters so rc-file noise (a stray `echo`
-    /// in ~/.zshrc) can't be mistaken for the token. `printf` emits no trailing
-    /// newline, so without delimiters noise would concatenate onto the value.
+    /// Delimiters keep shell-profile output from being mistaken for the value.
     static let beginMarker = "@@CLAUDEBAR_BEGIN@@"
     static let endMarker = "@@CLAUDEBAR_END@@"
 
@@ -36,16 +35,13 @@ public struct LoginShellEnvironment: Sendable {
             return nil
         }
 
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? ""
-        let binary = shell.isEmpty ? "/bin/zsh" : shell
-        // Interactive login shell so rc files that commonly hold the key
-        // (~/.zshrc as well as ~/.zprofile) are sourced before reading it.
-        let command = "printf '\(Self.beginMarker)%s\(Self.endMarker)\\n' \"$\(name)\""
+        let argv = command(name)
+        guard let binary = argv.first else { return nil }
 
         do {
             let result = try await cliExecutor.execute(
                 binary: binary,
-                args: ["-l", "-i", "-c", command],
+                args: Array(argv.dropFirst()),
                 input: nil,
                 timeout: timeout,
                 workingDirectory: nil,

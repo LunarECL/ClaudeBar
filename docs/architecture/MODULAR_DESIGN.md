@@ -356,7 +356,10 @@ Modules/DataSources/Sources/
     │                            rpcTransport? · scriptEngine? · keychain? ·
     │                            browserCookies? · browserStorage? · localNetwork? ·
     │                            processList? · screenRenderer? · binaryLocator? ·
-    │                            sqlite? — and Platform.bare: the name, nothing else
+    │                            sqlite? · applicationData? · pathSeparator ·
+    │                            scriptCommand? · loginShellCommand? ·
+    │                            localServer? · localServerCommands? —
+    │                            and Platform.bare: the name, nothing else
     ├── Unavailable.swift      a case whose connection is nil: fails at its step
     │                            as ErrorFact.unavailable, naming it and platform.name
     ├── Fetch/ Lookup/ Mapping/ Logs/ Network/ Process/   neutral workers
@@ -365,6 +368,7 @@ Modules/DataSources/Sources/
     │   ├── Process/                  DefaultCLIExecutor · PipeCLIExecutor ·
     │   │                             ProcessRPCTransport · BinaryLocator ·
     │   │                             RunningProcesses · TerminalRenderer · Shell …
+    │   ├── Fetch/LocalServerFetcher.swift   the Mac's pgrep/lsof worker
     │   ├── Mapping/JavaScriptCoreEngine.swift   : ScriptEngine
     │   ├── Lookup/                   SystemKeychain · SystemBrowserCookies ·
     │   │                             SystemBrowserStorage · SQLiteReader
@@ -372,7 +376,9 @@ Modules/DataSources/Sources/
     │   └── Logs/                     FileStamp+macOS · ByteSearch+macOS
     └── Windows/               #if os(Windows), whole file
         ├── Platform+Windows.swift    static let current = Platform(name: "Windows",
-        │                             binaryLocator: PathBinaryLocator(), …rest nil)
+        │                             applicationData: APPDATA or ~/AppData/Roaming,
+        │                             pathSeparator: "\\", binaryLocator: PathBinaryLocator(),
+        │                             scriptCommand: cmd.exe; execution connections nil)
         ├── Process/PathBinaryLocator.swift      : BinaryLocating (PATH + PATHEXT)
         └── Logs/                     FileStamp+Windows · ByteSearch+Windows
 Modules/DataSources/Tests/
@@ -402,9 +408,11 @@ Modules/DataSources/Tests/
 - **A test that needs a connection names it**, `.needs(\.processes)`, and
   runs wherever `Platform.current` has it. When a phase brings one, its tests
   start running there with no edit.
-- **A platform's facts are connections too:** the shell, the tools a worker
-  runs (`lsof`, `pgrep`, `security`), the folder a CLI trusts. Phase 4 moves
-  them from the neutral workers into `Platform`.
+- **A platform's facts are connections too:** the shell argv, the tools a
+  worker runs (`lsof`, `pgrep`, `security`), the folder a CLI trusts, app-data
+  and path separators. The factory supplies them to workers and to path
+  expansion; definitions use `{{platform.appData}}`, not a Mac folder literal.
+  A missing fact remains unavailable; it never becomes a guessed command.
 
 A module with no platform workers has no `Platform`. `Diagnostics` and
 `Leaderboard` follow the same shape for their own ports (`LogSink`,

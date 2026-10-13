@@ -368,8 +368,8 @@ extension UsageLog {
 }
 
 extension DataSources {
-    /// A login's usage log, reading this Mac's files. `scripts` finds the
-    /// price file shipped beside the definition.
+    /// A login's usage log, reading this platform's files. `scripts` finds
+    /// the price file shipped beside the definition.
     public static func makeUsageLog(
         _ definition: UsageLog.Definition,
         scripts: @escaping ScriptSource = { _ in nil },
@@ -378,7 +378,21 @@ extension DataSources {
         calendar: Calendar = .current,
         now: @escaping @Sendable () -> Date = { Date() }
     ) -> UsageLog {
-        let expand = { (path: String) in Paths.expand(path, homeDirectory: homeDirectory, environment: environment) }
+        makeUsageLog(definition, platform: .current, scripts: scripts, environment: environment,
+                     homeDirectory: homeDirectory, calendar: calendar, now: now)
+    }
+
+    static func makeUsageLog(
+        _ definition: UsageLog.Definition,
+        platform: Platform,
+        scripts: @escaping ScriptSource = { _ in nil },
+        environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        calendar: Calendar = .current,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) -> UsageLog {
+        let pathsEnvironment = pathEnvironment(platform: platform, homeDirectory: homeDirectory, environment: environment)
+        let expand = { (path: String) in Paths.expand(path, homeDirectory: homeDirectory, environment: pathsEnvironment) }
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         var hash = SHA256()

@@ -24,7 +24,7 @@ They appear for providers that keep local session logs:
 
 | Provider | Reads |
 |---|---|
-| Claude | Claude Code transcripts in `~/.claude/projects/**/*.jsonl`; an added account, its own folder's `projects/`. Your usual login also gets a **Claude Desktop · Token Usage** card from `~/Library/Application Support/Claude/buddy-tokens.json`, with tokens only and no cost |
+| Claude | Claude Code transcripts in `~/.claude/projects/**/*.jsonl`; an added account, its own folder's `projects/`. Your usual login also gets a **Claude Desktop · Token Usage** card from `Claude/buddy-tokens.json` under app-data (`~/Library/Application Support` on Mac, `%APPDATA%` on Windows), with tokens only and no cost |
 | Mistral | Vibe session metadata in `~/.vibe/logs/session/` |
 | Oh My Pi | omp's session logs in `~/.omp/agent/sessions/**/*.jsonl` (or `$PI_CODING_AGENT_DIR/sessions`), subagents included; every account omp drives adds up under Oh My Pi. See [Oh My Pi](../../providers/omp/README.md#daily-usage) |
 | Extensions | Whatever the extension's `dailyUsage` section returns; see [extensions](../extensions/README.md) |

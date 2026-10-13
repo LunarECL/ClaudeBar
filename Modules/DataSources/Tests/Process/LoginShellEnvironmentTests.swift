@@ -22,6 +22,10 @@ struct LoginShellEnvironmentTests {
         return mock
     }
 
+    private func makeShell(_ executor: any CLIExecutor) -> LoginShellEnvironment {
+        LoginShellEnvironment(cliExecutor: executor, command: { ["fixture-shell", $0] })
+    }
+
     // MARK: - Name Validation
 
     @Test
@@ -51,21 +55,19 @@ struct LoginShellEnvironmentTests {
 
     @Test
     func `should find the key the user's shell profile exports`() async {
-        let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: markerWrapped("shell-token")))
+        let shell = makeShell(makeExecutor(output: markerWrapped("shell-token")))
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == "shell-token")
     }
 
     @Test
     func `should find no key when the shell profile exports it empty`() async {
-        let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: markerWrapped("")))
+        let shell = makeShell(makeExecutor(output: markerWrapped("")))
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == nil)
     }
 
     @Test
     func `should find no key when the login shell fails`() async {
-        let shell = LoginShellEnvironment(
-            cliExecutor: makeExecutor(output: markerWrapped("partial"), exitCode: 1)
-        )
+        let shell = makeShell(makeExecutor(output: markerWrapped("partial"), exitCode: 1))
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == nil)
     }
 
@@ -80,57 +82,52 @@ struct LoginShellEnvironmentTests {
             workingDirectory: .any,
             autoResponses: .any
         ).willThrow(UsageError.executionFailed("shell failed"))
-        let shell = LoginShellEnvironment(cliExecutor: mock)
+        let shell = makeShell(mock)
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == nil)
     }
 
     @Test
     func `should never ask the shell for a variable whose name is unsafe`() async {
-        let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: "shell-token"))
+        let executor = makeExecutor(output: "shell-token")
+        let shell = makeShell(executor)
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN; rm -rf /") == nil)
+        verify(executor).execute(binary: .any, args: .any, input: .any, timeout: .any,
+                                 workingDirectory: .any, autoResponses: .any).called(0)
     }
 
     @Test
     func `should find the key without the whitespace around it`() async {
-        let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: markerWrapped("  shell-token  ")))
+        let shell = makeShell(makeExecutor(output: markerWrapped("  shell-token  ")))
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == "shell-token")
     }
 
     @Test
     func `should find the key when the shell profile prints a greeting first`() async {
         let output = "Welcome to zsh\n" + markerWrapped("shell-token")
-        let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: output))
+        let shell = makeShell(makeExecutor(output: output))
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == "shell-token")
     }
 
     @Test
     func `should find no key when the variable is unset and the shell profile prints a greeting`() async {
         let output = "Welcome to zsh\n" + markerWrapped("")
-        let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: output))
+        let shell = makeShell(makeExecutor(output: output))
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == nil)
     }
 
     @Test
     func `should find no key when the shell's answer is not the one ClaudeBar asked for`() async {
-        let shell = LoginShellEnvironment(cliExecutor: makeExecutor(output: "shell-token\n"))
+        let shell = makeShell(makeExecutor(output: "shell-token\n"))
         #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == nil)
     }
 
     @Test
-    func `should find the key only an interactive login shell exports`() async {
-        let mock = MockCLIExecutor()
-        given(mock).execute(
-            binary: .any,
-            args: .matching { args in
-                args.contains("-i") && args.contains { $0.contains("\"$GLM_TOKEN\"") }
-            },
-            input: .any,
-            timeout: .any,
-            workingDirectory: .any,
-            autoResponses: .any
-        ).willReturn(CLIResult(output: markerWrapped("shell-token"), exitCode: 0))
-
-        let shell = LoginShellEnvironment(cliExecutor: mock)
-        #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == "shell-token")
+    func `should not start a shell when no command was supplied`() async {
+        let executor = makeExecutor(output: markerWrapped("shell-token"))
+        let shell = LoginShellEnvironment(cliExecutor: executor, command: { _ in [] })
+        #expect(await shell.value(ofEnvVar: "GLM_TOKEN") == nil)
+        verify(executor).execute(binary: .any, args: .any, input: .any, timeout: .any,
+                                 workingDirectory: .any, autoResponses: .any).called(0)
     }
+
 }

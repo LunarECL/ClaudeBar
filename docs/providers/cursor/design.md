@@ -16,13 +16,13 @@ Cursor is `Modules/Providers/Resources/Providers/cursor.json` and `cursor-usage.
 
 Cursor has no CLI that reports usage, so the probe borrows the Cursor app's session:
 
-1. **Token.** `/usr/bin/sqlite3 ~/Library/Application Support/Cursor/User/globalStorage/state.vscdb "SELECT value FROM ItemTable WHERE key = 'cursorAuth/accessToken'"`. Empty output → signed out → authentication required.
+1. **Token.** The read-only SQLite connection queries `{{platform.appData}}/Cursor/User/globalStorage/state.vscdb` with `SELECT value AS token FROM ItemTable WHERE key = 'cursorAuth/accessToken'`. Empty output → signed out → authentication required.
 2. **User id.** The access token is a JWT; its `sub` claim (base64url payload, padded before decoding) is the user id.
 3. **Request.** `GET https://cursor.com/api/usage-summary` with `Cookie: WorkosCursorSessionToken={sub}::{accessToken}`.
 
 HTTP 401 → session expired (the token in the database is stale); 403 → authentication required.
 
-The probe is available only when `state.vscdb` exists, so a Mac without Cursor never shows an error.
+The probe is available only when `state.vscdb` exists, so a computer without Cursor never shows a missing-file error. The same `{{platform.appData}}` prefix is used by `requiresFiles` and the credential lookup: macOS keeps `~/Library/Application Support`, Windows uses nonempty `APPDATA` or `~/AppData/Roaming`. Windows SQLite and script mapping connections remain unavailable until the quotas phase; portable paths do not enable them.
 
 ## Response fields that matter
 

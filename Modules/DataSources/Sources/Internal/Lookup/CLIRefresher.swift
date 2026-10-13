@@ -8,6 +8,7 @@ import Foundation
 struct CLIRefresher: CredentialRefreshing {
     let call: CLICall
     let executor: any CLIExecutor
+    let directory: @Sendable () -> URL?
 
     var retryStatuses: [Int] { [401] }
     var writesBack: Bool { false }
@@ -21,7 +22,7 @@ struct CLIRefresher: CredentialRefreshing {
         }
         AppLog.probes.info("Running \(call.cli) to renew its login")
         _ = try await executor.execute(binary: call.cli, args: call.args, input: call.input, timeout: call.timeout,
-                                       workingDirectory: call.workingDirectory?.url, autoResponses: call.autoResponses)
+                                       workingDirectory: directory(), autoResponses: call.autoResponses)
         return credential
     }
 }

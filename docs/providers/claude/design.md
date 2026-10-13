@@ -34,6 +34,11 @@ still hold — they are now lines in `claude.json`, pinned by
 | Account identity | `~/.claude.json` → `oauthAccount` (email, display name, `billingType`) — read by every data source as the `account` context file, so the email shows whether the CLI or the API answered | CLI v2.1.79+ moved account details to a separate Status tab |
 | Guest passes | `claude /passes`, which copies the link to the clipboard | Max only (#243) |
 | Daily usage | `~/.claude/projects/*/*.jsonl` | Deduplicated by `(message.id, requestId)`, because Claude Code writes the same usage more than once |
+| Claude Desktop tokens | `{{platform.appData}}/Claude/buddy-tokens.json` | Today's `tokens-today.date` and `tokens-today.tokens`; tokens only, no cost |
+
+The Desktop path is a platform fact supplied through `DataSources`: macOS keeps
+`~/Library/Application Support`, while Windows uses nonempty `APPDATA` or
+`~/AppData/Roaming`. It does not change Claude Code's config and transcript paths.
 
 ## Fallback chain
 

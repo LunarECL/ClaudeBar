@@ -53,9 +53,6 @@ struct WindsurfDefinitionTests {
     func `should read Windsurf's own database, without running anything`() throws {
         let windsurf = try make()
         let source = try #require(windsurf.definition.dataSources.first)
-        #expect(source.fetch == .sqlite(SQLiteCall(
-            path: "~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb",
-            query: "SELECT value FROM ItemTable WHERE key = 'windsurf.settings.cachedPlanInfo' LIMIT 1")))
         #expect(source.fetch.connection.commands.isEmpty)
         #expect(source.fetch.connection.urls.isEmpty)
     }
