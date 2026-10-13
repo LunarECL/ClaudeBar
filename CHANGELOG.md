@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Windows file paths**: shared provider definitions find app-data files on Windows as well as Mac, including redirected `APPDATA` and the newest IDE quota file. Windows execution and quota display remain phase 5. ([#555](https://github.com/tddworks/ClaudeBar/issues/555)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/ENGINE_DESIGN.md)
+- **Windows file paths**: shared provider definitions find app-data files on Windows as well as Mac, including redirected `APPDATA` and the newest IDE quota file. Windows execution and quota display remain phase 5. ([#556](https://github.com/tddworks/ClaudeBar/pull/556), [#555](https://github.com/tddworks/ClaudeBar/issues/555)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/ENGINE_DESIGN.md)
 
 ---
 
