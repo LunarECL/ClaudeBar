@@ -2,7 +2,9 @@
 import Foundation
 
 extension Platform {
-    static let macScriptCommand: ScriptCommand = { run in ["/bin/sh", "-c", run] }
+    // A script is a path, not shell source; positional argv preserves spaces,
+    // quotes and metacharacters in the resolved filename.
+    static let macScriptCommand: ScriptCommand = { run in ["/bin/sh", "-c", "exec \"$1\"", "claudebar-script", run] }
 
     static let macLoginShellCommand: LoginShellCommand = { variable in
         let preferred = ProcessInfo.processInfo.environment["SHELL"] ?? ""

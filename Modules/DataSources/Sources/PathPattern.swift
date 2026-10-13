@@ -71,8 +71,10 @@ enum Paths {
         var path = path
         if path.hasPrefix("${"), let close = variableEnd(in: path) {
             let inner = path[path.index(path.startIndex, offsetBy: 2)..<close]
-            let parts = inner.components(separatedBy: ":-")
-            let value = environment(parts[0]).flatMap { $0.isEmpty ? nil : $0 } ?? (parts.count > 1 ? parts[1] : "")
+            let split = inner.range(of: ":-")
+            let name = split.map { String(inner[..<$0.lowerBound]) } ?? String(inner)
+            let value = environment(name).flatMap { $0.isEmpty ? nil : $0 }
+                ?? split.map { String(inner[$0.upperBound...]) } ?? ""
             path = value + path[path.index(after: close)...]
         }
         let windows = environment("platform.pathSeparator") == "\\"
