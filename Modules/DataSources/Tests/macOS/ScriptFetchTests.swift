@@ -9,7 +9,7 @@ import Testing
 /// section runs (docs/features/extensions/design.md). Run for real, in a temporary folder.
 @Suite
 struct ScriptFetchTests {
-    private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("script-fetch-\(UUID().uuidString)", isDirectory: true)
+    private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("script fetch's \(UUID().uuidString)", isDirectory: true)
 
     private final class Vault: SecretStore, @unchecked Sendable {
         let values: [String: String]

@@ -75,4 +75,13 @@ struct PlatformPathTests {
                 == "//server/share/Acme/usage.json")
         #expect(Paths.expand(#"literal\file.json"#, homeDirectory: home, environment: { _ in nil }) == #"literal\file.json"#)
     }
+
+    @Test
+    func `should keep the whole portable default when a folder name contains the default separator`() {
+        let appData = home.appendingPathComponent("application data").path
+        let environment: @Sendable (String) -> String? = { $0 == "platform.appData" ? appData : nil }
+        let expanded = Paths.expand("${CONFIG_HOME:-{{platform.appData}}/Acme:-archive}/usage.json",
+                                    homeDirectory: home, environment: environment)
+        #expect(expanded == appData + "/Acme:-archive/usage.json")
+    }
 }
