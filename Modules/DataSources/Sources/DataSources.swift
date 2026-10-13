@@ -34,7 +34,7 @@ public enum DataSources {
     /// lookups. A process variable never overrides a reserved platform fact.
     static func pathEnvironment(platform: Platform, homeDirectory: URL,
                                 environment: @escaping @Sendable (String) -> String?) -> @Sendable (String) -> String? {
-        let appData = platform.applicationData?(homeDirectory, environment)?.path
+        let appData = platform.applicationData?(homeDirectory, environment).path
         let separator = platform.pathSeparator
         return { name in
             switch name {
