@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Stuck on Syncing…**: a login shell that never finished, asked where a CLI is before a refresh starts it, no longer holds that refresh and every later one on *Syncing…* until a relaunch. It has 10 seconds, then ClaudeBar looks in the usual folders and logs a warning naming the shell. ([#550](https://github.com/tddworks/ClaudeBar/issues/550))
 - **Oh My Pi, Qwen Cloud**: a Qwen Cloud Token Plan signed into omp shows as Qwen Cloud, not Alibaba Token Plan, and points at omp's console cookie, the step its quota needs, instead of just "No usage reported"; Grok no longer shows as "Xai Oauth". ([#553](https://github.com/tddworks/ClaudeBar/pull/553)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/omp/README.md)
 - **Leaderboard joining**: when the leaderboard key can't be stored, joining now stops and says so, instead of joining anyway and dropping out at the next launch with the username taken. ([#548](https://github.com/tddworks/ClaudeBar/pull/548))
 

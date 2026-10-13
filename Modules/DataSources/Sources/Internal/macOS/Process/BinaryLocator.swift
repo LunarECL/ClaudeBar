@@ -238,38 +238,86 @@ public struct BinaryLocator: BinaryLocating, Sendable {
     }
 
     /// Tries to find a tool using the user's login shell.
-    private static func whichViaShell(_ tool: String) -> String? {
+    static func whichViaShell(_ tool: String, preferredShell preferred: String = userShell, timeout: TimeInterval = loginShellTimeout) -> String? {
         let startTime = CFAbsoluteTimeGetCurrent()
-        let preferred = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let shell = Shell.detect(from: preferred)
-        let shellPath = whichShellPath(preferred: preferred)
+        let answer = askLoginShell(whichShellPath(preferred: preferred), shell.whichArguments(for: tool), timeout: timeout)
+        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+        AppLog.probes.debug("BinaryLocator.whichViaShell('\(tool)') took \(String(format: "%.3f", elapsed))s")
+        guard let answer, answer.status == 0, let output = String(data: answer.output, encoding: .utf8) else { return nil }
+        return shell.parseWhichOutput(output)
+    }
 
+    /// What a login shell printed, and how it exited.
+    private struct LoginShellAnswer {
+        let output: Data
+        let status: Int32
+    }
+
+    /// Runs the person's login shell and reads what it prints.
+    ///
+    /// A refresh asks this before it starts a CLI, so it has a deadline like
+    /// every wait on a CLI (#550): a shell that hasn't exited by `timeout` is
+    /// stopped and the answer is `nil`, as it is when the shell can't start.
+    /// The output is read until the shell exits, not to end-of-file: a
+    /// program its profile starts, an agent or a daemon, keeps the output
+    /// open long after the shell answered.
+    private static func askLoginShell(_ executable: String, _ arguments: [String], timeout: TimeInterval) -> LoginShellAnswer? {
         let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: shellPath)
-        proc.arguments = shell.whichArguments(for: tool)
-
+        proc.executableURL = URL(fileURLWithPath: executable)
+        proc.arguments = arguments
         let pipe = Pipe()
         proc.standardOutput = pipe
         proc.standardError = FileHandle.nullDevice
-
         do {
             try proc.run()
-            // Drain before waiting: reading only after `waitUntilExit()` deadlocks
-            // if the child fills the pipe buffer while nothing consumes it.
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            proc.waitUntilExit()
-            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-            AppLog.probes.debug("BinaryLocator.whichViaShell('\(tool)') took \(String(format: "%.3f", elapsed))s")
-            guard proc.terminationStatus == 0 else { return nil }
-
-            guard let output = String(data: data, encoding: .utf8) else { return nil }
-
-            return shell.parseWhichOutput(output)
         } catch {
-            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-            AppLog.probes.debug("BinaryLocator.whichViaShell('\(tool)') failed after \(String(format: "%.3f", elapsed))s")
+            AppLog.probes.debug("BinaryLocator: \(executable) could not start: \(error.localizedDescription)")
             return nil
         }
+
+        let reader = pipe.fileHandleForReading
+        defer { try? reader.close() }
+        let fd = reader.fileDescriptor
+        _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)
+        var output = Data()
+        var chunk = [UInt8](repeating: 0, count: 4096)
+        // Read while it runs, so a long answer never fills the pipe and stalls it.
+        func drain() {
+            while true {
+                let count = Darwin.read(fd, &chunk, chunk.count)
+                guard count > 0 else { return }
+                output.append(contentsOf: chunk[0..<count])
+            }
+        }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while proc.isRunning {
+            guard Date() < deadline else {
+                AppLog.probes.warning("BinaryLocator: \(executable) \(arguments.joined(separator: " ")) didn't finish within \(Int(timeout))s; stopped it, and looking elsewhere")
+                stop(proc)
+                return nil
+            }
+            drain()
+            usleep(10_000)
+        }
+        // Once it has exited, everything it printed is in the pipe.
+        drain()
+        proc.waitUntilExit()
+        return LoginShellAnswer(output: output, status: proc.terminationStatus)
+    }
+
+    /// Stops a shell that ran out of time: asked first, then made to.
+    private static func stop(_ proc: Process) {
+        proc.terminate()
+        let deadline = Date().addingTimeInterval(1)
+        while proc.isRunning, Date() < deadline {
+            usleep(10_000)
+        }
+        if proc.isRunning {
+            kill(proc.processIdentifier, SIGKILL)
+        }
+        proc.waitUntilExit()
     }
 
     /// Searches for a tool in common installation paths.
@@ -365,40 +413,24 @@ public struct BinaryLocator: BinaryLocating, Sendable {
     }
 
     /// Uncached login-shell `PATH` lookup.
-    private static func computeShellPath() -> String {
+    static func computeShellPath(preferredShell preferred: String = userShell, timeout: TimeInterval = loginShellTimeout) -> String {
         let startTime = CFAbsoluteTimeGetCurrent()
-        let preferred = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let shell = Shell.detect(from: preferred)
-        let shellPath = whichShellPath(preferred: preferred)
-
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: shellPath)
-        proc.arguments = shell.pathArguments()
-
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = FileHandle.nullDevice
-
+        let answer = askLoginShell(whichShellPath(preferred: preferred), shell.pathArguments(), timeout: timeout)
+        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+        AppLog.probes.debug("BinaryLocator.shellPath() took \(String(format: "%.3f", elapsed))s")
         let fallback = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-
-        do {
-            try proc.run()
-            // Drain before waiting, as above.
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            proc.waitUntilExit()
-            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-            AppLog.probes.debug("BinaryLocator.shellPath() took \(String(format: "%.3f", elapsed))s")
-            guard proc.terminationStatus == 0 else { return fallback }
-
-            guard let output = String(data: data, encoding: .utf8) else { return fallback }
-
-            let path = shell.parsePathOutput(output)
-            return path.isEmpty ? fallback : path
-        } catch {
-            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-            AppLog.probes.debug("BinaryLocator.shellPath() failed after \(String(format: "%.3f", elapsed))s")
-            return fallback
-        }
+        guard let answer, answer.status == 0, let output = String(data: answer.output, encoding: .utf8) else { return fallback }
+        let path = shell.parsePathOutput(output)
+        return path.isEmpty ? fallback : path
     }
+
+    /// The person's shell, whose rules and `PATH` the lookups follow.
+    static var userShell: String { ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh" }
+
+    /// Seconds a login shell has to answer a lookup (#550). Usually it takes
+    /// a fraction of one; past this, a profile is waiting on something that
+    /// may never come, and the refresh waiting on it would too.
+    static let loginShellTimeout: TimeInterval = 10
 }
 #endif
