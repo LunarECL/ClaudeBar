@@ -82,7 +82,7 @@ struct ScriptFetchTests {
         try script("probe.sh", "cat left.json")
         try Data(#"{"weekly":{"left":47}}"#.utf8).write(to: folder.appendingPathComponent("left.json"))
         let definition = try JSONDecoder().decode(DataSourceDefinition.self, from: Data(#"""
-        {"kind":"quotas","fetch":{"script":{"run":"./probe.sh","folder":"${SCRIPT_ROOT:-~/missing}"}}},
+        {"kind":"quotas","fetch":{"script":{"run":"./probe.sh","folder":"${SCRIPT_ROOT:-~/missing}"}},
          "mapping":{"json":{"quotas":[{"kind":"weekly","at":"$.weekly","leftPercent":"left"}]}}}
         """#.utf8))
         let root = folder

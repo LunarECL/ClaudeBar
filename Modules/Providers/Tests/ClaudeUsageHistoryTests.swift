@@ -338,9 +338,12 @@ struct ClaudeUsageHistoryTests {
         var platform = Platform.current
         platform.applicationData = { _, _ in appData }
         let definition = try #require(try ProviderFactory.builtIn("claude").usageHistory?.otherApps?.first).definition
-        let now = try #require(ISO8601DateFormatter().date(from: "2026-10-13T12:00:00Z"))
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let calendar = Calendar.current
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 13, hour: 12)))
+        // Log discovery filters by modification date; the date-only record is parsed in the local timezone.
+        for fixture in [file, home.appendingPathComponent("Library/Application Support/Claude/buddy-tokens.json")] {
+            try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: fixture.path)
+        }
         let log = DataSources.makeUsageLog(definition, platform: platform, environment: { _ in nil },
                                           homeDirectory: home, calendar: calendar, now: { now })
 
@@ -366,9 +369,11 @@ struct ClaudeUsageHistoryTests {
             return appDataValue == "redirected" ? appData.path : appDataValue
         }
         let definition = try #require(try ProviderFactory.builtIn("claude").usageHistory?.otherApps?.first).definition
-        let now = try #require(ISO8601DateFormatter().date(from: "2026-10-13T12:00:00Z"))
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let calendar = Calendar.current
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 13, hour: 12)))
+        for fixture in [file, home.appendingPathComponent("Library/Application Support/Claude/buddy-tokens.json")] {
+            try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: fixture.path)
+        }
         let log = DataSources.makeUsageLog(definition, platform: .current, environment: environment,
                                           homeDirectory: home, calendar: calendar, now: { now })
 

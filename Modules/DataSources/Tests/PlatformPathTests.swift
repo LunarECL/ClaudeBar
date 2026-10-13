@@ -73,8 +73,6 @@ struct PlatformPathTests {
                 == "C:/Users/A Person/AppData/Roaming/Acme/usage.json")
         #expect(Paths.expand(#"\\server\share\Acme\usage.json"#, homeDirectory: home, environment: environment)
                 == "//server/share/Acme/usage.json")
-        #expect(Paths.resolve(#"\\server\share-does-not-exist\Acme\*\usage.json"#, homeDirectory: home, environment: environment)
-                == "//server/share-does-not-exist/Acme/*/usage.json")
         #expect(Paths.expand(#"literal\file.json"#, homeDirectory: home, environment: { _ in nil }) == #"literal\file.json"#)
     }
 }

@@ -386,9 +386,10 @@ struct ClaudeCLIDefinitionTests {
             }
     }
 
-    private func trust(in config: [String: Any]) -> Any? {
+    private func trust(in config: [String: Any], home: URL) -> Any? {
         let projects = config["projects"] as? [String: Any]
-        let entry = projects?[CLIWorkingDirectory.resolve().path] as? [String: Any]
+        let folder = home.appendingPathComponent("Library/Application Support/ClaudeBar/Probe").path
+        let entry = projects?[folder] as? [String: Any]
         return entry?["hasTrustDialogAccepted"]
     }
 
@@ -403,7 +404,7 @@ struct ClaudeCLIDefinitionTests {
 
         #expect(snapshot.sessionQuota?.percentRemaining == 65)
         let config = try claude.readClaudeConfig()
-        #expect(trust(in: config) as? Bool == true)
+        #expect(trust(in: config, home: claude.home) as? Bool == true)
         // The rest of the file is kept.
         #expect(config["numStartups"] as? Int == 3)
         #expect((config["oauthAccount"] as? [String: Any])?["emailAddress"] as? String == "user@example.com")
@@ -420,7 +421,7 @@ struct ClaudeCLIDefinitionTests {
 
         let projects = try claude.readClaudeConfig()["projects"] as? [String: Any]
         #expect((projects?["/Users/test/project"] as? [String: Any])?["hasTrustDialogAccepted"] as? Bool == true)
-        #expect(trust(in: try claude.readClaudeConfig()) as? Bool == true)
+        #expect(trust(in: try claude.readClaudeConfig(), home: claude.home) as? Bool == true)
     }
 
     @Test
@@ -439,7 +440,8 @@ struct ClaudeCLIDefinitionTests {
     func `should report folder trust as needed, not retry forever, when the folder is already trusted`() async throws {
         let claude = try ClaudeHarness()
         defer { claude.cleanUp() }
-        try claude.writeClaudeConfig(extra: ["projects": [CLIWorkingDirectory.resolve().path: ["hasTrustDialogAccepted": true]]])
+        let folder = claude.home.appendingPathComponent("Library/Application Support/ClaudeBar/Probe").path
+        try claude.writeClaudeConfig(extra: ["projects": [folder: ["hasTrustDialogAccepted": true]]])
         given(claude.cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
             .willReturn(CLIResult(output: Self.trustPrompt, exitCode: 0))
 

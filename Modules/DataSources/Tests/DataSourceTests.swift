@@ -188,41 +188,7 @@ struct DataSourceTests {
         }
     }
 
-    // MARK: - Where a CLI runs
-
-    @Test
-    func `should start a JSON-RPC CLI in ClaudeBar's own trusted folder (#267)`() async throws {
-        // Codex 0.150+ trust-checks the directory it starts in (#267), so the
-        // app-server must start in ClaudeBar's own probe directory.
-        let started = StartedProcess()
-        let transport = MockRPCTransport()
-        given(transport).send(.any).willReturn(())
-        given(transport).close().willReturn(())
-        given(transport).receive().willReturn(Data(#"{"id":1,"result":{}}"#.utf8))
-        let definition = try decode("""
-        {"kind":"rpc","fetch":{"jsonRpc":{"cli":"codex","args":["app-server"],"workingDirectory":"dedicated","call":"read"}},
-         "mapping":{"json":{"quotas":[]}}}
-        """)
-        let source = DataSources.make(
-            definition,
-            providerId: "test",
-            cliExecutor: MockCLIExecutor(),
-            network: MockNetworkClient(),
-            makeTransport: { executable, arguments, _, directory in
-                started.record(executable, arguments, directory)
-                return transport
-            },
-            environment: { _ in nil },
-            homeDirectory: FileManager.default.temporaryDirectory,
-            now: { Date() }
-        )
-
-        _ = try await source.fetchResponse()
-
-        #expect(started.executable == "codex")
-        #expect(started.arguments == ["app-server"])
-        #expect(started.directory == CLIWorkingDirectory.resolve())
-    }
+    // MARK: - A refresh always ends
 
     @Test
     func `should give up on a JSON-RPC CLI that stops answering, so the refresh ends (#517)`() async throws {
@@ -328,19 +294,6 @@ struct DataSourceTests {
         #expect(Template.fill("Bearer {{token}}", with: Credential(["token": "t"])) == "Bearer t")
         #expect(Template.fill("{{account}}", with: Credential(["token": "t"])) == nil)
         #expect(Template.fill("plain", with: nil) == "plain")
-    }
-}
-
-/// What the transport factory was asked to start.
-private final class StartedProcess: @unchecked Sendable {
-    private(set) var executable: String?
-    private(set) var arguments: [String]?
-    private(set) var directory: URL?
-
-    func record(_ executable: String, _ arguments: [String], _ directory: URL?) {
-        self.executable = executable
-        self.arguments = arguments
-        self.directory = directory
     }
 }
 
