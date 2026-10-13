@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.15] - 2026-10-13
+
 ### Fixed
 - **Stuck on Syncing…**: a login shell that never finished, asked where a CLI is before a refresh starts it, no longer holds that refresh and every later one on *Syncing…*. It has 10 seconds, then ClaudeBar looks in the usual folders and logs a warning naming the shell. ([#554](https://github.com/tddworks/ClaudeBar/pull/554), [#550](https://github.com/tddworks/ClaudeBar/issues/550))
 - **Oh My Pi, Qwen Cloud**: a Qwen Cloud Token Plan signed into omp shows as Qwen Cloud, not Alibaba Token Plan, and points at omp's console cookie, the step its quota needs, instead of just "No usage reported"; Grok no longer shows as "Xai Oauth". ([#553](https://github.com/tddworks/ClaudeBar/pull/553)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/omp/README.md)
@@ -247,7 +251,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.14...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.15...HEAD
+[0.5.15]: https://github.com/tddworks/ClaudeBar/compare/v0.5.14...v0.5.15
 [0.5.14]: https://github.com/tddworks/ClaudeBar/compare/v0.5.13...v0.5.14
 [0.5.13]: https://github.com/tddworks/ClaudeBar/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/tddworks/ClaudeBar/compare/v0.5.11...v0.5.12
