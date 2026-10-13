@@ -397,7 +397,10 @@ extension DataSources {
         encoder.outputFormatting = .sortedKeys
         var hash = SHA256()
         // Other apps are read on their own, so they never change how these days were summed.
-        let own = UsageLog.Definition(records: definition.records, prices: definition.prices,
+        let records = UsageLog.Records(
+            files: Paths.fingerprintPath(definition.records.files, homeDirectory: homeDirectory, environment: pathsEnvironment),
+            format: definition.records.format, shapes: definition.records.shapes)
+        let own = UsageLog.Definition(records: records, prices: definition.prices,
                                       freeWhen: definition.freeWhen, sessionGap: definition.sessionGap)
         hash.update(data: (try? encoder.encode(own)) ?? Data())
         hash.update(data: Data(expand(definition.records.files).utf8))

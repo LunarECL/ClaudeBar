@@ -425,6 +425,11 @@ keep their literal meaning. A wildcard still spans one name, not a directory
 boundary. The rule serves every path consumer: required files, context,
 recovery, usage logs and credential lookups as well as fetches.
 
+The app-data prefix is replaced by its concrete home-relative name when a
+usage log's definition is fingerprinted. Changing only this spelling must
+not discard closed days: a daily counter's original file may already have
+been overwritten, so re-reading cannot reconstruct its archived counts.
+
 Shell argv, the trusted CLI directory and local-process inspection belong
 to the platform too. The factory hands a worker its command or connection;
 the worker never chooses an OS. macOS keeps its existing interactive login

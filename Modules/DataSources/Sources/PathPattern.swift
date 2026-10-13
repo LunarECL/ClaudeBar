@@ -75,20 +75,39 @@ enum Paths {
             let value = environment(parts[0]).flatMap { $0.isEmpty ? nil : $0 } ?? (parts.count > 1 ? parts[1] : "")
             path = value + path[path.index(after: close)...]
         }
-        let appData = "{{platform.appData}}"
-        if path == appData || path.hasPrefix(appData + "/") || path.hasPrefix(appData + "\\") {
-            // A missing platform fact stays a missing path, never "/App/…".
-            guard let directory = environment("platform.appData"), !directory.isEmpty else { return path }
-            path = directory + path.dropFirst(appData.count)
-        }
-        if environment("platform.pathSeparator") == "\\", path.contains("\\") {
-            path = path.replacingOccurrences(of: "\\", with: "/")
-        }
-        if path == "~" { return homeDirectory.path }
+        let windows = environment("platform.pathSeparator") == "\\"
+        path = replacingAppData(path, with: environment("platform.appData"))
+        path = normalized(path, windows: windows)
+        if path == "~" { return normalized(homeDirectory.path, windows: windows) }
         if path.hasPrefix("~/") {
-            return homeDirectory.appendingPathComponent(String(path.dropFirst(2))).path
+            return normalized(homeDirectory.appendingPathComponent(String(path.dropFirst(2))).path, windows: windows)
         }
         return path
+    }
+
+    /// A portable folder's concrete name in a log definition, relative to
+    /// home when possible. Its spelling alone must not discard archived days
+    /// whose source files (Desktop's daily counter, for example) are gone.
+    static func fingerprintPath(_ path: String, homeDirectory: URL, environment: @Sendable (String) -> String?) -> String {
+        guard path.hasPrefix("{{platform.appData}}"),
+              let directory = environment("platform.appData"), !directory.isEmpty else { return path }
+        let windows = environment("platform.pathSeparator") == "\\"
+        let folder = normalized(directory, windows: windows)
+        let home = normalized(homeDirectory.path, windows: windows)
+        let prefix = home.hasSuffix("/") ? home : home + "/"
+        let name = folder == home ? "~" : (folder.hasPrefix(prefix) ? "~/" + folder.dropFirst(prefix.count) : folder)
+        return replacingAppData(path, with: name)
+    }
+
+    private static func replacingAppData(_ path: String, with directory: String?) -> String {
+        let marker = "{{platform.appData}}"
+        guard path == marker || path.hasPrefix(marker + "/") || path.hasPrefix(marker + "\\"),
+              let directory, !directory.isEmpty else { return path }
+        return directory + path.dropFirst(marker.count)
+    }
+
+    private static func normalized(_ path: String, windows: Bool) -> String {
+        windows && path.contains("\\") ? path.replacingOccurrences(of: "\\", with: "/") : path
     }
 
     /// The outer `}` of `${VAR:-default}`. A portable folder in the default
