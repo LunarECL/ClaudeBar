@@ -53,10 +53,10 @@ public struct PathPattern: Sendable, Equatable, Codable, ExpressibleByStringLite
 }
 
 /// Which file on disk a definition means — the one owner of that rule
-/// (ENGINE_DESIGN §2.9). `~/…` and `${VARIABLE:-default}/…` expand; a `*`
-/// matches within one name; of every file that matches, in every place, the
-/// most recently changed is the one. When none matches, the first place as
-/// written, which is missing.
+/// (ENGINE_DESIGN §2.9). Platform app-data, `~/…` and `${VARIABLE:-default}`
+/// expand; a `*` matches within one name; of every file that matches, in
+/// every place, the most recently changed is the one. When none matches,
+/// the first place as written, which is missing.
 enum Paths {
     static func resolve(_ pattern: PathPattern, homeDirectory: URL, environment: @Sendable (String) -> String?) -> String {
         let expanded = pattern.places.map { expand($0, homeDirectory: homeDirectory, environment: environment) }
@@ -66,20 +66,64 @@ enum Paths {
         return newest ?? expanded[0]
     }
 
-    /// `~/…` and `${VARIABLE:-default}/…` in one path.
+    /// Expands a path, using the path-only facts supplied by the factory.
     static func expand(_ path: String, homeDirectory: URL, environment: @Sendable (String) -> String?) -> String {
         var path = path
-        if path.hasPrefix("${"), let close = path.firstIndex(of: "}") {
+        if path.hasPrefix("${"), let close = variableEnd(in: path) {
             let inner = path[path.index(path.startIndex, offsetBy: 2)..<close]
-            let parts = inner.components(separatedBy: ":-")
-            let value = environment(parts[0]).flatMap { $0.isEmpty ? nil : $0 } ?? (parts.count > 1 ? parts[1] : "")
+            let split = inner.range(of: ":-")
+            let name = split.map { String(inner[..<$0.lowerBound]) } ?? String(inner)
+            let value = environment(name).flatMap { $0.isEmpty ? nil : $0 }
+                ?? split.map { String(inner[$0.upperBound...]) } ?? ""
             path = value + path[path.index(after: close)...]
         }
-        if path == "~" { return homeDirectory.path }
+        let windows = environment("platform.pathSeparator") == "\\"
+        path = replacingAppData(path, with: environment("platform.appData"))
+        path = normalized(path, windows: windows)
+        if path == "~" { return normalized(homeDirectory.path, windows: windows) }
         if path.hasPrefix("~/") {
-            return homeDirectory.appendingPathComponent(String(path.dropFirst(2))).path
+            return normalized(homeDirectory.appendingPathComponent(String(path.dropFirst(2))).path, windows: windows)
         }
         return path
+    }
+
+    /// A portable folder's concrete name in a log definition, relative to
+    /// home when possible. Its spelling alone must not discard archived days
+    /// whose source files (Desktop's daily counter, for example) are gone.
+    static func fingerprintPath(_ path: String, homeDirectory: URL, environment: @Sendable (String) -> String?) -> String {
+        guard path.hasPrefix("{{platform.appData}}"),
+              let directory = environment("platform.appData"), !directory.isEmpty else { return path }
+        let windows = environment("platform.pathSeparator") == "\\"
+        let folder = normalized(directory, windows: windows)
+        let home = normalized(homeDirectory.path, windows: windows)
+        let prefix = home.hasSuffix("/") ? home : home + "/"
+        let name = folder == home ? "~" : (folder.hasPrefix(prefix) ? "~/" + folder.dropFirst(prefix.count) : folder)
+        return replacingAppData(path, with: name)
+    }
+
+    private static func replacingAppData(_ path: String, with directory: String?) -> String {
+        let marker = "{{platform.appData}}"
+        guard path == marker || path.hasPrefix(marker + "/") || path.hasPrefix(marker + "\\"),
+              let directory, !directory.isEmpty else { return path }
+        return directory + path.dropFirst(marker.count)
+    }
+
+    private static func normalized(_ path: String, windows: Bool) -> String {
+        windows && path.contains("\\") ? path.replacingOccurrences(of: "\\", with: "/") : path
+    }
+
+    /// The outer `}` of `${VAR:-default}`. A portable folder in the default
+    /// has its own braces: `${CONFIG_HOME:-{{platform.appData}}}/App`.
+    private static func variableEnd(in path: String) -> String.Index? {
+        var depth = 1
+        for index in path.indices.dropFirst(2) {
+            if path[index] == "{" { depth += 1 }
+            if path[index] == "}" {
+                depth -= 1
+                if depth == 0 { return index }
+            }
+        }
+        return nil
     }
 
     /// The existing files and folders one expanded path names, a `*`
@@ -88,7 +132,9 @@ enum Paths {
         guard path.contains("*") else {
             return FileManager.default.fileExists(atPath: path) ? [path] : []
         }
-        var found = [path.hasPrefix("/") ? "/" : ""]
+        // Keep UNC's two leading separators; a drive prefix remains the first
+        // component ("C:/"). Neither root is a wildcard component.
+        var found = [path.hasPrefix("//") ? "//" : (path.hasPrefix("/") ? "/" : "")]
         for name in path.split(separator: "/").map(String.init) {
             found = found.flatMap { folder -> [String] in
                 guard name.contains("*") else { return [folder + name + "/"] }

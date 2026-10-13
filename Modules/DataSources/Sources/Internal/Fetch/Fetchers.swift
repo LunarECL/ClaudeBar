@@ -132,6 +132,7 @@ struct JSONRPCFetcher: Fetching {
     let call: JSONRPCCall
     let cliExecutor: any CLIExecutor
     let makeTransport: DataSources.TransportFactory
+    let directory: @Sendable () -> URL?
 
     func isReady() -> Bool {
         if cliExecutor.locate(call.cli) != nil { return true }
@@ -140,8 +141,7 @@ struct JSONRPCFetcher: Fetching {
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        let directory = call.workingDirectory?.url
-        let transport = try makeTransport(call.cli, call.args, Self.environment(call.environment), directory)
+        let transport = try makeTransport(call.cli, call.args, Self.environment(call.environment), directory())
         defer { transport.close() }
 
         // A CLI can stall without answering or exiting (#517). A read from
@@ -261,6 +261,7 @@ struct CommandFetcher: Fetching {
 
     let call: CommandCall
     let makeExecutor: MakeExecutor
+    let directory: @Sendable () -> URL?
 
     func isReady() -> Bool {
         makeExecutor(call.environment).locate(call.cli) != nil
@@ -277,7 +278,7 @@ struct CommandFetcher: Fetching {
                 args: call.args,
                 input: call.input,
                 timeout: call.timeout,
-                workingDirectory: call.workingDirectory?.url,
+                workingDirectory: directory(),
                 autoResponses: [:]
             )
         } catch UsageError.cliNotFound {
@@ -298,7 +299,7 @@ struct CommandFetcher: Fetching {
     }
 }
 
-/// `script` — the person's own script, run with `/bin/sh` from its folder,
+/// `script` — the person's own script, run with the supplied shell from its folder,
 /// its environment the definition's values and the secrets it names, read
 /// from the login's vault. Answers with what it printed; a non-zero exit is
 /// a fact, as for `command`.
@@ -307,9 +308,15 @@ struct ScriptFetcher: Fetching {
     let providerId: String
     let secrets: (any SecretStore)?
     let makeExecutor: CommandFetcher.MakeExecutor
+    let command: ScriptCommand
+    let directory: URL
+
+    private var path: String {
+        URL(fileURLWithPath: call.run, relativeTo: directory).path
+    }
 
     func isReady() -> Bool {
-        FileManager.default.fileExists(atPath: call.path)
+        FileManager.default.fileExists(atPath: path)
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
@@ -322,11 +329,13 @@ struct ScriptFetcher: Fetching {
         let executor = makeExecutor(ProcessEnvironment(set: set))
         let name = (call.run as NSString).lastPathComponent
         guard isReady() else { throw CLIMissingError(cli: name) }
+        let argv = command(path)
+        guard let binary = argv.first else { throw CLILaunchError(cli: name) }
         let result: CLIResult
         do {
             result = try await executor.execute(
-                binary: "/bin/sh", args: ["-c", call.path], input: nil, timeout: call.timeout,
-                workingDirectory: URL(fileURLWithPath: call.folder, isDirectory: true), autoResponses: [:]
+                binary: binary, args: Array(argv.dropFirst()), input: nil, timeout: call.timeout,
+                workingDirectory: directory, autoResponses: [:]
             )
         } catch let error as UsageError {
             throw error
@@ -351,6 +360,7 @@ struct CLIFetcher: Fetching {
 
     let call: CLICall
     let makeExecutor: MakeExecutor
+    let directory: @Sendable () -> URL?
     /// The screen a run's output shows: the output as it is for a `raw`
     /// screen, the platform's renderer for a `rendered` one.
     var screen: @Sendable (String) -> String = { $0 }
@@ -363,7 +373,7 @@ struct CLIFetcher: Fetching {
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        let directory = call.workingDirectory?.url
+        let directory = self.directory()
         let result: CLIResult
         do {
             if let plan = call.session {
@@ -432,14 +442,6 @@ extension ProcessEnvironment {
     }
 }
 
-extension WorkingDirectory {
-    /// Where the process starts.
-    var url: URL? {
-        switch self {
-        case .dedicated: CLIWorkingDirectory.resolve()
-        }
-    }
-}
 
 /// `file` — reads a file some tool keeps up to date. Ready while it exists.
 /// `directory` — the matching names in a folder, sorted.

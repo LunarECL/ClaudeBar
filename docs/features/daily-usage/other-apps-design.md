@@ -36,7 +36,8 @@ Its neighbours own the rest:
   for all Claude accounts", with **CLI** and **API**. All of these answer one
   question: how much of my plan's limit is left.
 - Settings → General → **Daily Usage Cards**: on or off.
-- Claude Desktop's file, `~/Library/Application Support/Claude/buddy-tokens.json`:
+- Claude Desktop's file, `{{platform.appData}}/Claude/buddy-tokens.json`
+  (`~/Library/Application Support` on Mac, `APPDATA` on Windows):
   `{"tokens-today": {"date": "2026-05-28", "tokens": 74422}}`. It holds only
   today's total, and Desktop overwrites it.
 
@@ -117,7 +118,7 @@ The definition follows the same tree:
   "otherApps": [{
     "label": "Claude Desktop",
     "records": {
-      "files":  "~/Library/Application Support/Claude/buddy-tokens.json",
+      "files":  "{{platform.appData}}/Claude/buddy-tokens.json",
       "format": "json",
       "at":     { "field": "$.tokens-today.date", "format": "yyyy-MM-dd" },
       "tokens": { "total": "$.tokens-today.tokens" }

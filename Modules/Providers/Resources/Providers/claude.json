@@ -389,7 +389,7 @@
       {
         "label": "Claude Desktop",
         "records": {
-          "files": "~/Library/Application Support/Claude/buddy-tokens.json",
+          "files": "{{platform.appData}}/Claude/buddy-tokens.json",
           "format": "json",
           "at": { "field": "$.tokens-today.date", "format": "yyyy-MM-dd" },
           "tokens": { "total": "$.tokens-today.tokens" }

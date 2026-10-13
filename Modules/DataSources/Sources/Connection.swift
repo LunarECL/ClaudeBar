@@ -52,11 +52,9 @@ extension HTTPSteps: Connection {
 }
 
 extension LocalServerCall: Connection {
-    /// Only this Mac's loopback address, on whatever port the app listens.
+    /// Only the machine's loopback address, on whatever port the app listens.
     public var urls: [String] { paths.map { "https://127.0.0.1:{{port}}\($0)" } }
-    public var commands: [[String]] {
-        [LocalServerFetcher.processQuery(process), ["/usr/sbin/lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", "{{pid}}"]]
-    }
+    public var commands: [[String]] { DataSources.localServerCommands(for: self) }
 }
 
 extension CloudWatchCall: Connection {
@@ -68,7 +66,7 @@ extension CloudWatchCall: Connection {
 extension ScriptCall: Connection {
     public var urls: [String] { [] }
     /// The person's own script — *Import* shows it before anything runs.
-    public var commands: [[String]] { [["/bin/sh", "-c", run]] }
+    public var commands: [[String]] { DataSources.scriptCommands(for: self) }
 }
 
 extension DirectoryCall: Connection {
@@ -77,7 +75,7 @@ extension DirectoryCall: Connection {
 }
 
 extension SQLiteCall: Connection {
-    /// An app's own database on this Mac — no host, nothing run.
+    /// An app's own database — no host, nothing run.
     public var urls: [String] { [] }
     public var commands: [[String]] { [] }
 }

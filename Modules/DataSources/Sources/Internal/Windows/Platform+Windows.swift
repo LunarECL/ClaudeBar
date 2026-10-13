@@ -2,9 +2,19 @@
 import Foundation
 
 extension Platform {
-    /// ClaudeBar for Windows so far (MODULAR_DESIGN §10): it finds a CLI on
-    /// `PATH`, and has no other connection yet. Each case that needs one fails
-    /// at its step, naming it and Windows; phase 5 fills them in.
-    static let current = Platform(name: "Windows", binaryLocator: PathBinaryLocator())
+    /// File paths and CLI discovery are available; execution connections stay
+    /// absent until phase 5. Missing connections fail at their named step.
+    static let current = Platform(
+        name: "Windows",
+        binaryLocator: PathBinaryLocator(),
+        applicationData: { home, environment in
+            if let path = environment("APPDATA"), !path.isEmpty {
+                return URL(fileURLWithPath: path, isDirectory: true)
+            }
+            return home.appendingPathComponent("AppData/Roaming", isDirectory: true)
+        },
+        pathSeparator: "\\",
+        scriptCommand: windowsScriptCommand
+    )
 }
 #endif

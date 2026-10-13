@@ -1,5 +1,5 @@
 ---
-description: Windsurf's JSON definition — reading Windsurf's saved plan with macOS's sqlite3, the windsurf-plan.js mapping, the stale-plan rule, and why the web source waits.
+description: Windsurf's JSON definition — reading Windsurf's saved plan through the platform's read-only SQLite connection, the windsurf-plan.js mapping, the stale-plan rule, and why the web source waits.
 ---
 
 # Windsurf as a definition
@@ -7,7 +7,7 @@ description: Windsurf's JSON definition — reading Windsurf's saved plan with m
 `windsurf.json` has one local data source: `fetch.sqlite` reads one row of Windsurf's own database, read-only, through `ReadOnlyQuery` ([ENGINE_DESIGN §2.9](../../architecture/ENGINE_DESIGN.md#29--what-a-new-provider-still-cant-say)).
 
 ```text
-fetch.sqlite  ~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb
+fetch.sqlite  {{platform.appData}}/Windsurf/User/globalStorage/state.vscdb
               SELECT value FROM ItemTable WHERE key = 'windsurf.settings.cachedPlanInfo' LIMIT 1
         ▼     [ { "value": "{…}" } ]   (a BLOB read as its UTF-8 or UTF-16LE text)
 windsurf-plan.js
@@ -18,7 +18,7 @@ windsurf-plan.js
   planName → plan badge; nothing to measure → noData
 ```
 
-The source is *Configured* only while the database is there, so a Mac that never ran Windsurf shows it as not set up. Its connection names no host and runs nothing.
+The source is *Configured* only while the database is there, so a computer that never ran Windsurf shows it as not set up. Its connection names no host and runs nothing. The prefix keeps `~/Library/Application Support` on macOS and uses nonempty `APPDATA`, otherwise `~/AppData/Roaming`, on Windows. Windows SQLite and script mapping connections remain unavailable until the quotas phase.
 
 ## Not built yet
 

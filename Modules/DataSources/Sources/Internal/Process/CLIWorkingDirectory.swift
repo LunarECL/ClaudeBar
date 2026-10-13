@@ -8,15 +8,9 @@ import Foundation
 /// fetches run in this app-owned directory instead, where trust only needs to
 /// be granted once and never blocks a refresh.
 public enum CLIWorkingDirectory {
-    /// Returns `Application Support/ClaudeBar/Probe`, creating it if needed.
+    /// Returns the app-data `ClaudeBar/Probe` directory, creating it if needed.
     /// The folder keeps its old name: CLIs have already trusted it.
     public static func resolve() -> URL {
-        let fm = FileManager.default
-        let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fm.temporaryDirectory
-        let dir = base
-            .appendingPathComponent("ClaudeBar", isDirectory: true)
-            .appendingPathComponent("Probe", isDirectory: true)
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+        DataSources.cliWorkingDirectory()
     }
 }

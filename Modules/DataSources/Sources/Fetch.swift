@@ -35,7 +35,7 @@ public enum Fetch: Sendable, Equatable {
 /// `"script": { "run": "./probe.sh", "folder": "/Users/you/.claudebar/extensions/acme",
 /// "environment": { "CLAUDEBAR_REGION": "{{setting.region}}" },
 /// "secrets": { "CLAUDEBAR_API_KEY": "apiKey" }, "timeout": 10 }` — runs `run`
-/// with `/bin/sh` from `folder`. `environment` is filled like any definition
+/// with the platform's shell from `folder`. `environment` is filled like any definition
 /// string; each of `secrets` is a setting read from the login's vault, so a
 /// script may take several keys (a `command` reaches one, as `{{token}}`).
 public struct ScriptCall: Sendable, Equatable, Codable {
@@ -63,13 +63,6 @@ public struct ScriptCall: Sendable, Equatable, Codable {
             secrets: try container.decodeIfPresent([String: String].self, forKey: .secrets) ?? [:],
             timeout: try container.decodeIfPresent(TimeInterval.self, forKey: .timeout) ?? 10
         )
-    }
-
-    /// The script's own path: `run` in `folder`, unless it is absolute.
-    var path: String {
-        if run.hasPrefix("/") { return run }
-        let relative = run.hasPrefix("./") ? String(run.dropFirst(2)) : run
-        return URL(fileURLWithPath: folder).appendingPathComponent(relative).path
     }
 
     private enum CodingKeys: String, CodingKey { case run, folder, environment, secrets, timeout }
@@ -153,8 +146,8 @@ public protocol PriceCatalog: Sendable {
 }
 
 /// `"localServer": {…}` — an app that serves its usage on 127.0.0.1: its
-/// process is found by name (`pgrep`), the values it was started with read
-/// from its command line, its listening ports looked up (`lsof`), and the
+/// process is found by name, the values it was started with read
+/// from its command line, its listening ports looked up, and the
 /// declared paths asked on each port in turn. Self-signed TLS is accepted on
 /// the loopback address only.
 public struct LocalServerCall: Sendable, Equatable, Codable {

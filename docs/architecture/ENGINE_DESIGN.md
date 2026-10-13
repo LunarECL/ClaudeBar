@@ -412,11 +412,38 @@ key (`jsonFile`, `sqlite`) and the answer (`file`, `directory`, `sqlite`).
 recently changed is used; none is a missing file. A path without `*` means
 what it did.
 
+**On both platforms (MODULAR_DESIGN §10 phase 4, [#555](https://github.com/tddworks/ClaudeBar/issues/555)).**
+A path may start with `{{platform.appData}}`: the application's data folder,
+supplied by `DataSources` from its `Platform`. On macOS it means
+`~/Library/Application Support`; on Windows it means nonempty `APPDATA`
+(roaming), or `~/AppData/Roaming` when that variable is absent. It is a path
+fact, never a credential or a template for a request. An unavailable fact
+stays unexpanded and names no file; it never falls back to the disk's root.
+`~` and `${VAR:-default}` keep their precedence and meaning. Backslashes in
+Windows paths are separators, including drive and UNC roots; on macOS they
+keep their literal meaning. A wildcard still spans one name, not a directory
+boundary. The rule serves every path consumer: required files, context,
+recovery, usage logs and credential lookups as well as fetches.
+
+The app-data prefix is replaced by its concrete home-relative name when a
+usage log's definition is fingerprinted. Changing only this spelling must
+not discard closed days: a daily counter's original file may already have
+been overwritten, so re-reading cannot reconstruct its archived counts.
+
+Shell argv, the trusted CLI directory and local-process inspection belong
+to the platform too. The factory hands a worker its command or connection;
+the worker never chooses an OS. macOS keeps its existing interactive login
+shell, `/bin/sh` script execution, `pgrep`/`lsof` local-server discovery and
+the trusted `Application Support/ClaudeBar/Probe` folder. Windows derives
+the folder from its app-data root; missing execution connections still fail
+as named `Unavailable`. This phase does not supply a Windows process runner,
+pseudo-terminal, JavaScript engine or SQLite implementation.
+
 ```text
-"path": ["~/Library/Application Support/JetBrains/*/options/AIAssistantQuotaManager2.xml",
-         "~/Library/Application Support/Google/*/options/AIAssistantQuotaManager2.xml"]
+"path": ["{{platform.appData}}/JetBrains/*/options/AIAssistantQuotaManager2.xml",
+         "{{platform.appData}}/Google/*/options/AIAssistantQuotaManager2.xml"]
         │
-        ▼  ~ and ${VAR} expand                  (as before)
+        ▼  platform folder, ~ and ${VAR} expand
         ▼  * matches within one name
    IntelliJIdea2025.3/options/…xml   changed 2026-10-05 09:12  ◄─ newest
    PyCharm2025.2/options/…xml        changed 2026-09-30 17:40
@@ -506,7 +533,7 @@ and one registration line.
       "summary": "Reads the plan Windsurf saves on this Mac, read-only. It updates while Windsurf runs.",
       "fetch": {
         "sqlite": {
-          "path": "~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb",
+          "path": "{{platform.appData}}/Windsurf/User/globalStorage/state.vscdb",
           "query": "SELECT value FROM ItemTable WHERE key = 'windsurf.settings.cachedPlanInfo' LIMIT 1"
         }
       },
@@ -537,8 +564,8 @@ and one registration line.
       "fetch": {
         "file": {
           "path": [
-            "~/Library/Application Support/JetBrains/*/options/AIAssistantQuotaManager2.xml",
-            "~/Library/Application Support/Google/*/options/AIAssistantQuotaManager2.xml"
+            "{{platform.appData}}/JetBrains/*/options/AIAssistantQuotaManager2.xml",
+            "{{platform.appData}}/Google/*/options/AIAssistantQuotaManager2.xml"
           ]
         }
       },

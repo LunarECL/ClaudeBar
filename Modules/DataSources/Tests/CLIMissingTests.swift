@@ -14,7 +14,7 @@ struct CLIMissingTests {
         let executor = MockCLIExecutor()
         given(executor).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
             .willThrow(UsageError.cliNotFound("acme"))
-        let fetcher = CLIFetcher(call: CLICall(cli: "acme", args: ["/usage"]), makeExecutor: { _ in executor })
+        let fetcher = CLIFetcher(call: CLICall(cli: "acme", args: ["/usage"]), makeExecutor: { _ in executor }, directory: { nil })
 
         do {
             _ = try await fetcher.fetch(with: nil)

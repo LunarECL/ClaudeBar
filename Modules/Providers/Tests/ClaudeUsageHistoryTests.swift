@@ -1,4 +1,4 @@
-import DataSources
+@testable import DataSources
 import Foundation
 import Providers
 import Quotas
@@ -260,8 +260,12 @@ struct ClaudeUsageHistoryTests {
 
     private func desktop() async throws -> UsageHistory {
         let definition = try #require(try ProviderFactory.builtIn("claude").usageHistory)
+        var platform = Platform.current
+        platform.applicationData = { home, _ in home.appendingPathComponent("Library/Application Support") }
+        let fixturePlatform = platform
         let history = UsageHistory(definition, login: "claude", log: {
-            DataSources.makeUsageLog($0, scripts: ProviderFactory.builtInScripts, environment: { _ in nil }, homeDirectory: home)
+            DataSources.makeUsageLog($0, platform: fixturePlatform, scripts: ProviderFactory.builtInScripts,
+                                    environment: { _ in nil }, homeDirectory: home)
         })
         await history.read()
         return try #require(history.otherApps.first)
@@ -321,4 +325,61 @@ struct ClaudeUsageHistoryTests {
     @Test func `should show nothing for Claude Desktop when it isn't on this Mac`() async throws {
         #expect(try await desktop().report == nil)
     }
+
+    @Test
+    func `should count Claude Desktop tokens from the app data folder supplied to the factory`() async throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        let appData = home.appendingPathComponent("Controlled App Data")
+        let file = appData.appendingPathComponent("Claude/buddy-tokens.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"tokens-today":{"date":"2026-10-13","tokens":74422}}"#.utf8).write(to: file)
+        // The old Mac location contains a different total, so choosing it is observable.
+        try buddyTokens(#"{"tokens-today":{"date":"2026-10-13","tokens":123}}"#)
+        var platform = Platform.current
+        platform.applicationData = { _, _ in appData }
+        let definition = try #require(try ProviderFactory.builtIn("claude").usageHistory?.otherApps?.first).definition
+        let calendar = Calendar.current
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 13, hour: 12)))
+        // Log discovery filters by modification date; the date-only record is parsed in the local timezone.
+        for fixture in [file, home.appendingPathComponent("Library/Application Support/Claude/buddy-tokens.json")] {
+            try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: fixture.path)
+        }
+        let log = DataSources.makeUsageLog(definition, platform: platform, environment: { _ in nil },
+                                          homeDirectory: home, calendar: calendar, now: { now })
+
+        let today = try #require(await log.days(last: 1).first)
+        #expect(today.totalTokens == 74_422)
+        #expect(today.totalCost == 0)
+        #expect(!log.knowsCost)
+    }
+
+    #if os(Windows)
+    @Test(arguments: [nil, "", "redirected"] as [String?])
+    func `should count Claude Desktop tokens from Windows app data including redirected APPDATA`(_ appDataValue: String?) async throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        let appData = appDataValue == "redirected"
+            ? home.appendingPathComponent("Redirected App Data")
+            : home.appendingPathComponent("AppData/Roaming")
+        let file = appData.appendingPathComponent("Claude/buddy-tokens.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"tokens-today":{"date":"2026-10-13","tokens":61210}}"#.utf8).write(to: file)
+        try buddyTokens(#"{"tokens-today":{"date":"2026-10-13","tokens":123}}"#)
+        let environment: @Sendable (String) -> String? = { name in
+            guard name == "APPDATA" else { return nil }
+            return appDataValue == "redirected" ? appData.path : appDataValue
+        }
+        let definition = try #require(try ProviderFactory.builtIn("claude").usageHistory?.otherApps?.first).definition
+        let calendar = Calendar.current
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 13, hour: 12)))
+        for fixture in [file, home.appendingPathComponent("Library/Application Support/Claude/buddy-tokens.json")] {
+            try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: fixture.path)
+        }
+        let log = DataSources.makeUsageLog(definition, platform: .current, environment: environment,
+                                          homeDirectory: home, calendar: calendar, now: { now })
+
+        let today = try #require(await log.days(last: 1).first)
+        #expect(today.totalTokens == 61_210)
+        #expect(today.totalCost == 0)
+    }
+    #endif
 }

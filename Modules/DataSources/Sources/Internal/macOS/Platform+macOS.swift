@@ -19,7 +19,12 @@ extension Platform {
         processList: RunningProcesses.system,
         screenRenderer: { TerminalRenderer(cols: 160, rows: 50).render($0) },
         binaryLocator: BinaryLocator(),
-        sqlite: { path, query, name in try ReadOnlyQuery.rows(at: path, query: query, name: name) }
+        sqlite: { path, query, name in try ReadOnlyQuery.rows(at: path, query: query, name: name) },
+        applicationData: { home, _ in home.appendingPathComponent("Library/Application Support", isDirectory: true) },
+        scriptCommand: macScriptCommand,
+        loginShellCommand: macLoginShellCommand,
+        localServer: macLocalServer,
+        localServerCommands: macLocalServerCommands
     )
 }
 #endif

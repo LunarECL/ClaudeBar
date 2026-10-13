@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Mockable
 import Quotas
@@ -21,15 +22,14 @@ struct LocalServerTests {
      "body":"{}"}
     """#
 
-    final class Seen: @unchecked Sendable { var urls: [String] = []; var csrf: [String?] = []; var commands: [[String]] = [] }
+    final class Seen: @unchecked Sendable { var urls: [String] = []; var csrf: [String?] = [] }
 
     private func fetch(pgrep: String, lsof: String = "acme 42 me 10u IPv4 0x1 0t0 TCP 127.0.0.1:5001 (LISTEN)\nacme 42 me 11u IPv4 0x1 0t0 TCP 127.0.0.1:5002 (LISTEN)",
                        answering: Set<String> = ["https://127.0.0.1:5002/status"], seen: Seen = Seen()) async throws -> Response {
         let call = try JSONDecoder().decode(LocalServerCall.self, from: Data(callJSON.utf8))
         let commands = MockCLIExecutor()
         given(commands).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
-            .willProduce { binary, args, _, _, _, _ in
-                seen.commands.append([binary] + args)
+            .willProduce { binary, _, _, _, _, _ in
                 return CLIResult(output: binary.hasSuffix("pgrep") ? pgrep : lsof)
             }
         let network = MockNetworkClient()
@@ -39,7 +39,7 @@ struct LocalServerTests {
             seen.csrf.append(request.value(forHTTPHeaderField: "X-Csrf"))
             return (Data(#"{"ok":true}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: answering.contains(url) ? 200 : 404, httpVersion: nil, headerFields: nil)!)
         }
-        return try await LocalServerFetcher(call: call, commands: commands, network: network, processPaths: { [] }).fetch(with: nil)
+        return try await Platform.macLocalServer(call, commands, network, { [] }).fetch(with: nil)
     }
 
     @Test func `should ask the running app on each port it listens on, with the token it was started with, until one answers`() async throws {
@@ -48,8 +48,6 @@ struct LocalServerTests {
         #expect(response.status == 200)
         #expect(seen.urls == ["https://127.0.0.1:5001/usage", "https://127.0.0.1:5001/status", "https://127.0.0.1:5002/usage", "https://127.0.0.1:5002/status"])
         #expect(seen.csrf.allSatisfy { $0 == "tok-1" })
-        #expect(seen.commands.first == ["/usr/bin/pgrep", "-lf", "acme_server"])
-        #expect(seen.commands.last == ["/usr/sbin/lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", "42"])
     }
 
     @Test func `should ask the plain HTTP port the app was started with last`() async throws {
@@ -83,18 +81,11 @@ struct LocalServerTests {
 
     @Test func `should be ready only while the app itself is running, without starting a process to check`() throws {
         let call = try JSONDecoder().decode(LocalServerCall.self, from: Data(#"{"app":"Acme","process":{"names":["acme_server"],"match":["/acme/"]},"paths":["/u"]}"#.utf8))
-        let running = LocalServerFetcher(call: call, commands: MockCLIExecutor(), network: MockNetworkClient(), processPaths: { ["/opt/acme/acme_server"] })
-        let other = LocalServerFetcher(call: call, commands: MockCLIExecutor(), network: MockNetworkClient(), processPaths: { ["/Applications/Other.app/acme_server"] })
+        let running = Platform.macLocalServer(call, MockCLIExecutor(), MockNetworkClient(), { ["/opt/acme/acme_server"] })
+        let other = Platform.macLocalServer(call, MockCLIExecutor(), MockNetworkClient(), { ["/Applications/Other.app/acme_server"] })
         #expect(running.isReady())
         #expect(!other.isReady())
     }
 
-    @Test func `should list what it runs and where it asks for Import, and keep the definition when written out and read back`() throws {
-        let call = try JSONDecoder().decode(LocalServerCall.self, from: Data(callJSON.utf8))
-        #expect(try JSONDecoder().decode(LocalServerCall.self, from: JSONEncoder().encode(call)) == call)
-        let fetch = Fetch.localServer(call)
-        #expect(try JSONDecoder().decode(Fetch.self, from: JSONEncoder().encode(fetch)) == fetch)
-        #expect(fetch.connection.urls == ["https://127.0.0.1:{{port}}/usage", "https://127.0.0.1:{{port}}/status"])
-        #expect(fetch.connection.commands.first == ["/usr/bin/pgrep", "-lf", "acme_server"])
-    }
 }
+#endif

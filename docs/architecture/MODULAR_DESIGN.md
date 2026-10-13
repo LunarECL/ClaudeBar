@@ -356,7 +356,10 @@ Modules/DataSources/Sources/
     │                            rpcTransport? · scriptEngine? · keychain? ·
     │                            browserCookies? · browserStorage? · localNetwork? ·
     │                            processList? · screenRenderer? · binaryLocator? ·
-    │                            sqlite? — and Platform.bare: the name, nothing else
+    │                            sqlite? · applicationData? · pathSeparator ·
+    │                            scriptCommand? · loginShellCommand? ·
+    │                            localServer? · localServerCommands? —
+    │                            and Platform.bare: the name, nothing else
     ├── Unavailable.swift      a case whose connection is nil: fails at its step
     │                            as ErrorFact.unavailable, naming it and platform.name
     ├── Fetch/ Lookup/ Mapping/ Logs/ Network/ Process/   neutral workers
@@ -365,6 +368,7 @@ Modules/DataSources/Sources/
     │   ├── Process/                  DefaultCLIExecutor · PipeCLIExecutor ·
     │   │                             ProcessRPCTransport · BinaryLocator ·
     │   │                             RunningProcesses · TerminalRenderer · Shell …
+    │   ├── Fetch/LocalServerFetcher.swift   the Mac's pgrep/lsof worker
     │   ├── Mapping/JavaScriptCoreEngine.swift   : ScriptEngine
     │   ├── Lookup/                   SystemKeychain · SystemBrowserCookies ·
     │   │                             SystemBrowserStorage · SQLiteReader
@@ -372,7 +376,9 @@ Modules/DataSources/Sources/
     │   └── Logs/                     FileStamp+macOS · ByteSearch+macOS
     └── Windows/               #if os(Windows), whole file
         ├── Platform+Windows.swift    static let current = Platform(name: "Windows",
-        │                             binaryLocator: PathBinaryLocator(), …rest nil)
+        │                             applicationData: APPDATA or ~/AppData/Roaming,
+        │                             pathSeparator: "\\", binaryLocator: PathBinaryLocator(),
+        │                             scriptCommand: cmd.exe; execution connections nil)
         ├── Process/PathBinaryLocator.swift      : BinaryLocating (PATH + PATHEXT)
         └── Logs/                     FileStamp+Windows · ByteSearch+Windows
 Modules/DataSources/Tests/
@@ -402,9 +408,11 @@ Modules/DataSources/Tests/
 - **A test that needs a connection names it**, `.needs(\.processes)`, and
   runs wherever `Platform.current` has it. When a phase brings one, its tests
   start running there with no edit.
-- **A platform's facts are connections too:** the shell, the tools a worker
-  runs (`lsof`, `pgrep`, `security`), the folder a CLI trusts. Phase 4 moves
-  them from the neutral workers into `Platform`.
+- **A platform's facts are connections too:** the shell argv, the tools a
+  worker runs (`lsof`, `pgrep`, `security`), the folder a CLI trusts, app-data
+  and path separators. The factory supplies them to workers and to path
+  expansion; definitions use `{{platform.appData}}`, not a Mac folder literal.
+  A missing fact remains unavailable; it never becomes a guessed command.
 
 A module with no platform workers has no `Platform`. `Diagnostics` and
 `Leaderboard` follow the same shape for their own ports (`LogSink`,
@@ -420,7 +428,7 @@ Each phase leaves main shippable and the Mac app unchanged in behaviour.
 | 1 | **The package.** Root `Package.swift` declares today's modules; Tuist consumes it; no source changes | `tuist test` and the macOS `swift test` are green — built ([#526](https://github.com/tddworks/ClaudeBar/pull/526)): `tuist test` runs the same 3,099 tests as before, and `swift test` runs the modules' tests without Tuist |
 | 2 | **The leaderboard slice.** Carve `Leaderboard` (§8); `CryptoKit` → `Crypto` in `UsageLog`, `CLISession`, `ProviderDefinition`, `RequestSigner`, `SigningKey`; Diagnostics behind `LogSink`; the Mac-only files of `DataSources` move to `Internal/macOS/` | `Quotas`, `Diagnostics`, `DataSources`, `Providers` and `Leaderboard` build and pass on Windows, including the log-reading tests and `vectors.json` — the Windows client can start — built ([#527](https://github.com/tddworks/ClaudeBar/pull/527), [#528](https://github.com/tddworks/ClaudeBar/pull/528), [#529](https://github.com/tddworks/ClaudeBar/pull/529), [#537](https://github.com/tddworks/ClaudeBar/pull/537)): Windows runs 1,355 of the 1,746 tests and skips the rest, each saying why; the leaderboard's run in full |
 | 3 | **Windows adapters for the slice:** `SigningKeyStore` on Credential Manager, `MachineIdentity` as "Windows PC" (the model Windows reports names a self-built PC's motherboard, so it isn't read; the hardware UUID came with the copied-key check, [#549](https://github.com/tddworks/ClaudeBar/pull/549)), `LeaderboardAPI` on `URLSession` as on the Mac | a program on Windows joins, uploads and leaves against the real server through the factories — built ([#547](https://github.com/tddworks/ClaudeBar/pull/547)) |
-| 4 | **Paths and shells.** The engine's Mac assumptions without an import (`/bin/zsh` and `/bin/sh` in `LoginShellEnvironment`, `Connection` and the `file` fetch; `/usr/sbin/lsof` and `/usr/bin/pgrep` in `LocalServerFetcher`; `/usr/bin/security`; `~/Library/Application Support`; `:` in `PATH`) become facts of the module's `Platform` that the factory hands each worker; definitions name a platform's app-data folder through the path language ([ENGINE_DESIGN](ENGINE_DESIGN.md) changes first) | the definitions that read local files resolve on Windows |
+| 4 | **Paths and shells.** App-data and path separators, shell argv, local-server discovery and the trusted CLI directory are platform facts supplied by the factory. Definitions use `{{platform.appData}}` ([ENGINE_DESIGN](ENGINE_DESIGN.md)); Mac process workers stay in `Internal/macOS/`, and Windows execution remains unavailable until phase 5 | definitions that read local files resolve on Windows — implemented in [#556](https://github.com/tddworks/ClaudeBar/pull/556), for review: redirected `APPDATA`, native drive/UNC paths, newest IDE file, and unchanged Mac paths/archived days |
 | 5 | **Quotas on Windows.** The rest of `Internal/Windows/`: processes, the pseudo-terminal, the JS engine, SQLite as a bundled package, `Monitoring`, `Alerting`, `Storage` | the Windows client shows quotas, and Windows skips no test |
 
 ### Open

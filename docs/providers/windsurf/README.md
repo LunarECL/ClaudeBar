@@ -1,5 +1,5 @@
 ---
-description: Track Windsurf's daily and weekly quota, or its message and flow-action allowances, from the plan the Windsurf app saves on your Mac. Use when setting up Windsurf or when its numbers look old.
+description: Track Windsurf's daily and weekly quota, or its message and flow-action allowances, from the plan the Windsurf app saves locally. Use when setting up Windsurf or when its numbers look old.
 ---
 
 # Windsurf
@@ -11,7 +11,7 @@ Shows how much of your Windsurf daily and weekly quota is left and when each res
 1. Open the Windsurf app and sign in once.
 2. Settings → Providers → Windsurf: turn it on. It's **off by default**. There's no key to paste.
 
-ClaudeBar reads the plan Windsurf saves in `~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb`, read-only. It runs nothing and sends nothing anywhere.
+ClaudeBar reads the plan Windsurf saves in its app-data folder, read-only: `~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb` on macOS, `%APPDATA%\Windsurf\User\globalStorage\state.vscdb` on Windows (or `~/AppData/Roaming` if `APPDATA` is empty or unset). It runs nothing and sends nothing anywhere.
 
 ## Gotchas
 
@@ -19,6 +19,7 @@ ClaudeBar reads the plan Windsurf saves in `~/Library/Application Support/Windsu
 - **"Windsurf's saved plan is out of date. Open Windsurf to update it."** The saved plan's billing period has ended, so its numbers are old. Open Windsurf.
 - **"Open Windsurf and sign in …"** Windsurf hasn't saved a plan yet. Until Windsurf has run once on this Mac, the card shows as not set up.
 - **A free plan** has nothing to measure, so the card shows no data.
+- **Windows path support does not yet supply SQLite or mapping scripts.** Until those connections are implemented, the source reports *Unavailable*; it does not try a Mac command.
 
 ## See also
 

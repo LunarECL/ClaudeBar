@@ -1,4 +1,4 @@
-import DataSources
+@testable import DataSources
 import Quotas
 import Foundation
 import Providers
@@ -277,29 +277,36 @@ struct UsageHistoryTests {
 
     // MARK: - Kept days
 
-    /// A usage history's fingerprint names how its days were summed: when it
-    /// changes, every kept day is summed again, a month of logs read anew. These
-    /// are the built-in definitions' fingerprints as released. Price files are
-    /// left out: a new price list re-sums the days, and is meant to.
     @Test
-    func `should keep the days every built-in usage history has already summed`() throws {
-        let home = URL(fileURLWithPath: "/Users/someone")
-        func fingerprint(_ definition: UsageLog.Definition?) throws -> String {
-            DataSources.makeUsageLog(try #require(definition), environment: { _ in nil }, homeDirectory: home).fingerprint
+    func `should keep an archived day when its file path becomes a portable app data path`() async throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        let calendar = Calendar.current
+        let now = Date()
+        let archived = try #require(calendar.date(byAdding: .day, value: -3, to: now))
+        let at = calendar.startOfDay(for: archived).addingTimeInterval(43_200)
+        let appData = home.appendingPathComponent("Library/Application Support")
+        let file = appData.appendingPathComponent("Desk/log.jsonl")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"at":\#(at.timeIntervalSince1970),"tokens":500}"#.utf8).write(to: file)
+        var platform = Platform.current
+        platform.applicationData = { _, _ in appData }
+        func make(_ path: String) -> UsageLog {
+            let definition = UsageLog.Definition(records: .init(files: path, at: "$.at", tokens: .init(total: "$.tokens")))
+            return DataSources.makeUsageLog(definition, platform: platform, environment: { _ in nil },
+                                            homeDirectory: home, calendar: calendar, now: { now })
         }
-        let claude = try ProviderFactory.builtIn("claude")
-        let codex = try ProviderFactory.builtIn("codex")
-
-        #expect(try fingerprint(claude.usageHistory) == "851e9eb52a92f16eaf3378180b15cb422377fdfc7cbea2026f24fbd0c8edbec3")
-        #expect(try fingerprint(claude.usageHistory(forAccount: ["configDirectory": "/Users/someone/work-claude"]))
-            == "ed76e0124128504ead1e34e3c8b6a16a7646a03b0ee2b697a8a091e8e9e0fe39")
-        #expect(try fingerprint(claude.usageHistory?.otherApps?.first?.definition)
-            == "f761decc6b879d16a902ddf10533d9c9f28a431a09e3c539ef331fc346bf89d1")
-        #expect(try fingerprint(codex.usageHistory) == "cec00b01bf43a537e7883daedb0d0a8a0022c00d6bf4bc4d6aa4b3607fe1c75a")
-        #expect(try fingerprint(codex.usageHistory(forAccount: ["codexHome": "/Users/someone/work-codex"]))
-            == "ed59ec2225ee86ebbc5074952cc2e5f9697389217f1684b9fc93ac13af31ac9f")
-        #expect(try fingerprint(ProviderFactory.builtIn("mistral").usageHistory)
-            == "61bc08fa764befb72d1866ae0b317aabf3aee7b957427e41ed4fd4c5d641cd9e")
+        let store = InMemoryLedgerStore()
+        let range = DateRange.last(5, endingOn: now, calendar: calendar)
+        let original = UsageHistory(log: make("~/Library/Application Support/Desk/log.jsonl"),
+                                    ledger: DayLedger(store: store, key: "desk"))
+        let before = await original.days(in: range)
+        #expect(before.stats.first { calendar.isDate($0.date, inSameDayAs: archived) }?.totalTokens == 500)
+        // Desktop overwrites its count every day; this archived source is gone.
+        try FileManager.default.removeItem(at: file)
+        let portable = UsageHistory(log: make("{{platform.appData}}/Desk/log.jsonl"),
+                                    ledger: DayLedger(store: store, key: "desk"))
+        let after = await portable.days(in: range)
+        #expect(after.stats.first { calendar.isDate($0.date, inSameDayAs: archived) }?.totalTokens == 500)
     }
 }
 

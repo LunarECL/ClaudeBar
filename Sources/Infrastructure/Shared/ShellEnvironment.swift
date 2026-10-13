@@ -11,20 +11,21 @@ import DataSources
 /// to a credential lookup that reaches the environment last.
 public final class ShellEnvironment: @unchecked Sendable {
     private let process: [String: String]
-    private let shell: LoginShellEnvironment
+    private let shell: LoginShellEnvironment?
     private let lock = NSLock()
     private var found: [String: String] = [:]
 
     public init(process: [String: String] = ProcessInfo.processInfo.environment,
                 cliExecutor: any CLIExecutor = DefaultCLIExecutor()) {
         self.process = process
-        self.shell = LoginShellEnvironment(cliExecutor: cliExecutor)
+        self.shell = DataSources.makeLoginShellEnvironment(cliExecutor: cliExecutor)
     }
 
     public func value(_ name: String) -> String? {
         if let value = process[name], !value.isEmpty { return value }
         if let value = lock.withLock({ found[name] }) { return value }
-        guard let value = Self.wait({ [shell] in await shell.value(ofEnvVar: name) }) else { return nil }
+        guard let shell,
+              let value = Self.wait({ await shell.value(ofEnvVar: name) }) else { return nil }
         lock.withLock { found[name] = value }
         return value
     }

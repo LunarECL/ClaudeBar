@@ -16,12 +16,12 @@
     {
       "kind": "local",
       "label": "IDE",
-      "summary": "Reads the AI quota your JetBrains IDE saves on this Mac, from the IDE you used last",
+      "summary": "Reads the AI quota your JetBrains IDE saves on this computer, from the IDE you used last",
       "fetch": {
         "file": {
           "path": [
-            "~/Library/Application Support/JetBrains/*/options/AIAssistantQuotaManager2.xml",
-            "~/Library/Application Support/Google/*/options/AIAssistantQuotaManager2.xml"
+            "{{platform.appData}}/JetBrains/*/options/AIAssistantQuotaManager2.xml",
+            "{{platform.appData}}/Google/*/options/AIAssistantQuotaManager2.xml"
           ]
         }
       },

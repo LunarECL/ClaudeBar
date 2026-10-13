@@ -1,3 +1,4 @@
+#if os(macOS)
 import Diagnostics
 import Quotas
 import Foundation
@@ -46,7 +47,8 @@ struct LocalServerFetcher: Fetching {
             throw UsageError.authenticationRequired
         }
 
-        let lsof = (try? await commands.execute(binary: "/usr/sbin/lsof", args: ["-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", String(pid)],
+        let portsQuery = Self.listeningPortsQuery(pid: String(pid))
+        let lsof = (try? await commands.execute(binary: portsQuery[0], args: Array(portsQuery.dropFirst()),
                                                 input: nil, timeout: call.timeout, workingDirectory: nil, autoResponses: [:]).output) ?? ""
         var tries = Self.listeningPorts(in: lsof).map { ("https", $0) }
         if let name = call.plainHTTPPort, let port = values[name].flatMap(Int.init) { tries.append(("http", port)) }
@@ -85,6 +87,10 @@ struct LocalServerFetcher: Fetching {
         ["/usr/bin/pgrep", "-lf", process.names.joined(separator: "|")]
     }
 
+    static func listeningPortsQuery(pid: String) -> [String] {
+        ["/usr/sbin/lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", pid]
+    }
+
     static func isApp(_ commandLine: String, _ process: LocalServerCall.Process) -> Bool {
         let lower = commandLine.lowercased()
         guard process.names.contains(where: { lower.contains($0.lowercased()) }) else { return false }
@@ -108,3 +114,4 @@ struct LocalServerFetcher: Fetching {
         return ports.sorted()
     }
 }
+#endif
