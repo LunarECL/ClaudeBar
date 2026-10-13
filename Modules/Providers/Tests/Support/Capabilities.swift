@@ -17,6 +17,14 @@ extension Trait where Self == ConditionTrait {
                  "runs a process: \(Platform.current.name) runs none yet (phase 5)")
     }
 
+    /// Traverses the app's local server and its fallback chain.
+    static var needsLocalServer: Self {
+        let platform = Platform.current
+        return .enabled(if: platform.localServer != nil && platform.runCommand != nil &&
+                            platform.localNetwork != nil && platform.processList != nil,
+                        "reads a local server: \(platform.name) has no local-server connection yet (phase 5)")
+    }
+
     /// Makes its database with `sqlite3` and reads it with the platform's SQLite.
     static var needsSQLite: Self {
         .enabled(if: Platform.current.sqlite != nil,
