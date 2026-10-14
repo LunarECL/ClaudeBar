@@ -47,9 +47,11 @@ enum ChildTeardown {
     }
 
     private static func waitForExit(_ isRunning: () -> Bool, within seconds: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(seconds)
+        // A monotonic clock: a wall-clock change mustn't stretch the bound.
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(seconds))
         while isRunning() {
-            guard Date() < deadline else { return false }
+            guard clock.now < deadline else { return false }
             usleep(20_000)
         }
         return true
