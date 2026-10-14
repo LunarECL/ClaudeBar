@@ -158,16 +158,8 @@ public struct InteractiveRunner: Sendable {
             try? primaryHandle.close()
             try? secondaryHandle.close()
 
-            if didLaunch, process.isRunning {
-                process.terminate()
-                let waitDeadline = Date().addingTimeInterval(2.0)
-                while process.isRunning, Date() < waitDeadline {
-                    usleep(100_000)
-                }
-                if process.isRunning {
-                    kill(process.processIdentifier, SIGKILL)
-                }
-                process.waitUntilExit()
+            if didLaunch {
+                ChildTeardown.end(process, named: process.executableURL?.lastPathComponent ?? "terminal child")
             }
         }
 
