@@ -33,16 +33,24 @@ struct ChildTeardownTests {
         #expect(Date().timeIntervalSince(started) < 2)
     }
 
-    @Test func `should end a real child that ignores the request to stop`() throws {
+    @Test func `should make a real child stop when it ignores the request to`() throws {
         let process = Process()
+        let ready = Pipe()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "trap '' TERM; while :; do sleep 1; done"]
+        // It says so once the request to stop is ignored, then never ends on its own.
+        process.arguments = ["-c", "trap '' TERM; echo ready; while :; do sleep 1; done"]
+        process.standardOutput = ready
+        process.standardError = FileHandle.nullDevice
         try process.run()
-        // Let the shell install its trap before it is asked to stop.
-        Thread.sleep(forTimeInterval: 0.3)
+        // If the teardown fails, the child must not outlive the test run.
+        defer { if process.isRunning { kill(process.processIdentifier, SIGKILL) } }
+        #expect(try ready.fileHandleForReading.read(upToCount: 1) == Data("r".utf8))
 
         #expect(ChildTeardown.end(process, named: "test child", grace: 0.2))
-        #expect(!process.isRunning)
+        try #require(!process.isRunning)
+        // Only SIGKILL ended it: the request to stop alone did not.
+        #expect(process.terminationReason == .uncaughtSignal)
+        #expect(process.terminationStatus == SIGKILL)
     }
 
     @Test func `should not signal a child that has already exited`() {
