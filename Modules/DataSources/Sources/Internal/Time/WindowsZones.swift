@@ -8,13 +8,23 @@ import Foundation
 enum WindowsZones {
     /// The key's IANA zone, with every daylight-saving change it has. The OS's
     /// own offset, fixed, when the person turned daylight saving's automatic
-    /// adjustment off (the OS then keeps standard time all year), or when the
-    /// table doesn't know the key: still the OS's fact for now, never a guess.
+    /// adjustment off (the OS then keeps standard time all year), when the
+    /// table doesn't know the key, or when the zone is one Foundation on
+    /// Windows can't format in: still the OS's fact for now, never a guess.
     static func zone(key: String, daylightSavingOff: Bool, secondsFromGMT: Int) -> TimeZone {
-        if !daylightSavingOff, let name = iana[key], let zone = TimeZone(identifier: name) {
+        if !daylightSavingOff, let name = iana[key], !unformattable.contains(name),
+           let zone = TimeZone(identifier: name) {
             return zone
         }
         // Windows' offsets lie within ±14 hours; Foundation takes up to ±18.
         return TimeZone(secondsFromGMT: secondsFromGMT)!
     }
+
+    /// Zones Foundation on Windows (Swift 6.3.3) has but can't format in: a
+    /// `DateFormatter` in one stops the process (0xC000001D), found by trying
+    /// every zone in the table on a Windows PC. Each has kept one offset since
+    /// 2022 or earlier, so the OS's offset is the same answer.
+    static let unformattable: Set<String> = [
+        "America/Mazatlan", "America/Whitehorse", "Asia/Qyzylorda", "Etc/UTC", "Europe/Volgograd",
+    ]
 }

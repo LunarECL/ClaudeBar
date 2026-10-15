@@ -437,10 +437,13 @@ Modules/DataSources/Tests/
   `DateRange` takes a calendar and has no default. The Mac's adapter is
   `TimeZone.current`. Windows' reads the zone's registry key
   (`TimeZoneKeyName`, never translated) and maps it to an IANA zone through
-  CLDR's `windowsZones`, the table ICU uses. When daylight saving's automatic
-  adjustment is off, or the key isn't in the table, it falls back to the OS's
-  own offset. It never loads the system `icu.dll`: once that is loaded,
-  Foundation's named zones are gone from the process. Its contract
+  CLDR's `windowsZones`, the table ICU uses. It falls back to the OS's own
+  offset when daylight saving's automatic adjustment is off, when the key
+  isn't in the table, or when the zone is one Foundation on Windows can't
+  format a date in (`Etc/UTC` and four others stop the process). Those five
+  each kept one offset since 2022 or earlier, and a test formats a date in
+  every zone the table gives. It never loads the system `icu.dll`: once that
+  is loaded, Foundation's named zones are gone from the process. Its contract
   (`TimeZoneContract`) holds each adapter to the OS's own offset at instants
   across two years, including every daylight-saving change.
 
