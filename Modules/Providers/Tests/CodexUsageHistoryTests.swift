@@ -36,7 +36,8 @@ struct CodexUsageHistoryTests {
     }
 
     private static var yesterdayNoon: Date {
-        Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: Date()))!.addingTimeInterval(43_200)
+        let calendar = DataSources.calendar()
+        return calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date()))!.addingTimeInterval(43_200)
     }
 
     /// A turn: `last` is this turn's usage, `total` the session's running sum.

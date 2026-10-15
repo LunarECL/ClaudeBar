@@ -381,7 +381,8 @@ both sides of a data source, the key and the fetch:
 
 #### `SystemValues` (built)
 
-Values the engine computes, made with the fetch's `now`, one row per name:
+Values the engine computes, made with the fetch's `now` and the person's zone
+(`Platform.timeZone`, #565), one row per name:
 `system.timeZone`, `system.osVersion`, `system.now.<format>`,
 `system.day±N.<format>` (UTC midnight, N days away), `system.month.<format>`
 (the first of this month, UTC midnight); formats `epoch` ·
@@ -390,7 +391,7 @@ new value is a new row, never a branch. HTTP fills them in its URL, headers
 and body; elsewhere a `system.` name stays unfilled.
 
 ```text
-DataSources.make(now:) ──► HTTPFetcher ──► SystemValues(now)
+DataSources.make(now:) ──► HTTPFetcher ──► SystemValues(now, timeZone)
                                               one row per name
                                               system.timeZone      → "Asia/Shanghai"
                                               system.osVersion     → "27.0.0"

@@ -8,6 +8,7 @@ import Foundation
 struct HTTPStepsFetcher: Fetching {
     let steps: HTTPSteps
     let network: any NetworkClient
+    let zone: any TimeZoneSource
     let now: @Sendable () -> Date
 
     func isReady() -> Bool { true }
@@ -45,7 +46,7 @@ struct HTTPStepsFetcher: Fetching {
         var filled = values
         for name in step.dropEmpty where filled[name] == nil { filled[name] = "" }
         let request = Self.droppingEmpty(step.dropEmpty, from: step.request, values: values)
-        let fetcher = HTTPFetcher(request: request, network: network, now: now)
+        let fetcher = HTTPFetcher(request: request, network: network, zone: zone, now: now)
         var attempt = 1
         while true {
             do {

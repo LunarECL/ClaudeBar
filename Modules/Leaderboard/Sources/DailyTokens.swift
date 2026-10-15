@@ -1,9 +1,11 @@
+import DataSources
 import Foundation
 import Quotas
 
-/// One provider's tokens for one local calendar day on this Mac — a line on
-/// the tally sheet, and everything about a day that leaves the Mac. Cost,
-/// sessions, working time, models and paths can't be expressed in it.
+/// One provider's tokens for one calendar day in the member's own time zone
+/// (`DataSources.calendar()`, #565) — a line on the tally sheet, and everything
+/// about a day that leaves the machine. Cost, sessions, working time, models
+/// and paths can't be expressed in it.
 public struct DailyTokens: Sendable, Equatable, Codable {
     public let provider: String
     /// The member's own date, `yyyy-MM-dd`.
@@ -26,7 +28,7 @@ public struct DailyTokens: Sendable, Equatable, Codable {
     }
 
     /// A day of a login's usage history, kept to its token counts.
-    public init(provider: String, stat: DailyUsageStat, calendar: Calendar = .current) {
+    public init(provider: String, stat: DailyUsageStat, calendar: Calendar = DataSources.calendar()) {
         self.init(provider: provider, day: Self.day(of: stat.date, calendar: calendar),
                   input: stat.inputTokens, output: stat.outputTokens,
                   cacheWrite: stat.cacheCreationTokens, cacheRead: stat.cacheReadTokens,
@@ -46,7 +48,8 @@ public struct DailyTokens: Sendable, Equatable, Codable {
     /// The days of `providers` in `logins`: each provider's logins added up
     /// per day, days without tokens left out, oldest first. What an upload
     /// sends and what its preview shows are both this.
-    public static func summed(_ logins: [LoginDays], providers: Set<String>, calendar: Calendar = .current) -> [DailyTokens] {
+    public static func summed(_ logins: [LoginDays], providers: Set<String>,
+                              calendar: Calendar = DataSources.calendar()) -> [DailyTokens] {
         var byDay: [String: DailyTokens] = [:]
         for login in logins where providers.contains(login.providerId) {
             for stat in login.days {
@@ -58,7 +61,7 @@ public struct DailyTokens: Sendable, Equatable, Codable {
         return byDay.values.filter { $0.total > 0 }.sorted { ($0.day, $0.provider) < ($1.day, $1.provider) }
     }
 
-    public static func day(of date: Date, calendar: Calendar = .current) -> String {
+    public static func day(of date: Date, calendar: Calendar = DataSources.calendar()) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }

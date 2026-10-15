@@ -18,20 +18,20 @@ struct ProcessFactsTests {
 
     @Test
     func `should never offer a login shell lookup when the platform has no shell connection`() {
-        let platform = Platform(name: "Windows")
+        let platform = Platform(name: "Windows", timeZone: Zones.seoul)
         #expect(DataSources.makeLoginShellEnvironment(platform: platform, cliExecutor: MockCLIExecutor()) == nil)
     }
 
     @Test
     func `should not describe unsupported scripts or local servers as running commands`() {
-        let platform = Platform(name: "Windows")
+        let platform = Platform(name: "Windows", timeZone: Zones.seoul)
         #expect(DataSources.scriptCommands(for: scriptCall, platform: platform).isEmpty)
         #expect(DataSources.localServerCommands(for: localCall, platform: platform).isEmpty)
     }
 
     @Test(arguments: [false, true])
     func `should name a missing script or server connection even when a generic command runner exists`(_ local: Bool) async {
-        var platform = Platform(name: "Windows")
+        var platform = Platform(name: "Windows", timeZone: Zones.seoul)
         platform.runCommand = { _ in MockCLIExecutor() }
         platform.localNetwork = MockNetworkClient()
         platform.processList = { [] }
@@ -52,7 +52,7 @@ struct ProcessFactsTests {
     func `should create the CLI trust directory under the supplied app data root`() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("cli-directory-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        var platform = Platform(name: "fixture")
+        var platform = Platform(name: "fixture", timeZone: Zones.seoul)
         platform.applicationData = { home, _ in home.appendingPathComponent("AppData", isDirectory: true) }
         let directory = DataSources.cliWorkingDirectory(platform: platform, homeDirectory: root, environment: { _ in nil })
         #expect(directory == root.appendingPathComponent("AppData/ClaudeBar/Probe", isDirectory: true))

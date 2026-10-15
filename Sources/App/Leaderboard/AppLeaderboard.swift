@@ -103,7 +103,7 @@ final class AppLeaderboard {
     /// Today's days for `providers`, exactly as an upload would send them —
     /// for the join form's preview.
     func preview(sharing providers: Set<String>) async -> [DailyTokens] {
-        let today = DateRange.last(1)
+        let today = DateRange.last(1, calendar: DataSources.calendar())
         return DailyTokens.summed(await logs.days(in: today), providers: providers)
     }
 

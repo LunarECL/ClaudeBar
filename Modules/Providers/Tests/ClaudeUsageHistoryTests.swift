@@ -43,7 +43,8 @@ struct ClaudeUsageHistoryTests {
     }
 
     private static var yesterdayNoon: Date {
-        Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: Date()))!.addingTimeInterval(43_200)
+        let calendar = DataSources.calendar()
+        return calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date()))!.addingTimeInterval(43_200)
     }
 
     private static func line(_ model: String = "claude-sonnet-4-6", input: Int = 1000, output: Int = 500, cacheWrite: Int = 0,
@@ -280,7 +281,8 @@ struct ClaudeUsageHistoryTests {
     private static func day(daysAgo: Int = 0) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!)
+        formatter.timeZone = DataSources.timeZone()
+        return formatter.string(from: DataSources.calendar().date(byAdding: .day, value: -daysAgo, to: Date())!)
     }
 
     @Test func `should show Claude Desktop's tokens today as their own history, with no cost (#198)`() async throws {
@@ -338,14 +340,14 @@ struct ClaudeUsageHistoryTests {
         var platform = Platform.current
         platform.applicationData = { _, _ in appData }
         let definition = try #require(try ProviderFactory.builtIn("claude").usageHistory?.otherApps?.first).definition
-        let calendar = Calendar.current
+        let calendar = DataSources.calendar()
         let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 13, hour: 12)))
-        // Log discovery filters by modification date; the date-only record is parsed in the local timezone.
+        // Log discovery filters by modification date; the date-only record is parsed in the person's zone.
         for fixture in [file, home.appendingPathComponent("Library/Application Support/Claude/buddy-tokens.json")] {
             try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: fixture.path)
         }
         let log = DataSources.makeUsageLog(definition, platform: platform, environment: { _ in nil },
-                                          homeDirectory: home, calendar: calendar, now: { now })
+                                          homeDirectory: home, now: { now })
 
         let today = try #require(await log.days(last: 1).first)
         #expect(today.totalTokens == 74_422)
@@ -369,13 +371,13 @@ struct ClaudeUsageHistoryTests {
             return appDataValue == "redirected" ? appData.path : appDataValue
         }
         let definition = try #require(try ProviderFactory.builtIn("claude").usageHistory?.otherApps?.first).definition
-        let calendar = Calendar.current
+        let calendar = DataSources.calendar()
         let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 13, hour: 12)))
         for fixture in [file, home.appendingPathComponent("Library/Application Support/Claude/buddy-tokens.json")] {
             try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: fixture.path)
         }
         let log = DataSources.makeUsageLog(definition, platform: .current, environment: environment,
-                                          homeDirectory: home, calendar: calendar, now: { now })
+                                          homeDirectory: home, now: { now })
 
         let today = try #require(await log.days(last: 1).first)
         #expect(today.totalTokens == 61_210)

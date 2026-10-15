@@ -54,7 +54,8 @@ struct HTTPFetcherTests {
         let network = MockNetworkClient()
         let response = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 429, httpVersion: nil, headerFields: headers)!
         given(network).request(.any).willReturn((Data(), response))
-        let fetcher = HTTPFetcher(request: HTTPRequest(url: "https://example.com"), network: network, now: { Self.now })
+        let fetcher = HTTPFetcher(request: HTTPRequest(url: "https://example.com"), network: network, zone: Zones.seoul,
+                                  now: { Self.now })
         do {
             _ = try await fetcher.fetch(with: nil)
             return nil
@@ -90,7 +91,8 @@ struct HTTPFetcherTests {
             seen.url = request.url
             return (Data("{}".utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
-        let fetcher = HTTPFetcher(request: HTTPRequest(url: "https://acme.test/usage?org={{org}}"), network: network, now: { Self.now })
+        let fetcher = HTTPFetcher(request: HTTPRequest(url: "https://acme.test/usage?org={{org}}"), network: network,
+                                  zone: Zones.seoul, now: { Self.now })
 
         _ = try await fetcher.fetch(with: Credential(["org": "team & org"]))
 

@@ -418,17 +418,16 @@ extension UsageLog.Records.Source {
 extension DataSources {
     /// A login's usage log, reading this platform's files or running this
     /// platform's commands. `scripts` finds the price file shipped beside
-    /// the definition.
+    /// the definition. Its days are the person's, in their OS's zone (#565).
     public static func makeUsageLog(
         _ definition: UsageLog.Definition,
         scripts: @escaping ScriptSource = { _ in nil },
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
-        calendar: Calendar = .current,
         now: @escaping @Sendable () -> Date = { Date() }
     ) -> UsageLog {
         makeUsageLog(definition, platform: .current, scripts: scripts, environment: environment,
-                     homeDirectory: homeDirectory, calendar: calendar, now: now)
+                     homeDirectory: homeDirectory, now: now)
     }
 
     static func makeUsageLog(
@@ -437,7 +436,6 @@ extension DataSources {
         scripts: @escaping ScriptSource = { _ in nil },
         environment: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
-        calendar: Calendar = .current,
         now: @escaping @Sendable () -> Date = { Date() }
     ) -> UsageLog {
         let pathsEnvironment = pathEnvironment(platform: platform, homeDirectory: homeDirectory, environment: environment)
@@ -471,7 +469,7 @@ extension DataSources {
                               homeDirectory: homeDirectory, environment: pathsEnvironment),
             prices: definition.prices.flatMap { PriceList.load($0.file, from: scripts) },
             localEndpoint: definition.freeWhen?.localEndpoint.map { LocalEndpoint(file: expand($0.file), url: $0.url) },
-            calendar: calendar,
+            calendar: platform.calendar,
             now: now,
             fingerprint: fingerprint
         )

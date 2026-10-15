@@ -21,7 +21,7 @@ struct JSONLogReaderTests {
     /// the beginning of time, so the test never hands it a file list.
     private func reader(at: UsageLog.At) -> JSONLogReader {
         JSONLogReader(glob: "\(dir.path)/**", shapes: [RecordShape(UsageLog.Shape(
-            at: at, tokens: UsageLog.Tokens(total: "$.used"), cost: "$.spent"))])
+            at: at, tokens: UsageLog.Tokens(total: "$.used"), cost: "$.spent"), zone: Zones.seoul)])
     }
 
     private func read(_ reader: JSONLogReader) -> [LogRecord] {
@@ -50,7 +50,7 @@ struct JSONLogReaderTests {
     }
 
     @Test(arguments: ["America/Los_Angeles", "Asia/Shanghai"])
-    func `should time a written-out date in the rule's time zone, or this Mac's when it names none`(zone: String) throws {
+    func `should time a written-out date in the rule's time zone, or the person's when it names none`(zone: String) throws {
         _ = try file("desk/today.json", #"{"day":"2026-05-28","used":74422}"#)
         let local = UsageLog.At.Formatted(field: "$.day", format: "yyyy-MM-dd")
         let named = UsageLog.At.Formatted(field: "$.day", format: "yyyy-MM-dd", timeZone: zone)
@@ -59,8 +59,8 @@ struct JSONLogReaderTests {
         let midnight = calendar.date(from: DateComponents(year: 2026, month: 5, day: 28))
 
         #expect(read(reader(at: .formatted(named))).first?.at == midnight)
-        calendar.timeZone = .current
-        #expect(read(reader(at: .formatted(local))).first?.at == calendar.date(from: DateComponents(year: 2026, month: 5, day: 28)))
+        // The reader's person is in Seoul: the 28th began there at 15:00 UTC on the 27th.
+        #expect(read(reader(at: .formatted(local))).first?.at == ISO8601DateFormatter().date(from: "2026-05-27T15:00:00Z"))
     }
 
     @Test(arguments: ["2026-02-30", "May 28 2026", "2026-05-28T08:00:00Z"])

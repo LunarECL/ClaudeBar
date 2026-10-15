@@ -18,7 +18,7 @@ struct DayLedgerTests {
     }
 
     private let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    private let calendar = Calendar.current
+    private let calendar = DataSources.calendar()
     private let shelf = Shelf()
 
     /// Today at `hour` o'clock.
@@ -29,8 +29,7 @@ struct DayLedgerTests {
     private func history(now: Date, cost: String = "$.cost", model: String? = nil) -> UsageHistory {
         let definition = UsageLog.Definition(records: UsageLog.Records(
             files: "~/.acme/*.jsonl", at: "$.at", model: model, tokens: UsageLog.Tokens(total: "$.tokens"), cost: cost))
-        let log = DataSources.makeUsageLog(definition, environment: { _ in nil }, homeDirectory: home,
-                                           calendar: calendar, now: { now })
+        let log = DataSources.makeUsageLog(definition, environment: { _ in nil }, homeDirectory: home, now: { now })
         return UsageHistory(log: log, ledger: DayLedger(store: shelf, key: "acme"))
     }
 
@@ -52,10 +51,10 @@ struct DayLedgerTests {
     @Test func `should keep a closed day's usage after the logs are gone`() async throws {
         let now = today(at: 12)
         try log([(14, 0), (41, 1)], now: now)
-        _ = await history(now: now).days(in: .last(2, endingOn: now))
+        _ = await history(now: now).days(in: .last(2, endingOn: now, calendar: calendar))
 
         try forgetLogs()
-        let days = await history(now: now).days(in: .last(2, endingOn: now))
+        let days = await history(now: now).days(in: .last(2, endingOn: now, calendar: calendar))
 
         #expect(days.stats.map(\.totalCost) == [41, 0])
     }
@@ -64,10 +63,10 @@ struct DayLedgerTests {
         let now = today(at: 12)
         try log([(14, 0)], now: now)
         let history = history(now: now)
-        _ = await history.days(in: .last(2, endingOn: now))
+        _ = await history.days(in: .last(2, endingOn: now, calendar: calendar))
 
         try log([(14, 0), (6, 0)], now: now)
-        let days = await history.days(in: .last(2, endingOn: now))
+        let days = await history.days(in: .last(2, endingOn: now, calendar: calendar))
 
         #expect(days.stats.last?.totalCost == 20)
     }
@@ -75,10 +74,10 @@ struct DayLedgerTests {
     @Test func `should keep reading yesterday from the logs until an hour past midnight`() async throws {
         let now = today(at: 0.5)
         try log([(41, 1)], now: now)
-        _ = await history(now: now).days(in: .last(2, endingOn: now))
+        _ = await history(now: now).days(in: .last(2, endingOn: now, calendar: calendar))
 
         try forgetLogs()
-        let days = await history(now: now).days(in: .last(2, endingOn: now))
+        let days = await history(now: now).days(in: .last(2, endingOn: now, calendar: calendar))
 
         #expect(days.stats.first?.totalCost == 0)
     }
@@ -86,10 +85,10 @@ struct DayLedgerTests {
     @Test func `should keep thirty closed days from one read and read only today again`() async throws {
         let now = today(at: 12)
         try log((0..<30).map { (cost: $0 + 1, daysAgo: $0) }, now: now)
-        let first = await history(now: now).days(in: .last(30, endingOn: now))
+        let first = await history(now: now).days(in: .last(30, endingOn: now, calendar: calendar))
 
         try forgetLogs()
-        let again = await history(now: now).days(in: .last(30, endingOn: now))
+        let again = await history(now: now).days(in: .last(30, endingOn: now, calendar: calendar))
 
         #expect(first.stats.count == 30)
         #expect(again.stats.dropLast().map(\.totalCost) == first.stats.dropLast().map(\.totalCost))
@@ -99,7 +98,7 @@ struct DayLedgerTests {
 
     @Test func `should keep a closed day with no usage as an empty day`() async throws {
         let now = today(at: 12)
-        _ = await history(now: now).days(in: .last(3, endingOn: now))
+        _ = await history(now: now).days(in: .last(3, endingOn: now, calendar: calendar))
 
         #expect(shelf.pages["acme"]?.days.count == 2)
     }
@@ -107,10 +106,10 @@ struct DayLedgerTests {
     @Test func `should read the logs again from scratch when how they are read changes`() async throws {
         let now = today(at: 12)
         try log([(41, 1)], now: now)
-        _ = await history(now: now).days(in: .last(2, endingOn: now))
+        _ = await history(now: now).days(in: .last(2, endingOn: now, calendar: calendar))
 
         try forgetLogs()
-        let days = await history(now: now, cost: "$.price").days(in: .last(2, endingOn: now))
+        let days = await history(now: now, cost: "$.price").days(in: .last(2, endingOn: now, calendar: calendar))
 
         #expect(days.stats.first?.totalCost == 0)
     }
@@ -145,18 +144,17 @@ struct DayLedgerTests {
         let definition = UsageLog.Definition(records: UsageLog.Records(
             files: "~/.acme/*.jsonl", at: "$.at", model: "$.model",
             tokens: UsageLog.Tokens(input: "$.input", output: "$.output"), cost: "$.cost"))
-        let log = DataSources.makeUsageLog(definition, environment: { _ in nil }, homeDirectory: home,
-                                           calendar: calendar, now: { now })
+        let log = DataSources.makeUsageLog(definition, environment: { _ in nil }, homeDirectory: home, now: { now })
         return UsageHistory(log: log, ledger: DayLedger(store: shelf, key: "acme"))
     }
 
     @Test func `should keep a closed day's per-model lines after the logs are gone`() async throws {
         let now = today(at: 12)
         try logTwoModels(now)
-        _ = await modelHistory(now: now).days(in: .last(2, endingOn: now))
+        _ = await modelHistory(now: now).days(in: .last(2, endingOn: now, calendar: calendar))
 
         try forgetLogs()
-        let days = await modelHistory(now: now).days(in: .last(2, endingOn: now))
+        let days = await modelHistory(now: now).days(in: .last(2, endingOn: now, calendar: calendar))
 
         #expect(days.stats.first?.lines == [
             ModelUsageLine(model: "m-large", inputTokens: 1000, outputTokens: 200, totalTokens: 1200, cost: 1.5),

@@ -10,7 +10,9 @@ import Testing
 struct CloudWatchFetchTests {
     private let call = CloudWatchCall(namespace: "Acme/Models", dimension: "ModelId", metrics: ["In", "Out"],
                                       regions: "east-1, west-2", profile: "work", prices: "AcmeModels")
-    private let noon = Date(timeIntervalSince1970: 1_767_268_800) // a fixed moment
+    private let noon = Date(timeIntervalSince1970: 1_767_268_800) // 2026-01-01 12:00 UTC, 21:00 in Seoul
+    /// The start of that day in the person's zone, Seoul: 2025-12-31 15:00 UTC.
+    private let startOfDay = Date(timeIntervalSince1970: 1_767_268_800 - 21 * 3600)
 
     final class Seen: @unchecked Sendable { var calls: [(String, String?, Date, Date)] = [] }
 
@@ -24,7 +26,8 @@ struct CloudWatchFetchTests {
             }
         let catalog = MockPriceCatalog()
         given(catalog).prices(service: .any, ids: .any).willReturn(["acme.small": ["in": "3", "out": "15", "per": "1000000"]])
-        let response = try await CloudWatchFetcher(call: call, client: client, catalog: catalog, now: { noon }).fetch(with: nil)
+        let response = try await CloudWatchFetcher(call: call, client: client, catalog: catalog, zone: Zones.seoul,
+                                                   now: { noon }).fetch(with: nil)
         return try #require(try JSONSerialization.jsonObject(with: response.body) as? [String: Any])
     }
 
@@ -36,7 +39,7 @@ struct CloudWatchFetchTests {
         #expect(rows.first?["In"] as? Double == 1000)
         #expect((body["prices"] as? [String: [String: String]])?["acme.small"]?["out"] == "15")
         #expect(seen.calls.map(\.1) == ["work", "work"])
-        #expect(seen.calls.first?.2 == Calendar.current.startOfDay(for: noon))
+        #expect(seen.calls.first?.2 == startOfDay)
         #expect(seen.calls.first?.3 == noon)
     }
 
@@ -56,7 +59,7 @@ struct CloudWatchFetchTests {
         _ = try await fetch(CloudWatchCall(namespace: "N", dimension: "D", metrics: ["M"], regions: "east-1", profile: "{{setting.profile}}"), seen: seen)
         #expect(seen.calls.first?.1 == nil)
         let blank = CloudWatchFetcher(call: CloudWatchCall(namespace: "N", dimension: "D", metrics: ["M"], regions: "{{setting.regions}}"),
-                                      client: MockCloudWatchClient(), catalog: nil, now: { Date() })
+                                      client: MockCloudWatchClient(), catalog: nil, zone: Zones.seoul, now: { Date() })
         #expect(!blank.isReady())
     }
 

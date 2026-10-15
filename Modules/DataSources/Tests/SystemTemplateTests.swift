@@ -18,7 +18,7 @@ struct SystemTemplateTests {
                                       osVersion: OperatingSystemVersion(majorVersion: 27, minorVersion: 1, patchVersion: 0))
 
     @Test
-    func `should send the Mac's time zone even without a credential`() {
+    func `should send the person's time zone even without a credential`() {
         #expect(Template.fill("tz={{system.timeZone}}", with: nil, system: system) == "tz=Asia/Shanghai")
     }
 
@@ -68,7 +68,8 @@ struct SystemTemplateTests {
         }
         let request = HTTPRequest(url: "https://api.example.com/costs?start_time={{system.day-29.epoch}}", method: "GET",
                                   headers: [:], body: nil, timeout: 5)
-        _ = try await HTTPFetcher(request: request, network: network, now: { Self.now }).fetch(with: Credential(["token": "t"]))
+        _ = try await HTTPFetcher(request: request, network: network, zone: Zones.seoul, now: { Self.now })
+            .fetch(with: Credential(["token": "t"]))
         #expect(seen.url == "https://api.example.com/costs?start_time=1788652800")
     }
 

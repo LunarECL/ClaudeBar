@@ -48,7 +48,7 @@ struct MistralUsageHistoryTests {
 
     @Test func `should count yesterday's sessions on yesterday`() async throws {
         try session(meta: meta(tokens: 1500))
-        try session(at: Calendar.current.date(byAdding: .day, value: -1, to: Date())!, meta: meta(tokens: 3000))
+        try session(at: DataSources.calendar().date(byAdding: .day, value: -1, to: Date())!, meta: meta(tokens: 3000))
         let report = try #require(try await report())
         #expect(report.today.totalTokens == 1500)
         #expect(report.previous.totalTokens == 3000)

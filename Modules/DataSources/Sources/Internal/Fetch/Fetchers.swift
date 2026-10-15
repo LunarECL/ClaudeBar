@@ -53,6 +53,8 @@ extension Credential {
 struct HTTPFetcher: Fetching {
     let request: HTTPRequest
     let network: any NetworkClient
+    /// The person's zone, for `{{system.timeZone}}`.
+    let zone: any TimeZoneSource
     let now: @Sendable () -> Date
 
     static let defaultRetryAfter: TimeInterval = 5 * 60
@@ -60,7 +62,7 @@ struct HTTPFetcher: Fetching {
     func isReady() -> Bool { true }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        let system = SystemValues(now: now())
+        let system = SystemValues(now: now(), timeZone: zone.current())
         guard let urlText = Template.fill(request.url, with: credential?.percentEncodedForURL, system: system), let url = URL(string: urlText) else {
             throw UsageError.executionFailed("Invalid URL")
         }

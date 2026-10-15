@@ -10,7 +10,7 @@ import Testing
 @Suite
 struct CommandLogTests {
     private let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    private let calendar = Calendar.current
+    private let calendar = DataSources.calendar()
     private let now = Date()
 
     private static let call = CommandCall(cli: "acme", args: ["db", "SELECT tokens FROM message", "--format", "json"], timeout: 15)
@@ -48,8 +48,7 @@ struct CommandLogTests {
     private func log(_ definition: UsageLog.Definition = Self.definition,
                      _ executor: (any CLIExecutor)?) -> UsageLog {
         DataSources.makeUsageLog(definition, platform: platform(running: executor), scripts: { _ in nil },
-                                 environment: { _ in nil }, homeDirectory: home, calendar: calendar,
-                                 now: { [now] in now })
+                                 environment: { _ in nil }, homeDirectory: home, now: { [now] in now })
     }
 
     /// Where the command was asked to run, read once the log has read.

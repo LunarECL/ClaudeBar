@@ -1,4 +1,5 @@
 import Crypto
+import DataSources
 import Diagnostics
 import Foundation
 import Quotas
@@ -69,7 +70,7 @@ public final class LeaderboardMembership {
     @ObservationIgnored private let now: () -> Date
 
     public init(api: any LeaderboardAPI, keys: any SigningKeyStore, settings: any LeaderboardSettingsRepository,
-                logs: any TokenLogs, machine: any MachineIdentity, calendar: Calendar = .current,
+                logs: any TokenLogs, machine: any MachineIdentity, calendar: Calendar = DataSources.calendar(),
                 now: @escaping () -> Date = Date.init) {
         self.api = api
         self.keys = keys

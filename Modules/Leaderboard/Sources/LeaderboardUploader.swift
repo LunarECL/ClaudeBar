@@ -1,3 +1,4 @@
+import DataSources
 import Foundation
 import Observation
 import Diagnostics
@@ -34,7 +35,7 @@ public final class LeaderboardUploader {
     static let interval: TimeInterval = 60 * 60
 
     public init(membership: LeaderboardMembership, logs: any TokenLogs, api: any LeaderboardAPI,
-                calendar: Calendar = .current, now: @escaping () -> Date = Date.init) {
+                calendar: Calendar = DataSources.calendar(), now: @escaping () -> Date = Date.init) {
         self.membership = membership
         self.logs = logs
         self.api = api
@@ -115,7 +116,7 @@ public final class LeaderboardUploader {
         return tokens.filter { $0.day >= since || refused.contains("\($0.provider) \($0.day)") }
     }
 
-    /// The start of a `yyyy-MM-dd` day, in this Mac's calendar.
+    /// The start of a `yyyy-MM-dd` day, in the member's own calendar.
     private func date(of day: String) -> Date? {
         let parts = day.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }

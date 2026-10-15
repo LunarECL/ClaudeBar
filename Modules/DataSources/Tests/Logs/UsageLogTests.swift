@@ -23,12 +23,12 @@ struct UsageLogTests {
     )
 
     private let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    private let calendar = Calendar.current
+    private let calendar = DataSources.calendar()
     private let now = Date()
 
     private func log(_ definition: UsageLog.Definition = Self.definition) -> UsageLog {
         DataSources.makeUsageLog(definition, scripts: { $0 == "acme-prices.json" ? PriceListTests.file : nil },
-                                 environment: { _ in nil }, homeDirectory: home, calendar: calendar, now: { [now] in now })
+                                 environment: { _ in nil }, homeDirectory: home, now: { [now] in now })
     }
 
     private func write(_ lines: [String], to name: String = "project/one.jsonl") throws {
@@ -56,7 +56,7 @@ struct UsageLogTests {
         try write([line(at: stamp())])
         let days = await log().days(last: 3)
         #expect(days.count == 3)
-        #expect(days.map(\.date) == DateRange.last(3, endingOn: now).days())
+        #expect(days.map(\.date) == DateRange.last(3, endingOn: now, calendar: calendar).days(in: calendar))
         #expect(days[0].isEmpty && days[1].isEmpty)
         #expect(days[2].totalTokens == 1500)
     }
@@ -254,6 +254,7 @@ struct UsageLogTests {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = calendar.timeZone
         let yesterday = formatter.string(from: calendar.date(byAdding: .day, value: -1, to: now)!)
         try #"{"day":"\#(yesterday)","n":74422}"#.write(to: url, atomically: true, encoding: .utf8)
 

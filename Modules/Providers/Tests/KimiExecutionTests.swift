@@ -36,7 +36,7 @@ struct KimiExecutionTests {
             seen.origin = request.value(forHTTPHeaderField: "Origin")
             guard request.httpMethod == "POST", request.url?.path == "/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages",
                   request.httpBody == Data(#"{"scope":["FEATURE_CODING"]}"#.utf8),
-                  request.value(forHTTPHeaderField: "r-timezone") == TimeZone.current.identifier else {
+                  request.value(forHTTPHeaderField: "r-timezone") == DataSources.timeZone().identifier else {
                 return (Data(), StubbedProvider.response(400))
             }
             return (Data(Self.api.utf8), StubbedProvider.response(status))

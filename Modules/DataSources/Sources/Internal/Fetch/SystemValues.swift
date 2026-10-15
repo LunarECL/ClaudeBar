@@ -5,7 +5,8 @@ import Foundation
 /// One row per value: a new value is a new row, never a branch elsewhere.
 struct SystemValues: Sendable {
     let now: Date
-    var timeZone: TimeZone = .current
+    /// The person's zone, from the platform: never Foundation's `.current`.
+    let timeZone: TimeZone
     var osVersion: OperatingSystemVersion = ProcessInfo.processInfo.operatingSystemVersion
 
     /// The value of `system.<name>`, or nil when the engine computes no such value.
@@ -16,7 +17,7 @@ struct SystemValues: Sendable {
     private typealias Row = @Sendable (SystemValues, String) -> String?
 
     private static let rows: [Row] = [
-        // The Mac's time zone, as a browser would send it.
+        // The person's time zone, as a browser would send it.
         { system, name in name == "timeZone" ? system.timeZone.identifier : nil },
         { system, name in
             guard name == "osVersion" else { return nil }

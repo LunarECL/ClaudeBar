@@ -9,7 +9,7 @@ import Foundation
 ///
 /// - `response` — `{ status, headers, text, json }` (`json` is the parsed body, or `null`)
 /// - `context` — `{ now, timeZone, credential, values, ...files }`: epoch
-///   seconds, the current zone's identifier, the credential values the
+///   seconds, the person's zone's identifier, the credential values the
 ///   definition lets it see, the settings it hands over (`values`), and each
 ///   declared context file's fields
 ///
@@ -28,6 +28,9 @@ struct ScriptMapper: Reading {
     let source: String?
     var values: [String: String] = [:]
     let engine: any ScriptEngine
+    /// The person's zone: the script's `context.timeZone`, and where
+    /// `humanDate` reads a text that names none.
+    let zone: any TimeZoneSource
     let now: @Sendable () -> Date
 
     func read(_ response: Response, facts: MappingFacts, providerId: String) throws -> UsageSnapshot {
@@ -35,13 +38,16 @@ struct ScriptMapper: Reading {
             throw UsageError.parseFailed("Mapping script '\(file)' is missing")
         }
         let clock = now
+        let timeZone = zone.current()
         let output: String?
         do {
             output = try engine.evaluate(
                 "JSON.stringify(read(JSON.parse(__input).response, JSON.parse(__input).context))",
                 after: [DecimalScript.source, source],
-                strings: ["__input": try Self.inputJSON(response, facts: facts, values: values, now: now())],
-                functions: ["humanDate": { HumanDate.parse($0, now: clock()).map { $0.timeIntervalSince1970 } }]
+                strings: ["__input": try Self.inputJSON(response, facts: facts, values: values, timeZone: timeZone, now: now())],
+                functions: ["humanDate": {
+                    HumanDate.parse($0, now: clock(), timeZone: timeZone).map { $0.timeIntervalSince1970 }
+                }]
             )
         } catch ScriptEngineError.load(let exception) {
             throw UsageError.parseFailed("Mapping script '\(file)' failed to load: \(exception)")
@@ -62,10 +68,11 @@ struct ScriptMapper: Reading {
         return try result.snapshot(providerId: providerId, capturedAt: now())
     }
 
-    private static func inputJSON(_ response: Response, facts: MappingFacts, values: [String: String], now: Date) throws -> String {
+    private static func inputJSON(_ response: Response, facts: MappingFacts, values: [String: String],
+                                  timeZone: TimeZone, now: Date) throws -> String {
         var context: [String: Any] = [
             "now": now.timeIntervalSince1970,
-            "timeZone": TimeZone.current.identifier,
+            "timeZone": timeZone.identifier,
             "credential": facts.credential,
             // A blank setting never filled its template.
             "values": values.filter { !$0.value.contains("{{") },
