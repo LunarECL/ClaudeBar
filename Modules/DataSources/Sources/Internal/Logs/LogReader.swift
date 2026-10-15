@@ -13,7 +13,7 @@ enum LogReader: Sendable {
     ///   `${VAR:-default}` — resolved the way the platform's paths are.
     init(_ records: UsageLog.Records, expand: (String) -> String, platform: Platform, homeDirectory: URL,
          environment: @escaping @Sendable (String) -> String?) {
-        let shapes = records.shapes.map(RecordShape.init)
+        let shapes = records.shapes.map { RecordShape($0, zone: platform.timeZone) }
         switch records.source {
         case .files(let glob, let format):
             switch format {

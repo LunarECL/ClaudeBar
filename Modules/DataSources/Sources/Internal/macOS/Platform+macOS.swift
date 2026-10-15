@@ -5,6 +5,7 @@ extension Platform {
     /// The Mac: every connection the engine has.
     static let current = Platform(
         name: "macOS",
+        timeZone: SystemTimeZone(),
         runCLI: CLIFetcher.system,
         runCommand: CommandFetcher.system,
         rpcTransport: { executable, arguments, environment, directory in

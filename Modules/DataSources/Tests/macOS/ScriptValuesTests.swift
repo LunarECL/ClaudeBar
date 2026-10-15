@@ -17,7 +17,8 @@ struct ScriptValuesTests {
     """
 
     private func read(_ values: [String: String]) throws -> UsageQuota {
-        let mapper = ScriptMapper(file: "s.js", source: script, values: values, engine: JavaScriptCoreEngine(), now: { Date() })
+        let mapper = ScriptMapper(file: "s.js", source: script, values: values, engine: JavaScriptCoreEngine(),
+                                  zone: Zones.seoul, now: { Date() })
         return try #require(try mapper.read(Response(text: "{}"), facts: MappingFacts(), providerId: "acme").quotas.first)
     }
 

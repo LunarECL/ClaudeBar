@@ -182,7 +182,8 @@ Asks to avoid:
 
 Decoding: a string is `.field` (*exists*); an object with `fromPath` is `.fromPath`
 (*exists*); an object with `field` and `format` is `.formatted` (new). It shares
-`FromPath`'s `format` and `timeZone` meaning, and nil means `TimeZone.current`.
+`FromPath`'s `format` and `timeZone` meaning, and nil means the person's zone
+(`Platform.timeZone`, #565).
 
 ## What dies
 

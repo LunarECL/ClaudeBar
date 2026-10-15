@@ -1,3 +1,4 @@
+import DataSources
 import Foundation
 import Observation
 import Diagnostics
@@ -34,7 +35,7 @@ public final class LeaderboardUploader {
     static let interval: TimeInterval = 60 * 60
 
     public init(membership: LeaderboardMembership, logs: any TokenLogs, api: any LeaderboardAPI,
-                calendar: Calendar = .current, now: @escaping () -> Date = Date.init) {
+                calendar: Calendar = DataSources.calendar(), now: @escaping () -> Date = Date.init) {
         self.membership = membership
         self.logs = logs
         self.api = api

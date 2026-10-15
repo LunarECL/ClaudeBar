@@ -3,10 +3,11 @@ import Foundation
 /// Reset times as CLIs print them for people — "2h 15m", "4:59pm
 /// (America/New_York)", "Jan 15, 3:30pm", "Dec 25 at 4:59am", "Jan 1, 2026" —
 /// turned into the next instant they name. A text format, not a vendor's:
-/// a mapping script reaches it as `humanDate(text)`.
+/// a mapping script reaches it as `humanDate(text)`. A text that names no
+/// zone is read in `timeZone`, the person's.
 enum HumanDate {
-    static func parse(_ text: String, now: Date) -> Date? {
-        relative(text, now: now) ?? absolute(text, now: now)
+    static func parse(_ text: String, now: Date, timeZone: TimeZone) -> Date? {
+        relative(text, now: now) ?? absolute(text, now: now, personsZone: timeZone)
     }
 
     /// "2d", "3h", "15m", "2 hours 5 min" — the sum of the first of each unit.
@@ -27,7 +28,7 @@ enum HumanDate {
     }
 
     /// A date and/or time, optionally followed by an IANA zone in parentheses.
-    private static func absolute(_ text: String, now: Date) -> Date? {
+    private static func absolute(_ text: String, now: Date, personsZone: TimeZone) -> Date? {
         let timeZone = zone(in: text)
 
         var cleaned = text.replacingOccurrences(of: #"\s+\d{1,3}%\s*(?:used|left)\s*$"#, with: "", options: .regularExpression)
@@ -45,7 +46,7 @@ enum HumanDate {
         ]
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = timeZone ?? .current
+        formatter.timeZone = timeZone ?? personsZone
         for format in formats {
             formatter.dateFormat = format
             if let date = formatter.date(from: cleaned) {

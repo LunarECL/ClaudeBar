@@ -43,7 +43,8 @@ struct OmpUsageHistoryTests {
     }
 
     private static var yesterdayNoon: Date {
-        Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: Date()))!.addingTimeInterval(43_200)
+        let calendar = DataSources.calendar()
+        return calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date()))!.addingTimeInterval(43_200)
     }
 
     private static func entryId() -> String { String(UUID().uuidString.prefix(8)).lowercased() }

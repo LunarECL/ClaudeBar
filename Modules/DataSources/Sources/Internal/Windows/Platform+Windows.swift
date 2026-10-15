@@ -6,6 +6,7 @@ extension Platform {
     /// absent until phase 5. Missing connections fail at their named step.
     static let current = Platform(
         name: "Windows",
+        timeZone: WindowsTimeZone(),
         binaryLocator: PathBinaryLocator(),
         applicationData: { home, environment in
             if let path = environment("APPDATA"), !path.isEmpty {

@@ -353,20 +353,27 @@ Modules/DataSources/Sources/
 ├── ScriptEngine.swift         port, @Mockable   ┐ a platform worker is reached
 ├── BinaryLocating.swift       port, @Mockable   │ through a port declared here,
 ├── …                                            ┘ never a twin type of one name
+├── Ports/TimeZoneSource.swift port, @Mockable: the person's zone, as the OS has it
+│                                now — and DataSources.timeZone() · .calendar(), the
+│                                one public way to it (#565)
 └── Internal/
-    ├── Platform.swift         ◇ struct Platform — name · runCLI? · runCommand? ·
-    │                            rpcTransport? · scriptEngine? · keychain? ·
-    │                            browserCookies? · browserStorage? · localNetwork? ·
-    │                            processList? · screenRenderer? · binaryLocator? ·
-    │                            sqlite? · applicationData? · pathSeparator ·
-    │                            scriptCommand? · loginShellCommand? ·
+    ├── Platform.swift         ◇ struct Platform — name · timeZone · runCLI? ·
+    │                            runCommand? · rpcTransport? · scriptEngine? ·
+    │                            keychain? · browserCookies? · browserStorage? ·
+    │                            localNetwork? · processList? · screenRenderer? ·
+    │                            binaryLocator? · sqlite? · applicationData? ·
+    │                            pathSeparator · scriptCommand? · loginShellCommand? ·
     │                            localServer? · localServerCommands? —
-    │                            and Platform.bare: the name, nothing else
+    │                            and Platform.bare: the name and zone, nothing else
     ├── Unavailable.swift      a case whose connection is nil: fails at its step
     │                            as ErrorFact.unavailable, naming it and platform.name
     ├── Fetch/ Lookup/ Mapping/ Logs/ Network/ Process/   neutral workers
+    ├── Time/WindowsZones.swift   a Windows zone key to its zone: CLDR's table
+    │                             (+Table, generated from Vendor/CLDR) or the OS's
+    │                             offset — neutral, so its tests run everywhere
     ├── macOS/                 #if os(macOS), whole file
     │   ├── Platform+macOS.swift      static let current = Platform(name: "macOS", …)
+    │   ├── Time/SystemTimeZone.swift   : TimeZoneSource — TimeZone.current
     │   ├── Process/                  DefaultCLIExecutor · PipeCLIExecutor ·
     │   │                             ProcessRPCTransport · BinaryLocator ·
     │   │                             RunningProcesses · TerminalRenderer · Shell …
@@ -381,12 +388,17 @@ Modules/DataSources/Sources/
         │                             applicationData: APPDATA or ~/AppData/Roaming,
         │                             pathSeparator: "\\", binaryLocator: PathBinaryLocator(),
         │                             scriptCommand: cmd.exe; execution connections nil)
+        ├── Time/WindowsTimeZone.swift   : TimeZoneSource — reads the zone's registry
+        │                             key and offset; WindowsZones picks the zone
         ├── Process/PathBinaryLocator.swift      : BinaryLocating (PATH + PATHEXT)
         └── Logs/                     FileStamp+Windows · ByteSearch+Windows
+Vendor/CLDR/                    windowsZones.xml · VERSION · LICENSE — pinned,
+                                changed only by scripts/bump-vendor.sh
 Modules/DataSources/Tests/
 ├── Support/Needs.swift        .needs(\.scriptEngine) — enabled when
 │                                Platform.current has it, else skipped, saying why
 ├── UnavailableTests.swift     the factory with Platform.bare — runs on the Mac too
+├── Contracts/TimeZoneContract.swift   run against Platform.current's adapter
 ├── …                          neutral tests: both platforms
 └── macOS/ · Windows/          a platform worker's own tests, under #if os(…)
 ```
@@ -415,6 +427,22 @@ Modules/DataSources/Tests/
   and path separators. The factory supplies them to workers and to path
   expansion; definitions use `{{platform.appData}}`, not a Mac folder literal.
   A missing fact remains unavailable; it never becomes a guessed command.
+- **The person's time zone is a port, never Foundation's `.current`.** On
+  Windows Foundation answers GMT: it looks the zone up by its display name,
+  which is in the person's language
+  ([swift-foundation#2244](https://github.com/swiftlang/swift-foundation/issues/2244)).
+  So a day, a reset or a zone handed to a script reads `TimeZoneSource`
+  through the factory, and other modules and clients read
+  `DataSources.timeZone()` / `.calendar()`. `Quotas` has no platform, so its
+  `DateRange` takes a calendar and has no default. The Mac's adapter is
+  `TimeZone.current`. Windows' reads the zone's registry key
+  (`TimeZoneKeyName`, never translated) and maps it to an IANA zone through
+  CLDR's `windowsZones`, the table ICU uses. When daylight saving's automatic
+  adjustment is off, or the key isn't in the table, it falls back to the OS's
+  own offset. It never loads the system `icu.dll`: once that is loaded,
+  Foundation's named zones are gone from the process. Its contract
+  (`TimeZoneContract`) holds each adapter to the OS's own offset at instants
+  across two years, including every daylight-saving change.
 
 A module with no platform workers has no `Platform`. `Diagnostics` and
 `Leaderboard` follow the same shape for their own ports (`LogSink`,

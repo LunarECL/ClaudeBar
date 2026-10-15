@@ -68,7 +68,8 @@ struct SystemTemplateTests {
         }
         let request = HTTPRequest(url: "https://api.example.com/costs?start_time={{system.day-29.epoch}}", method: "GET",
                                   headers: [:], body: nil, timeout: 5)
-        _ = try await HTTPFetcher(request: request, network: network, now: { Self.now }).fetch(with: Credential(["token": "t"]))
+        _ = try await HTTPFetcher(request: request, network: network, zone: Zones.seoul, now: { Self.now })
+            .fetch(with: Credential(["token": "t"]))
         #expect(seen.url == "https://api.example.com/costs?start_time=1788652800")
     }
 

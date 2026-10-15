@@ -9,6 +9,8 @@ struct CloudWatchFetcher: Fetching {
     let call: CloudWatchCall
     let client: (any CloudWatchClient)?
     let catalog: (any PriceCatalog)?
+    /// The person's zone: "today" starts at their midnight.
+    let zone: any TimeZoneSource
     let now: @Sendable () -> Date
 
     func isReady() -> Bool { client != nil && !call.regionList.isEmpty }
@@ -18,7 +20,9 @@ struct CloudWatchFetcher: Fetching {
         let regions = call.regionList
         guard !regions.isEmpty else { throw UsageError.executionFailed("No regions configured") }
         let end = now()
-        let start = Calendar.current.startOfDay(for: end)
+        var calendar = Calendar.current
+        calendar.timeZone = zone.current()
+        let start = calendar.startOfDay(for: end)
 
         var rows: [[String: Any]] = []
         var firstError: Error?

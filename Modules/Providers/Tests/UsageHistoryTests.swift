@@ -22,8 +22,8 @@ struct UsageHistoryTests {
         let dir = home.appendingPathComponent(".acme")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let lines = entries.map { entry -> String in
-            let day = Calendar.current.date(byAdding: .day, value: -entry.daysAgo, to: Date())!
-            let at = entry.daysAgo == 0 ? Date() : Calendar.current.startOfDay(for: day).addingTimeInterval(43_200)
+            let day = DataSources.calendar().date(byAdding: .day, value: -entry.daysAgo, to: Date())!
+            let at = entry.daysAgo == 0 ? Date() : DataSources.calendar().startOfDay(for: day).addingTimeInterval(43_200)
             return #"{"at":\#(at.timeIntervalSince1970),"tokens":1000,"cost":\#(entry.cost)}"#
         }
         try lines.joined(separator: "\n").write(to: dir.appendingPathComponent("log.jsonl"), atomically: true, encoding: .utf8)
@@ -91,7 +91,7 @@ struct UsageHistoryTests {
     func `should show every day of a range, used or not`() async throws {
         try log([("14", 0), ("41", 1)])
 
-        let days = await history().days(in: .last(30))
+        let days = await history().days(in: .last(30, calendar: DataSources.calendar()))
 
         #expect(days.stats.count == 30)
         #expect(days.stats.map(\.totalCost).suffix(2) == [41, 14])
@@ -125,7 +125,7 @@ struct UsageHistoryTests {
     // MARK: - Other apps
 
     private func desk(_ tokens: Int, daysAgo: Int = 0) throws {
-        let day = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!
+        let day = DataSources.calendar().date(byAdding: .day, value: -daysAgo, to: Date())!
         let dir = home.appendingPathComponent("Desk")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try #"{"at":\#(day.timeIntervalSince1970),"n":\#(tokens)}"#.write(to: dir.appendingPathComponent("today.json"), atomically: true, encoding: .utf8)
@@ -232,7 +232,7 @@ struct UsageHistoryTests {
     private func writeSampleLogs() throws {
         let dir = home.appendingPathComponent("sample-logs")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let calendar = Calendar.current
+        let calendar = DataSources.calendar()
         let formatter = ISO8601DateFormatter()
         var lines: [String] = []
         for daysAgo in 0...30 {
@@ -280,7 +280,7 @@ struct UsageHistoryTests {
     @Test
     func `should keep an archived day when its file path becomes a portable app data path`() async throws {
         defer { try? FileManager.default.removeItem(at: home) }
-        let calendar = Calendar.current
+        let calendar = DataSources.calendar()
         let now = Date()
         let archived = try #require(calendar.date(byAdding: .day, value: -3, to: now))
         let at = calendar.startOfDay(for: archived).addingTimeInterval(43_200)
@@ -293,7 +293,7 @@ struct UsageHistoryTests {
         func make(_ path: String) -> UsageLog {
             let definition = UsageLog.Definition(records: .init(files: path, at: "$.at", tokens: .init(total: "$.tokens")))
             return DataSources.makeUsageLog(definition, platform: platform, environment: { _ in nil },
-                                            homeDirectory: home, calendar: calendar, now: { now })
+                                            homeDirectory: home, now: { now })
         }
         let store = InMemoryLedgerStore()
         let range = DateRange.last(5, endingOn: now, calendar: calendar)

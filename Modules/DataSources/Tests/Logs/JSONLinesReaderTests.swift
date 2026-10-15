@@ -24,7 +24,7 @@ struct JSONLinesReaderTests {
     /// A reader with no glob of its own: these tests name the files, and read
     /// them whole, so what is under test is the scanning, not the finding.
     private func reader(_ records: UsageLog.Records = Self.records) -> JSONLinesReader {
-        JSONLinesReader(glob: "", shapes: records.shapes.map(RecordShape.init))
+        JSONLinesReader(glob: "", shapes: records.shapes.map { RecordShape($0, zone: Zones.seoul) })
     }
 
     private func makeFile(_ content: String) throws -> URL {

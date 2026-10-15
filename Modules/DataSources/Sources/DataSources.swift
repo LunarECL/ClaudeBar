@@ -222,9 +222,9 @@ public enum DataSources {
         }
         switch fetch {
         case .http(let request):
-            return HTTPFetcher(request: request, network: network, now: now)
+            return HTTPFetcher(request: request, network: network, zone: platform.timeZone, now: now)
         case .httpSteps(let steps):
-            return HTTPStepsFetcher(steps: steps, network: network, now: now)
+            return HTTPStepsFetcher(steps: steps, network: network, zone: platform.timeZone, now: now)
         case .jsonRpc(let call):
             guard let runCLI = platform.runCLI, let transport = platform.rpcTransport else {
                 return unavailable("Running \(call.cli)")
@@ -259,7 +259,7 @@ public enum DataSources {
             }
             return localServer(call, runCommand(ProcessEnvironment()), localNetwork, processList)
         case .cloudWatch(let call):
-            return CloudWatchFetcher(call: call, client: cloudWatch, catalog: priceCatalog, now: now)
+            return CloudWatchFetcher(call: call, client: cloudWatch, catalog: priceCatalog, zone: platform.timeZone, now: now)
         case .directory(let call):
             return DirectoryFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
         case .sqlite(let call):
@@ -286,7 +286,8 @@ public enum DataSources {
         guard let engine = platform.scriptEngine else {
             return Unavailable(.mapping, "Running a mapping script", on: platform.name)
         }
-        return ScriptMapper(file: mapping.file, source: source, values: mapping.values, engine: engine, now: now)
+        return ScriptMapper(file: mapping.file, source: source, values: mapping.values, engine: engine,
+                            zone: platform.timeZone, now: now)
     }
 
     private struct Readers {

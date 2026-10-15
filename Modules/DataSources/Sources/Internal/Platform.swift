@@ -12,6 +12,8 @@ import Foundation
 struct Platform: Sendable {
     /// How a person names it: "macOS", "Windows".
     let name: String
+    /// The person's time zone. Every platform has one, so it is never `nil`.
+    var timeZone: any TimeZoneSource
     /// Runs a CLI for a `cli` fetch or a CLI renewal.
     var runCLI: CLIFetcher.MakeExecutor?
     /// Runs a command or script over pipes: `command`, `script`, `localServer`.
@@ -45,6 +47,7 @@ struct Platform: Sendable {
 
     init(
         name: String,
+        timeZone: any TimeZoneSource,
         runCLI: CLIFetcher.MakeExecutor? = nil,
         runCommand: CommandFetcher.MakeExecutor? = nil,
         rpcTransport: DataSources.TransportFactory? = nil,
@@ -65,6 +68,7 @@ struct Platform: Sendable {
         localServerCommands: LocalServerCommands? = nil
     ) {
         self.name = name
+        self.timeZone = timeZone
         self.runCLI = runCLI
         self.runCommand = runCommand
         self.rpcTransport = rpcTransport
@@ -85,7 +89,14 @@ struct Platform: Sendable {
         self.localServerCommands = localServerCommands
     }
 
-    /// This platform's name and no connection: what a test hands the factory
-    /// to see, on any platform, what a platform without a connection does.
-    static var bare: Platform { Platform(name: current.name) }
+    /// This platform's name and zone and no connection: what a test hands the
+    /// factory to see, on any platform, what a platform without a connection does.
+    static var bare: Platform { Platform(name: current.name, timeZone: current.timeZone) }
+
+    /// The calendar a day is counted in: the system's, in the person's zone.
+    var calendar: Calendar {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone.current()
+        return calendar
+    }
 }

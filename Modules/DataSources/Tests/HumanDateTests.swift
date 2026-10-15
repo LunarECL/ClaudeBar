@@ -9,9 +9,11 @@ import Testing
 struct HumanDateTests {
     /// 2026-06-15 12:00:00 UTC.
     static let now = Date(timeIntervalSince1970: 1_781_524_800)
+    /// The person's zone, for texts without one.
+    static let person = TimeZone(identifier: "Asia/Seoul")!
 
     private func parse(_ text: String, now: Date = now) -> Date? {
-        HumanDate.parse(text, now: now)
+        HumanDate.parse(text, now: now, timeZone: Self.person)
     }
 
     private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0, in zone: String = "UTC") -> Date {
@@ -20,10 +22,10 @@ struct HumanDateTests {
         return calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
     }
 
-    /// A wall-clock time in the zone the app runs in, for texts without a zone.
+    /// A wall-clock time in the person's zone, for texts without a zone.
     private func local(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .current
+        calendar.timeZone = Self.person
         return calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
     }
 

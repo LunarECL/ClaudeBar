@@ -68,9 +68,12 @@ struct LogRecord: Sendable, Equatable {
 /// bytes a line must hold for its `where` to have a chance.
 struct RecordShape: Sendable {
     let shape: UsageLog.Shape
+    /// The person's zone: a written-out time that names none is theirs.
+    let zone: any TimeZoneSource
 
-    init(_ shape: UsageLog.Shape) {
+    init(_ shape: UsageLog.Shape, zone: any TimeZoneSource) {
         self.shape = shape
+        self.zone = zone
     }
 
     /// The `where` text, quoted as JSON writes it, or `nil` when the shape has
@@ -118,27 +121,27 @@ struct RecordShape: Sendable {
     private func time(in scope: JSONScope, path: String) -> Date? {
         switch shape.at {
         case .field(let field): Self.date(scope.value(field))
-        case .fromPath(let rule): Self.date(inPath: path, rule)
-        case .formatted(let rule): scope.string(rule.field).flatMap { Self.date($0, format: rule.format, timeZone: rule.timeZone) }
+        case .fromPath(let rule): date(inPath: path, rule)
+        case .formatted(let rule): scope.string(rule.field).flatMap { date($0, format: rule.format, timeZone: rule.timeZone) }
         }
     }
 
     /// The first capture of the rule's pattern in `path`, read with its format.
-    static func date(inPath path: String, _ rule: UsageLog.At.FromPath) -> Date? {
+    func date(inPath path: String, _ rule: UsageLog.At.FromPath) -> Date? {
         guard let regex = try? NSRegularExpression(pattern: rule.pattern),
               let match = regex.firstMatch(in: path, range: NSRange(path.startIndex..., in: path)),
               match.numberOfRanges > 1, let range = Range(match.range(at: 1), in: path) else { return nil }
         return date(String(path[range]), format: rule.format, timeZone: rule.timeZone)
     }
 
-    /// `text` read with `format` in `timeZone`, the user's own when `nil`.
+    /// `text` read with `format` in `timeZone`, the person's own when `nil`.
     /// Text the format doesn't give back unchanged — `2026-02-30`, or a time
     /// after a bare day — has no time.
-    static func date(_ text: String, format: String, timeZone: String?) -> Date? {
+    func date(_ text: String, format: String, timeZone: String?) -> Date? {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = format
-        formatter.timeZone = timeZone.flatMap(TimeZone.init(identifier:)) ?? .current
+        formatter.timeZone = timeZone.flatMap(TimeZone.init(identifier:)) ?? zone.current()
         guard let date = formatter.date(from: text), formatter.string(from: date) == text else { return nil }
         return date
     }
