@@ -178,7 +178,10 @@ private struct AccountRow: View {
             .help(isPinned ? "Shown in the menu bar" : "Show in the menu bar")
             Menu {
                 Button("Rename…", action: onRename)
-                Button(account.isEnabled ? "Pause" : "Resume") { account.isEnabled.toggle() }
+                // The same door the popover's account menu comes through.
+                Button(account.isEnabled ? "Pause" : "Resume") {
+                    if account.isEnabled { monitor.pause(account) } else { monitor.resume(account) }
+                }
                 if !account.isDefault {
                     Divider()
                     Button("Remove…", role: .destructive, action: onRemove)

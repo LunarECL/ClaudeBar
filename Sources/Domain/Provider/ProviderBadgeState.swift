@@ -23,6 +23,9 @@ public enum ProviderBadgeState: Equatable, Sendable {
     case usageOnly
     /// No probe has produced data yet (first launch, provider just enabled).
     case awaitingData
+    /// Every login of the product is paused — the person stopped watching, so
+    /// nothing is fetched and there are no numbers to show (CANONICAL §5).
+    case paused
     /// We have numbers, and this is what they say.
     case quota(QuotaStatus)
 
@@ -56,6 +59,18 @@ public enum ProviderBadgeState: Equatable, Sendable {
         self.init(of: logins.map { Login(isSyncing: $0.isSyncing, failed: $0.lastError != nil,
                                          needsSetup: $0.needsSetup, readsUsage: $0.readsUsage) },
                   quotaStatus: quotaStatus)
+    }
+
+    /// What the header says about the product a tab opens: a tab whose every
+    /// login is paused reads *PAUSED* — the person stopped watching, which is
+    /// not the same as having nothing to show (CANONICAL §5). The tab answers;
+    /// no caller re-asks what its logins are doing.
+    @MainActor
+    public init(of tab: ProductTab, quotaStatus: QuotaStatus?) {
+        let state: ProviderBadgeState = tab.watched.isEmpty && !tab.paused.isEmpty
+            ? .paused
+            : ProviderBadgeState(of: tab.watched, quotaStatus: quotaStatus)
+        self = state
     }
 
     /// What the badge reads of one login.

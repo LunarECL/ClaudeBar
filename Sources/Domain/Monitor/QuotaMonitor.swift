@@ -156,14 +156,42 @@ public final class QuotaMonitor {
 
     // MARK: - Monitoring Operations
 
-    /// Refreshes all enabled providers concurrently.
-    /// Each provider updates its own snapshot.
-    /// Disabled providers are skipped.
-    public func refreshAll() async {
+    /// Refreshes every watched login concurrently, each updating its own
+    /// snapshot. Today's usage is *not* read: this is also the background's
+    /// moment, and usage history is read with a page, never in the background.
+    public func refreshAll(kind: RefreshKind = .interactive) async {
+        await refresh(lineup, kind: kind)
+    }
+
+    /// The popover's page: every login it watches is refreshed, and today's
+    /// usage is read with it — the moment the page is on screen (CANONICAL §1).
+    /// Who is fetched is decided here, so a page draws and calls.
+    public func refresh(_ tab: ProductTab, kind: RefreshKind = .interactive) async {
+        await refresh(tab.watched, kind: kind) { await $0.usageHistory?.read() }
+    }
+
+    /// *TODAY'S USAGE* for every watched login — what the *All* page and the
+    /// notch read, and when they read it: with a page, never in the background.
+    public func readToday() async {
         await withTaskGroup(of: Void.self) { group in
-            for provider in lineup {
+            for login in lineup {
+                group.addTask { await login.usageHistory?.read() }
+            }
+        }
+    }
+
+    /// The logins, refreshed together — one place, whether it is the whole
+    /// watch list or one product's page.
+    private func refresh(
+        _ logins: [Account],
+        kind: RefreshKind,
+        also: (@Sendable (Account) async -> Void)? = nil
+    ) async {
+        await withTaskGroup(of: Void.self) { group in
+            for login in logins {
                 group.addTask {
-                    await self.refreshProvider(provider)
+                    await self.refreshProvider(login, kind: kind)
+                    await also?(login)
                 }
             }
         }
@@ -178,10 +206,13 @@ public final class QuotaMonitor {
         }
 
         do {
+            // A paused login's fetch is refused — before it starts, or as it
+            // lands — so nothing is recorded and there is nothing to publish.
             let snapshot = try await product.refresh(provider, kind)
             await handleSnapshotUpdate(provider: provider, snapshot: snapshot)
         } catch {
-            // Provider stores error in lastError - no need for external observer
+            // The refusal (.paused) and every failure: the login holds both, in
+            // `lastError`. No external observer is told.
         }
     }
 
@@ -215,7 +246,9 @@ public final class QuotaMonitor {
         refreshObservers.append(observer)
     }
 
-    /// Refreshes a single provider by its ID.
+    /// Refreshes a single provider by its ID. Whether it may be fetched is the
+    /// product's to answer, and it answers `.paused` for a paused login
+    /// (CANONICAL §5) — so no caller filters first.
     public func refresh(providerId: String, kind: RefreshKind = .interactive) async {
         guard let provider = login(id: providerId) else {
             return
@@ -478,14 +511,14 @@ public final class QuotaMonitor {
         }
     }
 
-    /// The popover's pills: one per product, its enabled logins inside —
-    /// the tabs follow the persisted order (issue #141), not the
+    /// The popover's pills: one per product whose switch is on, holding every
+    /// login of it — the tabs follow the persisted order (issue #141), not the
     /// registration order.
-    public var tabs: [ProductTab] { ProductTab.tabs(of: lineup, in: providers) }
+    public var tabs: [ProductTab] { ProductTab.tabs(in: providers) }
 
     /// Settings → Providers: every product, on or off, each with all its
     /// logins, in the pane's order (CANONICAL §1: the product's switch).
-    public var productTabs: [ProductTab] { ProductTab.tabs(of: logins, in: providers) }
+    public var productTabs: [ProductTab] { ProductTab.everyProduct(in: providers) }
 
     /// A product's switch — off hides every login of it and keeps them; the
     /// selection moves off a product that is turned off.
@@ -494,50 +527,59 @@ public final class QuotaMonitor {
         if !enabled { selectFirstEnabledIfNeeded() }
     }
 
+    /// *Pause* — the login stops being watched and keeps what it last showed
+    /// (`Account` owns that; CANONICAL §5). The Monitor's part is the
+    /// selection: it moves off a login no page is showing any more.
+    public func pause(_ account: Account) {
+        account.pause()
+        selectFirstEnabledIfNeeded()
+    }
+
+    /// *Resume* — the login is watched again, from the numbers it kept.
+    public func resume(_ account: Account) {
+        account.resume()
+    }
+
     /// The tab the selected login belongs to.
     public var selectedTab: ProductTab? { tabs.first { $0.contains(selectedProviderId) } }
 
-    /// The logins the popover shows: the selected tab's, or the selected
-    /// provider alone.
-    public var selectedLogins: [Account] { selectedTab?.accounts ?? selectedLogin.map { [$0] } ?? [] }
+    /// The logins being watched on the selected tab: what the page's cards
+    /// show and what judges anything.
+    public var selectedLogins: [Account] { selectedTab?.watched ?? selectedLogin.map { [$0] } ?? [] }
 
     /// One login's quota status under the person's policy; `nil` with no usage.
     public func status(of login: Account) -> QuotaStatus? {
         usage(of: login)?.overallStatus(under: statusPolicy)
     }
 
-    /// The selected tab's worst quota status; `nil` while no login has usage.
+    /// The selected tab's worst quota status; `nil` while no watched login has usage.
     public var selectedTabStatus: QuotaStatus? { selectedLogins.compactMap { status(of: $0) }.max() }
 
-    /// What the popover's header says about the selected tab.
-    public var selectedBadge: ProviderBadgeState { ProviderBadgeState(of: selectedLogins, quotaStatus: selectedTabStatus) }
+    /// What the popover's header says about the selected tab — the tab's own
+    /// answer, with the status the person's policy gives its watched logins.
+    public var selectedBadge: ProviderBadgeState {
+        // No page, no badge — an empty cast, since `[]` fits both login shapes.
+        guard let tab = selectedTab else { return ProviderBadgeState(of: [Account](), quotaStatus: nil) }
+        return ProviderBadgeState(of: tab, quotaStatus: selectedTabStatus)
+    }
 
     /// Selects the tab in the given 1-based slot, counted the way the popover
-    /// lists them (⌘1 is the first pill), opening on its first login — the
-    /// slots follow the persisted order (issue #141). A slot with no tab
+    /// lists them (⌘1 is the first pill), opening on its first login — the one
+    /// a paused-only tab has is paused, and its page is still that product's.
+    /// The slots follow the persisted order (issue #141). A slot with no tab
     /// leaves the selection alone.
     public func selectProvider(atPosition position: Int) {
         let tabs = tabs
-        guard tabs.indices.contains(position - 1), let first = tabs[position - 1].accounts.first else { return }
+        guard tabs.indices.contains(position - 1), let first = tabs[position - 1].logins.first else { return }
         selectedProviderId = first.id
     }
 
-    /// Sets a provider's enabled state.
-    /// When disabling the currently selected provider, automatically switches
-    /// to the first available enabled provider.
-    public func setProviderEnabled(_ id: String, enabled: Bool) {
-        guard let login = login(id: id) else { return }
-        login.isEnabled = enabled
-        if !enabled {
-            selectFirstEnabledIfNeeded()
-        }
-    }
-
-    /// Selects the first enabled provider if current selection is invalid.
-    /// Called automatically during initialization and when providers are disabled.
+    /// Selects the first enabled provider if the selection is on no page the
+    /// popover still shows — a product turned off, or a login gone. Called on
+    /// initialization, and whenever a login or a product leaves the page.
     private func selectFirstEnabledIfNeeded() {
-        if !lineup.contains(where: { $0.id == selectedProviderId }),
-           let firstEnabled = lineup.first {
+        if tabs.contains(where: { $0.contains(selectedProviderId) }) { return }
+        if let firstEnabled = lineup.first {
             selectedProviderId = firstEnabled.id
         }
     }

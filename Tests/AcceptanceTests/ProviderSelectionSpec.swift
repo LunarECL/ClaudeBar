@@ -158,36 +158,32 @@ struct ProviderSelectionSpec {
         }
 
         @Test
-        func `should select Codex when the person turns off the selected Claude`() {
+        func `should select Codex when the person turns off the selected Claude`() throws {
             // Given — Claude is selected
             let settings = Self.makeSettings()
             let claudeProduct = stubbedProduct("claude", probe: MockUsageProbe(), settings: settings)
-            let claude = claudeProduct.defaultAccount
             let codexProduct = stubbedProduct("codex", probe: MockUsageProbe(), settings: settings)
-            let codex = codexProduct.defaultAccount
             let monitor = QuotaMonitor(
                 providers: kept([claudeProduct, codexProduct]),
                 clock: TestClock()
             )
             #expect(monitor.selectedProviderId == "claude")
 
-            // When — user disables Claude
-            monitor.setProviderEnabled("claude", enabled: false)
+            // When — the person turns the product off in Settings
+            let claude = try #require(monitor.productTabs.first { $0.id == "claude" })
+            monitor.setProductEnabled(claude, enabled: false)
 
             // Then — auto-switches to Codex
-            #expect(claude.isEnabled == false)
             #expect(monitor.selectedProviderId == "codex")
         }
 
         @Test
-        func `should select the first provider that is on when Claude is off at launch`() {
-            // Given — Claude disabled before init
+        func `should select the first provider that is on when the person turned Claude off`() {
+            // Given — Claude turned off before init, so it has no page to open on
             let settings = Self.makeSettings()
             let claudeProduct = stubbedProduct("claude", probe: MockUsageProbe(), settings: settings)
-            let claude = claudeProduct.defaultAccount
             let codexProduct = stubbedProduct("codex", probe: MockUsageProbe(), settings: settings)
-            let codex = codexProduct.defaultAccount
-            claude.isEnabled = false
+            claudeProduct.isEnabled = false
 
             // When — monitor initializes
             let monitor = QuotaMonitor(

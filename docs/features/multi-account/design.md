@@ -6,7 +6,7 @@ description: Contributor design for multiple accounts under one provider — how
 
 User guide: [README.md](README.md).
 
-**Status: BUILT, slices 1–6.** Built: one `Provider` owns `[Account]`; an
+**Status: BUILT, slices 1–7.** Built: one `Provider` owns `[Account]`; an
 added login runs the **same** data sources with `accounts.patch` merged in and
 `{{account.x}}` filled from its values; added by `accounts.folder` — Codex
 (#356) and Claude (slice 1: `IdentityField`, `derived`, identity from a context
@@ -18,7 +18,13 @@ menu-bar names (slice 2); `accounts.signIn`, `provider.signIn` /
 `SecretStore.scoped(to:)` and `SecretVault`, with API providers made in Add
 Provider asking for a key per account (slice 5); the popover by provider —
 `ProductTab`, `QuotaMonitor.tabs` / `selectedTab`, `Provider.worstAccount`,
-account chips and the callout (slice 6). `selectedProviderId` stays a lineup id
+account chips and the callout (slice 6); **pausing from the popover** —
+`ProductTab.logins` / `.watched` / `.paused`, `QuotaMonitor.pause(_:)` /
+`resume(_:)` as the one door the popover's account menu and the Accounts card share,
+`Account.pause()` / `resume()` as the login's own, the
+as the one door the popover's account menu and the Accounts card share, the
+*PAUSED* rows with *Resume*, and `ProviderBadgeState.paused` for a product
+whose every login is paused (slice 7, §3.5). `selectedProviderId` stays a lineup id
 underneath (the tab's first login), so the menu bar, the refresh loop and the
 Touch Bar read it unchanged. PR #358 adds Claude (as data — kept), browser sign-in, rename and
 compact labels (kept, reshaped below), and a Swift bridge that gives the 18
@@ -347,9 +353,10 @@ model disagree, the decision and its reason are in §8.
 ```text
 ┌──────────────────────────────────────────────┐
 │ ClaudeBar                             ↻  ⚙   │
-│ (Claude) (Codex) (Gemini) (Copilot) (Amp)    │ ← monitor.providers.enabled; selection: Provider.ID
-│ ACCOUNTS  (P Personal●) (W Work●) (S Side●)  │ ← provider.accounts.enabled — a VIEW FILTER (page's)
-│                                              │   shown only when there are 2 or more
+│ (Claude) (Codex) (Gemini) (Copilot) (Amp)    │ ← monitor.tabs — a product whose switch is on;
+│                                              │   selection: Provider.ID
+│ ACCOUNTS  (P Personal●) (W Work●) (S Side●)  │ ← tab.watched — a VIEW FILTER (page's),
+│                                              │   shown only when the product has 2 or more logins
 │ P PERSONAL                       [Healthy]   │ ← account.displayName · account.status
 │ ┌ OPUS 72% ────────┐ ┌ SONNET 88% ───────┐   │ ← account.usage.quotas
 │ W WORK — ACME                    [Warning]   │
@@ -361,11 +368,45 @@ model disagree, the decision and its reason are in §8.
 └──────────────────────────────────────────────┘
 ```
 
-- A provider with one account looks exactly like it does today: no
+- A provider with one login looks exactly like it does today: no
   ACCOUNTS row and no account headers.
 - The dot on a chip is that account's `status` colour. Grey means its last
   fetch failed.
 - Clicking a section header opens that account's card, as a pill does today.
+
+**Popover: a login you stopped watching (slice 7).** The look is
+[`pause.html`](../../../design-concept/multi-account/components/pause.html).
+
+```text
+┌──────────────────────────────────────────────┐
+│ (Claude) (Codex ✓ PAUSED) (Gemini)           │
+│ ACCOUNTS  (P Personal●)                      │ ← tab.watched — still only the ones being watched
+│ P PERSONAL                       [Healthy]   │
+│ ┌ OPUS 72% ────────┐ ┌ SONNET 88% ───────┐   │
+│ PAUSED                                       │ ← tab.paused — the login is on the page, not in it
+│ (W) Work — Acme  last seen 3h ago · 18%  [Resume]
+│ ⏸ No logins watched — Codex is on            │ ← only when tab.watched is empty
+└──────────────────────────────────────────────┘
+
+  right-click a chip, or a section header:
+    ┌────────────────────────────────┐
+    │ ⏸ Pause                        │
+    │ ▶ Use for New Terminal Sessions │
+    └────────────────────────────────┘
+```
+
+- **The menu** is one builder, shown on the chip, on the section header and on
+  a single login's card, with the same words as the Accounts card's `⋯`. The
+  chip's *click* still only filters the view: a chip tapped to tidy the popover
+  never silences an alert (§8).
+- **A paused login is out of every judgement** — no refresh, no menu-bar name,
+  no health colour, no alert, no say in the product's status, and none on *All*.
+  What it keeps is its last numbers, printed as *last seen*.
+- **A tab exists while the product's switch is on.** Pausing every login of a
+  product leaves its tab, dimmed, its header reading *PAUSED* and its page
+  saying *No logins watched* with a *Resume* per login — pause and the
+  product's switch are two facts. Turning the switch off in Settings is what
+  takes a tab away.
 
 **Settings: the Accounts card.** It replaces `CodexAccountsCard`, and every
 provider with an `accounts` block gets it.
@@ -434,7 +475,7 @@ are the cases the definition declares (§8).
 | a folder already listed, or the default login, is not added twice | `Provider` (`addAccount`) |
 | sign-in never writes to an existing folder and saves nothing on failure, cancel or timeout | `AccountSignIn` |
 | display name is label, else email, else the provider's name | `Account.displayName` |
-| one refresh per account in flight; a failed refresh keeps the last usage | `Provider` |
+| one refresh per account in flight; a failed refresh keeps the last usage; a **paused login is never fetched** — the lifecycle says so before it spends a CLI or a request, and answers `UsageError.paused` | `Provider.refresh` |
 | today's usage is read from one login's local logs — Claude's default login's — so only that login shows it; guest passes likewise | `UsageHistory` (keyed by lineup id) · `Account.guestPasses` |
 | removing deletes only what ClaudeBar made — the account's settings, its vault corner, and its folder when it goes with the account; never a folder the person chose or the CLI's files | `Provider.remove`, asking `SignedInFolder.goesWithAccount` |
 | a data source whose key lookup ClaudeBar cannot see (`fetch: script`) declares an `identity`, or the definition is refused on load | `ProviderDefinition` validation (`DefinitionError`) |
@@ -443,6 +484,11 @@ are the cases the definition declares (§8).
 | an account is added only once its identity is known; *Add anyway* exists only after that step passed | `Provider` (`addAccount`) |
 | accounts keep the order the person gave them; the default is found by `isDefault`, not by position | `Provider.accounts` |
 | the provider's status names the account that causes it | `Provider.worstAccount` |
+| a fetch is judged when it **lands**: one landing while the login is paused lands nowhere — nothing recorded, success or failure, and nothing published — while one landing after the person resumed serves the watched login, which is what *Resume* asked for. The rule itself is [CANONICAL §5](../../architecture/CANONICAL_MODEL.md#5--the-laws-on-the-node-that-owns-them)'s | `Account.isEnabled` |
+| a product is off only when the person turns it off; pausing every login of it leaves its tab, dimmed, with *Resume* | `Provider.isEnabled` · `ProductTab` |
+| the selection never lands on a login the popover's page is not showing | `QuotaMonitor.pause(_:)` |
+| a login is never removed from the popover without saying whether it was paused or forgotten | `ProductTab.logins` |
+| a product whose every login is paused reads *PAUSED*, never *NO DATA* — it is not waiting, it stopped looking | `ProviderBadgeState.paused` |
 
 Two laws #358 put in two places, now one each: the identity check (it ran in
 `DataSource` **and** in `Provider.refresh`'s bridge branch) and display naming
@@ -457,6 +503,8 @@ try await provider.signIn()                                    // sign in, check
 try provider.addAccount(signedInAt: url)                       // check, add, save
 provider.rename(account, to: name)
 provider.remove(account)
+monitor.pause(account)                 // the popover's account menu and the Accounts card
+monitor.resume(account)
 
 // Composition root
 let vault = ProviderVault()
@@ -512,6 +560,7 @@ Each slice one PR, test first, green.
 | 4 ✅ | **one Accounts card** (§3.5) — renders `accounts.ways`, reorder, menu-bar pin, Rename · Pause · Remove, Re-auth; the 4-step Add Account sheet with VERIFY by step; `CodexAccountsCard` goes | a provider with `accounts: nil` shows no button; *Add anyway* is absent until identity passed; order survives relaunch |
 | 6 ✅ | **popover by provider** (§3.5) — `selection: Provider.ID`; account sections, view-filter chips, `worstAccount` callout; CANONICAL §8's build truth updated | one account looks like today; a failed fetch is grey with its last usage, never a Status colour; the callout names the account |
 | 5 ✅ | **`form` + scoped secrets** (`SecretStore.scoped(to:)`, `SecretVault`) — account-scope settings in the form; custom definitions can declare `accounts` | an added account's missing key is *Key needed*, never the default's |
+| 7 ✅ | **pause from the popover** (§3.5) — `ProductTab.logins` / `.watched` / `.paused`, `QuotaMonitor.pause(_:)` / `resume(_:)`, the account menu, the *PAUSED* rows and *No logins watched* | a paused login leaves the chips, the menu bar and every aggregate, and is still on the page with *Resume*; a chip click still only filters; a product whose logins are all paused keeps its tab |
 | — | legacy providers | gain accounts in TARGET slices 2 and 5, when they become JSON — by adding an `accounts` block, nothing else |
 
 ## 8 · Open questions
@@ -590,12 +639,21 @@ and *who owns the thing?* — never from what is easiest to build.
   (offline, an expired session), the account is real. It is added, and shows
   *Re-auth* with nothing fetched yet. If no login was found, there is nobody
   to monitor and nothing to name, so there is no *Add anyway*.
-- ~~**Do the popover's account chips pause monitoring?**~~ **No. They only
-  filter the view.** Pausing stops refreshes and notifications. A chip
-  tapped to tidy the popover must not silence an alert. Pause lives on the
-  Accounts card (*Pause*, `isEnabled`). A hidden account still counts toward
-  the provider's status, and the callout names it, so a hidden account can
-  never be the unexplained cause of a warning.
+- ~~**Do the popover's account chips pause monitoring?**~~ **A chip's click
+  does not; the login's menu does.** Pausing stops refreshes, alerts and every
+  judgement. A chip *tapped* to tidy the popover must not silence an alert, so
+  the click still only filters the view. What silences a login is a *command* —
+  **Pause**, on the login's own menu (the chip's right-click and the section
+  header's) and on the Accounts card's `⋯`, both one `monitor.pause(_:)` /
+  so the two doors cannot drift. Pausing from the popover would have been
+  impossible to undo there: a paused login leaves the lineup, and the tab was
+  built from the lineup. So the tab now holds **every** login of a product whose
+  switch is on — watched ones as cards, paused ones as *PAUSED* rows with
+  *Resume* — which is also why *pause* and *the product's switch* stopped being
+  the same fact: pausing your last login turned the whole product off, and the
+  person could not tell that from having turned it off. A hidden login still
+  counts toward the provider's status, and the callout names it, so a hidden
+  login can never be the unexplained cause of a warning (slice 7).
 - ~~**One pill per account (today), or one per provider with its accounts
   inside (the concept)?**~~ **One per provider.** People think *"how is my
   Claude?"* first and *"which login?"* second. With per-account pills, three
