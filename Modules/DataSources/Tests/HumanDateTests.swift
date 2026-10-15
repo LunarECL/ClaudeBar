@@ -92,7 +92,7 @@ struct HumanDateTests {
     }
 
     @Test
-    func `should reset at the day and time the CLI gives in this Mac's time zone when it names none`() {
+    func `should reset at the day and time the CLI gives in the person's time zone when it names none`() {
         #expect(parse("Resets Jan 15, 3:30pm") == local(2027, 1, 15, 15, 30))
     }
 

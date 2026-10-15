@@ -18,7 +18,7 @@ struct SystemTemplateTests {
                                       osVersion: OperatingSystemVersion(majorVersion: 27, minorVersion: 1, patchVersion: 0))
 
     @Test
-    func `should send the Mac's time zone even without a credential`() {
+    func `should send the person's time zone even without a credential`() {
         #expect(Template.fill("tz={{system.timeZone}}", with: nil, system: system) == "tz=Asia/Shanghai")
     }
 
