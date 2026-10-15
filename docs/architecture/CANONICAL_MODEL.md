@@ -163,11 +163,13 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │   │                   provider. Built by DataSources from the definition's
 │       │       │   │   │                   `usageHistory` (a UsageLog.Definition) filled with this
 │       │       │   │   │                   login's values (its folder); days(from:to:) reads them:
-│       │       │   │   ├── records         WHERE AND HOW — files (a glob) · format (a JSON object per
-│       │       │   │   │                   line, or per file) · the record's shape in the mapping's
-│       │       │   │   │                   path language (when, which model, tokens by kind, its own
-│       │       │   │   │                   cost, its identity), or its `shapes` when the log writes it
-│       │       │   │   │                   more than one way, each read whole
+│       │       │   │   ├── records         WHERE AND HOW — files (a glob) or one fixed read-only
+│       │       │   │   │   │               command whose JSON answer holds the rows · format (a
+│       │       │   │   │   │               JSON object per line, or per file) · the record's shape
+│       │       │   │   │   │               in the mapping's path language (when, which model,
+│       │       │   │   │   │               tokens by kind, its own cost, its identity), or its
+│       │       │   │   │   │               `shapes` when the log writes it more than one way,
+│       │       │   │   │   │               each read whole
 │       │       │   │   ├── prices: PriceList   WHAT A TOKEN COSTS — a price file beside the
 │       │       │   │   │                   definition, or a cloud's list through Bedrock's PriceCatalog
 │       │       │   │   └── sessionGap: seconds?   a pause longer than this starts a working session
@@ -455,6 +457,9 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a day is the local calendar day; a record counts on the day its own timestamp falls in — a timestamp written in UTC (a file name) is converted, never read as local | `Day` |
 | a record written twice counts once — the last copy wins (a streamed message is logged as it grows) | `UsageLog.records` |
 | a record is read by the first shape whose `where` holds; one shape's paths never answer for another's record | `UsageLog.Records` |
+| a log's records come from FILES or from ONE COMMAND — the two cases of one sum, so "both" and "neither" cannot be written; a command's records carry no `format`, because the answer's layout is the reader's business | `UsageLog.Records.source` |
+| a reader is TOLD what to read, never asked what it holds: `records(since:)` is one method every reader answers, a file reader finding its own files and the command reader running its command, so no caller branches on which kind of log it has | `LogReader` |
+| the range asked for is cut by `days(in:)`, NEVER by the log: a log answers from `since` on, and a query that bounds itself below the range asked would have its older days read as empty and kept that way for good | `UsageLog.days(in:)` |
 | a day closes a fixed while after it ends; a closed day is summed once, kept, and never read from the logs again. Today, and the day before until it closes, are read every time | `DayLedger` |
 | a day is THE SUM OF ITS LINES: one line per model, a line holding what the day holds — the model's tokens by kind and its cost. The log's own cost wins; otherwise cost is ESTIMATED from the price catalog, and says so. A model served on this Mac costs nothing; an unknown model gets the catalog's fallback price, never zero by omission. Records with no model form one unnamed line, so the lines always add up to the day | `Day.lines` · `PriceList` |
 | a range of days answers the page's questions — which models, in order; a day's lines, largest first; its total in a unit — so a view renders and tells | `Days` |
