@@ -307,17 +307,10 @@ public struct BinaryLocator: BinaryLocating, Sendable {
         return LoginShellAnswer(output: output, status: proc.terminationStatus)
     }
 
-    /// Stops a shell that ran out of time: asked first, then made to.
+    /// Stops a shell that ran out of time: asked first, then made to, and
+    /// left if it's still there, so the lookup's deadline holds.
     private static func stop(_ proc: Process) {
-        proc.terminate()
-        let deadline = Date().addingTimeInterval(1)
-        while proc.isRunning, Date() < deadline {
-            usleep(10_000)
-        }
-        if proc.isRunning {
-            kill(proc.processIdentifier, SIGKILL)
-        }
-        proc.waitUntilExit()
+        ChildTeardown.end(proc, named: "login shell", grace: 1)
     }
 
     /// Searches for a tool in common installation paths.

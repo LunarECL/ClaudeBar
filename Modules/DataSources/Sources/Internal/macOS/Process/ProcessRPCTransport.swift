@@ -96,22 +96,9 @@ public final class ProcessRPCTransport: RPCTransport, @unchecked Sendable {
         // and shuts down on its own, without needing a signal.
         try? stdinPipe.fileHandleForWriting.close()
 
-        if process.isRunning {
-            process.terminate()
-
-            // Bounded wait, then escalate. Mirrors InteractiveRunner's teardown.
-            let deadline = Date().addingTimeInterval(2.0)
-            while process.isRunning, Date() < deadline {
-                usleep(50_000)
-            }
-            if process.isRunning {
-                kill(process.processIdentifier, SIGKILL)
-            }
-        }
-
-        // Reap the child. Without this it lingers as a zombie for the lifetime
-        // of the app, since nothing else ever waits on it.
-        process.waitUntilExit()
+        // Asked, made, then left (#550): this close is the deadline's, so it
+        // can't wait on a child that outlives SIGKILL.
+        ChildTeardown.end(process, named: process.executableURL?.lastPathComponent ?? "RPC child")
         try? stdoutPipe.fileHandleForReading.close()
     }
 }
