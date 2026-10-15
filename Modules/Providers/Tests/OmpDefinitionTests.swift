@@ -560,6 +560,22 @@ struct OmpDefinitionTests {
     }
 
     @Test(.needsScriptEngine)
+    func `should show a pool from the member that has an amount when the first reports none`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "google-antigravity",
+            "limits": [
+              { "label": "Claude & GPT (shared)", "scope": { "windowId": "5h", "sharedGroup": "3p-5h:5h" }, "amount": { "unit": "percent" } },
+              { "label": "Claude & GPT (shared)", "scope": { "windowId": "5h", "sharedGroup": "3p-5h:5h" }, "amount": { "remainingFraction": 0.35 } }
+            ]
+        } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(snapshot.quotas.map(\.percentRemaining) == [35])
+    }
+
+    @Test(.needsScriptEngine)
     func `should keep limits that share a window but no pool apart`() throws {
         // Same window and label, no sharedGroup: two pools omp names alike.
         let json = """

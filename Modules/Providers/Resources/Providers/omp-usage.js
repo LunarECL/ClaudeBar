@@ -87,15 +87,17 @@ function read(response) {
         const providerName = displayName(report.provider);
         const group = discriminator ? providerName + ' · ' + discriminator : providerName;
         // One pool omp reports once per model family (Antigravity's Claude and
-        // GPT) carries one `sharedGroup`: it is one quota, shown once.
+        // GPT) carries one `sharedGroup`: it is one quota, shown from the first
+        // member with an amount to show.
+        const shows = l => l.uncapped != null || (l.percent != null && (!l.monetary || l.capped != null));
         const pools = new Set();
-        const limits = report.limits.filter(object).filter(l => {
-            const pool = object(l.scope) ? str(l.scope.sharedGroup) : null;
-            if (!pool) return true;
+        const limits = report.limits.filter(object).map(limitOf).filter(l => {
+            const pool = str(l.scope.sharedGroup);
+            if (!pool || !shows(l)) return true;
             if (pools.has(pool)) return false;
             pools.add(pool);
             return true;
-        }).map(limitOf);
+        });
         const perWindow = {};
         for (const l of limits) perWindow[l.groupKey] = (perWindow[l.groupKey] || 0) + 1;
         // Limits a (tier, window, meter) can't tell apart are named by omp's
