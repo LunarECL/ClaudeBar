@@ -52,10 +52,12 @@ The provider declares a 5-minute `backgroundRefreshFloor`: `omp usage` caches up
 
 ## Labels are keys
 
-Each limit becomes a `timeLimit` quota labelled `"<Provider> [Tier] [Meter] <window> [· account]"`, e.g. "Claude 5h", "Codex Spark 7d", "Z.ai Tokens 5h". **The label is the persisted quota key** (menu-bar selections, Notify! gauge), so it must be unique and stable:
+Each limit becomes a `timeLimit` quota labelled `"<Provider> [Tier] [Meter] [Name] <window> [· account]"`, e.g. "Claude 5h", "Codex Spark 7d", "Z.ai Tokens 5h", "Antigravity Gemini 5h". **The label is the persisted quota key** (menu-bar selections, Notify! gauge), so it must be unique and stable:
 
 - **Account discriminator** only when several reports share one upstream provider: the email local part (≤16 chars) or the first 8 chars of an opaque id, else `#<index>`.
 - **Meter** only when two limits share a (tier, window) on one account, e.g. Z.ai's token and request quotas are both `5h`. The meter is `amount.unit` capitalised, unless it's `percent`.
+- **Name** only when limits share a (tier, window, meter) on one account and omp's own `label`s differ, e.g. Antigravity's "Gemini" beside "Claude & GPT (shared)" (omp v18.11). Spend rows keep their names.
+- **One pool, one quota**: limits with the same `scope.sharedGroup` are one pool, and only the first is shown. Antigravity reports the pool Claude and GPT share once per model family.
 - **Final guard**: any remaining collision gets ` (2)`, ` (3)`…
 - The raw window token (`scope.windowId` → `window.id` → `window.label`) is never humanised in the label.
 

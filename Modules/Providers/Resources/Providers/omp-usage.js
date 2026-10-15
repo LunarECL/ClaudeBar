@@ -47,6 +47,7 @@ function read(response) {
         else if (num(amount.used) != null && num(amount.limit) > 0) percent = (num(amount.limit) - num(amount.used)) / num(amount.limit) * 100;
         return {
             scope, window, amount, monetary, token, percent,
+            name: str(l.label) ? l.label.trim() : null,
             groupKey: (scope.tier || '') + '|' + windowToken,
             capped: monetary && num(amount.limit) > 0 && amount.used != null ? {used: decimalCents(amount.used), cap: decimalCents(amount.limit)} : null,
             uncapped: monetary && amount.limit == null && amount.used != null ? decimalCents(amount.used) : null,
@@ -85,9 +86,24 @@ function read(response) {
             ? (identity ? (identity.includes('@') ? identity.split('@')[0].slice(0, 16) : identity.slice(0, 8)) : '#' + (index + 1)) : null;
         const providerName = displayName(report.provider);
         const group = discriminator ? providerName + ' · ' + discriminator : providerName;
-        const limits = report.limits.filter(object).map(limitOf);
+        // One pool omp reports once per model family (Antigravity's Claude and
+        // GPT) carries one `sharedGroup`: it is one quota, shown once.
+        const pools = new Set();
+        const limits = report.limits.filter(object).filter(l => {
+            const pool = object(l.scope) ? str(l.scope.sharedGroup) : null;
+            if (!pool) return true;
+            if (pools.has(pool)) return false;
+            pools.add(pool);
+            return true;
+        }).map(limitOf);
         const perWindow = {};
         for (const l of limits) perWindow[l.groupKey] = (perWindow[l.groupKey] || 0) + 1;
+        // Limits a (tier, window, meter) can't tell apart are named by omp's
+        // own label when the labels differ (Antigravity's "Gemini" beside
+        // "Claude & GPT (shared)"). Spend keeps its own names.
+        const namesPerMeter = {};
+        const meterKey = l => l.groupKey + '|' + (l.meter || '');
+        for (const l of limits) if (!l.monetary && l.name) (namesPerMeter[meterKey(l)] = namesPerMeter[meterKey(l)] || new Set()).add(l.name);
         const before = quotas.length + notes.length;
         for (const l of limits) {
             if (l.uncapped != null) {
@@ -101,6 +117,7 @@ function read(response) {
             const parts = [providerName];
             if (str(l.scope.tier)) parts.push(capitalized(l.scope.tier));
             if (meter) parts.push(meter);
+            if (!l.monetary && l.name && namesPerMeter[meterKey(l)].size > 1) parts.push(l.name);
             parts.push(l.token);
             if (discriminator) parts.push('· ' + discriminator);
             const q = {type: 'time', name: unique(parts.join(' '), seenLabels), group};
