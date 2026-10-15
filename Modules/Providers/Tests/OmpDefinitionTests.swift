@@ -485,6 +485,113 @@ struct OmpDefinitionTests {
         #expect(!labels.contains { $0.hasSuffix("(2)") })
     }
 
+    /// Modeled on live `omp usage --json` output for `google-antigravity`
+    /// (omp v18.11.0): Gemini has its own 5-hour and weekly limits, and
+    /// Claude and GPT draw on one pool, reported once per model family and
+    /// marked `shared` with the same `sharedGroup`. All values are synthetic.
+    static let antigravityResponse = """
+    { "reports": [ {
+        "provider": "google-antigravity",
+        "limits": [
+          {
+            "id": "google-antigravity:google:default:gemini-weekly",
+            "label": "Gemini",
+            "scope": { "provider": "google-antigravity", "projectId": "test-project", "windowId": "weekly" },
+            "window": { "id": "weekly", "label": "Weekly", "durationMs": 604800000, "resetsAt": 1792640089000 },
+            "amount": { "unit": "percent", "remainingFraction": 0.9, "usedFraction": 0.1, "remaining": 90, "used": 10, "limit": 100 }
+          },
+          {
+            "id": "google-antigravity:google:default:gemini-5h",
+            "label": "Gemini",
+            "scope": { "provider": "google-antigravity", "projectId": "test-project", "windowId": "5h" },
+            "window": { "id": "5h", "label": "5 Hour", "durationMs": 18000000, "resetsAt": 1792053289000 },
+            "amount": { "unit": "percent", "remainingFraction": 0.8, "usedFraction": 0.2, "remaining": 80, "used": 20, "limit": 100 }
+          },
+          {
+            "id": "google-antigravity:anthropic:default:3p-weekly",
+            "label": "Claude & GPT (shared)",
+            "scope": { "provider": "google-antigravity", "projectId": "test-project", "windowId": "weekly", "shared": true, "sharedGroup": "3p-weekly:weekly" },
+            "window": { "id": "weekly", "label": "Weekly", "durationMs": 604800000, "resetsAt": 1792640089000 },
+            "amount": { "unit": "percent", "remainingFraction": 0.7, "usedFraction": 0.3, "remaining": 70, "used": 30, "limit": 100 }
+          },
+          {
+            "id": "google-antigravity:openai:default:3p-weekly",
+            "label": "Claude & GPT (shared)",
+            "scope": { "provider": "google-antigravity", "projectId": "test-project", "windowId": "weekly", "shared": true, "sharedGroup": "3p-weekly:weekly" },
+            "window": { "id": "weekly", "label": "Weekly", "durationMs": 604800000, "resetsAt": 1792640089000 },
+            "amount": { "unit": "percent", "remainingFraction": 0.7, "usedFraction": 0.3, "remaining": 70, "used": 30, "limit": 100 }
+          },
+          {
+            "id": "google-antigravity:anthropic:default:3p-5h",
+            "label": "Claude & GPT (shared)",
+            "scope": { "provider": "google-antigravity", "projectId": "test-project", "windowId": "5h", "shared": true, "sharedGroup": "3p-5h:5h" },
+            "window": { "id": "5h", "label": "5 Hour", "durationMs": 18000000, "resetsAt": 1792053289000 },
+            "amount": { "unit": "percent", "remainingFraction": 0.6, "usedFraction": 0.4, "remaining": 60, "used": 40, "limit": 100 }
+          },
+          {
+            "id": "google-antigravity:openai:default:3p-5h",
+            "label": "Claude & GPT (shared)",
+            "scope": { "provider": "google-antigravity", "projectId": "test-project", "windowId": "5h", "shared": true, "sharedGroup": "3p-5h:5h" },
+            "window": { "id": "5h", "label": "5 Hour", "durationMs": 18000000, "resetsAt": 1792053289000 },
+            "amount": { "unit": "percent", "remainingFraction": 0.6, "usedFraction": 0.4, "remaining": 60, "used": 40, "limit": 100 }
+          }
+        ],
+        "metadata": { "projectId": "test-project", "email": "agy@example.com" }
+    } ] }
+    """
+
+    @Test(.needsScriptEngine)
+    func `should tell apart limits sharing one window by what omp calls each`() throws {
+        let snapshot = try OmpFixtures.parse(Self.antigravityResponse)
+
+        #expect(snapshot.quota(for: .timeLimit("Antigravity Gemini weekly"))?.percentRemaining == 90)
+        #expect(snapshot.quota(for: .timeLimit("Antigravity Gemini 5h"))?.percentRemaining == 80)
+        #expect(snapshot.quota(for: .timeLimit("Antigravity Claude & GPT (shared) weekly"))?.percentRemaining == 70)
+        #expect(snapshot.quota(for: .timeLimit("Antigravity Claude & GPT (shared) 5h"))?.percentRemaining == 60)
+    }
+
+    @Test(.needsScriptEngine)
+    func `should show a pool omp reports once per model family as one quota`() throws {
+        let snapshot = try OmpFixtures.parse(Self.antigravityResponse)
+        let labels = snapshot.quotas.map(\.quotaType.displayName)
+
+        #expect(labels.count == 4)
+        #expect(!labels.contains { $0.hasSuffix("(2)") })
+    }
+
+    @Test(.needsScriptEngine)
+    func `should show a pool from the member that has an amount when the first reports none`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "google-antigravity",
+            "limits": [
+              { "label": "Claude & GPT (shared)", "scope": { "windowId": "5h", "sharedGroup": "3p-5h:5h" }, "amount": { "unit": "percent" } },
+              { "label": "Claude & GPT (shared)", "scope": { "windowId": "5h", "sharedGroup": "3p-5h:5h" }, "amount": { "remainingFraction": 0.35 } }
+            ]
+        } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(snapshot.quotas.map(\.percentRemaining) == [35])
+    }
+
+    @Test(.needsScriptEngine)
+    func `should keep limits that share a window but no pool apart`() throws {
+        // Same window and label, no sharedGroup: two pools omp names alike.
+        let json = """
+        { "reports": [ {
+            "provider": "google-antigravity",
+            "limits": [
+              { "label": "Claude", "scope": { "windowId": "5h", "shared": true }, "amount": { "remainingFraction": 0.5 } },
+              { "label": "Claude", "scope": { "windowId": "5h", "shared": true }, "amount": { "remainingFraction": 0.4 } }
+            ]
+        } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(snapshot.quotas.map(\.percentRemaining) == [50, 40])
+    }
+
     // MARK: - Card Title Humanization
 
     /// Modeled on live `omp usage --json` output for `kimi-code` (omp

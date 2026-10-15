@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Oh My Pi, Antigravity**: each card says which models it counts, Gemini or Claude & GPT, instead of "Antigravity Weekly (2)", and the pool Claude and GPT share shows once, not twice. A menu-bar pick of an Antigravity quota needs choosing again. ([#562](https://github.com/tddworks/ClaudeBar/pull/562)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/omp/design.md)
 - **Stuck on Syncing... again**: stopping a CLI at its deadline no longer waits forever when the CLI is still running after being killed. ClaudeBar gives it 2 seconds, then logs a warning naming it and its process id, and moves on to the fallback. ([#561](https://github.com/tddworks/ClaudeBar/pull/561), [#550](https://github.com/tddworks/ClaudeBar/issues/550)) -> [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/codex/design.md)
 
 ### Added
