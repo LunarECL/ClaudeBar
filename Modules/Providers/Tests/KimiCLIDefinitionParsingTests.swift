@@ -245,6 +245,17 @@ struct KimiCLIDefinitionParsingTests {
         #expect(monthly.windowDuration == TimeInterval(28 * 86400 - 3600))
     }
 
+    @Test
+    func `should start the monthly window at the hour the clocks skip, moved forward as the Mac did`() throws {
+        // Resets 2026-04-08 02:30 PDT; a month before, 02:30 on 03-08 never
+        // happened in Los Angeles, so the window starts at 03:30 PDT.
+        let now = Date(timeIntervalSince1970: 1_773_506_880)
+        let monthly = try #require(try KimiDefinitionFixtures.cli(Self.cli2xOutput, in: Zones.losAngeles, now: now)
+            .quota(for: .timeLimit("Monthly")))
+        #expect(monthly.resetsAt == Date(timeIntervalSince1970: 1_775_640_600))
+        #expect(monthly.windowDuration == TimeInterval(31 * 86400 - 3600))
+    }
+
     // MARK: - Reset Time Parsing
 
     @Test

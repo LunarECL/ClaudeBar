@@ -52,4 +52,20 @@ struct ScriptCalendarTests {
         // 2027-01-01 09:30 PST.
         #expect(quota.resetsAt == Date(timeIntervalSince1970: 1_798_824_600))
     }
+
+    /// A clock time the zone skips or repeats reads as `new Date(y, m, d, …)`
+    /// does: 02:30 on 2026-03-08 doesn't exist and moves forward to 03:30 PDT;
+    /// 01:30 on 2026-11-01 happens twice and is the first, PDT.
+    @Test(arguments: [
+        ("2026, 2, 8, 2, 30", 1_772_965_800.0),
+        ("2026, 10, 1, 1, 30", 1_793_521_800),
+    ])
+    func `should read a clock time the zone skips or repeats as Date does`(_ time: String, _ seconds: Double) throws {
+        let quota = try read(script: """
+        function read() {
+          return { quotas: [{ type: 'time', name: 'Change', percentRemaining: 50, resetsAt: localTime(\(time)) }] };
+        }
+        """)
+        #expect(quota.resetsAt == Date(timeIntervalSince1970: seconds))
+    }
 }

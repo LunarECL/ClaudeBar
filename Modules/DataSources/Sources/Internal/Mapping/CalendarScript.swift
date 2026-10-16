@@ -6,7 +6,8 @@
 ///   that instant on the person's clock, the month from 0 as `Date` has it;
 /// - `localTime(year, month, day, hours, minutes, seconds)`: the instant the
 ///   person's clock reads that; a field past its range carries, as
-///   `Date.UTC`'s do.
+///   `Date.UTC`'s do. A clock time the zone repeats is its first instant, and
+///   one it skips moves forward by the gap, as `new Date(y, m, d, …)` does.
 ///
 /// Both rest on the host's `zoneOffset(seconds)`: the zone's offset from UTC
 /// at that instant, in seconds.
@@ -19,7 +20,12 @@ function localParts(seconds) {
 }
 function localTime(year, month, day, hours, minutes, seconds) {
     const wall = Date.UTC(year, month, day, hours || 0, minutes || 0, seconds || 0) / 1000;
-    return wall - zoneOffset(wall - zoneOffset(wall));
+    // The offsets either side of any change near this clock time.
+    const before = wall - zoneOffset(wall - 86400), after = wall - zoneOffset(wall + 86400);
+    const reads = (instant) => instant + zoneOffset(instant) === wall;
+    if (reads(before) && reads(after)) return Math.min(before, after);
+    if (reads(after)) return after;
+    return before;
 }
 """#
 }
