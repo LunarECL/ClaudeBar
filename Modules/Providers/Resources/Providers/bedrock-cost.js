@@ -29,9 +29,9 @@ function read(response, context) {
                     detail: tokens(m.input + m.output) + ' tokens · ' + m.calls + ' calls' + (price.input ? '' : ' · no price known')});
     }
     lines.sort((a, b) => Number(b.used) - Number(a.used) || (a.label < b.label ? -1 : 1));
-    // Today ends at the person's next midnight.
-    const today = localParts(data.periodStart || context.now);
-    const cost = {kind: 'apiCost', used: total, lines, resetsAt: localTime(today.year, today.month, today.day + 1), resetText: 'Today'};
+    const midnight = new Date((data.periodStart || context.now) * 1000);
+    midnight.setDate(midnight.getDate() + 1);
+    const cost = {kind: 'apiCost', used: total, lines, resetsAt: midnight.getTime() / 1000, resetText: 'Today'};
     if (context.values.dailyBudget) cost.limit = context.values.dailyBudget;
     return {quotas: [], cost};
 }

@@ -19,9 +19,8 @@ import Foundation
 /// `humanDate(text)` for an epoch-seconds reset time, or `null`;
 /// `jsonDecimal(text)` to parse JSON keeping every number as its exact text;
 /// `decimalCents(amount)` to round such an amount to cents without a
-/// binary float — money stays exact (CANONICAL §5, `Money`); and
-/// `localTime(…)` / `localParts(seconds)` for a date on the person's clock
-/// (`CalendarScript`), never the engine's own local time.
+/// binary float — money stays exact (CANONICAL §5, `Money`). Its `Date` is
+/// on the person's clock: the engine's local time is `zone` (`ScriptEngine`).
 ///
 /// The context has no file, network or process access: the script turns text
 /// into numbers and nothing else.
@@ -30,8 +29,8 @@ struct ScriptMapper: Reading {
     let source: String?
     var values: [String: String] = [:]
     let engine: any ScriptEngine
-    /// The person's zone: the script's `context.timeZone`, and where
-    /// `humanDate` reads a text that names none.
+    /// The person's zone: the script's `context.timeZone`, its `Date`'s
+    /// local time, and where `humanDate` reads a text that names none.
     let zone: any TimeZoneSource
     let now: @Sendable () -> Date
 
@@ -45,12 +44,12 @@ struct ScriptMapper: Reading {
         do {
             output = try engine.evaluate(
                 "JSON.stringify(read(JSON.parse(__input).response, JSON.parse(__input).context))",
-                after: [DecimalScript.source, CalendarScript.source, source],
+                after: [DecimalScript.source, source],
                 strings: ["__input": try Self.inputJSON(response, facts: facts, values: values, timeZone: timeZone, now: now())],
                 functions: [
                     "humanDate": { HumanDate.parse($0, now: clock(), timeZone: timeZone).map { $0.timeIntervalSince1970 } },
-                    "zoneOffset": { Double($0).map { Double(timeZone.secondsFromGMT(for: Date(timeIntervalSince1970: $0))) } },
-                ]
+                ],
+                localTime: timeZone
             )
         } catch ScriptEngineError.load(let exception) {
             throw UsageError.parseFailed("Mapping script '\(file)' failed to load: \(exception)")

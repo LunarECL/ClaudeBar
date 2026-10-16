@@ -442,8 +442,8 @@ Modules/DataSources/Sources/
     ├── Unavailable.swift      a case whose connection is nil: fails at its step
     │                            as ErrorFact.unavailable, naming it and platform.name
     ├── Mapping/QuickJSEngine.swift   the one engine, on CQuickJS (#570)
-    ├── Mapping/CalendarScript.swift  localParts() · localTime(): a script's
-    │                                 dates on the person's clock (#570)
+    ├── Mapping/LocalDateScript.swift Date's local time is the zone the
+    │                                 engine is given, not the OS's (#570)
     ├── Lookup/ReadOnlyQuery.swift    the one SQLite reader, on CSQLite (#570)
     ├── Time/WindowsZones.swift   a Windows zone key to its zone: CLDR's table
     │                             (+Table, generated from Vendor/CLDR) or the OS's
@@ -560,14 +560,15 @@ Phase 5's slices, each its own issue and PR
   the first slice that regroups `Platform`.
 - ~~**The JavaScript engine on Windows.**~~ QuickJS, vendored, on the Mac too
   ([#570](https://github.com/tddworks/ClaudeBar/issues/570)).
-- ~~**A script's local time on Windows.**~~ QuickJS's Windows
-  `getTimezoneOffset` ignores the date it is asked about and applies today's
-  offset to every date (quickjs-ng v0.17.0, `quickjs-amalgam.c`). So a script
-  never reads the engine's local time: it gets the person's clock from
-  `localParts(seconds)` and `localTime(year, month, day, …)`, which rest on
-  the host's `zoneOffset(seconds)` from `Platform.timeZone`, and the scripts
-  that called `new Date(y, m, d)` or `getHours()` moved to them. A test in Los
-  Angeles across a daylight-saving change holds it
+- ~~**A script's local time on Windows.**~~ A script's `Date` local time is
+  the person's zone, on every platform: the engine takes it from the
+  `TimeZone` port. QuickJS asks the OS (libc's zone on the Mac; on Windows,
+  today's offset for every date, quickjs-ng v0.17.0), so `ScriptEngine`'s
+  `evaluate` takes a `localTime` zone and `QuickJSEngine` runs
+  `LocalDateScript` before the scripts, which binds `new Date(y, m, d)`, the
+  local getters and setters, a date-time text with no zone and `toString()` to
+  it. Scripts are plain JavaScript. Its contract test checks five zones
+  against Foundation's calendar, every quarter hour around each clock change
   ([#570](https://github.com/tddworks/ClaudeBar/issues/570)).
 - **Foundation's differences on Windows** (paths, symlinks, `FileManager`,
   date formats, and APIs it lacks outright, such as `RelativeDateTimeFormatter`)

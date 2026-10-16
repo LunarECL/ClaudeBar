@@ -5,7 +5,8 @@ import Quotas
 /// QuickJS (quickjs-ng, pinned in `Vendor/CQuickJS`): the one script engine,
 /// the same on every platform (MODULAR_DESIGN §10, #570). Each run gets a
 /// fresh runtime and context, built without QuickJS's libc, so a script
-/// reaches no file, network or process: it turns text into numbers.
+/// reaches no file, network or process: it turns text into numbers. Its
+/// `Date`'s local time is the zone it is given, not the OS's (`LocalDateScript`).
 struct QuickJSEngine: ScriptEngine {
     /// Each run has a thread of its own with this much stack. QuickJS's
     /// interpreter frames are large in an unoptimised build: a mapping ran
@@ -16,11 +17,13 @@ struct QuickJSEngine: ScriptEngine {
     static let stackLimit = 6 << 20
 
     func evaluate(_ expression: String, after scripts: [String], strings: [String: String],
-                  functions: [String: ScriptFunction]) throws -> String? {
+                  functions: [String: ScriptFunction], localTime: TimeZone) throws -> String? {
         let outcome = Outcome()
         let done = DispatchSemaphore(value: 0)
         let thread = Thread {
-            outcome.result = Result { try Self.run(expression, after: scripts, strings: strings, functions: functions) }
+            outcome.result = Result {
+                try Self.run(expression, after: scripts, strings: strings, functions: functions, localTime: localTime)
+            }
             done.signal()
         }
         thread.stackSize = Self.threadStack
@@ -30,13 +33,19 @@ struct QuickJSEngine: ScriptEngine {
     }
 
     private static func run(_ expression: String, after scripts: [String], strings: [String: String],
-                            functions: [String: ScriptFunction]) throws -> String? {
+                            functions: [String: ScriptFunction], localTime: TimeZone) throws -> String? {
         guard let runtime = JS_NewRuntime() else { throw UsageError.executionFailed("QuickJS is unavailable") }
         defer { JS_FreeRuntime(runtime) }
         JS_SetMaxStackSize(runtime, stackLimit)
         guard let context = JS_NewContext(runtime) else { throw UsageError.executionFailed("QuickJS is unavailable") }
         defer { JS_FreeContext(context) }
 
+        var functions = functions
+        functions[LocalDateScript.offsetFunction] = { milliseconds in
+            Double(milliseconds).flatMap { $0.isFinite ? $0 : nil }.map {
+                Double(localTime.secondsFromGMT(for: Date(timeIntervalSince1970: $0 / 1000)))
+            }
+        }
         let named = functions.sorted { $0.key < $1.key }
         let host = Unmanaged.passRetained(Host(functions: named.map(\.value)))
         defer { host.release() }
@@ -60,7 +69,7 @@ struct QuickJSEngine: ScriptEngine {
             JS_SetPropertyStr(context, global, function.key, call)
         }
 
-        for script in scripts {
+        for script in [LocalDateScript.source] + scripts {
             let loaded = JS_Eval(context, script, script.utf8.count, "<script>", Int32(JS_EVAL_TYPE_GLOBAL))
             defer { JS_FreeValue(context, loaded) }
             if JS_IsException(loaded) { throw ScriptEngineError.load(exception(context)) }

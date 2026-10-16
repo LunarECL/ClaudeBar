@@ -12,10 +12,18 @@ protocol ScriptEngine: Sendable {
     /// or `null`, then evaluates `expression`. Answers its value as text, or
     /// `nil` when it is `undefined`.
     ///
+    /// `Date`'s local time is `localTime`, the person's zone from the
+    /// `TimeZone` port (#567), never the engine's own: `new Date(y, m, d)`,
+    /// `getHours()`, the setters, a date-time text with no zone and
+    /// `toString()` read the person's clock on every platform, so a script
+    /// is plain JavaScript and never learns which one it runs on. A clock
+    /// time the zone skips moves forward by the gap; one it repeats is its
+    /// first instant.
+    ///
     /// Throws `ScriptEngineError.load` when a script throws while loading,
     /// and `.run` when `expression` throws.
     func evaluate(_ expression: String, after scripts: [String], strings: [String: String],
-                  functions: [String: ScriptFunction]) throws -> String?
+                  functions: [String: ScriptFunction], localTime: TimeZone) throws -> String?
 }
 
 /// A host function a script may call: text in, a number or `null` out.

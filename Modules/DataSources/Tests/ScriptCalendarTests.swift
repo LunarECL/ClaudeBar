@@ -3,10 +3,10 @@ import Quotas
 import Testing
 @testable import DataSources
 
-/// `localTime` and `localParts`: a script's calendar is the person's, from
-/// `Platform.timeZone` (#570), never the engine's own local time, which on
-/// Windows applies today's offset to every date. Los Angeles, fixed, moves its
-/// clocks on 2026-03-08, so a day that morning is 23 hours on any machine.
+/// A mapping script's `Date` is on the person's clock, the zone the platform's
+/// `TimeZone` port gives (#567), never the OS's, so plain JavaScript reads the
+/// same on every machine (#570). Los Angeles, fixed, moves its clocks on
+/// 2026-03-08, so a day that morning is 23 hours on any machine.
 @Suite
 struct ScriptCalendarTests {
     private func read(script: String) throws -> UsageQuota {
@@ -22,7 +22,7 @@ struct ScriptCalendarTests {
     @Test func `should count a day across a daylight-saving change in the person's zone`() throws {
         let quota = try read(script: """
         function read() {
-          const saturday = localTime(2026, 2, 7), monday = localTime(2026, 2, 9);
+          const saturday = new Date(2026, 2, 7) / 1000, monday = new Date(2026, 2, 9) / 1000;
           return { quotas: [{ type: 'time', name: 'Weekend', percentRemaining: 50,
                               resetsAt: monday, windowSeconds: monday - saturday }] };
         }
@@ -35,9 +35,9 @@ struct ScriptCalendarTests {
     @Test func `should read an instant's date and time in the person's zone`() throws {
         let quota = try read(script: """
         function read() {
-          const p = localParts(1773039600 - 1);
+          const d = new Date((1773039600 - 1) * 1000);
           return { quotas: [{ type: 'time', name: 'Day', percentRemaining: 50,
-                              resetText: [p.year, p.month + 1, p.day, p.hours, p.minutes, p.seconds].join(' ') }] };
+                              resetText: [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()].join(' ') }] };
         }
         """)
         #expect(quota.resetText == "2026 3 8 23 59 59")
@@ -46,24 +46,23 @@ struct ScriptCalendarTests {
     @Test func `should carry a month that runs past the year`() throws {
         let quota = try read(script: """
         function read() {
-          return { quotas: [{ type: 'time', name: 'Year', percentRemaining: 50, resetsAt: localTime(2026, 12, 1, 9, 30) }] };
+          return { quotas: [{ type: 'time', name: 'Year', percentRemaining: 50, resetsAt: new Date(2026, 12, 1, 9, 30) / 1000 }] };
         }
         """)
         // 2027-01-01 09:30 PST.
         #expect(quota.resetsAt == Date(timeIntervalSince1970: 1_798_824_600))
     }
 
-    /// A clock time the zone skips or repeats reads as `new Date(y, m, d, …)`
-    /// does: 02:30 on 2026-03-08 doesn't exist and moves forward to 03:30 PDT;
+    /// 02:30 on 2026-03-08 doesn't exist and moves forward to 03:30 PDT;
     /// 01:30 on 2026-11-01 happens twice and is the first, PDT.
     @Test(arguments: [
         ("2026, 2, 8, 2, 30", 1_772_965_800.0),
         ("2026, 10, 1, 1, 30", 1_793_521_800),
     ])
-    func `should read a clock time the zone skips or repeats as Date does`(_ time: String, _ seconds: Double) throws {
+    func `should read a clock time the zone skips or repeats as JavaScript does`(_ time: String, _ seconds: Double) throws {
         let quota = try read(script: """
         function read() {
-          return { quotas: [{ type: 'time', name: 'Change', percentRemaining: 50, resetsAt: localTime(\(time)) }] };
+          return { quotas: [{ type: 'time', name: 'Change', percentRemaining: 50, resetsAt: new Date(\(time)) / 1000 }] };
         }
         """)
         #expect(quota.resetsAt == Date(timeIntervalSince1970: seconds))
