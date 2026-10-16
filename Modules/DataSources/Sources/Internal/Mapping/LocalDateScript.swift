@@ -45,8 +45,11 @@ enum LocalDateScript {
   // `t` on the person's clock: a date whose UTC fields read it.
   const wall = (t) => new NativeDate(isNaN(t) ? NaN : t + offset(t));
   const fields = (date) => UTC_FIELDS.map((get) => call(get, date));
-  // MakeDate of the fields, as UTC, with no 0-99 year mapping.
+  // MakeDate of the fields, as UTC, with no 0-99 year mapping. A field that
+  // isn't finite makes the date invalid: QuickJS's `setUTCHours` would
+  // rebuild an invalid date from 0 and lose it.
   function fromFields(f) {
+    if (!f.every(isFinite)) return NaN;
     const date = new NativeDate(0);
     call(setUTCFullYear, date, f[0], f[1], f[2]);
     return call(setUTCHours, date, f[3], f[4], f[5], f[6]);
@@ -137,12 +140,14 @@ enum LocalDateScript {
   });
   if (proto.getYear) define(proto, 'getYear', function () { return proto.getFullYear.call(this) - 1900; });
 
-  // Each setter replaces `most` fields from `first`, read on the person's clock.
+  // Each setter replaces up to `most` fields from `first`, read on the
+  // person's clock. Its first field is always set: given nothing, it is
+  // `undefined`, so the date becomes invalid.
   [['setFullYear', 0, 3], ['setMonth', 1, 2], ['setDate', 2, 1], ['setHours', 3, 4],
    ['setMinutes', 4, 3], ['setSeconds', 5, 2], ['setMilliseconds', 6, 1]].forEach(([name, first, most]) => {
     define(proto, name, function (...values) {
       const t = timeOf(this);
-      const given = values.slice(0, Math.max(1, Math.min(values.length, most))).map(Number);
+      const given = (values.length ? values.slice(0, most) : [undefined]).map(Number);
       if (isNaN(t) && first !== 0) return NaN;
       const f = fields(isNaN(t) ? new NativeDate(0) : wall(t));
       given.forEach((value, index) => { f[first + index] = value; });

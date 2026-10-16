@@ -168,6 +168,19 @@ struct QuickJSEngineTests {
         #expect(times == "1772913600000 1772996400000 1772965800000 1793532600000 1793521800000 1767254400000")
     }
 
+    /// A setter given nothing sets its field to `undefined`, so the date
+    /// becomes invalid, as every engine does.
+    @Test(arguments: ["setFullYear", "setMonth", "setDate", "setHours", "setMinutes", "setSeconds", "setMilliseconds", "setYear"])
+    func `should make a date invalid when a setter is given nothing`(_ setter: String) throws {
+        #expect(try run("(() => { const d = new Date(0); const r = d.\(setter)(); return r + ' ' + d.getTime(); })()",
+                        in: "America/Los_Angeles") == "NaN NaN")
+    }
+
+    @Test(arguments: ["NaN, 0", "2026, NaN", "2026, 0, NaN", "2026, 0, 1, NaN", "2026, 0, 1, 0, 0, 0, Infinity"])
+    func `should make a date invalid when a part it is built from is not a number`(_ parts: String) throws {
+        #expect(try run("String(new Date(\(parts)).getTime())", in: "America/Los_Angeles") == "NaN")
+    }
+
     @Test func `should write a date on the person's clock`() throws {
         let text = try run("""
             (() => { const d = new Date(1772965800000);
