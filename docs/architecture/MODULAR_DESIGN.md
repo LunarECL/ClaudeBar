@@ -293,6 +293,70 @@ Foundation is the same code on every platform, and the Mac keeps calling its
 modules directly. Main's modules import Foundation and each other in all but
 29 files; those 29 are this section's work.
 
+### The porting surface
+
+**Why.** The point of the package is that ClaudeBar is easy to run on another
+platform. The measure: *how little must a new platform write, and how much
+runs the same everywhere?* Phase 2's `Platform` grew to one value with 19
+optional fields. Two of them were libraries, not facts about the OS
+(`scriptEngine`, `sqlite`), and they caused 391 of Windows' 413 skipped tests.
+The time zone wasn't in it at all, which is how a KST member's day ended at
+09:00 ([#563](https://github.com/tddworks/ClaudeBar/issues/563)).
+
+```text
+  Anything that can be a library is a library: ONE copy, the same on every OS.
+  Only what the OS truly owns differs: a SMALL, NAMED set of ports, each with a contract suite.
+  A new platform = implement those ports. Nothing else.
+```
+
+```text
+ ┌─────────────────────────────── ClaudeBarKit ──────────────────────────────────┐
+ │  WRITTEN ONCE: every OS                                                       │
+ │   Quotas · Providers · DataSources · Leaderboard · Monitoring                 │
+ │   Vendor/: QuickJS · SQLite · CLDR       (libraries and data, not OS facts)   │
+ │                                                                               │
+ │  THE PORTING SURFACE: all a new platform implements                           │
+ │  ┌──────────┬──────────┬──────────┬────────────┬──────────┬──────────┐        │
+ │  │Processes │ Terminal │ Secrets  │LocalNetwork│  Places  │ TimeZone │        │
+ │  └──────────┴──────────┴──────────┴────────────┴──────────┴──────────┘        │
+ │   each: a protocol + ONE contract suite every platform's adapter must pass    │
+ ├──────────── Internal/macOS ─────────┬──── Internal/Windows ───┬── (Linux?) ───┤
+ │  6 adapters                         │  6 adapters             │  6 adapters   │
+ └─────────────────────────────────────┴─────────────────────────┴───────────────┘
+   Mac App: views, menu bar, Notify!      Windows client: C interface → HUD
+
+  Tests:  everything above the ports  ─▶ runs on every OS, never skips
+          each port's contract suite  ─▶ runs against each adapter; skips only until it exists
+```
+
+**Done when** a third platform, Linux say, means writing 6 adapters and
+passing 6 contract suites, with no edit above the line.
+
+- **A library is vendored, pinned, never hand-edited.** One folder per
+  library under `Vendor/`, holding the source, its release `VERSION` and its
+  `LICENSE`; shims live in their own file. `scripts/bump-vendor.sh` is the
+  one way a pinned version changes. A wrapper package would add a
+  supply-chain hop to an app that holds people's API keys.
+- **One JavaScript engine, QuickJS, on the Mac too.** With one engine there
+  is nothing to keep in sync: a script reads the same on every OS. A spike
+  ran all 2,170 Mac tests green on it
+  ([#563](https://github.com/tddworks/ClaudeBar/issues/563#issuecomment-6188010943)).
+  JavaScriptCore goes.
+- **One SQLite, bundled.** The Mac's `SQLite3` goes too, so `ReadOnlyQuery`
+  is one file with no `#if`.
+- **What the OS owns is a port**, `@Mockable`, in `Ports/`, with one contract
+  suite in `Tests/Contracts/` that runs against `Platform.current`'s adapter.
+  The fields a port takes over leave `Platform`:
+
+| Port | Takes over today's | Mac adapter | Windows adapter |
+|---|---|---|---|
+| `TimeZone` | (new) | `TimeZone.current` | the zone's registry key, through CLDR: built ([#567](https://github.com/tddworks/ClaudeBar/pull/567)) |
+| `Processes` | `runCommand` · `rpcTransport` · `processList` · `binaryLocator` · `scriptCommand` · `loginShellCommand` | Darwin processes, the login shell | `CreateProcess`, `PATH` + `PATHEXT` |
+| `LocalNetwork` | `localNetwork` · `localServer` · `localServerCommands` | the trusted-localhost client, `lsof` / `pgrep` | the same client; the listener table |
+| `Terminal` | `runCLI` · `screenRenderer` | SwiftTerm on a pty | the console's pseudo-terminal (ConPTY) |
+| `Secrets` | `keychain` · `browserCookies` · `browserStorage` | Keychain, SweetCookieKit | Credential Manager; cookies and storage `Unavailable` in phase 5 |
+| `Places` | `applicationData` · `pathSeparator` | `~/Library/Application Support`, `/` | `APPDATA`, `\` (phase 4) |
+
 ### The shape
 
 ```text
@@ -304,11 +368,14 @@ Modules/<Context>/
 │   │                      Crypto and suppliers only (§3 rule 7)
 │   └── Internal/
 │       ├── *.swift        implementations that need no platform
-│       ├── macOS/         #if os(macOS) — Keychain, OSLog, JavaScriptCore,
-│       │                  IOKit, Darwin processes, SwiftTerm, SweetCookieKit
-│       └── Windows/       #if os(Windows) — Credential Manager, WinSDK
-│                          processes, the console's pseudo-terminal, a
-│                          bundled JS engine
+│       ├── macOS/         #if os(macOS): the Mac's adapters for the ports
+│       │                  (Keychain, OSLog, IOKit, Darwin processes,
+│       │                  SwiftTerm, SweetCookieKit)
+│       └── Windows/       #if os(Windows): the same ports, one slice at a
+│                          time (Credential Manager, WinSDK processes, the
+│                          console's pseudo-terminal)
+Vendor/<Library>/          pinned C and data, never hand-edited: QuickJS,
+                           SQLite, CLDR; changed only by scripts/bump-vendor.sh
 ├── Resources/
 └── Tests/                 Swift Testing — run on macOS and on windows-latest
 ```
@@ -321,7 +388,8 @@ Modules/<Context>/
   SweetCookieKit in `DataSources`. `AWSClients` builds on macOS only.
 - **`CryptoKit` becomes `Crypto`** (swift-crypto), which re-exports CryptoKit
   on Apple platforms, so the Mac's signatures and hashes don't change.
-- **SQLite is a bundled package** on both platforms, not the system's `SQLite3`.
+- **SQLite and QuickJS are vendored C targets** on both platforms, not the
+  system's `SQLite3` or JavaScriptCore (slice 1).
 - **What a platform lacks is not a stub.** A fetch or lookup case with no
   Windows implementation fails as a `DataSourceError` naming the case and the
   platform; a capability with none is `nil`, as when a definition doesn't
@@ -341,66 +409,67 @@ Modules/<Context>/
 ### One place picks the platform
 
 **Why.** A module that has platform workers needs, on each platform, *what
-this machine offers*: a way to run a CLI, a JavaScript engine, a Keychain.
+this machine offers*: a way to run a CLI, a Keychain, the person's zone.
 Asked in many places (`#if os` in the factory, two types with one name, a
 `nil` argument meaning "use the default"), the answer drifts: a third
 platform falls into every `#else`, a Mac test can't reach what Windows does,
 and a new capability edits shared files. So it is asked once.
 
+The folders, as the slices leave them; *(slice N)* marks what is not built
+yet:
+
 ```text
+Package.swift                    + CQuickJS · CSQLite C targets (slice 1)
+Vendor/                          pinned, never hand-edited; changed only by
+│                                scripts/bump-vendor.sh
+├── CLDR/       windowsZones.xml · VERSION · LICENSE (#567)
+├── CQuickJS/   quickjs-amalgam.c · include/quickjs.h · include/shim.h ·
+│               VERSION · LICENSE (slice 1)
+└── CSQLite/    sqlite3.c · include/sqlite3.h · VERSION · LICENSE (slice 1)
 Modules/DataSources/Sources/
 ├── DataSources.swift          the factory: make(…, platform: .current) — never #if
-├── ScriptEngine.swift         port, @Mockable   ┐ a platform worker is reached
-├── BinaryLocating.swift       port, @Mockable   │ through a port declared here,
-├── …                                            ┘ never a twin type of one name
-├── Ports/TimeZoneSource.swift port, @Mockable: the person's zone, as the OS has it
-│                                now — and DataSources.timeZone() · .calendar(), the
-│                                one public way to it (#565)
+├── ScriptEngine.swift         a neutral worker's port, @Mockable, so a test can
+│                              hand a mapping its answer — not a platform's
+├── Ports/                     the porting surface, @Mockable, one file each
+│   ├── TimeZoneSource.swift   the person's zone, and DataSources.timeZone() ·
+│   │                          .calendar(), the one public way to it (#567)
+│   └── Processes · Terminal · Secrets · LocalNetwork · Places   (slices 2–5)
 └── Internal/
-    ├── Platform.swift         ◇ struct Platform — name · timeZone · runCLI? ·
-    │                            runCommand? · rpcTransport? · scriptEngine? ·
-    │                            keychain? · browserCookies? · browserStorage? ·
-    │                            localNetwork? · processList? · screenRenderer? ·
-    │                            binaryLocator? · sqlite? · applicationData? ·
-    │                            pathSeparator · scriptCommand? · loginShellCommand? ·
-    │                            localServer? · localServerCommands? —
-    │                            and Platform.bare: the name and zone, nothing else
+    ├── Platform.swift         ◇ struct Platform — holds the ports, nothing
+    │                            else; Platform.bare: the name and zone. Until
+    │                            a slice moves them, today's optional fields
+    │                            stay here
     ├── Unavailable.swift      a case whose connection is nil: fails at its step
     │                            as ErrorFact.unavailable, naming it and platform.name
-    ├── Fetch/ Lookup/ Mapping/ Logs/ Network/ Process/   neutral workers
+    ├── Mapping/QuickJSEngine.swift   the one engine, on CQuickJS (slice 1)
+    ├── Lookup/ReadOnlyQuery.swift    the one SQLite reader, on CSQLite (slice 1)
     ├── Time/WindowsZones.swift   a Windows zone key to its zone: CLDR's table
     │                             (+Table, generated from Vendor/CLDR) or the OS's
     │                             offset — neutral, so its tests run everywhere
-    ├── macOS/                 #if os(macOS), whole file
+    ├── Fetch/ Lookup/ Mapping/ Logs/ Network/ Process/   neutral workers
+    ├── macOS/                 #if os(macOS), whole file: one adapter per port
     │   ├── Platform+macOS.swift      static let current = Platform(name: "macOS", …)
-    │   ├── Time/SystemTimeZone.swift   : TimeZoneSource — TimeZone.current
-    │   ├── Process/                  DefaultCLIExecutor · PipeCLIExecutor ·
-    │   │                             ProcessRPCTransport · BinaryLocator ·
-    │   │                             RunningProcesses · TerminalRenderer · Shell …
-    │   ├── Fetch/LocalServerFetcher.swift   the Mac's pgrep/lsof worker
-    │   ├── Mapping/JavaScriptCoreEngine.swift   : ScriptEngine
-    │   ├── Lookup/                   SystemKeychain · SystemBrowserCookies ·
-    │   │                             SystemBrowserStorage · SQLiteReader
-    │   ├── Network/                  InsecureLocalhostNetworkClient
-    │   └── Logs/                     FileStamp+macOS · ByteSearch+macOS
-    └── Windows/               #if os(Windows), whole file
-        ├── Platform+Windows.swift    static let current = Platform(name: "Windows",
-        │                             applicationData: APPDATA or ~/AppData/Roaming,
-        │                             pathSeparator: "\\", binaryLocator: PathBinaryLocator(),
-        │                             scriptCommand: cmd.exe; execution connections nil)
-        ├── Time/WindowsTimeZone.swift   : TimeZoneSource — reads the zone's registry
-        │                             key and offset; WindowsZones picks the zone
-        ├── Process/PathBinaryLocator.swift      : BinaryLocating (PATH + PATHEXT)
+    │   ├── Time/SystemTimeZone.swift   TimeZone.current
+    │   └── Process/ · Lookup/ · Network/ · Logs/   today's workers, regrouped
+    │                                 under their ports in slices 2–5;
+    │                                 JavaScriptCoreEngine and ReadOnlyQuery
+    │                                 deleted (slice 1)
+    └── Windows/               #if os(Windows), whole file: the same ports
+        ├── Platform+Windows.swift    static let current = Platform(name: "Windows", …)
+        ├── Time/WindowsTimeZone.swift   the zone's registry key and offset (#567)
+        ├── Process/PathBinaryLocator.swift   PATH + PATHEXT
         └── Logs/                     FileStamp+Windows · ByteSearch+Windows
-Vendor/CLDR/                    windowsZones.xml · VERSION · LICENSE — pinned,
-                                changed only by scripts/bump-vendor.sh
 Modules/DataSources/Tests/
-├── Support/Needs.swift        .needs(\.scriptEngine) — enabled when
-│                                Platform.current has it, else skipped, saying why
+├── Contracts/                 one suite per port, run against Platform.current's
+│                                adapter: TimeZoneContract (#567), the rest with
+│                                their slices
 ├── UnavailableTests.swift     the factory with Platform.bare — runs on the Mac too
-├── Contracts/TimeZoneContract.swift   run against Platform.current's adapter
-├── …                          neutral tests: both platforms
-└── macOS/ · Windows/          a platform worker's own tests, under #if os(…)
+├── Support/Capabilities.swift .needsProcesses … — skips a test only until its
+│                                port's Windows adapter exists, saying why
+├── …                          everything else: every OS, no skips
+└── macOS/ · Windows/          an adapter's own tests, under #if os(…)
+Modules/Monitoring/            QuotaMonitor's neutral core (slice 6, its own design
+                               review first)
 ```
 
 - **`Platform` is a value, and `Platform.current` is its only `#if`.** Each
@@ -412,16 +481,23 @@ Modules/DataSources/Tests/
   mean "the default", so a test hands in `Platform.bare` (or `.current` with
   one connection removed) and checks on the Mac what Windows does.
 - **A platform worker is reached through a port** declared in the neutral
-  part (`ScriptEngine`, `BinaryLocating`, `CLIExecutor` …, §6). Two types of
-  one name, one per folder, are not allowed: nothing makes their APIs agree.
+  part (`Ports/`, and `BinaryLocating`, `CLIExecutor` … until their slices
+  move them, §6). Two types of one name, one per folder, are not allowed:
+  nothing makes their APIs agree.
 - **Only the factory reads `Platform`.** It hands each worker the one thing it
   uses (§4); no worker receives the bag.
 - **What the platform lacks is a fact, not text.** `Unavailable` fails as
   `ErrorFact.unavailable`, so a definition's `errors` may word it and a
   screen can tell "not on Windows yet" from a failure.
-- **A test that needs a connection names it**, `.needs(\.processes)`, and
-  runs wherever `Platform.current` has it. When a phase brings one, its tests
-  start running there with no edit.
+- **Everything above the ports runs on every OS and never skips.** A test
+  that needs a port names it (`.needsProcesses`) and runs wherever
+  `Platform.current` has that port; when a slice brings the Windows adapter,
+  its tests start running there with no edit. A library is never a reason to
+  skip.
+- **Each port has one contract suite**, in `Tests/Contracts/`, that runs
+  against `Platform.current`'s adapter on every OS. It holds the adapter to
+  what the OS itself says, as `TimeZoneContract` compares the zone with the
+  OS's own offset.
 - **A platform's facts are connections too:** the shell argv, the tools a
   worker runs (`lsof`, `pgrep`, `security`), the folder a CLI trusts, app-data
   and path separators. The factory supplies them to workers and to path
@@ -462,12 +538,34 @@ Each phase leaves main shippable and the Mac app unchanged in behaviour.
 | 2 | **The leaderboard slice.** Carve `Leaderboard` (§8); `CryptoKit` → `Crypto` in `UsageLog`, `CLISession`, `ProviderDefinition`, `RequestSigner`, `SigningKey`; Diagnostics behind `LogSink`; the Mac-only files of `DataSources` move to `Internal/macOS/` | `Quotas`, `Diagnostics`, `DataSources`, `Providers` and `Leaderboard` build and pass on Windows, including the log-reading tests and `vectors.json` — the Windows client can start — built ([#527](https://github.com/tddworks/ClaudeBar/pull/527), [#528](https://github.com/tddworks/ClaudeBar/pull/528), [#529](https://github.com/tddworks/ClaudeBar/pull/529), [#537](https://github.com/tddworks/ClaudeBar/pull/537)): Windows runs 1,355 of the 1,746 tests and skips the rest, each saying why; the leaderboard's run in full |
 | 3 | **Windows adapters for the slice:** `SigningKeyStore` on Credential Manager, `MachineIdentity` as "Windows PC" (the model Windows reports names a self-built PC's motherboard, so it isn't read; the hardware UUID came with the copied-key check, [#549](https://github.com/tddworks/ClaudeBar/pull/549)), `LeaderboardAPI` on `URLSession` as on the Mac | a program on Windows joins, uploads and leaves against the real server through the factories — built ([#547](https://github.com/tddworks/ClaudeBar/pull/547)) |
 | 4 | **Paths and shells.** App-data and path separators, shell argv, local-server discovery and the trusted CLI directory are platform facts supplied by the factory. Definitions use `{{platform.appData}}` ([ENGINE_DESIGN](ENGINE_DESIGN.md)); Mac process workers stay in `Internal/macOS/`, and Windows execution remains unavailable until phase 5 | definitions that read local files resolve on Windows — implemented in [#556](https://github.com/tddworks/ClaudeBar/pull/556), for review: redirected `APPDATA`, native drive/UNC paths, newest IDE file, and unchanged Mac paths/archived days |
-| 5 | **Quotas on Windows.** The rest of `Internal/Windows/`: processes, the pseudo-terminal, the JS engine, SQLite as a bundled package, `Monitoring`, `Alerting`, `Storage` | the Windows client shows quotas, and Windows skips no test |
+| 5 | **Quotas on Windows**, in the slices below | the Windows client shows quotas, and Windows skips no test |
+
+Phase 5's slices, each its own issue and PR
+([#563](https://github.com/tddworks/ClaudeBar/issues/563)):
+
+| # | Slice | Done when |
+|---|---|---|
+| 0 | **`TimeZone` port.** The person's zone, read through the factory; every `.current` calendar default reads it | a KST test runs on any machine — built ([#567](https://github.com/tddworks/ClaudeBar/pull/567)) |
+| 1 | **Vendor QuickJS and SQLite; one engine everywhere.** `QuickJSEngine` replaces JavaScriptCore on the Mac and is the engine on Windows; one `ReadOnlyQuery` on bundled SQLite | Windows no longer skips a test for a script engine or SQLite (−391); the Mac's numbers don't change; release-build timing, the size added to the Mac app, and scripts in definitions people wrote checked |
+| 2 | **`Processes`**: port, contract, Windows adapter | its tests run on Windows |
+| 3 | **`LocalNetwork`**, with the localhost-certificate spike | its tests run on Windows |
+| 4 | **`Terminal`**, with the SwiftTerm-on-Windows spike | its tests run on Windows |
+| 5 | **`Secrets`**: Credential Manager; browser cookies and storage stay `Unavailable` | its tests run on Windows |
+| 6 | **`Monitoring` into the package**, so no platform rewrites refresh scheduling and alert logic; the menu bar and Notify! stay in the Mac app | its own design review first, since it reshapes the domain's root |
 
 ### Open
 
-- **The JavaScript engine on Windows.** QuickJS through a C target is the
-  candidate; only `script` mappings need it, not the leaderboard.
+- **`Places` has no slice of its own.** Its two fields came with phase 4 and
+  already work on Windows; it becomes a port, with its contract, in slice 2,
+  the first slice that regroups `Platform`.
+- ~~**The JavaScript engine on Windows.**~~ QuickJS, vendored, on the Mac too
+  (slice 1).
+- **A script's local time on Windows.** QuickJS's Windows `getTimezoneOffset`
+  ignores the date it is asked about and applies today's offset to every date
+  (quickjs-ng v0.17.0, `quickjs-amalgam.c`), so a script's `new Date(y, m, d)`
+  is an hour off across a daylight-saving change. Slice 1 decides, with a
+  test in a zone with daylight saving, whether scripts keep local-time calls
+  or read the zone only through `context.timeZone` and `humanDate()`.
 - **Foundation's differences on Windows** (paths, symlinks, `FileManager`,
   date formats, and APIs it lacks outright, such as `RelativeDateTimeFormatter`)
   are found by running the same tests there, which is why every module's tests
