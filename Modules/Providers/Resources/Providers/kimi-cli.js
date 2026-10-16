@@ -30,10 +30,9 @@ function read(response, context) {
             if (seconds > 0) {
                 q.resetsAt = context.now + seconds;
                 if (kind === 'monthly') {
-                    // The month that ends on the reset date — its real length.
-                    const end = new Date(q.resetsAt * 1000);
-                    const start = new Date(end.getFullYear(), end.getMonth() - 1, end.getDate(), end.getHours(), end.getMinutes(), end.getSeconds());
-                    q.windowSeconds = (end.getTime() - start.getTime()) / 1000;
+                    // The month that ends on the reset date — its real length, on the person's clock.
+                    const end = localParts(q.resetsAt);
+                    q.windowSeconds = q.resetsAt - localTime(end.year, end.month - 1, end.day, end.hours, end.minutes, end.seconds);
                 }
             }
         }

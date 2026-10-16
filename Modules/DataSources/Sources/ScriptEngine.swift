@@ -3,8 +3,8 @@ import Mockable
 
 /// A JavaScript engine, for a `script` mapping (MODULAR_DESIGN §6). Each run
 /// gets a fresh context with no file, network or process access: a mapping
-/// script turns text into numbers and nothing else. The Mac's is
-/// JavaScriptCore; a platform with none has no `scriptEngine` (§10).
+/// script turns text into numbers and nothing else. There is one, QuickJS, on
+/// every platform (#570); the port is here so a test can hand a mapping its answer.
 @Mockable
 protocol ScriptEngine: Sendable {
     /// Loads `scripts` in order into a fresh context that holds `strings` as

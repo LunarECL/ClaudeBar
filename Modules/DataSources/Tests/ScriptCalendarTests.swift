@@ -1,0 +1,55 @@
+import Foundation
+import Quotas
+import Testing
+@testable import DataSources
+
+/// `localTime` and `localParts`: a script's calendar is the person's, from
+/// `Platform.timeZone` (#570), never the engine's own local time, which on
+/// Windows applies today's offset to every date. Los Angeles, fixed, moves its
+/// clocks on 2026-03-08, so a day that morning is 23 hours on any machine.
+@Suite
+struct ScriptCalendarTests {
+    private func read(script: String) throws -> UsageQuota {
+        let definition = DataSourceDefinition(kind: "api", fetch: .http(HTTPRequest(url: "https://acme.test")),
+                                              mapping: .script(ScriptMapping(file: "days.js")))
+        let source = DataSources.make(definition, providerId: "acme",
+                                      platform: .current(in: Zones.fixed("America/Los_Angeles")),
+                                      network: MockNetworkClient(), scripts: { _ in script }, environment: { _ in nil },
+                                      homeDirectory: FileManager.default.temporaryDirectory, now: { Date() })
+        return try #require(try source.read(Response(text: "{}")).quotas.first)
+    }
+
+    @Test func `should count a day across a daylight-saving change in the person's zone`() throws {
+        let quota = try read(script: """
+        function read() {
+          const saturday = localTime(2026, 2, 7), monday = localTime(2026, 2, 9);
+          return { quotas: [{ type: 'time', name: 'Weekend', percentRemaining: 50,
+                              resetsAt: monday, windowSeconds: monday - saturday }] };
+        }
+        """)
+        // Monday 00:00 PDT is 07:00 UTC; Saturday 00:00 PST was 08:00 UTC.
+        #expect(quota.resetsAt == Date(timeIntervalSince1970: 1_773_039_600))
+        #expect(quota.windowDuration == TimeInterval(47 * 3600))
+    }
+
+    @Test func `should read an instant's date and time in the person's zone`() throws {
+        let quota = try read(script: """
+        function read() {
+          const p = localParts(1773039600 - 1);
+          return { quotas: [{ type: 'time', name: 'Day', percentRemaining: 50,
+                              resetText: [p.year, p.month + 1, p.day, p.hours, p.minutes, p.seconds].join(' ') }] };
+        }
+        """)
+        #expect(quota.resetText == "2026 3 8 23 59 59")
+    }
+
+    @Test func `should carry a month that runs past the year`() throws {
+        let quota = try read(script: """
+        function read() {
+          return { quotas: [{ type: 'time', name: 'Year', percentRemaining: 50, resetsAt: localTime(2026, 12, 1, 9, 30) }] };
+        }
+        """)
+        // 2027-01-01 09:30 PST.
+        #expect(quota.resetsAt == Date(timeIntervalSince1970: 1_798_824_600))
+    }
+}

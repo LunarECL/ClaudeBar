@@ -1,7 +1,6 @@
-// Kiro's plain /usage output, with dates in the Mac's own time zone.
+// Kiro's plain /usage output, with dates on the person's clock (localTime).
 function read(response, context) {
     const text = response.text.replace(/\u001B\[[0-9;]*[a-zA-Z]/g, "");
-    const now = new Date(context.now * 1000);
     const quotas = [];
     const bonus = text.match(/Bonus credits:\s*([\d.]+)\/([\d.]+)/);
     if (bonus && Number(bonus[2]) > 0) {
@@ -18,15 +17,16 @@ function read(response, context) {
         const reset = text.match(/resets on (\d{2})\/(\d{2})/);
         let date = null, windowSeconds = null;
         if (reset) {
-            date = new Date(now.getFullYear(), Number(reset[1]) - 1, Number(reset[2]));
-            if (date < now) date = new Date(now.getFullYear() + 1, Number(reset[1]) - 1, Number(reset[2]));
+            const year = localParts(context.now).year;
+            date = localTime(year, Number(reset[1]) - 1, Number(reset[2]));
+            if (date < context.now) date = localTime(year + 1, Number(reset[1]) - 1, Number(reset[2]));
             // The month that ends on the reset date — its real length.
-            const start = new Date(date.getFullYear(), date.getMonth() - 1, date.getDate());
-            windowSeconds = (date.getTime() - start.getTime()) / 1000;
+            const day = localParts(date);
+            windowSeconds = date - localTime(day.year, day.month - 1, day.day);
         }
         quotas.push({type: "time", name: "Monthly",
             percentRemaining: Math.max(0, (Number(credits[2]) - Number(credits[1])) / Number(credits[2]) * 100),
-            resetsAt: date ? date.getTime() / 1000 : null,
+            resetsAt: date,
             resetText: reset ? "Resets on " + reset[1] + "/" + reset[2] : null, windowSeconds: windowSeconds});
     }
     return quotas.length ? {quotas: quotas} : {error: {parseFailed: "No quota data found in Kiro CLI output"}};
