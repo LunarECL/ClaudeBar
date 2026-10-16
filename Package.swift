@@ -26,13 +26,19 @@ let vendored: [Target] = [
     // libc, so a script reaches no file, network or process.
     .target(name: "CQuickJS", path: "Vendor/CQuickJS", exclude: ["VERSION", "LICENSE"], sources: ["quickjs-amalgam.c"]),
     // SQLite: the one reader of another app's own database. Loading an extension is
-    // compiled out; nothing here may run code a database names.
+    // compiled out; nothing here may run code a database names. A definition's SQL
+    // reads as it did on the Mac's own SQLite: double-quoted strings and the math
+    // functions, as Apple builds it.
     .target(
         name: "CSQLite",
         path: "Vendor/CSQLite",
         exclude: ["VERSION", "LICENSE"],
         sources: ["sqlite3.c"],
-        cSettings: [.define("SQLITE_OMIT_LOAD_EXTENSION"), .define("SQLITE_DQS", to: "0")]
+        cSettings: [
+            .define("SQLITE_OMIT_LOAD_EXTENSION"),
+            .define("SQLITE_DQS", to: "3"),
+            .define("SQLITE_ENABLE_MATH_FUNCTIONS"),
+        ]
     ),
 ]
 

@@ -462,7 +462,10 @@ A row of an app's own database as the answer: one case, one worker,
 read-only, refuses a statement that would write, and reads text and UTF-8
 or UTF-16LE BLOBs; the key lookup and the fetch both use it. The answer is
 the rows, `[{column: text}]`. *Configured* while the file exists; its
-`Connection` names no URL and runs nothing.
+`Connection` names no URL and runs nothing. It runs on the one SQLite
+vendored in `Vendor/CSQLite` ([#570](https://github.com/tddworks/ClaudeBar/issues/570)),
+built so a query reads as it did on the Mac's own SQLite: a double-quoted
+string is text (`SQLITE_DQS=3`) and the math functions are there.
 
 ```text
 "sqlite": { "path": "…/state.vscdb", "query": "SELECT value FROM ItemTable WHERE key = '…'" }

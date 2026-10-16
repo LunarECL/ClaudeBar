@@ -40,6 +40,21 @@ struct DatabaseFetchTests {
         #expect(try rows(response) == [["value": #"{"planName":"Pro"}"#]])
     }
 
+    /// SQL a definition wrote against the Mac's own SQLite, which takes a
+    /// double-quoted string and has the math functions, reads the same here.
+    @Test(arguments: [
+        (#"SELECT value FROM ItemTable WHERE key = "plan""#, #"{"planName":"Pro"}"#),
+        ("SELECT CAST(floor(pow(2, 3) + 0.5) AS INTEGER) AS value", "8"),
+    ])
+    func `should read a query written for the Mac's SQLite`(_ query: String, _ value: String) async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try database("CREATE TABLE ItemTable(key TEXT, value TEXT); INSERT INTO ItemTable VALUES ('plan', '{\"planName\":\"Pro\"}');")
+
+        let response = try await fetcher(path: "~/state.vscdb", query: query).fetch(with: nil)
+
+        #expect(try rows(response) == [["value": value]])
+    }
+
     @Test(arguments: [true, false])
     func `should read text an app stored as a UTF-8 or UTF-16 BLOB`(_ utf16: Bool) async throws {
         defer { try? FileManager.default.removeItem(at: root) }
