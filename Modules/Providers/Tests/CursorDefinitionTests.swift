@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import Providers
-import DataSources
+@testable import DataSources
 import Quotas
 import Mockable
 #if canImport(FoundationNetworking)
@@ -978,9 +978,12 @@ struct CursorDefinitionTests {
             return (data,HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:nil,headerFields:nil)!)
         }
         let definition=try ProviderFactory.builtIn("cursor")
+        var platform=Platform.current
+        platform.applicationData={home,_ in home.appendingPathComponent("Library/Application Support")}
+        let fixturePlatform=platform
         let make: @MainActor () -> Provider = {
             Provider(definition:definition,settings:settings,accounts:settings.accounts(forProvider:"cursor"),makeDataSource:{source,login in
-                DataSources.make(source,providerId:"cursor",cliExecutor:MockCLIExecutor(),network:network,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,secrets:vault.scoped(to:login),environment:{_ in personal},homeDirectory:root,now:{Date()})
+                DataSources.make(source,providerId:"cursor",platform:fixturePlatform,network:network,scripts:ProviderFactory.builtInScripts,secrets:vault.scoped(to:login),environment:{_ in personal},homeDirectory:root,now:{Date()})
             },vault:vault)
         }
         let first=make()

@@ -1,4 +1,4 @@
-import DataSources
+@testable import DataSources
 import Foundation
 import Mockable
 import Providers
@@ -6,7 +6,7 @@ import Quotas
 import Testing
 
 /// Windsurf as data: the plan Windsurf caches in its own database, read
-/// with macOS's `sqlite3` and mapped by `windsurf-plan.js`.
+/// read-only and mapped by `windsurf-plan.js`.
 @MainActor @Suite
 struct WindsurfDefinitionTests {
     static let plan = #"{"planName":"Pro","startTimestamp":1771610750000,"endTimestamp":1774029950000,"usage":{"messages":50000,"usedMessages":35650,"remainingMessages":14350,"flowActions":150000,"usedFlowActions":0,"remainingFlowActions":150000},"quotaUsage":{"dailyRemainingPercent":9,"weeklyRemainingPercent":54,"dailyResetAtUnix":1774080000,"weeklyResetAtUnix":1774166400}}"#
@@ -28,10 +28,13 @@ struct WindsurfDefinitionTests {
     private func make(_ plan: String? = Self.plan, now: Date = Date(timeIntervalSince1970: 1773000000)) throws -> Provider {
         let definition = try ProviderFactory.builtIn("windsurf")
         let folder = try home(plan)
-        return Provider(definition: definition, settings: InMemoryProviderSettings(), makeDataSource: { source, login in
-            DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: MockNetworkClient(),
-                             makeTransport: { _, _, _, _ in MockRPCTransport() }, scripts: ProviderFactory.builtInScripts,
-                             environment: { _ in nil }, homeDirectory: folder, now: { now })
+        var platform = Platform.current
+        platform.applicationData = { home, _ in home.appendingPathComponent("Library/Application Support") }
+        let fixturePlatform = platform
+        return Provider(definition: definition, settings: InMemoryProviderSettings(), makeDataSource: { source, _ in
+            DataSources.make(source, providerId: definition.id, platform: fixturePlatform, network: MockNetworkClient(),
+                             scripts: ProviderFactory.builtInScripts, environment: { _ in nil },
+                             homeDirectory: folder, now: { now })
         })
     }
 
