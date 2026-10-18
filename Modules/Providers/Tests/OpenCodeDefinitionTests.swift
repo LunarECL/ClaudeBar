@@ -9,15 +9,35 @@ import FoundationNetworking
 #endif
 
 /// OpenCode Go as data: the usage API, and — with no key — one read-only
-/// query of opencode's own database, worked out by SQLite.
+/// call on opencode's own database, worked out by SQLite. The call reads
+/// every place the store keeps messages: `message` (opencode 1),
+/// `session_message` (opencode 2), or both after an upgrade (#566).
 @Suite @MainActor
 struct OpenCodeDefinitionTests {
+    typealias Place = OpenCodeStore.Place
     static let usage = #"{"usage":{"rolling":{"status":"ok","percent":1,"resetsAt":"2026-08-24T15:34:00.000Z"},"weekly":{"status":"ok","percent":17,"resetsAt":"2026-08-29T00:00:00Z"},"monthly":{"status":"rate-limited","percent":98}}}"#
     static let now = Date(timeIntervalSince1970: 1775044800) // Apr 1, 2026 12:00 UTC
-    /// What `opencode db … --format json` prints for the query: one row.
-    static let localRow = #"[{"now_ms":1775044800000,"five_hour_cost":2.5,"five_hour_oldest_ms":1775037600000,"weekly_cost":7.5,"week_end_ms":1775433600000,"monthly_cost":15,"month_start_ms":1773502200000,"month_end_ms":1776177000000}]"#
-    private func make(body: String = usage, status: Int = 200, key: String? = "personal", local: String = Self.localRow, exit: Int32 = 0, clock: Date = now, home: URL = FileManager.default.temporaryDirectory, env: [String:String]? = nil, available: Bool = true, vault: MemoryVault = MemoryVault()) throws -> Provider {
-        let now = clock
+
+    /// The stores opencode leaves: one 1 wrote, one 2 started, one upgraded.
+    nonisolated static let stores: [Set<Place>] = [[.message], [.sessionMessage], [.message, .sessionMessage]]
+
+    /// A home whose opencode store holds `places` and `messages`; a home with
+    /// no database at all when `places` is `nil`.
+    private func home(_ places: Set<Place>?, _ messages: [OpenCodeStore.Message] = []) throws -> URL {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        if let places {
+            try OpenCodeStore.make(at: home.appendingPathComponent("data/opencode/opencode.db"), places: places, messages)
+        }
+        return home
+    }
+
+    /// A provider whose default login has `key`, reading the store under
+    /// `home` (one with no database when nil).
+    private func make(body: String = usage, status: Int = 200, key: String? = "personal",
+                      home: URL? = nil, clock: Date = now, available: Bool = true,
+                      vault: MemoryVault = MemoryVault()) throws -> Provider {
+        let home = try home ?? self.home(nil)
+        let env = ["XDG_DATA_HOME": home.appendingPathComponent("data").path]
         let def = try ProviderFactory.builtIn("opencode-go")
         let net = MockNetworkClient()
         given(net).request(.any).willProduce { @Sendable request in
@@ -28,18 +48,11 @@ struct OpenCodeDefinitionTests {
         }
         let cli = MockCLIExecutor()
         given(cli).locate(.any).willReturn(available ? "/test/opencode" : nil)
-        given(cli).execute(binary:.any,args:.any,input:.any,timeout:.any,workingDirectory:.any,autoResponses:.any).willProduce { @Sendable binary,args,_,timeout,_,_ in
-            #expect(binary == "opencode")
-            #expect(timeout == 15)
-            #expect(args.first == "db")
-            #expect(args.suffix(2) == ["--format","json"])
-            #expect(args.count == 4) // one fixed query, shown word for word on Import
-            return CLIResult(output: local, exitCode: exit)
-        }
         return Provider(definition:def,settings:InMemoryProviderSettings(),makeDataSource:{source,login in
-            DataSources.make(source,providerId:def.id,cliExecutor:cli,network:net,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,secrets:vault.scoped(to:login),environment:{ name in env.map { $0[name] } ?? (name == "OPENCODE_API_KEY" ? key : nil) },homeDirectory:home,now:{now})
+            DataSources.make(source,providerId:def.id,cliExecutor:cli,network:net,makeTransport:{_,_,_,_ in MockRPCTransport()},scripts:ProviderFactory.builtInScripts,secrets:vault.scoped(to:login),environment:{ name in env[name] ?? (name == "OPENCODE_API_KEY" ? key : nil) },homeDirectory:home,now:{clock})
         },vault:vault)
     }
+
     @Test func `should show the 5-hour, weekly and monthly quotas with their resets and windows when OpenCode Go answers`() async throws {
         let p = try make()
         #expect(p.name == "OpenCode Go")
@@ -74,72 +87,127 @@ struct OpenCodeDefinitionTests {
     @Test func `should show a rate limit, not read the local database, when OpenCode Go is rate-limiting`() async throws {
         await #expect { try await make(status:429).refreshPlain() } throws: { ($0 as? UsageError)?.tag == "rateLimited" }
     }
-    @Test func `should show dollars left of each cap from opencode's own database when there is no key`() async throws {
-        let p = try make(key:nil)
+
+    /// Go spend `seconds` before now, in `place` — the query works its
+    /// windows out of SQLite's own `'now'`, so a fixed date would fall out of
+    /// them. The exact windows are the SQL-level tests' to pin.
+    private static func spent(_ id: String, _ seconds: TimeInterval, _ cost: Double, in place: Place,
+                              provider: String = "opencode-go") -> OpenCodeStore.Message {
+        OpenCodeStore.Message(id: id, at: Int64((Date() - seconds).timeIntervalSince1970 * 1000), provider: provider, cost: cost, place: place)
+    }
+
+    /// The spend of the local tests, in the places `store` has: the month's
+    /// anchor long ago (in 1's place, when the store kept it), and every
+    /// window's spend a minute ago.
+    private static func spend(in store: Set<Place>) -> [OpenCodeStore.Message] {
+        let past: Place = store.contains(.message) ? .message : .sessionMessage
+        let present: Place = store.contains(.sessionMessage) ? .sessionMessage : .message
+        return [
+            spent("anchor", 400 * 86_400, 1.0, in: past),   // the first message: the month's anchor
+            spent("a", 60, 0.5, in: past),                  // inside every window
+            spent("b", 30, 0.25, in: present),
+            spent("c", 20, 99, in: present, provider: "another"), // not OpenCode Go's
+        ]
+    }
+
+    @Test(arguments: stores)
+    func `should show dollars left of each cap from opencode's own database when there is no key`(_ store: Set<Place>) async throws {
+        let p = try make(key:nil, home:home(store, Self.spend(in: store)))
         #expect(await p.isPlainAvailable())
         let qs = try await p.refreshPlain().quotas
         #expect(qs.map(\.quotaType) == [.session,.weekly,.timeLimit("Monthly")])
-        #expect(qs[0].left == .money(Money(Decimal(string: "9.50")!, currency: "USD"), of: Money(12, currency: "USD")))
-        #expect(qs[1].left == .money(Money(Decimal(string: "22.50")!, currency: "USD"), of: Money(30, currency: "USD")))
-        #expect(qs[2].left == .money(Money(Decimal(string: "45.00")!, currency: "USD"), of: Money(60, currency: "USD")))
-        #expect(qs[0].resetsAt == Date(timeIntervalSince1970: 1775037600 + 18000)) // the oldest spend in 5h, plus 5h
-        #expect(qs[1].resetsAt == Date(timeIntervalSince1970: 1775433600))
-        #expect(qs[2].resetsAt == Date(timeIntervalSince1970: 1776177000))
-        #expect(qs[2].window?.length == TimeInterval(2_674_800)) // the anchored month itself: Mar 14 to Apr 14
+        #expect(qs[0].left == .money(Money(Decimal(string: "11.25")!, currency: "USD"), of: Money(12, currency: "USD")))
+        #expect(qs[1].left == .money(Money(Decimal(string: "29.25")!, currency: "USD"), of: Money(30, currency: "USD")))
+        #expect(qs[2].left == .money(Money(Decimal(string: "59.25")!, currency: "USD"), of: Money(60, currency: "USD")))
+        // The 5-hour window ends 5 hours after its oldest spend; the week,
+        // next UTC Monday; the month, its anchor + 1. The SQL-level tests pin
+        // the exact resets; here they are just the windows they should be.
+        #expect(abs((qs[0].resetsAt?.timeIntervalSince(Date()) ?? 0) - (5 * 3600 - 60)) < 120)
+        #expect((qs[1].resetsAt?.timeIntervalSince(Date()) ?? 0) > 3600) // a reset still ahead
+        #expect(qs[2].resetsAt != nil)
+        #expect(qs[2].window?.length != nil) // the anchored month itself
     }
-    @Test func `should show every cap full and no monthly window when nothing has been spent yet`() async throws {
-        let row = #"[{"now_ms":1775044800000,"five_hour_cost":0,"five_hour_oldest_ms":null,"weekly_cost":0,"week_end_ms":1775433600000,"monthly_cost":0,"month_start_ms":null,"month_end_ms":null}]"#
-        let qs = try await make(key:nil,local:row).refreshPlain().quotas
+    @Test func `should count a message an upgraded store holds in both places once`() async throws {
+        let store: Set<Place> = [.message, .sessionMessage]
+        let qs = try await make(key:nil, home:home(store, [Self.spent("same", 60, 2.0, in: .message),
+                                                           Self.spent("same", 60, 2.0, in: .sessionMessage)])).refreshPlain().quotas
+        #expect(qs[0].left == .money(Money(Decimal(string: "10.00")!, currency: "USD"), of: Money(12, currency: "USD")))
+    }
+    @Test(arguments: stores)
+    func `should show every cap full and no monthly window when nothing has been spent yet`(_ store: Set<Place>) async throws {
+        let qs = try await make(key:nil, home:home(store)).refreshPlain().quotas
         #expect(qs.map(\.percentLeft) == [100,100,100])
-        #expect(qs[0].resetsAt == Self.now.addingTimeInterval(18000))
+        #expect(abs(qs[0].resetsAt!.timeIntervalSince(Date()) - 18000) < 60) // now + 5h, by SQLite's clock
         #expect(qs[2].resetsAt == nil)
         #expect(qs[2].window?.length == nil)
     }
     @Test(arguments:[-5.0,6.0,20.0]) func `should never show less than nothing left of a cap`(_ cost:Double) async throws {
-        let row = "[{\"now_ms\":1775044800000,\"five_hour_cost\":\(cost),\"weekly_cost\":0,\"week_end_ms\":1775433600000,\"monthly_cost\":0}]"
-        let qs = try await make(key:nil,local:row).refreshPlain().quotas
+        let qs = try await make(key:nil, home:home([.sessionMessage], [Self.spent("a", 60, cost, in: .sessionMessage)])).refreshPlain().quotas
         #expect(qs[0].dollarRemaining == Decimal(string: String(format: "%.2f", max(0, 12 - cost))))
     }
-    @Test(arguments:["not JSON","[]",#"[{}]"#]) func `should fail to read usage when opencode's database gives no readable spend`(_ local:String) async throws {
-        await #expect(throws:UsageError.self) { try await make(key:nil,local:local).refreshPlain() }
-    }
-    @Test func `should fail, never show usage, when reading opencode's database fails`() async throws {
-        await #expect(throws:UsageError.executionFailed("`opencode` exited with code 1")) { try await make(key:nil,exit:1).refreshPlain() }
-    }
-    @Test func `should be unavailable and say opencode is not found when there is no key and no CLI`() async throws {
-        let p = try make(key:nil,available:false)
+    @Test func `should skip OpenCode Go and fail, never show usage, when there is no database`() async throws {
+        let p = try make(key:nil)
         #expect(!(await p.isPlainAvailable()))
-        await #expect(throws:UsageError.cliNotFound("opencode")) { try await p.refreshPlain() }
+        await #expect(throws:UsageError.self) { try await p.refreshPlain() }
+    }
+    @Test func `should skip OpenCode Go when opencode's database keeps no messages it knows`() async throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try SQLiteFiles.make(at: home.appendingPathComponent("data/opencode/opencode.db"), "CREATE TABLE other(id TEXT);")
+        let p = try make(key:nil, home:home)
+        #expect(!(await p.isPlainAvailable()))
+        await #expect(throws:UsageError.self) { try await p.refreshPlain() }
+    }
+    @Test func `should answer from the database alone when there is no key and no CLI`() async throws {
+        // The database is read directly: the CLI's own query door came and
+        // went with opencode 2 (#566), so the local mode never needs it.
+        let p = try make(key:nil, home:home([.sessionMessage]), available:false)
+        #expect(await p.isPlainAvailable())
+        let qs = try await p.refreshPlain().quotas
+        #expect(qs.map(\.quotaType) == [.session,.weekly,.timeLimit("Monthly")])
     }
 
-    // MARK: - The query itself, run by SQLite
+    // MARK: - The queries themselves, run by SQLite
 
-    /// The definition's query against a fixture database, as of `now` (UTC).
-    private func query(_ messages: [(at: String, cost: Double, provider: String)], now: String) throws -> [String: Any] {
+    /// The local call's queries, in order: both places, 2's, 1's.
+    nonisolated private static let queries = Array(0..<3)
+
+    /// The `index`th of the local call's queries against a store holding the
+    /// tables it requires, as of `now` (UTC). In a store with both places
+    /// the first message (the month's anchor) is 1's, the rest 2's.
+    private func query(_ index: Int, _ messages: [(at: String, cost: Double, provider: String)], now: String) throws -> [String: Any] {
         let definition = try ProviderFactory.builtIn("opencode-go")
-        guard case .command(let call) = try #require(definition.dataSource("local")).fetch else {
-            Issue.record("Expected a command"); return [:]
+        guard case .sqlite(let call) = try #require(definition.dataSource("local")).fetch else {
+            Issue.record("Expected the local source to read the database itself"); return [:]
         }
-        let sql = call.args[1].replacingOccurrences(of: "'now'", with: "'\(now)'")
+        let query = call.queries[index]
+        let places = Set(query.requires.compactMap(Place.init(rawValue:)))
+        let formatter = ISO8601DateFormatter()
+        let stored = try messages.enumerated().map { n, message in
+            OpenCodeStore.Message(id: "msg_\(n)", at: Int64(try #require(formatter.date(from: message.at)).timeIntervalSince1970 * 1000),
+                                  provider: message.provider, cost: message.cost,
+                                  place: places.count == 2 ? (n == 0 ? .message : .sessionMessage) : places.first!)
+        }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let db = root.appendingPathComponent("opencode.db")
-        let formatter = ISO8601DateFormatter()
-        var setup = "CREATE TABLE message(data TEXT, time_created INTEGER);"
-        for message in messages {
-            let ms = Int64(try #require(formatter.date(from: message.at)).timeIntervalSince1970 * 1000)
-            setup += "INSERT INTO message VALUES ('{\"providerID\":\"\(message.provider)\",\"role\":\"assistant\",\"cost\":\(message.cost),\"time\":{\"created\":\(ms)}}', 0);"
-        }
-        try SQLiteFiles.make(at: db, setup)
-        return try #require(try SQLiteFiles.rows(at: db, sql).first)
+        try OpenCodeStore.make(at: db, places: places, stored)
+        return try #require(try SQLiteFiles.rows(at: db, query.query.replacingOccurrences(of: "'now'", with: "'\(now)'")).first)
     }
 
     private func ms(_ text: String) throws -> Int64 {
         Int64(try #require(ISO8601DateFormatter().date(from: text)).timeIntervalSince1970 * 1000)
     }
 
-    @Test func `should add up the last 5 hours, the UTC week and the anchored month of OpenCode Go spend only`() throws {
-        let row = try query([
+    @Test func `should read the store with the first query whose tables it has: both places, 2's, then 1's`() throws {
+        let definition = try ProviderFactory.builtIn("opencode-go")
+        guard case .sqlite(let call) = try #require(definition.dataSource("local")).fetch else {
+            Issue.record("Expected the local source to read the database itself"); return
+        }
+        #expect(call.queries.map(\.requires) == [["message", "session_message"], ["session_message"], ["message"]])
+    }
+
+    @Test(arguments: queries) func `should add up the last 5 hours, the UTC week and the anchored month of OpenCode Go spend only`(_ index: Int) throws {
+        let row = try query(index, [
             ("2026-01-31T14:30:00Z", 1.0, "opencode-go"),   // the first message: the month's anchor
             ("2026-04-29T09:00:00Z", 2.0, "opencode-go"),
             ("2026-04-30T15:00:00Z", 4.0, "opencode-go"),
@@ -157,23 +225,26 @@ struct OpenCodeDefinitionTests {
         #expect(row["monthly_cost"] as? Double == 4.75)
     }
 
-    @Test(arguments: [
-        ("2024-03-14T14:30:00Z", "2024-04-02 10:00:00", "2024-04-14T14:30:00Z"),
-        ("2024-01-20T09:00:00Z", "2024-04-05 12:00:00", "2024-04-20T09:00:00Z"),
-        // The 31st in a 29-day February: the month ends on its last day.
-        ("2024-01-31T09:00:00Z", "2024-02-05 12:00:00", "2024-02-29T09:00:00Z"),
-    ])
-    func `should start each month on the first message's day, or the month's last day when it is shorter`(_ fixture: (String, String, String)) throws {
-        let row = try query([(fixture.0, 1, "opencode-go")], now: fixture.1)
+    @Test(arguments: queries.flatMap { index in
+        [
+            ("2024-03-14T14:30:00Z", "2024-04-02 10:00:00", "2024-04-14T14:30:00Z", index),
+            ("2024-01-20T09:00:00Z", "2024-04-05 12:00:00", "2024-04-20T09:00:00Z", index),
+            // The 31st in a 29-day February: the month ends on its last day.
+            ("2024-01-31T09:00:00Z", "2024-02-05 12:00:00", "2024-02-29T09:00:00Z", index),
+        ]
+    })
+    func `should start each month on the first message's day, or the month's last day when it is shorter`(_ fixture: (String, String, String, Int)) throws {
+        let row = try query(fixture.3, [(fixture.0, 1, "opencode-go")], now: fixture.1)
         #expect(row["month_end_ms"] as? Int64 == (try ms(fixture.2)))
     }
 
-    @Test func `should show no spend and no month when there are no OpenCode Go messages`() throws {
-        let row = try query([("2026-05-04T14:00:00Z", 5, "another")], now: "2026-05-04 15:00:00")
+    @Test(arguments: queries) func `should show no spend and no month when there are no OpenCode Go messages`(_ index: Int) throws {
+        let row = try query(index, [("2026-05-04T14:00:00Z", 5, "another")], now: "2026-05-04 15:00:00")
         #expect(row["five_hour_cost"] as? Double == 0)
         #expect(row["monthly_cost"] as? Double == 0)
         #expect(row["month_start_ms"] == nil || row["month_start_ms"] is NSNull)
     }
+
     @Test func `should use only an added login's own key, never the local database, and ask to sign in when it is gone`() async throws {
         let vault = MemoryVault()
         let p = try make(vault:vault)
@@ -191,8 +262,7 @@ struct OpenCodeDefinitionTests {
         try FileManager.default.createDirectory(at:data,withIntermediateDirectories:true)
         let auth = entry == "both" ? #"{"opencode-go":{"key":"file-key"},"opencode":{"key":"other-key"}}"# : "{\"\(entry)\":{\"type\":\"api\",\"key\":\"file-key\"}}"
         try Data(auth.utf8).write(to:data.appendingPathComponent("auth.json"))
-        let p = try make(key:nil,home:home,env:["XDG_DATA_HOME":home.appendingPathComponent("data").path])
+        let p = try make(key:nil, home:home)
         #expect(try await p.refreshPlain().quotas.map(\.percentRemaining) == [99,83,0])
     }
-
 }
