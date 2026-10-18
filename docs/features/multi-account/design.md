@@ -6,9 +6,12 @@ description: Contributor design for multiple accounts under one provider — how
 
 User guide: [README.md](README.md).
 
+**Built ([#577](https://github.com/tddworks/ClaudeBar/issues/577)): one law in
+place of `accounts.patch` — [§ What an account's sign-in reaches](#what-an-accounts-sign-in-reaches).**
+
 **Status: BUILT, slices 1–7.** Built: one `Provider` owns `[Account]`; an
-added login runs the **same** data sources with `accounts.patch` merged in and
-`{{account.x}}` filled from its values; added by `accounts.folder` — Codex
+added login runs the **same** data sources with `{{account.x}}` filled from
+its values; added by `accounts.folder` — Codex
 (#356) and Claude (slice 1: `IdentityField`, `derived`, identity from a context
 file); `displayName`, `rename`, a saved default-account name and short
 menu-bar names (slice 2); `accounts.signIn`, `provider.signIn` /
@@ -72,14 +75,15 @@ own corner of the vault.**
 ```text
                        codex.json / claude.json / <custom>.json
                        ┌──────────────────────────────────────┐
-                       │ dataSources: [ … {{account.home}} … ] │  written ONCE
-                       │ accounts: { add, patch, identity }    │
+                       │ dataSources: [ … {{account.folder}} … ] │  written ONCE, for any login
+                       │ accounts: { folder, signIn, cli }     │
                        └──────────────────┬───────────────────┘
-                                          │  patched + filled per login
+                                          │  filled per login; an added one leaves out this Mac's reads
              ┌────────────────────────────┼────────────────────────────┐
              ▼                            ▼                            ▼
      Account  "codex"            Account "codex.7f3a"          Account "codex.c19e"
-     values: {}                  values: {home: ~/A}           values: {home: ~/B}
+     values: {folder: ~/.codex}  values: {folder: ~/A}         values: {folder: ~/B}
+       (the defaults) + this Mac
      vault: provider.codex.*     vault: provider.codex.        vault: provider.codex.
                                         account.7f3a.*                account.c19e.*
              │                            │                            │
@@ -88,6 +92,147 @@ own corner of the vault.**
        bound once,                  bound once,                  bound once,
        own cache                    own cache                    own cache
 ```
+
+## What an account's sign-in reaches
+
+Mia's journey ([USER_JOURNEYS 2b, F13](../../architecture/USER_JOURNEYS.md)):
+her terminal is signed in to *Personal*; she adds *Work — Acme* by
+*Sign in with browser*, *Choose Signed-in Folder* or the form's *API KEY*. She
+thinks of each account by **how it is signed in**, and expects each to show its
+own numbers. Two accounts showing the same numbers is what makes her stop
+trusting both (#578).
+
+> **An account shows only what its own sign-in reaches.** The default account
+> is the one **signed in on this Mac**: what every program here sees — the
+> terminal's CLI, environment variables, its folders, the Keychain, the
+> browser, an app's own database. An added account is signed in through the
+> folder or the key Mia gave it, and never reaches anything of this Mac.
+
+```text
+ provider.refresh(account)
+        │
+        ▼
+ definition.dataSources(for: account)
+        │
+   ┌────┴───────────────────────────┐
+   ▼                                ▼
+ DEFAULT ACCOUNT                  ADDED ACCOUNT
+ signed in on this Mac            signed in through its folder / key
+ {{account.folder}} ← folder.default    {{account.folder}} ← its folder
+ every read is reached            a read that names nothing of the account is
+                                  this Mac's: not reached. A CLI run goes
+                                  through accounts.cli; a folder account's
+                                  accountId is checked on every fetch
+   │                                │
+   ▼                                ▼
+ "Personal": its quotas           "Work — Acme": its quotas, never Personal's
+```
+
+```text
+ read in the definition                       Personal (this Mac)   Work (folder)   Side (API key)
+ ─────────────────────────────────────────    ───────────────────   ─────────────   ──────────────
+ { "environment": "OPENAI_API_KEY" }                 ✓                   ✗               ✗
+ { "setting": "apiKey" }                             ✓ if saved          ✓ if saved      ✓
+ "{{account.folder}}/auth.json"                      ✓ ~/.codex          ✓ ~/work-codex  ✗ no folder
+ "~/.vibe/logs/session"                              ✓                   ✗               ✗
+ `codex app-server` (a CLI run)                      ✓ as it is          ✓ accounts.cli  ✗
+```
+
+**The default account's folder is `folder.default`** (`${CODEX_HOME:-~/.codex}`),
+or the folder setting's own `default` (`~/.kimi`), so a read written under
+`{{account.folder}}` serves it too. A value the person saved on the default
+account wins over its default, as it always has.
+
+**Where a vendor keeps the default account somewhere else, the definition says
+both places where they are read** — never in a table of names to look up:
+
+```jsonc
+{ "keychain": { "service": "Claude Code-credentials" } },                             // this Mac's
+{ "keychain": { "service": "Claude Code-credentials-{{account.folder#sha256.8}}" } }  // the account's folder
+"context": { "account": { "path": ["{{account.folder}}/.claude.json",               // the account's
+                                   "${CLAUDE_CONFIG_DIR:-~}/.claude.json"] } }       // this Mac's
+```
+
+`#sha256.8` is a placeholder transform like `#host` and `#jwt.sub`: the first
+eight hex digits of the value's SHA-256, which is how Claude Code names a
+folder's Keychain item. A path list keeps, for an added account, only its own
+entries. A lookup in a chain that names a value the account can't give is left
+out of it: the default account's folder is `${CLAUDE_CONFIG_DIR:-~/.claude}`,
+not yet a place, so it has no folder-named Keychain item — as Claude Code has
+none when no folder is set.
+
+| Owner | Decides |
+|---|---|
+| `Accounts` | which account is signed in on this Mac (the default) and what an added one was signed in with — `isDefault`, `folder: SignedInFolder?`, its values and vault corner. Nothing new is stored |
+| `ProviderDefinition.dataSources(for:)` · `usageHistory(for:)` | what one account's sign-in reaches: the definition read for it. The one door Providers uses |
+| DataSources, inside that door | each piece of a definition says whether it names the account — a lookup, a fetch, a context file, a log. A read that names nothing of the account (`{{account.x}}`, a pasted `setting`) is this Mac's. DataSources never learns what an account is; nothing is guessed from what a path looks like |
+| `accounts.cli` | how the vendor's CLI is signed in through a folder: a subprocess reads only where it is pointed |
+| `Provider` | a hand-off or fallback to a data source the account's sign-in doesn't reach moves on along the chain, as it always has |
+
+**What this takes out of a definition:** `accounts.patch`, and with it every
+`"firstOf": null`, `"<kind>": null`, `"fallbackOn": null`, per-source
+`identity`, `requiresFiles`, and the CLI switch copied into each data source.
+A definition that forgets nothing can no longer show this Mac's numbers under
+an added account; that is the default.
+
+### What a definition still says, and why
+
+The JSON is an abstraction layer: it answers three questions, each once —
+*who is the provider* (`profile`), *how is an account signed in*
+(`settings` and `accounts`), *how do I get its usage* (`dataSources`). A key
+provider writes no `accounts`: its key is an account-scope setting and each read
+says whose it is. Only a vendor whose login lives in a folder writes
+`accounts`, once.
+
+```jsonc
+"accounts": {
+  "folder": {                                       // "Choose Signed-in Folder"
+    "default": "${CODEX_HOME:-~/.codex}",           // where the default account's login is kept
+    "signedInAs": {                                 // "Signed in as …" — read once, for every source
+      "file":  "{{account.folder}}/auth.json",
+      "id":    "$.tokens.account_id",               //   the same person on every fetch
+      "email": "$.tokens.id_token#jwt.email"        //   what the pill says
+    },
+    "notSignedIn": "…"                              // optional: the fix is vendor-specific
+  },
+  "signIn": { "args": ["login"] },                  // "Sign in with browser": the vendor's login command
+  "cli": {                                          // how the CLI runs as an added account:
+    "environment": {                                //   the shape a CLI fetch already uses
+      "set":   { "CODEX_HOME": "{{account.folder}}" },   // pointed at its folder
+      "unset": ["OPENAI_API_KEY", "…"]              //   blind to this Mac's login
+    },
+    "args": ["-c", "cli_auth_credentials_store=\"file\""]   // keep the login in the folder
+  }
+}
+```
+
+| Key | Why it exists |
+|---|---|
+| `folder.default` | where the vendor keeps the default account's login; fills `{{account.folder}}` for it, and is never added a second time |
+| `folder.signedInAs` | the file that says who is signed in (a path, or a list where the vendor keeps the default account elsewhere), and its fields: `id`, and any of `email`, `organization`, `billingType`. It is the screen's *Signed in as …*: the pill's email when a mapping names none, what a mapping reads as `$signedInAs.<field>`, what *Choose Signed-in Folder* reads to say who is there, and the identity of an added folder account, checked before and after every fetch. A missing file means not signed in: fail closed, never another account |
+| `folder.notSignedIn` | optional; what to do differs per vendor |
+| `signIn.args` | the vendor's login command; its program is the definition's `cli`, its environment `accounts.cli` |
+| `cli.environment.set` | the variables that point the vendor's CLI at the folder — `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, or Kiro's `HOME` and `XDG_*` — written as a CLI fetch's `environment` already is. Fetch, refresh and sign-in run with them, and *In use* writes the same lines into the person's shell |
+| `cli.environment.unset` · `cli.args` | this Mac's variables that would beat the folder; arguments that keep the login inside it. Said once, applied to every CLI run of an added account. The default account's CLI runs as it always has |
+
+Gone: `accounts.patch`; per-source `context`, `identity` and `requiresFiles`
+for who is signed in — `signedInAs`, said once; `folder.accountId` and
+`folder.email` — its `id` and `email`; `folder.savedAs` and `accountId.savedAs`
+— an added folder account's folder is `folder` and its id `accountId`, and
+values saved as `codexHome`, `configDirectory`, `chatgptAccountId` or
+`loginEmail` are read through the compatibility tables
+([settings.md](../../settings.md)). A folder given on the form keeps its own
+name (Gemini's, Kiro's and Kimi's `home`, Grok's `directory`); `folder.derived`
+— `{{account.folder#sha256.8}}` and a path list, said where they are read;
+`signIn.cli`, `signIn.homeVariable` and `signIn.unset` — the definition's `cli`
+and `accounts.cli`, said once.
+
+A provider whose added login uses a different thing than its default login
+says so with two data sources, not a rule. Amp's default login is the CLI's
+own; an added one is a pasted key handed to the same CLI. So `cli` reads the
+account's key and passes `AMP_API_KEY={{token}}` — kept for every login that
+has a key — and hands off, when there is none, to `cliLogin`, which runs the CLI
+as itself: this Mac's, so the default login's alone.
 
 ---
 
@@ -117,7 +262,9 @@ diff:
 | **Account** | one login you pay for: who, its values, what we last saw | a data source; a provider |
 | **default account** | the plain login the CLI already uses; id = provider id; never removed | "the first added one" |
 | **added account** | a login beside it; id `<provider>.<acct>` | a copy of the provider |
-| **account values** | the account-scope settings that fill `{{account.x}}` — a folder, a login id, a region | secrets |
+| **account values** | the account-scope settings that fill `{{account.x}}` — a folder, a login id, a region. The default login's folder is `folder.default` | secrets |
+| **signed in on this Mac** | the default account's sign-in: what every program on the Mac sees — the terminal's CLI, environment variables, fixed paths and Keychain names, browser cookies, local databases and logs. Never an added account's | the default login's folder, which is one of its values |
+| **folder** (the account value) | the folder a login lives in, `{{account.folder}}` — a signed-in folder for an added login, `folder.default` for the default one. The vendor's own word for it (`CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `GEMINI_CLI_HOME`) appears only in `accounts.cli.environment.set` | `$HOME` |
 | **account secret** | an account-scope secret (an API key) — a *name*, its value in the vault under that account | a value in `settings.json` |
 | **way to add** (`accounts.ways`) | how the definition lets a person add one — the keys it has: `signIn` · `folder` · `form` | a data source kind |
 | **signed-in folder** | the folder an added login lives in, and who made it — the person, or ClaudeBar by signing in. Put [*in use*](../in-use/design.md), the person's terminal starts on it too | the default login's folder |
@@ -153,8 +300,9 @@ Monitor ◆                                  the menu bar's root
          │       │                           NEW folder, then the folder rule checks it
          │       │     folder(rule)          "Choose Signed-in Folder" — read who is signed in there
          │       │     form                  fill the form's ACCOUNT-scope settings (slice 5)
-         │       ├── patch                 by data source kind: what an added login changes (RFC 7396)
-         │       └── identity              which field names the login; a mismatch fails closed
+         │       └── cli                   how the CLI runs as an added login — environment {set, unset}, args
+         │                                 (what an added login reads is not written here: it is
+         │                                  every read that uses an account value — § What a login reads)
          ├── settingsForm ◇                [Setting], each with a SCOPE: provider | account
          ├── accounts: Accounts ◆          NEVER EMPTY; [0] is the default. Its logins are
          │   │                             INTERCHANGEABLE — and it owns the rule that says so:
@@ -193,14 +341,14 @@ into JSON, and not before.
 
 | Case | JSON | Carries | What it does |
 |---|---|---|---|
-| **folder** | `"folder": { savedAs, default, accountId: {field, savedAs}, email?, derived?, notSignedIn }` | where the login lives, which field names it | reads the folder through the definition's own credential/context lookup (filled with that folder), refuses the default folder and duplicates, saves `{savedAs: folder, accountId.savedAs: fact}` |
-| **signIn** | `"signIn": { cli, args, homeVariable, unset, timeout }` | the vendor's login command ([where its CLI is](../../architecture/ENGINE_DESIGN.md#27--where-a-providers-cli-is)) | makes `~/.claudebar/accounts/<provider>/<uuid>/` (0700), runs `cli args` with `homeVariable=<folder>` and `unset` removed, waits; on exit 0 the provider checks the folder as **folder** does, recorded `madeBy: .signIn` |
+| **folder** | `"folder": { default, signedInAs: {file, id, email?, …}, notSignedIn? }` | where the login lives, which field names it | reads the folder through the definition's own credential/context lookup (filled with that folder), refuses the default folder and duplicates, saves `{home: folder, accountId: fact}` |
+| **signIn** | `"signIn": { args, timeout? }` | the vendor's login command ([where its CLI is](../../architecture/ENGINE_DESIGN.md#27--where-a-providers-cli-is)) | makes `~/.claudebar/accounts/<provider>/<uuid>/` (0700), runs the definition's `cli` with `args` under `accounts.cli` (the folder as `{{account.folder}}`), waits; on exit 0 the provider checks the folder as **folder** does, recorded `madeBy: .signIn` |
 | **form** | `"form": true` | — | renders the form's account-scope settings; non-secrets → `values`, secrets → the account's vault; then *Test Connection* with them before saving |
 
 `signIn` requires `folder` (it ends in one) — a definition with one and not
-the other is refused on load. `derived` — #358's
-`derivedValues`, e.g. Claude's Keychain service `Claude Code-credentials-<hash8>`
-— is a feature of the folder rule, so stays.
+the other is refused on load. #358's `derivedValues` (Claude's Keychain service
+`Claude Code-credentials-<hash8>`) is now said where it is used, as
+`{{account.folder#sha256.8}}` (#577).
 
 ### `Account` — one login
 
@@ -265,11 +413,12 @@ ClaudeBarApp.init (composition root)
   ▼
 ProviderFactory.make(definition, settings, vault)
   │
-  ├─ default account:  definition.dataSources ──map──▶ DataSources.make(_, secrets: vault.scoped(to: "<id>"))
+  ├─ default account:  definition filled with its values, else their defaults ──▶ DataSources.make(_, secrets: vault.scoped(to: "<id>"))
   │
   └─ for each config:  provider.add(config)
-        │  definition.dataSources(forAccount: config.values)     patch merged, {{account.x}} filled
-        │  ── a data source the patch nulls is left out for that login
+        │  definition.forAccount(config.values) — what its sign-in reaches, {{account.x}} filled
+        │  ── a data source left with no read of the account's is left out
+        │  ── accounts.cli applied to every CLI run; identity from accounts.folder.signedInAs.id
         ▼
         DataSources.make(_, secrets: vault.scoped(to: "<id>.<acct>"))
         │
@@ -289,9 +438,9 @@ Every provider is a `Provider`: its enabled logins are its pills ([TARGET §2.1]
    ├─ "Sign in with browser" ──▶ provider.signIn(with:under:) ─────────────────┐
    │                               │ AccountSignIn (DataSources worker)        │
    │                               │   folders.create(<root>/<p>/<uuid>)       │
-   │                               │   run signIn.cli signIn.args              │
-   │                               │     env[homeVariable] = folder            │
-   │                               │     env -= signIn.unset                   │
+   │                               │   run cli signIn.args                     │
+   │                               │     under accounts.cli, with              │
+   │                               │     {{account.folder}} = folder             │
    │                               │   exit 0? else throw (folder removed)     │
    │                               ▼                                           │
    ├─ "Choose Signed-in Folder" ─▶ provider.addAccount(signedInAt:) ◀─────────┘
@@ -324,7 +473,7 @@ Provider.refresh(account, kind)            in flight already? → await that tas
   │  bound[account.id] → active DataSource (and its fallback chain)
   ▼
 DataSource.fetchUsage()                    already filled for this login; vault already scoped
-  │  lookUp()  ── credential from {{account.home}}/auth.json · vault account.<acct>.apiKey
+  │  lookUp()  ── credential from {{account.folder}}/auth.json · vault account.<acct>.apiKey
   │  identity  ── the looked-up fact == the saved one?  no → DataSourceError(.lookup, sessionExpired(hint))
   │  cache?    ── per DataSource, so per login
   │  fetch → map
@@ -476,11 +625,14 @@ are the cases the definition declares (§8).
 | Law | Owner |
 |---|---|
 | a provider has at least one account; the default's id is the provider id, an added one's `<provider>.<acct>` | `Provider.accounts` |
-| one definition serves every account — an added login's data sources are the definition patched and filled, never a hand-built copy | `ProviderDefinition.dataSources(forAccount:)` |
+| one definition serves every account — an added login's data sources are the definition without this Mac's reads, filled with its values; never a hand-built copy | `ProviderDefinition.dataSources(forAccount:)` |
+| **an account shows only what its own sign-in reaches**: the default account is signed in on this Mac; an added one, through its folder or key, never reaches a read that names nothing of it — an environment variable, a fixed path, a fixed Keychain name, browser cookies, a local database or log | `ProviderDefinition.dataSources(for:)` — the definition read for one account |
+| the default login's folder is `folder.default` (or the folder setting's `default`), so a read under `{{account.folder}}` serves it too; a value it saved wins | `ProviderDefinition` |
 | a provider without `accounts` cannot add one — the button is absent, not disabled | `ProviderDefinition.accounts` |
 | an account's secret is read only from that account's vault corner; a missing one is *Key needed*, never the default's key or the environment | `SecretStore.scoped(to:)`, used by every added login's data sources |
-| an added login's CLI never sees the default login's credentials: what to set and unset is the definition's `patch`, per data source | the definition (data) — run by `CLIFetcher` |
-| usage shown under a login was fetched with that login's credential; a different identity fails closed with the definition's hint | `DataSource` (lookup) |
+| an added login's CLI never sees the default login's credentials: what to point at its folder, unset and add is `accounts.cli`, said once and applied to every CLI run of an added login — fetch, refresh, sign-in | the definition (data) — run by `CLIFetcher` |
+| usage shown under a login was fetched with that login's credential; a different identity fails closed. An added folder account's identity is `accounts.folder.signedInAs.id`, given to every one of its data sources | `DataSource` (lookup) · `Provider` (gives it) |
+| *checked once* (`verifyBeforeBackground`, #216) is the default login's: an added login is checked by being added, and only the default login marks or forgets the provider's `verifiedAtLeastOnce` | `Provider` |
 | a folder already listed, or the default login, is not added twice | `Provider` (`addAccount`) |
 | sign-in never writes to an existing folder and saves nothing on failure, cancel or timeout | `AccountSignIn` |
 | display name is label, else email, else the provider's name | `Account.displayName` |
@@ -488,7 +640,7 @@ are the cases the definition declares (§8).
 | today's usage is read from one login's local logs — Claude's default login's — so only that login shows it; guest passes likewise | `UsageHistory` (keyed by lineup id) · `Account.guestPasses` |
 | removing deletes only what ClaudeBar made — the account's settings, its vault corner, and its folder when it goes with the account; never a folder the person chose or the CLI's files | `Provider.remove`, asking `SignedInFolder.goesWithAccount` |
 | a data source whose key lookup ClaudeBar cannot see (`fetch: script`) declares an `identity`, or the definition is refused on load | `ProviderDefinition` validation (`DefinitionError`) |
-| the data source choice is the provider's; a login the patch leaves without it uses the next on the fallback chain, and its usage says which | `Provider` |
+| the data source choice is the provider's; a login without it (an added login, where it reads only this Mac) uses the next on the fallback chain, and its usage says which | `Provider` |
 | a menu bar name is shortened for width and never widens to a full email | `MenuBarAccountName` (App) |
 | an account is added only once its identity is known; *Add anyway* exists only after that step passed | `Provider` (`addAccount`) |
 | accounts keep the order the person gave them; the default is found by `isDefault`, not by position | `Provider.accounts` |
@@ -615,9 +767,9 @@ and *who owns the thing?* — never from what is easiest to build.
   that account's budget. There is no interim adapter.
 - ~~**One data source choice, or one per account?**~~ **One, the provider's.**
   *DATA SOURCE* sits on the provider's card, and to the person it means *"how
-  ClaudeBar asks Codex"*, not *"how it asks for work@"*. An added login whose
-  `patch` leaves out the active kind (a form account with only a key has no
-  CLI) uses the first remaining data source on the active one's fallback
+  ClaudeBar asks Codex"*, not *"how it asks for work@"*. An added login
+  without the active kind (a form account with only a key has no CLI) uses
+  the first remaining data source on the active one's fallback
   chain. Its pill says which one (*via API*), so the difference is never
   silent. **Built** (`ProviderTests`): the refresh starts at the next data source on the chain the login has. (§4)
 - ~~**Can the default account be renamed?**~~ **Yes.** Two people with
@@ -677,3 +829,20 @@ and *who owns the thing?* — never from what is easiest to build.
 - ~~**One Swift adapter so every provider has accounts now?**~~ **No.** It
   builds a second lifecycle and four `switch id` tables, and every line of it
   is deleted when the provider becomes JSON (§ What is wrong today).
+- ~~**Does an added Codex login keep the terminal fallback (`tty`)?**~~ **Yes.**
+  It was left out because *"the terminal would read the global login"*: the
+  patch gave the RPC `CODEX_HOME` and never gave it to the terminal. With
+  `accounts.cli` applied to every CLI run of an added login, the terminal
+  reads that login's folder, and `fallback.sameLogin` still skips it when the
+  login is signed out (#525). ([#577](https://github.com/tddworks/ClaudeBar/issues/577))
+- ~~**`verifyBeforeBackground` for added logins: on (Gemini) or off (Codex)?**~~
+  **Neither; it is the default login's.** An added login is checked by being
+  added (`Provider.isVerified`), so neither patch value ever held one back. But
+  the flag both touched is the provider's, so Gemini's let an added login mark
+  the **default** login checked, or take that away. Only the default login
+  marks or forgets it now, and both values are gone. (§4, #577)
+- ~~**An extension that still says `accounts.patch`?**~~ **Ignored, with one log
+  line; the law applies.** That is the safe direction: at worst an added login
+  loses a read and shows *not set up*; it never shows this Mac's numbers. A
+  second mechanism kept for files that may not exist would cost more than it
+  saves. (#577)
