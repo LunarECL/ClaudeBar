@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Claude's default account honours `CLAUDE_CONFIG_DIR` for its credentials file**, as it already did for its account file. ([#577](https://github.com/tddworks/ClaudeBar/issues/577))
 - **OpenCode Go on OpenCode 2**: without an API key, the estimate and daily cards read opencode's database directly, so OpenCode 1 and 2 both work and spend from before an upgrade still counts. ([#566](https://github.com/tddworks/ClaudeBar/issues/566), [#572](https://github.com/tddworks/ClaudeBar/pull/572))
 
+### Added
+- **Bars on the All page**: Settings → General → All Page Style prints each provider as a row with a bar per quota, ordered by the windows a provider states — most state none and read tightest first. Rings stay the default. ([#575](https://github.com/tddworks/ClaudeBar/issues/575)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/monitoring/all-providers/README.md)
+
 ---
 
 ## [0.5.16] - 2026-10-16

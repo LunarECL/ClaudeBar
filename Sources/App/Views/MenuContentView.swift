@@ -692,6 +692,23 @@ struct MenuContentView: View {
 
     // MARK: - Metrics Content
 
+    /// The All page in the style the person chose — the same cards, printed as
+    /// bars (docs/features/monitoring/all-providers/design.md).
+    @ViewBuilder
+    private var allPage: some View {
+        if settings.allPageStyle == .bars {
+            OverviewBarsPageView(overview: overview, open: openCard)
+        } else {
+            OverviewPageView(overview: overview, open: openCard)
+        }
+    }
+
+    /// A tap on a card or a row opens the provider on its first login.
+    private func openCard(_ card: OverviewCard) {
+        if let first = card.firstLoginId { selectedProviderId = first }
+        page = .provider
+    }
+
     @ViewBuilder
     private var metricsContent: some View {
         if let notice = leaderboard.offNotice {
@@ -702,13 +719,9 @@ struct MenuContentView: View {
         if showsLeaderboard {
             LeaderboardPopoverView(leaderboard: leaderboard, monitor: monitor)
         } else if showsAll {
-            OverviewPageView(overview: overview) { card in
-                // A tap opens the provider on its first login.
-                if let first = card.firstLoginId { selectedProviderId = first }
-                page = .provider
-            }
-            .opacity(animateIn ? 1 : 0)
-            .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
+            allPage
+                .opacity(animateIn ? 1 : 0)
+                .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
         } else if let tab = monitor.selectedTab, tab.showsAccountPages {
             accountsContent(tab)
         } else if let provider = selectedLogin, let snapshot = monitor.usage(of: provider) {
@@ -1837,33 +1850,7 @@ struct WrappedStatCard: View {
                 }
             }
 
-            // Progress bar with the pace tick under it
-            VStack(spacing: 1) {
-                QuotaProgressBar(
-                    percent: quota.displayProgressPercent(mode: effectiveDisplayMode),
-                    fill: theme.progressGradient(for: quota.status(under: settings.statusPolicy)),
-                    animate: animateProgress,
-                    delay: delay
-                )
-
-                // Expected pace tick mark
-                if let expectedPercent = quota.expectedProgressPercent(mode: effectiveDisplayMode) {
-                    GeometryReader { geo in
-                        let tickX = geo.size.width * max(0, min(100, expectedPercent)) / 100
-                        Path { path in
-                            path.move(to: CGPoint(x: tickX - 3, y: 4))
-                            path.addLine(to: CGPoint(x: tickX + 3, y: 4))
-                            path.addLine(to: CGPoint(x: tickX, y: 0))
-                            path.closeSubpath()
-                        }
-                        .fill(quota.paceLevel?.displayColor ?? theme.textTertiary)
-                        .opacity(animateProgress ? 1 : 0)
-                        .animation(.easeIn(duration: 0.3).delay(delay + 0.5), value: animateProgress)
-                    }
-                    .frame(height: 5)
-                }
-            }
-            .help(quota.paceTickHelp(mode: effectiveDisplayMode) ?? "")
+            QuotaCardBar(quota: quota, animate: animateProgress, delay: delay)
 
             // Reset info (hidden when the grid hoisted a shared countdown)
             if showsReset, let resetText = quota.resetTimestampDescription ?? quota.resetText ?? quota.resetDescription {

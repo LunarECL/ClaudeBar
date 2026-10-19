@@ -7,21 +7,49 @@ struct OverviewPageView: View {
     let overview: Overview
     let open: (OverviewCard) -> Void
 
-    @Environment(\.appTheme) private var theme
-
     var body: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 6) {
-                if overview.critical > 0 { count("\(overview.critical) critical", theme.statusCritical) }
-                if overview.warning > 0 { count("\(overview.warning) warning", theme.statusWarning) }
-                if overview.healthy > 0 { count("\(overview.healthy) healthy", theme.statusHealthy) }
-                Spacer(minLength: 0)
-            }
+            OverviewCounts(overview: overview)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(overview.cards) { card in
                     OverviewCardView(card: card) { open(card) }
                 }
             }
+        }
+    }
+}
+
+/// The *All* page in **Bars**: a row per provider, a line per quota the
+/// person watches, every bar drawn from the same place so two providers can be
+/// read against each other down the column (docs/features/monitoring/all-providers/design.md).
+struct OverviewBarsPageView: View {
+    let overview: Overview
+    let open: (OverviewCard) -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            OverviewCounts(overview: overview)
+            VStack(spacing: 8) {
+                ForEach(overview.cards) { card in
+                    OverviewBarRowView(card: card) { open(card) }
+                }
+            }
+        }
+    }
+}
+
+/// The critical / warning / healthy capsules both styles show above the page.
+private struct OverviewCounts: View {
+    let overview: Overview
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if overview.critical > 0 { count("\(overview.critical) critical", theme.statusCritical) }
+            if overview.warning > 0 { count("\(overview.warning) warning", theme.statusWarning) }
+            if overview.healthy > 0 { count("\(overview.healthy) healthy", theme.statusHealthy) }
+            Spacer(minLength: 0)
         }
     }
 
@@ -37,6 +65,148 @@ struct OverviewPageView: View {
                                               lineWidth: theme.isOutlined ? theme.cardBorderWidth * 0.8 : 1))
             )
     }
+}
+
+/// One provider in **Bars**: its word, then one line per quota it watches.
+/// A tap opens the provider's page, as a card does.
+struct OverviewBarRowView: View {
+    let card: OverviewCard
+    let open: () -> Void
+
+    @Environment(\.appTheme) private var theme
+    @State private var settings = AppSettings.shared
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: open) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    ProviderIconView(providerId: card.id, size: 16, showGlow: false)
+                    Text(settings.shown(card.name))
+                        .popoverFont(11, weight: .semibold)
+                        .foregroundStyle(theme.textPrimary)
+                        .lineLimit(1)
+                    if let account = card.tightestLogin {
+                        Text(settings.shown(account))
+                            .popoverFont(9, weight: .medium)
+                            .foregroundStyle(theme.textTertiary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    if card.badge.showsBadge {
+                        Text(card.badge.badgeText(in: theme))
+                            .popoverFont(9, weight: .semibold)
+                            .foregroundStyle(card.badge.badgeColor(theme))
+                    }
+                }
+                if card.lines.isEmpty {
+                    Text(card.badge.badgeText(in: theme).capitalized)
+                        .popoverFont(10, weight: .semibold)
+                        .foregroundStyle(theme.textSecondary)
+                } else {
+                    // Keyed by the quota, not the row's offset: a refresh can
+                    // reorder lines, and identity by position would hand one
+                    // line's view to another quota's content.
+                    ForEach(Array(card.lines.enumerated()), id: \.element.quotaType) { index, quota in
+                        OverviewQuotaLineView(quota: quota, delay: Double(index) * 0.05)
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                        .fill(theme.cardGradient).themeShadow(theme)
+                    RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                        .stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth)
+                }
+            )
+            .contentShape(.rect)
+            .scaleEffect(isHovering ? 1.01 : 1.0)
+            .animation(.easeOut(duration: 0.15), value: isHovering)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help("Open \(settings.shown(card.name))")
+    }
+}
+
+/// One quota in a **Bars** row: its label and reset on the left, its bar in
+/// the fixed middle, its percentage on the right. The label and the number
+/// are held at a fixed width so every bar on the page starts and ends in the
+/// same place — that is what makes two providers comparable.
+private struct OverviewQuotaLineView: View {
+    let quota: UsageQuota
+    let delay: Double
+
+    @Environment(\.appTheme) private var theme
+    @Environment(\.popoverTextSize) private var popoverTextSize
+    @State private var settings = AppSettings.shared
+
+    /// Held columns so every bar on the page starts and ends in the same
+    /// place. They scale with the popover's text size, which widens the
+    /// popover by the same factor — the bar keeps its share of the row.
+    private var labelWidth: CGFloat { popoverTextSize.scaled(82) }
+    private var valueWidth: CGFloat { popoverTextSize.scaled(46) }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            label
+                .frame(width: labelWidth, alignment: .leading)
+            bar
+                .frame(maxWidth: .infinity)
+            value
+                .frame(width: valueWidth, alignment: .trailing)
+        }
+        // A minimum, not a height: the label is two lines when a quota has a
+        // reset, and at a larger text size a fixed height would compress them.
+        .frame(minHeight: 20)
+    }
+
+    private var label: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .popoverFont(10, weight: .semibold)
+                .foregroundStyle(theme.textPrimary)
+                .lineLimit(1)
+            // The line's countdown stays in two units — `resetDescription`
+            // caps itself there — so "2d 1h" fits the held column that the
+            // full "Resets in 1d 18h 59m" would spill out of.
+            if let reset = quota.resetDescription ?? quota.resetText {
+                Text(reset)
+                    .popoverFont(9, weight: .medium)
+                    .foregroundStyle(theme.textTertiary)
+                    .lineLimit(1)
+            }
+        }
+        // The name is what tells two quotas apart, so it stays readable when
+        // the column has to cut it.
+        .help(title)
+    }
+
+    /// The page's own bar, on the mode the person chose. A balance with no
+    /// ceiling has no percentage, so it gets no bar rather than a false one.
+    @ViewBuilder
+    private var bar: some View {
+        if !quota.isBalance {
+            QuotaCardBar(quota: quota, delay: delay)
+        }
+    }
+
+    /// A percentage in the person's display mode; a balance as its amount.
+    private var value: some View {
+        Text(text)
+            .popoverDisplayFont(11)
+            .foregroundStyle(theme.textPrimary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+    }
+
+    private var text: String { QuotaLineText.value(quota, mode: settings.usageDisplayMode) }
+
+    private var title: String { QuotaLineText.title(quota) }
 }
 
 /// One provider on *All*: its badge, its tightest quota as a ring, the next
@@ -146,13 +316,11 @@ struct OverviewCardView: View {
     }
 
     private func title(_ quota: UsageQuota, login: String?) -> String {
-        let name = quota.compactTitle ?? quota.quotaType.displayName
-        return login.map { "\(settings.shown($0)) · \(name)" } ?? name
+        QuotaLineText.title(quota, login: login, shown: { settings.shown($0) })
     }
 
     /// A percentage in the person's display mode; a balance as its amount.
     private func value(_ quota: UsageQuota) -> String {
-        if quota.percentLeft == nil, let dollars = quota.formattedDollarRemaining { return dollars }
-        return "\(Int(quota.displayPercent(mode: settings.usageDisplayMode)))%"
+        QuotaLineText.value(quota, mode: settings.usageDisplayMode)
     }
 }
