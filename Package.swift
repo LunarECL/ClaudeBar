@@ -181,6 +181,9 @@ let package = Package(
         .testTarget(name: "QuotasTests", dependencies: ["Quotas"], path: "Modules/Quotas/Tests"),
         .target(name: "Diagnostics", path: "Modules/Diagnostics/Sources"),
         .testTarget(name: "DiagnosticsTests", dependencies: ["Diagnostics"], path: "Modules/Diagnostics/Tests"),
+        // WinHTTP, which the SDK's WinSDK module leaves out: the LocalNetwork adapter's
+        // one request to a server on this machine.
+        .systemLibrary(name: "CWinHTTP", path: "Modules/DataSources/CWinHTTP"),
         .target(
             name: "DataSources",
             dependencies: [
@@ -188,12 +191,14 @@ let package = Package(
                 "Diagnostics",
                 "CQuickJS",
                 "CSQLite",
+                "CWinHTTP",
                 mockable,
                 .product(name: "Subprocess", package: "swift-subprocess"),
                 crypto,
             ],
             path: "Modules/DataSources/Sources",
-            swiftSettings: mocking
+            swiftSettings: mocking,
+            linkerSettings: [.linkedLibrary("iphlpapi")]
         ),
         .testTarget(
             name: "DataSourcesTests",

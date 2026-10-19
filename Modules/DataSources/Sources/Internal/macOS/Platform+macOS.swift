@@ -11,11 +11,9 @@ extension Platform {
         keychain: KeychainReader.system,
         browserCookies: SystemBrowserCookies(),
         browserStorage: SystemBrowserStorage(),
-        localNetwork: InsecureLocalhostNetworkClient(),
+        localServers: LocalServers(MacLocalServers()),
         screenRenderer: { TerminalRenderer(cols: 160, rows: 50).render($0) },
-        applicationData: { home, _ in home.appendingPathComponent("Library/Application Support", isDirectory: true) },
-        localServer: macLocalServer,
-        localServerCommands: macLocalServerCommands
+        applicationData: { home, _ in home.appendingPathComponent("Library/Application Support", isDirectory: true) }
     )
 }
 #endif

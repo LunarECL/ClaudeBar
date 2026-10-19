@@ -82,8 +82,9 @@ public enum DataSources {
     /// The same, with each connection handed in — how tests, here and in the
     /// modules above, run real definitions over stubbed connections. Every
     /// CLI and command runs on `cliExecutor`, whatever environment it asks
-    /// for, and `network` also answers for servers on this machine. This
-    /// platform's screen renderer stays; a `nil` browser store means none.
+    /// for. A local server is found among `running` and asked through
+    /// `network`, on every platform. This platform's screen renderer stays;
+    /// a `nil` browser store means none.
     public static func make(
         _ definition: DataSourceDefinition,
         providerId: String,
@@ -98,19 +99,18 @@ public enum DataSources {
         loginShell: (@Sendable (String) -> String?)? = nil,
         environment: @escaping @Sendable (String) -> String?,
         homeDirectory: URL,
-        processPaths: @escaping @Sendable () -> [String] = { [] },
+        running: [RunningProgram] = [],
         cloudWatch: (any CloudWatchClient)? = nil,
         priceCatalog: (any PriceCatalog)? = nil,
         now: @escaping @Sendable () -> Date
     ) -> DataSource {
         var platform = Platform.current
         platform.runCLI = { _ in cliExecutor }
-        platform.processes = platform.processes?.with(pipes: { _ in cliExecutor }, conversation: makeTransport,
-                                                      paths: processPaths)
+        platform.processes = platform.processes?.with(pipes: { _ in cliExecutor }, conversation: makeTransport)
         platform.keychain = security
         platform.browserCookies = browserCookies
         platform.browserStorage = browserStorage
-        platform.localNetwork = network
+        platform.localServers = LocalServers(handing: running, network: network)
         return make(
             definition,
             providerId: providerId,
@@ -249,11 +249,8 @@ public enum DataSources {
         case .file(let call):
             return FileFetcher(call: call, homeDirectory: homeDirectory, environment: environment)
         case .localServer(let call):
-            guard let processes = platform.processes, let localNetwork = platform.localNetwork,
-                  let localServer = platform.localServer else {
-                return unavailable("Reading a local server")
-            }
-            return localServer(call, processes.pipes(ProcessEnvironment()), localNetwork, { processes.running.paths() })
+            guard let servers = platform.localServers else { return unavailable("Reading a local server") }
+            return servers.fetcher(for: call)
         case .cloudWatch(let call):
             return CloudWatchFetcher(call: call, client: cloudWatch, catalog: priceCatalog, zone: platform.timeZone, now: now)
         case .directory(let call):

@@ -607,7 +607,6 @@ test first. Findings that need a decision first are in §9.
 | Data Sources | `Connection` means a payload's disclosures and a platform port; `[*]` ends a path in `JSONPath` and fans out in `LocalEndpoint` | one word each; one path dialect |
 | Data Sources | failures worded by workers (*No file at*, *Network error*, OAuth's *Token refresh failed*), retry decided by `tag == "executionFailed"`, `Unavailable` returns text, a missing CloudWatch client words its own | wider `ErrorFact` (`network`, `fileMissing`, `unavailable`, …), one table of failure names |
 | Data Sources | `DataSource` reads the refresher's state to decide renewal; the secret field names are a set on the aggregate | the refresher is told and answers a renewal; `Credential` knows its secrets |
-| Data Sources | a local server's flow (find the app, try ports and paths, word failures) inside the Mac adapter, between `pgrep` and `lsof` parsing | a neutral worker over a `LocalNetwork` port (phase 5, slice 3) |
 | SDK clients | Bedrock's prices and model names in `AWSClients`' Swift | a price file in the definition |
 | Activity | the hooks installed are a list beside `SessionEvent.EventName`, without `Notification`, so *Needs you* never comes | the installer registers every `EventName` |
 | Activity | "ClaudeBar's own CLI run" decided in four places; `CLAUDEBAR_PROBE` written by hand in `claude.json` and the guest-pass runner | Data Sources marks every child it starts and answers "is this one of my runs" |

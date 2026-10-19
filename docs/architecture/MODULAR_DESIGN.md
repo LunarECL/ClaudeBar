@@ -167,7 +167,7 @@ Modules/DataSources/
 │       ├── Process/   PipeCLIExecutor · PipeConversation · SubprocessSupport ·
 │       │              DefaultCLIExecutor · InteractiveRunner · BinaryLocator ·
 │       │              LoginShellEnvironment · RunningProcesses · TerminalRenderer
-│       └── Network/   URLSessionNetworkClient · InsecureLocalhostNetworkClient
+│       └── Network/   URLSessionNetworkClient · LocalServers · LoopbackClient
 └── Tests/
     ├── Fetch/JSONRPCFetcherTests.swift
     ├── Mapping/JSONMapperTests.swift  one test per mapping feature
@@ -358,8 +358,8 @@ passing 6 contract suites, with no edit above the line.
 | Port | Takes over today's | Mac adapter | Windows adapter |
 |---|---|---|---|
 | `TimeZone` | (new) | `TimeZone.current` | the zone's registry key, through CLDR: built ([#567](https://github.com/tddworks/ClaudeBar/pull/567)) |
-| `Processes` | `runCommand` · `rpcTransport` · `processList` · `binaryLocator` · `scriptCommand` · `loginShellCommand` | the login shell's `PATH`, `sh` for a script, `SIGTERM` then `SIGKILL`, `proc_listallpids`, `$SHELL -l -i` | `PATH` + `PATHEXT`, a script run as the file itself, `TerminateProcess`, `EnumProcesses`, the PowerShell profile: built ([#580](https://github.com/tddworks/ClaudeBar/pull/580)). The OS answers five facts; finding, running, talking and reporting are one neutral copy ([below](#processes-a-program-the-person-has)) |
-| `LocalNetwork` | `localNetwork` · `localServer` · `localServerCommands` | the trusted-localhost client, `lsof` / `pgrep` | the same client; the listener table |
+| `Processes` | `runCommand` · `rpcTransport` · `processList` · `binaryLocator` · `scriptCommand` · `loginShellCommand` | the login shell's `PATH`, `sh` for a script, `SIGTERM` then `SIGKILL`, `$SHELL -l -i` | `PATH` + `PATHEXT`, a script run as the file itself, `TerminateProcess`, the PowerShell profile: built ([#580](https://github.com/tddworks/ClaudeBar/pull/580)). The OS answers four facts; finding, running, talking and reporting are one neutral copy ([below](#processes-a-program-the-person-has)) |
+| `LocalNetwork` | `localNetwork` · `localServer` · `localServerCommands` | `proc_listallpids`, `pgrep`, `lsof`, `URLSession` trusting this machine's certificate | `EnumProcesses`, each process's command line from its process information, the TCP listener table, WinHTTP with the certificate checks off on that request: built ([#588](https://github.com/tddworks/ClaudeBar/issues/588)). The OS answers four facts; finding the app and asking it are one neutral copy ([below](#localnetwork-an-apps-own-server)) |
 | `Terminal` | `runCLI` · `screenRenderer` | SwiftTerm on a pty | the console's pseudo-terminal (ConPTY) |
 | `Secrets` | `keychain` · `browserCookies` · `browserStorage` | Keychain, SweetCookieKit | Credential Manager; cookies and storage `Unavailable` in phase 5 |
 | `Places` | `applicationData` · `pathSeparator` | `~/Library/Application Support`, `/` | `APPDATA`, `\` (phase 4) |
@@ -368,13 +368,13 @@ passing 6 contract suites, with no edit above the line.
 
 A data source asks for a program in the person's words: *run the CLI they
 installed*, *talk to it*, *run their own script*, *what does their login
-set*, *is that app running*. Pipes, argv, `PATH` and signals are how, and
+set*. Pipes, argv, `PATH` and signals are how, and
 stay below. So the port is split by what each fact answers, and the
 business is one neutral copy above it:
 
 ```text
 DOMAIN, neutral, one copy
-  Processes        the programs on this machine, from the five facts below
+  Processes        the programs on this machine, from the four facts below
     .program(named:)  → Program?      an installed CLI, found
     .script(at:)      → Program?      the person's script file, when it is there
     .loginEnvironment → LoginShellEnvironment
@@ -392,14 +392,13 @@ PORTS, Ports/Processes.swift: what each OS answers, one question each
   LoginShell          command(printing:between:)  $SHELL -l -i              │ PowerShell profile
   ChildLaunch         environment(for:) ·         PATH + tool folders,      │ names ignoring case,
                       teardown                    SIGTERM, kill after 2s    │ TerminateProcess
-  RunningPrograms     paths()                     proc_listallpids          │ EnumProcesses
 ```
 
 - **Each piece changes for one reason.** How a CLI is found changes
   `InstalledPrograms`; a new kind of script changes `ScriptStart`; a login
   shell changes `LoginShell`; a timeout changes `PipeCLIExecutor`; how a
   failed run is worded changes `Program`.
-- **A new platform answers the five facts**, in one adapter that conforms to
+- **A new platform answers the four facts**, in one adapter that conforms to
   them (`MacProcesses`, `WindowsProcesses`), and passes `ProcessesContract`.
   Nothing above the ports is edited. A fetch kind that runs a program uses
   `Program` and edits no adapter.
@@ -410,8 +409,41 @@ PORTS, Ports/Processes.swift: what each OS answers, one question each
 - **A test hands in the running, not the facts.** `Processes.with(pipes:…)`
   keeps this OS's facts and runs programs on what the test gives, so the
   factory's stubbed `make` and a provider's test say the same thing.
-- `RunningPrograms` answers a local server's question; it moves to
-  `LocalNetwork` with slice 3.
+
+#### LocalNetwork: an app's own server
+
+A `localServer` fetch asks for an app in the person's words: *is it
+running*, *what was it started with*, *where does it listen*, *ask it*.
+The flow (find the app, read its values, try its ports and paths, word the
+failure) is one neutral copy; the OS answers four facts
+([#588](https://github.com/tddworks/ClaudeBar/issues/588)):
+
+```text
+DOMAIN, neutral, one copy
+  LocalServers         the four facts below, and a client that asks only here
+    .fetcher(for:)   → LocalServerFetcher   find, read values, try ports and paths
+    .commands(for:)  → what Import discloses: the programs reading the facts runs
+  LoopbackClient       refuses an address off this machine before sending; follows
+                       a redirect only within the same scheme, host and port
+PORTS, Ports/LocalNetwork.swift                    Mac                     │ Windows
+  RunningPrograms      paths()                     proc_listallpids        │ EnumProcesses
+  ProgramCommandLines  commandLines(naming:)       pgrep -a -lf            │ NtQueryInformationProcess
+  ListeningPorts       ports(of:)                  lsof -iTCP -sTCP:LISTEN │ GetExtendedTcpTable
+  LoopbackRequests     send(_:) → no redirect      URLSession, any cert    │ WinHTTP, cert checks off
+                       followed                    on 127.0.0.1            │ on that request
+```
+
+- **Windows runs no program to find an app.** Its command lines and ports
+  come from the kernel, so Import discloses nothing for them there.
+- **`URLSession` can't be the Windows client.** swift-corelibs-foundation
+  has no server trust (`URLProtectionSpace.serverTrust` is unsupported), and
+  its one way to skip the check is a process-wide variable read on Android
+  only. WinHTTP turns the checks off on one request; the SDK's `WinSDK`
+  module leaves `winhttp.h` out, so a two-line system-library module
+  (`CWinHTTP`) brings it in, on Windows only.
+- **A test hands in the running, not the facts.** The stubbed `make` takes
+  `running: [RunningProgram]` (path, command line, ports), so Antigravity's
+  tests run on every platform.
 
 ### The shape
 
@@ -490,9 +522,12 @@ Modules/DataSources/Sources/
 │   ├── TimeZoneSource.swift   the person's zone, and DataSources.timeZone() ·
 │   │                          .calendar(), the one public way to it (#567)
 │   ├── Processes.swift        InstalledPrograms · ScriptStart · LoginShell ·
-│   │                          ChildLaunch · RunningPrograms: what an OS
-│   │                          answers about programs (#579)
-│   └── Terminal · Secrets · LocalNetwork   (slices 3–5)
+│   │                          ChildLaunch: what an OS answers about
+│   │                          programs (#579)
+│   ├── LocalNetwork.swift     RunningPrograms · ProgramCommandLines ·
+│   │                          ListeningPorts · LoopbackRequests: what an OS
+│   │                          answers about an app's own server (#588)
+│   └── Terminal · Secrets     (slices 4–5)
 └── Internal/
     ├── Platform.swift         ◇ struct Platform — holds the ports, nothing
     │                            else; Platform.bare: the name and zone. Until
@@ -512,21 +547,27 @@ Modules/DataSources/Sources/
     │                            PipeCLIExecutor · PipeConversation ·
     │                            SubprocessSupport underneath, one copy for every
     │                            platform (#579)
+    ├── Network/               LocalServers · LoopbackClient, and
+    │                            Fetch/LocalServerFetcher: an app's own server,
+    │                            found and asked, one copy (#588)
     ├── Fetch/ Lookup/ Mapping/ Logs/ Network/   neutral workers
     ├── macOS/                 #if os(macOS), whole file: one adapter per port
     │   ├── Platform+macOS.swift      static let current = Platform(name: "macOS", …)
     │   ├── Time/SystemTimeZone.swift   TimeZone.current
-    │   ├── Process/MacProcesses.swift   the five facts: BinaryLocator, sh,
-    │   │                               $SHELL -l -i, SIGTERM then kill,
-    │   │                               RunningProcesses (#579)
+    │   ├── Process/MacProcesses.swift   the four facts: BinaryLocator, sh,
+    │   │                               $SHELL -l -i, SIGTERM then kill (#579)
+    │   ├── Network/MacLocalServers.swift   RunningProcesses, pgrep, lsof,
+    │   │                               URLSession trusting 127.0.0.1 (#588)
     │   └── Process/ · Lookup/ · Network/ · Logs/   today's workers, regrouped
     │                                 under their ports in slices 3–5
     └── Windows/               #if os(Windows), whole file: the same ports
         ├── Platform+Windows.swift    static let current = Platform(name: "Windows", …)
         ├── Time/WindowsTimeZone.swift   the zone's registry key and offset (#567)
-        ├── Process/WindowsProcesses.swift   the five facts: PathBinaryLocator (PATH +
+        ├── Process/WindowsProcesses.swift   the four facts: PathBinaryLocator (PATH +
         │                                   PATHEXT), the file itself, PowerShell,
-        │                                   TerminateProcess, EnumProcesses (#579)
+        │                                   TerminateProcess (#579)
+        ├── Network/WindowsLocalServers.swift   EnumProcesses, NtQueryInformationProcess,
+        │                                   GetExtendedTcpTable, WinHTTP (#588)
         └── Logs/                     FileStamp+Windows · ByteSearch+Windows
 Modules/DataSources/Tests/
 ├── Contracts/                 one suite per port, run against Platform.current's
@@ -615,7 +656,7 @@ Phase 5's slices, each its own issue and PR
 | 0 | **`TimeZone` port.** The person's zone, read through the factory; every `.current` calendar default reads it | a KST test runs on any machine — built ([#567](https://github.com/tddworks/ClaudeBar/pull/567)) |
 | 1 | **Vendor QuickJS and SQLite; one engine everywhere.** `QuickJSEngine` replaces JavaScriptCore on the Mac and is the engine on Windows; one `ReadOnlyQuery` on bundled SQLite | Windows no longer skips a test for a script engine or SQLite (−391); the Mac's numbers don't change; release-build timing, the size added to the Mac app, and scripts in definitions people wrote checked — built ([#571](https://github.com/tddworks/ClaudeBar/pull/571)) |
 | 2 | **`Processes`**: port, contract, Windows adapter | its tests run on Windows — built ([#580](https://github.com/tddworks/ClaudeBar/pull/580)): `command`, `script` and `jsonRpc` fetches, `command` logs and the login-shell lookup run on Windows |
-| 3 | **`LocalNetwork`**, with the localhost-certificate spike | its tests run on Windows |
+| 3 | **`LocalNetwork`**, with the localhost-certificate spike | its tests run on Windows — built ([#588](https://github.com/tddworks/ClaudeBar/issues/588)): a `localServer` fetch (Antigravity's `local` source) runs on Windows |
 | 4 | **`Terminal`**, with the SwiftTerm-on-Windows spike | its tests run on Windows |
 | 5 | **`Secrets`**: Credential Manager; browser cookies and storage stay `Unavailable` | its tests run on Windows |
 | 6 | **`Monitoring` into the package**, so no platform rewrites refresh scheduling and alert logic; the menu bar and Notify! stay in the Mac app | its own design review first, since it reshapes the domain's root |
