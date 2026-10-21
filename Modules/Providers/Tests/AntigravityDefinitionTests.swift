@@ -91,7 +91,7 @@ struct AntigravityDefinitionTests {
         let seen = Seen()
         let provider = try make(answers: ["RetrieveUserQuotaSummary": (200, #"{"response":\#(Self.summary)}"#)], seen: seen)
         let quotas = try await provider.refreshPlain().quotas
-        #expect(quotas.map(\.quotaType) == [.session, .weekly, .modelSpecific("Claude"), .modelSpecific("Claude Weekly")])
+        #expect(quotas.map(\.quotaType) == [.session, .weekly, .modelSpecific("Claude 5h"), .modelSpecific("Claude 7d")])
         #expect(quotas.map(\.percentRemaining) == [80, 60, 40, 20])
         // A 5-hour bucket is 5 hours — the probe called the 3p one a week.
         #expect(quotas.map { $0.window?.length } == [18000, 604800, 18000, 604800])
@@ -103,7 +103,7 @@ struct AntigravityDefinitionTests {
     @Test(.needsLocalServer) func `should show the separately reported weekly model pool`() async throws {
         let provider = try make(answers: ["RetrieveUserQuotaSummary": (200, #"{"response":\#(Self.summaryWithArgon)}"#)])
         let quotas = try await provider.refreshPlain().quotas
-        #expect(quotas.map(\.quotaType) == [.session, .weekly, .modelSpecific("Claude"), .modelSpecific("Claude Weekly"), .modelSpecific("Argon Weekly")])
+        #expect(quotas.map(\.quotaType) == [.session, .weekly, .modelSpecific("Claude 5h"), .modelSpecific("Claude 7d"), .modelSpecific("Argon Weekly")])
         #expect(quotas.map(\.percentRemaining) == [100, 100, 100, 100, 95])
         #expect(quotas.map { $0.window?.length } == [18000, 604800, 18000, 604800, 604800])
     }

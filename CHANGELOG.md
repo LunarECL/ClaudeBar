@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Antigravity's Claude pool says which window it is**: its quotas read "Claude 5h" and "Claude 7d" instead of "Claude" and "Claude Weekly", so two of them side by side can be told apart. ([#589](https://github.com/tddworks/ClaudeBar/issues/589))
+
 ### Added
+- **The Notify! tile's quota windows can stay where they are**: Settings → Notify! → Tile Order → Fixed positions keeps each provider's windows together and in the same place, instead of reordering the row as the percentages change. The lowest quota still colours the tile. ([#589](https://github.com/tddworks/ClaudeBar/issues/589)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/alerting/notify/README.md)
 - **Antigravity, Gemini 4 Argon**: shows the separate weekly quota pool for Gemini 4 Argon (`ARGON WEEKLY`) when reported by Antigravity. ([#591](https://github.com/tddworks/ClaudeBar/pull/591)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/antigravity/README.md)
 
 ---
