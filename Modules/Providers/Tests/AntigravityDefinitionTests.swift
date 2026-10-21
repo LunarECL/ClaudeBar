@@ -20,6 +20,7 @@ struct AntigravityDefinitionTests {
         commandLine: "/Applications/Antigravity.app/Contents/Resources/app/extensions/antigravity/bin/language_server_macos_arm --csrf_token 9f808dbe-cb96-4829 --extension_server_port 58445 --app_data_dir antigravity",
         ports: [42135])
     nonisolated static let summary = #"{"groups":[{"displayName":"Gemini","buckets":[{"bucketId":"gemini-5h","remainingFraction":0.8,"resetTime":"2025-01-01T05:00:00Z"},{"bucketId":"gemini-weekly","remainingFraction":0.6,"resetTime":"2025-01-07T00:00:00Z"}]},{"displayName":"Claude & others","buckets":[{"bucketId":"3p-5h","remainingFraction":0.4},{"bucketId":"3p-weekly","remainingFraction":0.2},{"bucketId":"gemini-image-5h","remainingFraction":1.0}]}]}"#
+    nonisolated static let summaryWithArgon = #"{"groups":[{"displayName":"Gemini Models","buckets":[{"bucketId":"gemini-weekly","window":"weekly","remainingFraction":1,"resetTime":"2025-01-07T00:00:00Z"},{"bucketId":"gemini-5h","window":"5h","remainingFraction":1,"resetTime":"2025-01-01T05:00:00Z"}]},{"displayName":"Claude and GPT models","buckets":[{"bucketId":"3p-weekly","window":"weekly","remainingFraction":1,"resetTime":"2025-01-07T00:00:00Z"},{"bucketId":"3p-5h","window":"5h","remainingFraction":1,"resetTime":"2025-01-01T05:00:00Z"}]},{"displayName":"Gemini 4 Argon","buckets":[{"bucketId":"gemini-argon-wtu-weekly","window":"weekly","remainingFraction":0.95,"resetTime":"2025-01-07T00:00:00Z"}]}]}"#
     nonisolated static let userStatus = #"{"userStatus":{"email":"user@example.com","planStatus":{"planInfo":{"planName":"Pro"}},"cascadeModelConfigData":{"clientModelConfigs":[{"label":"Claude Sonnet","quotaInfo":{"remainingFraction":0.75,"resetTime":"2025-01-01T00:00:00Z"}},{"label":"Gemini Pro","quotaInfo":{"remainingFraction":0.5,"resetTime":"1735689600"}},{"label":"No Quota Model"}]}}}"#
 
     final class Seen: @unchecked Sendable {
@@ -91,13 +92,21 @@ struct AntigravityDefinitionTests {
         let seen = Seen()
         let provider = try make(answers: ["RetrieveUserQuotaSummary": (200, #"{"response":\#(Self.summary)}"#)], seen: seen)
         let quotas = try await provider.refreshPlain().quotas
-        #expect(quotas.map(\.quotaType) == [.session, .weekly, .modelSpecific("Claude"), .modelSpecific("Claude Weekly")])
+        #expect(quotas.map(\.quotaType) == [.session, .weekly, .modelSpecific("Claude 5h"), .modelSpecific("Claude 7d")])
         #expect(quotas.map(\.percentRemaining) == [80, 60, 40, 20])
         // A 5-hour bucket is 5 hours — the probe called the 3p one a week.
         #expect(quotas.map { $0.window?.length } == [18000, 604800, 18000, 604800])
         let request = try #require(seen.requests.first)
         #expect(request.url?.absoluteString == "https://127.0.0.1:42135/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary")
         #expect(request.value(forHTTPHeaderField: "X-Codeium-Csrf-Token") == "9f808dbe-cb96-4829")
+    }
+
+    @Test func `should show the separately reported weekly model pool`() async throws {
+        let provider = try make(answers: ["RetrieveUserQuotaSummary": (200, #"{"response":\#(Self.summaryWithArgon)}"#)])
+        let quotas = try await provider.refreshPlain().quotas
+        #expect(quotas.map(\.quotaType) == [.session, .weekly, .modelSpecific("Claude 5h"), .modelSpecific("Claude 7d"), .modelSpecific("Argon Weekly")])
+        #expect(quotas.map(\.percentRemaining) == [100, 100, 100, 100, 95])
+        #expect(quotas.map { $0.window?.length } == [18000, 604800, 18000, 604800, 604800])
     }
 
     @Test func `should show a quota per model with the plan and email when an older app answers`() async throws {

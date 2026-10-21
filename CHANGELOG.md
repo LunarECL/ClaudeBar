@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.18] - 2026-10-21
+
+### Fixed
+- **Antigravity's Claude pool says which window it is**: its quotas read "Claude 5h" and "Claude 7d" instead of "Claude" and "Claude Weekly", so two of them side by side can be told apart. ([#589](https://github.com/tddworks/ClaudeBar/issues/589))
+
+### Added
+- **The Notify! tile's quota windows can stay where they are**: Settings → Notify! → Tile Order → Fixed positions keeps each provider's windows together and in the same place, instead of reordering the row as the percentages change. The lowest quota still colours the tile. ([#589](https://github.com/tddworks/ClaudeBar/issues/589)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/alerting/notify/README.md)
+- **Antigravity, Gemini 4 Argon**: shows the separate weekly quota pool for Gemini 4 Argon (`ARGON WEEKLY`) when reported by Antigravity. ([#591](https://github.com/tddworks/ClaudeBar/pull/591)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/antigravity/README.md)
+
+---
+
 ## [0.5.17] - 2026-10-19
 
 ### Changed
@@ -20,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Commands and scripts on Windows**: providers that run a command, a script or a JSON-RPC CLI now run on Windows, on the Mac's pipe runner. An extension's script must be a `.cmd`, `.bat` or `.exe` there. ([#580](https://github.com/tddworks/ClaudeBar/pull/580), [#579](https://github.com/tddworks/ClaudeBar/issues/579)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10-one-package-two-platforms)
 
 ### Fixed
+- **A provider's API key can no longer be sent anywhere but its own site**: a redirect to another address is not followed, and a key can no longer reach the log file through a failed request either — registered keys are scrubbed from every log line. ([#585](https://github.com/tddworks/ClaudeBar/pull/585))
 - **An added Mistral account showed this Mac's Vibe sessions as its own**: it now shows only its own web usage. ([#578](https://github.com/tddworks/ClaudeBar/issues/578), [#577](https://github.com/tddworks/ClaudeBar/issues/577))
 - **Claude's default account honours `CLAUDE_CONFIG_DIR` for its credentials file**, as it already did for its account file. ([#577](https://github.com/tddworks/ClaudeBar/issues/577))
 - **OpenCode Go on OpenCode 2**: without an API key, the estimate and daily cards read opencode's database directly, so OpenCode 1 and 2 both work and spend from before an upgrade still counts. ([#566](https://github.com/tddworks/ClaudeBar/issues/566), [#572](https://github.com/tddworks/ClaudeBar/pull/572))
@@ -290,7 +302,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.17...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.18...HEAD
+[0.5.18]: https://github.com/tddworks/ClaudeBar/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/tddworks/ClaudeBar/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/tddworks/ClaudeBar/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/tddworks/ClaudeBar/compare/v0.5.14...v0.5.15
