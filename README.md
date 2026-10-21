@@ -173,6 +173,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     <tr>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/boogle42"><img src="https://avatars.githubusercontent.com/u/5807520?v=4?s=80" width="80px;" alt="Jamie Goodfellow"/><br /><sub><b>Jamie Goodfellow</b></sub></a><br /><a href="https://github.com/tddworks/claudebar/commits?author=boogle42" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://luolei.org/"><img src="https://avatars.githubusercontent.com/u/1920586?v=4?s=80" width="80px;" alt="Luo Lei"/><br /><sub><b>Luo Lei</b></sub></a><br /><a href="https://github.com/tddworks/claudebar/commits?author=foru17" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://jniimilab.ai/"><img src="https://avatars.githubusercontent.com/u/54612149?v=4?s=80" width="80px;" alt="Junichiro Niimi"/><br /><sub><b>Junichiro Niimi</b></sub></a><br /><a href="https://github.com/tddworks/claudebar/commits?author=jniimi" title="Code">💻</a></td>
     </tr>
   </tbody>
   <tfoot>
