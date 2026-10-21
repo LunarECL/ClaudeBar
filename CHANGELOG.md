@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.18] - 2026-10-21
+
 ### Fixed
 - **Antigravity's Claude pool says which window it is**: its quotas read "Claude 5h" and "Claude 7d" instead of "Claude" and "Claude Weekly", so two of them side by side can be told apart. ([#589](https://github.com/tddworks/ClaudeBar/issues/589))
 
@@ -295,7 +299,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.17...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.18...HEAD
+[0.5.18]: https://github.com/tddworks/ClaudeBar/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/tddworks/ClaudeBar/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/tddworks/ClaudeBar/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/tddworks/ClaudeBar/compare/v0.5.14...v0.5.15
