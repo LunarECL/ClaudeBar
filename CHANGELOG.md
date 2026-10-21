@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- **An app's own server on Windows**: a provider reading an app's server on this machine, as Antigravity's `local` source does, now reads it on Windows, running no program to find it. Mac quotas are unchanged. ([#590](https://github.com/tddworks/ClaudeBar/pull/590)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10-one-package-two-platforms)
+- **An app's own server on Windows**: a provider reading an app's server on this machine, as Antigravity's `local` source does, now reads it on Windows, running no program to find it. Mac quotas are unchanged. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-two-platforms) ([#590](https://github.com/tddworks/ClaudeBar/pull/590))
 
 ---
 

@@ -84,11 +84,23 @@ final class LoopbackServer: @unchecked Sendable {
         return String(decoding: bytes, as: UTF8.self)
     }
 
-    /// A port nothing listens on now, for a server another program starts.
+    /// Reserve an OS-picked port and release it before the next program binds.
+    /// Do not start an accept thread: close() wakes that thread asynchronously,
+    /// so its listener can still own the port when the next program starts.
     static func freePort() throws -> Int {
-        let server = try LoopbackServer(answers: [])
-        server.close()
-        return server.port
+        Socket.start()
+        let socket = Socket.open()
+        guard socket != Socket.invalid else { throw CocoaError(.fileWriteUnknown) }
+        defer { Socket.close(socket) }
+        var address = Socket.loopback(port: 0)
+        var length = Socket.addressLength
+        guard withUnsafePointer(to: &address, {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(socket, $0, length) }
+        }) == 0,
+        withUnsafeMutablePointer(to: &address, {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(socket, $0, &length) }
+        }) == 0 else { throw CocoaError(.fileWriteUnknown) }
+        return Int(UInt16(bigEndian: address.sin_port))
     }
 }
 
