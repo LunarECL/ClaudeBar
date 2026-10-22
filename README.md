@@ -66,12 +66,14 @@ Or download the signed and notarized DMG from [Releases](https://github.com/tddw
 | Area | What you can do |
 |---|---|
 | All providers | Every provider's tightest quota on one page as rings, or every quota as bars, one tap from its own → [docs](docs/features/monitoring/all-providers/README.md) |
+| Forecast | Under a quota's reset countdown, whether that window lasts until it resets at its current pace, or when it runs out → [docs](docs/features/monitoring/forecast/README.md) |
 | Menu bar | Up to three providers as a percentage and reset countdown, or a status icon → [docs](docs/features/app/menu-bar/README.md) |
 | [Multiple Codex accounts](docs/features/providers/multi-account/README.md) | Separate logins, identified by email, with independent quotas |
 | Alerts & colors | Healthy, warning, critical and depleted levels, pace-aware colors, custom colors and High Contrast → [docs](docs/features/quota/status-colors/README.md) |
 | Notch | Quota and live Claude Code sessions in the MacBook notch → [docs](docs/features/activity/notch/README.md) |
 | Touch Bar | Quota gauges on a MacBook Pro Touch Bar → [docs](docs/features/alerting/touch-bar/README.md) |
 | Notify! | Quota on your iPhone Lock Screen and Home Screen → [docs](docs/features/alerting/notify/README.md) |
+| Webhooks | Your quota and status alerts in Slack or at a URL you own → [docs](docs/features/alerting/webhooks/README.md) |
 | Session hooks | Claude Code Started / Finished notifications → [docs](docs/features/activity/session-hooks/README.md) |
 | Daily usage | Today's cost and tokens next to yesterday's → [docs](docs/features/usage-history/daily-usage/README.md) |
 | Leaderboard | Share daily token totals and see where you rank → [docs](docs/features/leaderboard/README.md) |

@@ -25,6 +25,12 @@ struct LocalServerTests {
 
     private func server(_ commandLine: String?, ports: [Int] = [5001, 5002],
                         answering: Set<String> = ["https://127.0.0.1:5002/status"], seen: Seen = Seen()) throws -> LocalServerFetcher {
+        let running = commandLine.map { [RunningProgram(pid: 42, path: "/opt/acme/acme_server", commandLine: $0, ports: ports)] } ?? []
+        return try server(running, answering: answering, seen: seen)
+    }
+
+    private func server(_ running: [RunningProgram],
+                        answering: Set<String> = ["https://127.0.0.1:5002/status"], seen: Seen = Seen()) throws -> LocalServerFetcher {
         let call = try JSONDecoder().decode(LocalServerCall.self, from: Data(callJSON.utf8))
         let network = MockNetworkClient()
         given(network).request(.any).willProduce { request in
@@ -33,7 +39,6 @@ struct LocalServerTests {
             seen.csrf.append(request.value(forHTTPHeaderField: "X-Csrf"))
             return (Data(#"{"ok":true}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: answering.contains(url) ? 200 : 404, httpVersion: nil, headerFields: nil)!)
         }
-        let running = commandLine.map { [RunningProgram(pid: 42, path: "/opt/acme/acme_server", commandLine: $0, ports: ports)] } ?? []
         return LocalServers(handing: running, network: network).fetcher(for: call)
     }
 
@@ -66,6 +71,18 @@ struct LocalServerTests {
         await #expect(throws: UsageError.authenticationRequired) {
             try await server("/opt/acme/acme_server --app acme").fetch(with: nil)
         }
+    }
+
+    @Test func `should ask the running app with its token while a CLI of the same name runs beside it without one`() async throws {
+        let seen = Seen()
+        // Listed out of PID order, as an OS may list them; only the app listens.
+        let response = try await server([
+            RunningProgram(pid: 42, path: "/opt/acme/acme_server", commandLine: "/opt/acme/acme_server --app acme --csrf tok-2", ports: [5001, 5002]),
+            RunningProgram(pid: 7, path: "/opt/acme/acme_server", commandLine: "/opt/acme/acme_server --app acme", ports: []),
+        ], seen: seen).fetch(with: nil)
+        #expect(response.status == 200)
+        #expect(seen.urls.last == "https://127.0.0.1:5002/status")
+        #expect(seen.csrf.allSatisfy { $0 == "tok-2" })
     }
 
     @Test func `should say it couldn't connect to the app when no port answers`() async throws {

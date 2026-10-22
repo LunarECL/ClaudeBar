@@ -29,14 +29,15 @@ A key that's missing means "use the default", so a fresh install starts with an 
 
 | Namespace | Holds | Example |
 |---|---|---|
-| `app.*` | App-wide preferences: theme, menu bar readout, refresh, burn rate, status colors, notch, Touch Bar | `"app": { "burnRateWarningEnabled": true, "burnRateThreshold": 1.5 }` |
+| `app.*` | App-wide preferences: theme, menu bar readout, refresh, the run-out warning, status colors, notch, Touch Bar. `app.burnRateWarningEnabled` is *Warn when a quota will run out before it resets*: `true` colours and alerts by the forecast ([status colors](features/quota/status-colors/README.md)). `app.burnRateThreshold` is retired and ignored if present | `"app": { "burnRateWarningEnabled": true }` |
 | `providers.<id>.*` | Per-provider switches, keyed by the provider id | `"providers": { "gemini": { "isEnabled": false } }` |
 | `providers.order` | Your provider display order — the popover pills, the All page and ⌘1–⌘9 follow it; unset means registration order | `"providers": { "order": ["codex", "claude"] }` |
 | `providers.<id>.cliPath` | The *CLI location* a person chose for a provider that runs a CLI; absent means "find it as usual" (#210) | `"providers": { "claude": { "cliPath": "/opt/tools/bin/claude" } }` |
 | `providers.<id>.hiddenQuotaKeys` | Quotas a person stopped watching for a product, by quota key (`model:gemini-2.0-flash`); shared by its accounts. A key no longer reported is ignored, and hiding every quota hides none (#140) | `"providers": { "gemini": { "hiddenQuotaKeys": ["model:gemini-2.0-flash"] } }` |
 | `<provider>.*` | A provider's own settings, each named in its definition's `settings` (`<id>.<setting>`), and its data source choice (`<id>.probeMode`) | `"kimi": { "probeMode": "api", "region": "international" }` |
 | `hook.*` | [Session hooks](features/activity/session-hooks/README.md) | `"hook": { "enabled": true }` |
-| `alerts.*` | [Quota alerts](features/alerting/quota-alerts/README.md): the percentages you chose | `"alerts": { "thresholds": [60, 35] }` |
+| `alerts.thresholds` | [Quota alerts](features/alerting/quota-alerts/README.md): the percentages you chose | `"alerts": { "thresholds": [60, 35] }` |
+| `alerts.webhooks` | [Webhooks](features/alerting/webhooks/README.md): each webhook's id, name, channel (`slack` · `json`), scope (`provider`, `null` for every login), what it sends and whether it is on. Never its URL | `"alerts": { "webhooks": [{ "id": "9F2C…", "name": "#ai-quota", "channel": "slack", "provider": null, "quotaAlerts": true, "statusAlerts": false, "isOn": true }] }` |
 | `notify.*` | [Notify!](features/alerting/notify/README.md) device link and surfaces | `"notify": { "enabled": true, "widgetEnabled": true }` |
 | `leaderboard.*` | [Leaderboard](features/leaderboard/README.md) membership (name, what you share, last upload) and `leaderboard.on`, which outlives leaving | `"leaderboard": { "on": false, "username": "tokenwhale" }` |
 | `ext-<extension-id>.*` | A user [extension](features/providers/extensions/README.md)'s non-secret config fields, as provider settings. Values an older version kept under `extensions.<extension-id>.*` move here once | `"ext-my-api": { "baseURL": "https://…" }` |
@@ -57,6 +58,8 @@ A few `app.*` keys worth knowing:
 | `app.popoverTitle` | `""` (default) shows **ClaudeBar** at the top of the popover; any other text shows there instead, on one line, at most 24 characters ([popover title](features/app/popover-title/README.md)) |
 | `app.popoverOpensOn` | `whereILeftIt` (default) keeps the page the popover was on; `all` opens it on the All page every time. Unset with the old `app.overviewModeEnabled` on reads `all` ([all providers](features/monitoring/all-providers/README.md)) |
 | `app.allPageStyle` | `rings` (default) reads each provider as a card led by its tightest quota; `bars` gives each provider a row with a bar per quota, shortest window first ([all providers](features/monitoring/all-providers/README.md)) |
+| `app.usageSections.<section>` | Which usage sections the popover shows under the quotas (Settings → **General** → **Usage in the popover**), each `true` or `false`: `today` (the Cost, Tokens and Working Time cards, and other apps' cards), `lastThirtyDays` (the daily chart) and `weeklyRecap` (the All page's recap) are shown by default; `lastYear` (the heatmap) and `modelMix` are hidden by default, and the year's logs are read only while one of them is shown ([insights](features/usage-history/insights/README.md)) |
+| `app.showDailyUsageCards` | Read only for compatibility: when `false` (the one switch that came before the sections), every section with no `app.usageSections` value of its own reads hidden. `true` or absent leaves each section's default |
 | `app.popoverTextSize` | `medium` (default), `large`, `extraLarge` — scales the popover's text up to 1.4× and widens the window to fit. No smaller step is offered: the popover's smallest labels are already 8pt |
 | `app.menuBarProviderSettings` | Per-provider menu bar choices: `{ "codex": { "primaryQuotaKey": "session", "secondaryQuotaKey": "weekly", "stacked": false, "stackedSize": "small" } }` |
 | `app.nativeMenuBarIconsEnabled` | `false` (default) keeps brand colors; `true` uses monochrome provider marks for every menu bar account, adapting to the bar’s appearance |
@@ -78,6 +81,7 @@ Deleting the file resets every setting to its default. Secrets stay where they a
 |---|---|
 | Provider keys you paste into ClaudeBar — API keys, tokens, session cookies, for the default login and every added account | Keychain (the provider vault). A key an older version kept in the app credential store moves to the Keychain after a verified write, the first time it's read |
 | Notify! device token | Keychain, or the app credential store on builds the Keychain refuses (see below) |
+| [Webhook](features/alerting/webhooks/README.md) URLs — a Slack URL carries a token | Keychain under `webhook-url-<id>`, or the app credential store on builds the Keychain refuses (see below). Kept by the same store as the Notify! token |
 | Secret fields of user extensions | Keychain (the provider vault). One an older version kept in the app credential store moves there once |
 | Your provider sign-ins (Claude Code, Codex, Gemini, Grok, Cursor…) | Where that provider's own CLI or app keeps them. ClaudeBar reads them there; see each [provider doc](providers/) |
 
@@ -85,7 +89,7 @@ Deleting the file resets every setting to its default. Secrets stay where they a
 - **The app credential store** is ClaudeBar's own macOS preferences (`defaults read com.tddworks.claudebar`), with keys starting `com.claudebar.credentials.`. It isn't encrypted beyond your account's normal file protection. Provider and extension keys left there by older versions move to the Keychain.
 - **Environment variables**: some providers take a key from an env var instead (`zai.glmAuthEnvVar`, `copilot.authEnvVar`, `minimax.authEnvVar`…). The settings file stores only the variable's *name*, never its value.
 - **Another tool's login** (the GitHub CLI's, Antigravity's, Claude Code's) is read from that tool's own Keychain item or file and never written by ClaudeBar, except where the provider's doc says it renews a token there.
-- **Ad-hoc signed builds** (ones you compile yourself) can't use the Keychain, so the Notify! token falls back to the app credential store and the Notify! pane says so. A Developer ID build from the release page isn't affected.
+- **Ad-hoc signed builds** (ones you compile yourself) can't use the Keychain, so the Notify! token and webhook URLs fall back to the app credential store, and the Notify! pane and the Webhooks card say so. A Developer ID build from the release page isn't affected.
 
 ## See also
 

@@ -215,8 +215,8 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │   └── switchWhenLow: SwitchWhenLow  ◆   opt-in: isOn · below · mayPick(login)
 │       └── status                          DERIVED → accounts.status (tell, don't ask)
 │
-└── statusPolicy: StatusPolicy  ◇           HOW STRICT TO BE — absolute thresholds, or pace-aware
-                                            with the user's burn-rate threshold. ONE for the app
+└── statusPolicy: StatusPolicy  ◇           HOW STRICT TO BE — absolute thresholds, or pace-aware:
+                                            warn when it runs out before it resets. ONE for the app
                                             (General): every surface — menu bar, pill, card, Touch
                                             Bar, notch, notifications, status export — reads the
                                             same status. Colours are not policy: they are the page's
@@ -235,8 +235,14 @@ Usage  ◇                                    "Fetching usage data…" — WHAT 
 │       │                                     money(Money, of: Money?)  "$12.40 remaining", "of $50"
 │       ├── window: Window?                 WHEN IT REFILLS — length + resetsAt. "Resets in 2h 5m".
 │       │                                   A prepaid balance has none
-│       ├── status                          DERIVED — Left × StatusPolicy (× Window, when pace-aware)
-│       └── pace                            DERIVED — needs a Window; otherwise unknown
+│       ├── rate: SpendRate?     DERIVED    HOW FAST IT IS SPENT — used share ÷ share of the window
+│       │                                   gone. nil without a length + reset, for a balance with
+│       │                                   no ceiling, and under 3% of the window (noise)
+│       ├── forecast: Forecast?  DERIVED    "Lasts until it resets" or "Runs out in 38m — 34m before
+│       │                                   it resets": the rate carried forward to zero. nil
+│       │                                   without a rate, and once the quota is used up
+│       ├── status                          DERIVED — Left × StatusPolicy (× rate, when pace-aware)
+│       └── pace                            DERIVED — reads the rate; otherwise unknown
 ├── cost: Cost?  ◇                          MONEY GONE — "API COST" or "EXTRA USAGE", over a period.
 │                                           Judged by a Budget, never by a Quota
 └── account facts                           email · organization · plan, when the data source learns them —
@@ -252,7 +258,7 @@ Usage History                               the context that runs each login's `
 New sessions  ◆                             In use's shell side — the lines that make `claude` start on the
                                             login in use; a choice waits for them. Follows refreshes
                                             through the Monitor's one extension point, `onRefreshed`
-Destinations                                notifications · your quota alerts · Notify! · live activity · status export
+Destinations                                notifications · your quota alerts · status alerts · webhooks · Notify! · live activity · status export
 
     NOT IN THE MODEL (the page's)
 MenuBarLabel · display mode (left/used) · countdown colon · popover height · theme ·
@@ -375,8 +381,9 @@ Claude Code sessions (Activity); where settings and secrets are kept
 | *Add to ~/.zshrc* · *Copy — I'll Add It* · *Remove* | `newSessions.setUp()` · `setUpByHand()` · `turnOff()` | the lines are shown before they are written |
 | turns on *Switch when low*, sets its threshold, unticks a login | `inUse.switchWhenLow.isOn` · `.below` · `.setMayPick(_:_:)` | off by default |
 | sets a Daily Budget · the Claude API Budget | `account.budget = …` (an account-scope setting) | judges that login's cost only |
-| turns the burn-rate warning on, sets its threshold | `monitor.statusPolicy = …` | every status and every alert follows at once |
+| turns on *Warn when a quota will run out before it resets* | `monitor.statusPolicy = …` | every status and every alert follows at once |
 | adds or removes an alert percentage | `quotaAlerts.add(_:)` · `remove(_:)` | whole percents 1–99; 20% and 0% are refused, the status alerts already say them |
+| *Add Webhook* · *Edit* · *Remove* · its switch · *Send a test* | `webhooks.add(url:…)` · `edit(_:url:…)` · `remove(_:)` · `turn(_:on:)` · `sendTest(_:)` | an http URL is refused unless it is local; a test is labelled a test, never an alert ([design](../features/alerting/webhooks/design.md)) |
 | chooses status colours · high contrast | — the page's theme | how a status looks, never what it is |
 
 ## 4 · The reads — what the tree answers
@@ -398,6 +405,8 @@ usage.quota(named:)                  → Quota?
 usage.isStale                        → Bool         older than 5 minutes
 quota.status(under: StatusPolicy)    → Status
 quota.pace                           → Pace         unknown without a window
+quota.rate                           → SpendRate?   how fast it is spent against its window
+quota.forecast                       → Forecast?    lasts until it resets, or runs out N before it
 quota.window?.timeUntilReset         → Duration?    "Resets in 2h 5m"
 account.budgetStatus                 → BudgetStatus? ON TRACK · NEAR LIMIT · OVER BUDGET —
                                                     usage.cost judged by account.budget
@@ -434,6 +443,13 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a quota alert says once that a login fell below one of the person's percentages, and again only after it climbed back a point above it | `QuotaAlerts` |
 | a quota alert judges what the person sees: the lowest share left among the login's quotas not hidden; a balance with no ceiling has no share and is never judged | `QuotaAlerts` |
 | a quota alert names the login (*Claude · work*), never only the product, once a product has several | `QuotaAlerts` |
+| a status alert says when a login's status got worse under the policy and is not healthy, once per worsening; the first status seen is compared with healthy ([design](../features/alerting/status-alerts/design.md)) | `StatusAlerts` |
+| an alert names the login by its `lineupName` and carries its provider id; every alert goes to every destination, and no destination decides whether a login is low | `Alert` · `AlertDestinations` |
+| a webhook wants an alert when it is on, sends that kind, and the alert's provider is in its scope; it has no percent of its own ([design](../features/alerting/webhooks/design.md)) | `Webhook` |
+| how an alert or a test reads in Slack and as JSON; a test is never shaped like an alert | `WebhookBody` |
+| a webhook URL is https, or http only to a loopback or LAN host | `WebhookAddress` |
+| one POST per alert, no retry; a redirect stays on the URL's origin; nothing that could carry the URL reaches a log or the pane | `WebhookClient` |
+| a destination's secret (Notify!'s token, a webhook's URL) is never in `settings.json` or a log — webhooks keep the rest under `alerts.webhooks`; one the Keychain refuses falls back to the app credential store, read Keychain first, and the pane says so — one copy of that rule for every destination | `DestinationSecrets` |
 | one provider per id; the order is the pane's, saved, a provider's logins together; only a provider you made can be deleted — a built-in is turned off. The Monitor never adds, deletes or orders one | `Providers` |
 | a paused account is PAUSED, not forgotten, and is out of every judgement: no refresh, no status, no badge, no alert, no menu-bar name, and no say in its product's status. What it keeps is its last numbers, printed as *last seen* — and a fetch that lands while the login is paused lands nowhere: nothing recorded, success or failure, and nothing published. The refusal is an **outcome** (`UsageError.paused`), never an empty answer dressed as usage | `Account.isPaused` |
 | a product is off only when the person turns it off. Pausing every login of it leaves its tab, dimmed, with *Resume* — pause and the switch are two facts, and a login never leaves the popover without saying which one happened | `Provider.isEnabled` · `QuotaMonitor.tabs` |
@@ -447,7 +463,13 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | money keeps its currency; two currencies are never added or compared | `Money` |
 | **a window's length is the provider's word**, never guessed from a quota's name — the Codex RPC's primary window can be the weekly one | `Window` |
 | pace exists only inside a window with a reset; outside it is `unknown`, never `onPace` | `Quota.pace` |
-| depleted at 0, critical under 20 — ABSOLUTE, whatever the policy; pace-aware only decides WARNING vs HEALTHY between 20% and 50% left | `StatusPolicy` |
+| **ONE rate per quota**: how fast it is spent against its window — one used share (from `left`, so a capped money quota by its money), one noise floor (3% of the window) — and pace, the pace tick, the pace-aware status and the forecast all read it, never their own copy | `SpendRate` · `Quota.rate` |
+| a quota runs out before its reset ⇔ it is used more than 5 points ahead of the share of its window gone; within 5 either side it is on the line. ONE rule, read by Pace, the forecast and the pace-aware status | `SpendRate.runsOutBeforeReset` |
+| a forecast is a READ of the rate over the CURRENT window — never stored on `Usage`; it lasts until the reset unless it runs out first, and *Running hot* ⇔ it runs out first, so a card never says both *On track* and *Runs out* | `Forecast` · `UsagePace` |
+| no forecast without a rate, or once the quota is used up — it has already run out; never a number invented from nothing | `Forecast` |
+| a forecast is said *at this pace*: the window's average, not the next burst | `QuotaCardText` |
+| depleted at 0, critical under 20 — ABSOLUTE, whatever the policy | `StatusPolicy` |
+| a quota's status under the pace-aware policy warns exactly when it runs out before its reset, from 20% left up; without a rate it is the absolute answer ([design](../features/quota/status-colors/design.md)) | `StatusPolicy` reading `SpendRate` |
 | ONE status per quota: the menu bar, the cards, the Touch Bar, the notch, the status export and the notifications all read `quota.status(under: monitor.statusPolicy)` — never their own copy of the rule | `StatusPolicy` · `Monitor` |
 | a quota is the vendor's ceiling; a budget is the user's. A Cost is judged by a Budget, never shown as a Quota. A budget judges ONE account's cost — two logins' spend is never summed against it | `Cost` · `Account.budget` |
 | usage is stale 5 minutes after it was updated | `Usage` |
@@ -482,10 +504,18 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | the range asked for is cut by `days(in:)`, NEVER by the log: a log answers from `since` on, and a query that bounds itself below the range asked would have its older days read as empty and kept that way for good | `UsageLog.days(in:)` |
 | a day closes a fixed while after it ends; a closed day is summed once, kept, and never read from the logs again. Today, and the day before until it closes, are read every time | `DayLedger` |
 | a day is THE SUM OF ITS LINES: one line per model, a line holding what the day holds — the model's tokens by kind and its cost. The log's own cost wins; otherwise cost is ESTIMATED from the price catalog, and says so. A model served on this Mac costs nothing; an unknown model gets the catalog's fallback price, never zero by omission. Records with no model form one unnamed line, so the lines always add up to the day | `Day.lines` · `PriceList` |
-| a range of days answers the page's questions — which models, in order; a day's lines, largest first; its total in a unit — so a view renders and tells | `Days` |
+| a range of days answers the page's questions — which models, in order; a day's lines, largest first; its total in a unit; which units it offers — so a view renders and tells. The unit is the view's choice (cost, tokens, cache), and COST is offered only when the log prices its records and a day holds a cost: a log that writes zero everywhere has nothing to say in dollars ; what caching saved over the range | `Days` |
+| two lines of one model add up to one line: every count and the cost, so a sum over days never drops a field | `ModelUsageLine` |
+| a range's mix is each model summed over it, largest first, the unnamed line included so the parts add up; each part carries its share — a page that needs a top model reads it here, and the unnamed line is never the top model | `ModelMix` |
+| a day's share is its value against the range's busiest; a range with nothing used has no busiest day, and every share is 0. The shading band a heatmap draws is the App's | `DayActivity` |
 | usage history is per login: an added login reads its own folder's logs; two logins' days are never summed | `Account.usageHistory` |
+| a week is the calendar's week holding a day, from the calendar's own first weekday; the range before a range is the same length, one run earlier | `DateRange` (`week`, `before`) |
+| two days of one date add up to one day: every count, the cost, the time, the savings, one line per model — so several ranges read as one (`Days.merged`) never drop a field | `DailyUsageStat` (`+`) |
+| a RECAP is the one read that sums across logins, for the person's total, and names the providers it spans — two logins of one provider are one part; a login's own chart stays its own. It reads in the unit every range offers: cost only when every provider that used anything, this range or the one before, offers cost, tokens otherwise; its change is against the range before, in that unit, and none when nothing was used before; its top model is `ModelMix`'s and its biggest day `DayActivity`'s, over the providers' days merged | `Recap` |
+| the weekly recap is read again only when the week turned or a login's days were read again since its last read; the page tells it when usage was read and never decides | `WeeklyRecaps` |
 | a capability is declared by the definition — even one only a single product has (guest passes), whose runner the engine supplies — never chosen by a provider's name, never a vendor name in a module. Either way it is reached through the login's handle (`account.usageHistory`, `account.guestPasses`), `nil` when not offered | `Account` |
-| usage history is read when the popover opens, never in the background, and never carried on `Usage` | `UsageHistory` |
+| usage history is read when the popover opens, never in the background, and never carried on `Usage`; the year only while a section that shows it is on | `UsageHistory` |
+| which usage sections the popover shows — *Today*, *Last 30 days*, *Last year*, *Model mix*, *Weekly recap* — and their defaults: the year's two hidden, the rest shown, until the person chooses | `UsageSection` · `AppSettingsRepository` |
 | another app's usage on this Mac (Claude Desktop) is its OWN history under its own name: never summed with the login's days, never a data source, never a quota; the default login reads it; it is this Mac's, so an added login never does | `UsageHistory.otherApps` |
 | a login with no usage whose CLI isn't on this Mac, or that never signed in, is NOT SET UP — fetch health, not a failure: it says what setting up takes, keeps showing the usage history it can read, and the badge reads *NOT SET UP*, not *UNAVAILABLE* — or nothing, while that usage history shows: a Claude Desktop user did set Claude up, only the limits need more. Any other failure stays an error | `Account.needsSetup` · `ProviderBadgeState` |
 | a day with nothing is an empty day, not a missing one — a series has every date in its range | `UsageHistory.days(in:)` |
@@ -526,7 +556,7 @@ its factory.
 | **Providers** | **core** | *who do I pay, under which accounts, and what did they last say?* | ◆ `Providers` → `Provider` → `Accounts` | a `DataSource` the factory makes from a definition |
 | **Data Sources** | supporting | *how do we find out?* — DataSource, DataSourceDefinition, CredentialLookup, Fetch, Mapping, Setting, DataSourceError, and every worker | ◆ `DataSource` | the platform's ports |
 | **Monitoring** | **core · conductor** | *what is true right now, and when do we look again?* | ◆ `QuotaMonitor` | `onRefreshed`: whatever follows a refresh observes it |
-| **Alerting** | generic | *who needs to hear that it changed?* — notifications, Notify!, live activity, status export | ◆ `QuotaAlerts`, the Notify publication | a login's id, its `lineupName`, its usage and its status under the policy |
+| **Alerting** | generic | *who needs to hear that it changed?* — notifications, your quota alerts, status alerts, webhooks, Notify!, live activity, status export | ◆ `QuotaAlerts`, `StatusAlerts`, `Webhooks`, the Notify publication | a login's id, its `lineupName`, its usage and its status under the policy |
 | **Activity** | supporting | *what is Claude Code doing right now?* — hooks, sessions, the notch | ◆ `SessionMonitor` | Data Sources' answer to "is this one of my runs" |
 | **Usage History** | supporting | *what did I use, day by day?* | ◆ `UsageHistory`, one per login | `account.usageHistory` |
 | **In use** | supporting | *which login does my next terminal session start with?* | ◆ `InUse` | the login's id and folder; the best login from `Accounts` |
@@ -566,10 +596,9 @@ is built is not listed — the code is its record. What isn't yet:
 | `Plan` | `AccountTier` with Claude's cases | a name and a badge |
 | `Usage` | carries `extensionMetrics` and `dailyUsageReport` | kernel fields only — usage history is read from `account.usageHistory` |
 | `Account.budget` | `app.claudeApiBudget` (Claude's card) and Bedrock's `dailyBudget` as a quota | a `Budget` beside the login's `Cost`, judged as `BudgetStatus`; the old keys read as the default login's budget |
-| `StatusPolicy` | `menuBarLabel(…)` takes the two burn-rate values; `StatusColorPolicy` is in `Domain` | the label takes the policy; colours move to the App |
+| `StatusPolicy` | `StatusColorPolicy` is in `Domain` | colours move to the App |
 | page state | `MenuBarLabel`, `CountdownColon`, `PopoverContentHeight`, `MenuBarStackedSize` in `Domain/App`; `menuBarLabel(…)` on `QuotaMonitor` | the App |
 | `Day` | `DailyUsageReport` / `DailyUsageStat` (with `lines`) | `Day` — the sum of its lines, one per model; records with no model, one unnamed line |
-| `Days` — a range of days | `days(in:)` returns a bare array; the chart decides what is offered, the totals, the models' order and each one's colour | a `Days` value answering the page's questions — its models in order, a day's lines largest first, its total in a unit — so the view renders and never decides |
 | *Add Provider* | no *Edit*; one quota per response from the sheet | *Edit*; several quotas from one response |
 | In use | folder logins only | an environment-variable record for API-key providers |
 
@@ -581,15 +610,12 @@ test first. Findings that need a decision first are in §9.
 
 | Context | The code today | Moves to |
 |---|---|---|
-| Quota | pace-aware `QuotaStatus.from` returns *critical* at 60% left and *warning* at 15%, breaking the absolute floor; the person's burn-rate threshold is never read | `StatusPolicy` owns status: the absolute bands first, pace decides only between 20% and 50%, against the threshold |
-| Quota | pace graded three ways (`UsagePace` ±5 points, `PaceLevel`'s six levels, the status's 0.7/0.9), so one quota can read *Room to spare*, a warm tick and WARNING at once | one `Pace` from the `Window`; the words and the tick are views of it |
+| Quota | one `SpendRate` is graded two ways (`UsagePace`'s words, `PaceLevel`'s six levels), so one quota can read *On track* beside a warm tick | one `Pace` from the rate; the words and the tick are views of it |
 | Quota | the share left of a money quota computed twice, once across currencies (`QuotaAlerts.lowestShare`); `<` compares `percentRemaining`, where a balance is 100 | `Left.share`, `nil` for a balance or mixed currencies, read by every comparison |
 | Quota · Providers | a login's status has two owners: `Account.status` / `Accounts.status` ignore the policy and hidden quotas, `QuotaMonitor.status(of:)` and `Overview` apply both | `accounts.status(under:)`; the Monitor and the overview delegate |
 | Monitoring | the menu-bar quota reads `snapshot` directly, so a hidden quota still colours the menu bar | read through the watched usage |
-| Monitoring | the Monitor sends status alerts itself (`previousStatuses`, `alerter`); "alert only when worse" sits in `NotificationAlerter` | `StatusAlerts` in Alerting, beside `QuotaAlerts`, following `onRefreshed` |
 | Monitoring | which logins the background refresh fetches, and starting the loop, live in `StatusItemLabelDriver` | the Monitor, from what each surface asks to keep fresh; the driver renders |
 | Monitoring | `selectedProviderId = "claude"`; `ObservationRenderSync` (a SwiftUI workaround) in `Domain`; `MonitoringEvent.error` never sent | the first in the lineup; the App; removed |
-| Alerting | the status alert names a login by `"codex."` prefix, Providers' saved accounts and `ProviderFactory` | it is handed the login's `lineupName`, as `QuotaAlerts` is |
 | Alerting | Notify!'s publishing laws (a tile's backoff never silences a widget, the 6-hour pause, forget only the refused handle) in `NotifyPublishDriver` | a `NotifyPublication` in Alerting, told each offer and failure; the driver keeps the timer |
 | Alerting | status export recomputes status and *no data*, and turns off with the Touch Bar; Notify!'s tint is hard-coded in `Domain`; `QuotaAlerts` repeats the policy's 20 and 0 | every destination reads the status under the policy; colours come from the App's theme; the policy names its boundaries |
 | Providers | `Provider` and `Account` write storage keys (`plainLoginKey`, `isEnabled(forProvider: loginId)`, `verifiedAtLeastOnce`) and migrate old ones | a pause/switch port; compatibility in `JSONSettingsRepository`'s tables |

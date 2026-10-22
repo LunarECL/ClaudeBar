@@ -1,5 +1,5 @@
 ---
-description: How ClaudeBar's code is cut into modules — one module per bounded context, the domain at each module's root and its implementations in Internal/, no Infrastructure layer and no vendor modules, one factory per module, the dependency rules, naming, testing, the one package that also builds on Windows, and what is left to carve; read before adding a file, a type or a module.
+description: How ClaudeBar's code is cut into modules — one module per bounded context, the domain at each module's root and its implementations in Internal/, no Infrastructure layer and no vendor modules, one factory per module, the dependency rules, naming, testing, the one package that also builds on Windows and Linux, and what is left to carve; read before adding a file, a type or a module.
 ---
 
 # ClaudeBar — the modular design
@@ -67,7 +67,7 @@ let monitor  = Monitoring.makeMonitor(providers: catalog.load())
 | `Providers` | Providers · core | `Provider` (the product), `Account` (a login — today `ProviderAccount`) and its capability handles `usageHistory: UsageHistory?` · `guestPasses` (nil when the definition doesn't offer them), `UsageHistory` (`days(in:)`), `Providers` (the providers you keep: add, delete, order, the lineup), `ProviderFactory`, `ProviderDefinition`, `ProviderCatalog`, `ProviderSettingsRepository`, `CredentialRepository` | definition-file reading, `DayLedger` (closed days, under `~/.claudebar/usage-history/`), `Extensions` (a manifest read as a definition) |
 | `Providers/Resources/Providers/` | — | **the built-in definitions**: `codex.json`, `deepseek.json`, … | |
 | `Monitoring` | Monitoring · conductor | `QuotaMonitor`, `MonitoringEvent`, `RefreshInterval`, `RefreshKind`, `Clock`, `PowerStateProvider` | `SystemClock`, `SystemPowerStateProvider`, `SingleFlightCache` |
-| `Alerting` | Alerting | `QuotaAlerter`, Notify! values, `NotifySettingsRepository` | `NotificationAlerter`, `SystemAlertSender`, `NotifyGatewayClient` |
+| `Alerting` | Alerting | `QuotaAlerts`, `StatusAlerts`, `Alert`, `AlertDestination`, `Webhooks`, Notify! values, `NotifySettingsRepository`, `WebhookSettingsRepository` | `Notifications`, `SystemAlertSender`, `WebhookClient`, `NotifyGatewayClient` |
 | `Activity` | Activity | `ClaudeSession`, `SessionEvent`, `SessionMonitor`, `NotchActivity`, `HookSettingsRepository` | `HookHTTPServer`, `HookInstaller`, `PortDiscovery`, `SessionEventParser` |
 | `Leaderboard` | Leaderboard | `LeaderboardMembership`, `DailyTokens`, `Username`, `RequestSigner`, `LeaderboardUploader`, the devices' values (`Device`, `DeviceCode`, `DeviceLabel`), the ports `LeaderboardAPI` · `SigningKeyStore` · `MachineIdentity` · `TokenLogs` ([its design §7](../features/leaderboard/design.md#7--architecture)); the factory `Leaderboard.makeAPI(client:)` · `makeKeyStore()` · `makeMachineIdentity()` | `LeaderboardHTTPClient`; `FallbackSigningKeyStore` over `KeychainSigningKeyStore` (macOS) and `DefaultsSigningKeyStore`; `IOKitMachineIdentity` with `MacModel` (macOS); `CredentialManagerSigningKeyStore` and `WindowsMachineIdentity` (Windows) |
 | `Storage` | Vault & Settings · generic | `Storage.makeSettings()`, `Storage.makeVault()`, `AppSettingsRepository` | `JSONSettingsRepository`, `JSONSettingsStore`, `KeychainCredentialRepository`, `UserDefaults…`, `SecureCredentialMigration` |
@@ -216,7 +216,9 @@ for that thing, is `@Mockable`, and has its implementation in an `Internal/`.
 | `LedgerStore` | Providers | `~/.claudebar/usage-history/` | `Providers/Internal` (→ `Storage`) |
 | `ProviderSettingsRepository` · `CredentialRepository` | Providers | `settings.json`, the Keychain | `Storage` |
 | `Clock` · `PowerStateProvider` | Monitoring | time, the battery | `Monitoring/Internal` |
-| `QuotaAlerter` | Alerting | the user's notifications | `Alerting/Internal` |
+| `AlertDestination` | Alerting | who hears an alert: this Mac's notifications, the person's webhooks | `Alerting/Internal` |
+| `WebhookSending` | Alerting | one POST to a webhook's URL | `Alerting/Internal` |
+| `DestinationSecrets` | Alerting | a destination's secret, in the Keychain or its fallback | `Storage` |
 | `HookEventReceiver` | Activity | Claude Code's hooks | `Activity/Internal` |
 | `ScriptEngine` | DataSources | a JavaScript engine, for a `script` mapping | `DataSources/Internal/Mapping` (QuickJS, vendored, both platforms, §10) |
 | `LogSink` | Diagnostics | where a log line goes | `Diagnostics/Internal/macOS` (OSLog) · the file log, both platforms |
@@ -251,7 +253,7 @@ so a folder already names its destination:
 
 | Today | Goes to |
 |---|---|
-| `Domain/Monitoring/`, `Infrastructure/Monitoring/` | `Monitoring` (`QuotaAlerter` → `Alerting`) |
+| `Domain/Monitoring/`, `Infrastructure/Monitoring/` | `Monitoring` |
 | `Domain/Alerting/`, `Infrastructure/Alerting/`, `App/Alerting/` (its drivers stay in the App) | `Alerting` |
 | `Domain/Activity/`, `Infrastructure/Activity/`, `App/Activity/` (views stay in the App) | `Activity` (`NSScreen+NotchMetrics` → App) |
 | `Domain/InUse/`, `Infrastructure/InUse/` | not decided: beside `InUse` in `Providers`, or a module of its own (§9) |
@@ -280,7 +282,7 @@ under *where the code is still behind*.
   SQLite log) or a second consumer; keeping `Internal/Logs/` and
   `UsageHistory.swift` in their own files keeps that carve cheap.
 
-## 10 · One package, two platforms
+## 10 · One package, three platforms
 
 **Why.** A member of the Leaderboard who also codes on a Windows PC uses
 *ClaudeBar for Windows*, the community client in
@@ -327,17 +329,20 @@ The time zone wasn't in it at all, which is how a KST member's day ended at
  │  │Processes │ Terminal │ Secrets  │LocalNetwork│  Places  │ TimeZone │        │
  │  └──────────┴──────────┴──────────┴────────────┴──────────┴──────────┘        │
  │   each: a protocol + ONE contract suite every platform's adapter must pass    │
- ├──────────── Internal/macOS ─────────┬──── Internal/Windows ───┬── (Linux?) ───┤
- │  6 adapters                         │  6 adapters             │  6 adapters   │
- └─────────────────────────────────────┴─────────────────────────┴───────────────┘
-   Mac App: views, menu bar, Notify!      Windows client: C interface → HUD
+ ├──────────── Internal/macOS ───┬──── Internal/Windows ───┬── Internal/Linux ───┤
+ │  6 adapters                   │  6 adapters             │  6 adapters         │
+ └───────────────────────────────┴─────────────────────────┴─────────────────────┘
+   Mac App: views, menu bar, Notify!   Windows client: C interface → HUD   (no Linux client yet)
 
   Tests:  everything above the ports  ─▶ runs on every OS, never skips
           each port's contract suite  ─▶ runs against each adapter; skips only until it exists
 ```
 
-**Done when** a third platform, Linux say, means writing 6 adapters and
-passing 6 contract suites, with no edit above the line.
+**Done when** a third platform means writing 6 adapters and passing 6 contract
+suites, with no edit above the line. Linux is the third platform, and its
+adapters exist as far as Windows' do: the modules build and pass their tests
+there, and the ports whose slice hasn't come (`Terminal`, `Secrets`,
+`LocalNetwork`) are `nil`, so a case that needs one fails at its named step.
 
 - **A library is vendored, pinned, never hand-edited.** One folder per
   library under `Vendor/`, holding the source, its release `VERSION` and its
@@ -459,18 +464,26 @@ Modules/<Context>/
 │       ├── macOS/         #if os(macOS): the Mac's adapters for the ports
 │       │                  (Keychain, OSLog, IOKit, Darwin processes,
 │       │                  SwiftTerm, SweetCookieKit)
-│       └── Windows/       #if os(Windows): the same ports, one slice at a
-│                          time (Credential Manager, WinSDK processes, the
-│                          console's pseudo-terminal)
+│       ├── Windows/       #if os(Windows): the same ports, one slice at a
+│       │                  time (Credential Manager, WinSDK processes, the
+│       │                  console's pseudo-terminal)
+│       └── Linux/         #if os(Linux): the same ports, one slice at a time
+│                          (libsecret, glibc's stat); no client yet
 Vendor/<Library>/          pinned C and data, never hand-edited: QuickJS,
                            SQLite, CLDR; changed only by scripts/bump-vendor.sh
 ├── Resources/
-└── Tests/                 Swift Testing — run on macOS and on windows-latest
+└── Tests/                 Swift Testing — run on macOS, on windows-latest and on Linux
 ```
 
 - **Each module's factory picks the platform's implementation.** The Windows
   client calls the same factories as the App (`Leaderboard.make…`,
   `ProviderFactory.makeCatalog…`); no client names `Internal/`.
+- **A platform's file names are its own.** SwiftPM names each source file's
+  object after the file, so two platforms' files in one target can't share a
+  basename even when both are `#if`-guarded: hence `SystemTimeZone.swift` on
+  the Mac and `LinuxTimeZone.swift`, not a second `SystemTimeZone.swift`. An
+  extension of a shared type is fine — `FileStamp+Linux.swift` names the
+  platform in the file itself.
 - **An Apple-only package is a platform-conditional dependency**
   (`.product(…, condition: .when(platforms: [.macOS]))`): SwiftTerm and
   SweetCookieKit in `DataSources`. `AWSClients` builds on macOS only.
@@ -560,22 +573,29 @@ Modules/DataSources/Sources/
     │   │                               URLSession trusting 127.0.0.1 (#588)
     │   └── Process/ · Lookup/ · Network/ · Logs/   today's workers, regrouped
     │                                 under their ports in slices 3–5
-    └── Windows/               #if os(Windows), whole file: the same ports
-        ├── Platform+Windows.swift    static let current = Platform(name: "Windows", …)
-        ├── Time/WindowsTimeZone.swift   the zone's registry key and offset (#567)
-        ├── Process/WindowsProcesses.swift   the four facts: PathBinaryLocator (PATH +
-        │                                   PATHEXT), the file itself, PowerShell,
-        │                                   TerminateProcess (#579)
-        ├── Network/WindowsLocalServers.swift   EnumProcesses, NtQueryInformationProcess,
-        │                                   GetExtendedTcpTable, WinHTTP (#588)
-        └── Logs/                     FileStamp+Windows · ByteSearch+Windows
+    ├── Windows/               #if os(Windows), whole file: the same ports
+    │   ├── Platform+Windows.swift    static let current = Platform(name: "Windows", …)
+    │   ├── Time/WindowsTimeZone.swift   the zone's registry key and offset (#567)
+    │   ├── Process/WindowsProcesses.swift   the four facts: PathBinaryLocator (PATH +
+    │   │                                   PATHEXT), the file itself, PowerShell,
+    │   │                                   TerminateProcess (#579)
+    │   ├── Network/WindowsLocalServers.swift   EnumProcesses, NtQueryInformationProcess,
+    │   │                                   GetExtendedTcpTable, WinHTTP (#588)
+    │   └── Logs/                     FileStamp+Windows · ByteSearch+Windows
+    └── Linux/                 #if os(Linux), whole file: the same ports, as far as
+        ├── Platform+Linux.swift     static let current = Platform(name: "Linux", …)
+        ├── Time/LinuxTimeZone.swift     TimeZone.current; a zone with no tzdata
+        │                                 file is the OS's offset, fixed
+        ├── Process/LinuxProcesses.swift  the four facts: LinuxBinaryLocator (PATH),
+        │                                 /bin/sh, $SHELL -l -i, SIGTERM then kill
+        └── Logs/                    FileStamp+Linux · ByteSearch+Linux
 Modules/DataSources/Tests/
 ├── Contracts/                 one suite per port, run against Platform.current's
 │                                adapter: TimeZoneContract (#567),
 │                                ProcessesContract (#579), the rest with their slices
 ├── UnavailableTests.swift     the factory with Platform.bare — runs on the Mac too
 ├── …                          everything else: every OS, no skips
-└── macOS/ · Windows/          an adapter's own tests, under #if os(…)
+└── macOS/ · Windows/ · Linux/   an adapter's own tests, under #if os(…)
 Modules/Monitoring/            QuotaMonitor's neutral core (slice 6, its own design
                                review first)
 ```
@@ -647,6 +667,7 @@ Each phase leaves main shippable and the Mac app unchanged in behaviour.
 | 3 | **Windows adapters for the slice:** `SigningKeyStore` on Credential Manager, `MachineIdentity` as "Windows PC" (the model Windows reports names a self-built PC's motherboard, so it isn't read; the hardware UUID came with the copied-key check, [#549](https://github.com/tddworks/ClaudeBar/pull/549)), `LeaderboardAPI` on `URLSession` as on the Mac | a program on Windows joins, uploads and leaves against the real server through the factories — built ([#547](https://github.com/tddworks/ClaudeBar/pull/547)) |
 | 4 | **Paths and shells.** App-data and path separators, shell argv, local-server discovery and the trusted CLI directory are platform facts supplied by the factory. Definitions use `{{platform.appData}}` ([ENGINE_DESIGN](ENGINE_DESIGN.md)); Mac process workers stay in `Internal/macOS/`, and Windows execution remains unavailable until phase 5 | definitions that read local files resolve on Windows — implemented in [#556](https://github.com/tddworks/ClaudeBar/pull/556), for review: redirected `APPDATA`, native drive/UNC paths, newest IDE file, and unchanged Mac paths/archived days |
 | 5 | **Quotas on Windows**, in the slices below | the Windows client shows quotas, and Windows skips no test |
+| 6 | **Linux, as far as Windows got.** `Internal/Linux/` implements `TimeZone`, `Places` and the log stamps, `Processes` over `/bin/sh`, and the leaderboard's key store over libsecret with the app's own store behind it; `Package.swift` and a `ubuntu-latest` job build and test the modules there | `swift test` is green on Linux and `ProcessesContract` and `TimeZoneContract` pass there; the ports without a slice (`Terminal`, `Secrets`, `LocalNetwork`) stay `nil`, so their cases fail at the named step |
 
 Phase 5's slices, each its own issue and PR
 ([#563](https://github.com/tddworks/ClaudeBar/issues/563)):
@@ -664,8 +685,21 @@ Phase 5's slices, each its own issue and PR
 ### Open
 
 - **`Places` has no slice of its own.** Its two fields came with phase 4 and
-  already work on Windows. Slice 2 kept to `Processes`, so they stay fields
-  of `Platform` until a slice needs them as a port.
+  already work on Windows and on Linux. Slice 2 kept to `Processes`, so they
+  stay fields of `Platform` until a slice needs them as a port.
+- **Linux is where Windows was before slice 3.** Its adapters exist as far
+  as Windows' did; `LocalNetwork`, `Terminal` and `Secrets` stay `nil` there
+  ([#563](https://github.com/tddworks/ClaudeBar/issues/563), slices 3–5), and
+  `LocalNetworkContract` is skipped on Linux, saying why. What Linux answers in
+  its own words: a `secret-tool` key store with the app's own store behind it,
+  `~/.local/share` for `{{platform.appData}}`, and the zone Foundation reads
+  from `/etc/localtime`. The key goes into the tool's pipe *before* the tool
+  starts: a write to a tool that has already gone — `env` exiting 127 when
+  `secret-tool` isn't installed — is a write to a pipe with no reader, and
+  `SIGPIPE`'s default action ends the whole app, not just that call.
+- **No Linux client.** The modules carry no UI: the Mac's is the Mac's, and
+  the Windows client is its own repo. A Linux one would be a third, and would
+  start where the Windows one started.
 - **Extension scripts on Windows.** An extension's script runs as the file
   itself, so a `.cmd`, `.bat` or `.exe` works and the example's `.sh`
   doesn't. Running a `.ps1` through PowerShell, or a `.sh` through Git for
@@ -687,6 +721,16 @@ Phase 5's slices, each its own issue and PR
   date formats, and APIs it lacks outright, such as `RelativeDateTimeFormatter`)
   are found by running the same tests there, which is why every module's tests
   run on both. A file that imports only Foundation can still fail to build.
+- **Foundation's differences on Linux** are found the same way. One already is:
+  `TimeZone(identifier:)` answers a name the OS's tzdata no longer carries —
+  Ubuntu keeps CLDR's deprecated aliases (`Asia/Calcutta`, `Europe/Kiev`, …) in
+  a separate `tzdata-legacy` package — and the zone it answers can't back a
+  `DateFormatter`, which stops the process instead of failing. Linux's own
+  adapter owns it: `LinuxTimeZone` answers a `TZ` with no file under
+  `/usr/share/zoneinfo` with the OS's offset, fixed, which is what the C
+  library's clock keeps for it, and the TimeZone contract's *should give a zone
+  a date can be written in* proves it on every OS (Linux CI runs it in
+  `Asia/Calcutta`) ([#600](https://github.com/tddworks/ClaudeBar/pull/600)).
 - ~~**The machine GUID** is kept by a disk image cloned to another PC, unlike a
   Mac's `IOPlatformUUID`; the leaderboard design decides whether that is
   enough for its copied-key check.~~ It isn't: Windows reads the firmware's

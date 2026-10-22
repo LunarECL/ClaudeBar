@@ -37,11 +37,11 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// Keywords beyond the title that the settings search matches against.
     var searchKeywords: [String] {
         switch self {
-        case .general: ["launch", "login", "overview", "daily usage", "burn rate", "threshold"]
+        case .general: ["launch", "login", "overview", "daily usage", "burn rate", "pace", "forecast", "run out"]
         case .appearance: ["theme", "dark", "light", "cli", "christmas", "import", "color", "contrast", "status", "high contrast", "native", "icon", "monochrome", "grayscale"]
         case .menuBar: ["percentage", "duration", "quota display", "stacked", "status bar", "account", "email", "label"]
         case .providers: ["claude", "codex", "gemini", "copilot", "zai", "bedrock", "kimi", "minimax", "enable"]
-        case .syncAlerts: ["background", "refresh", "interval", "notification", "alert", "quota alert", "percent"]
+        case .syncAlerts: ["background", "refresh", "interval", "notification", "alert", "quota alert", "percent", "webhook", "slack", "json", "status alert"]
         case .hooks: ["claude code", "session", "install"]
         case .notify: ["iphone", "phone", "lock screen", "live activity", "widget", "gauge", "push", "device"]
         case .leaderboard: ["rank", "username", "tokens", "share", "board", "compete", "hide", "disable", "turn off", "pause", "opt out"]

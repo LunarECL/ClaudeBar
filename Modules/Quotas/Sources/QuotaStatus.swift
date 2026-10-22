@@ -33,42 +33,6 @@ public enum QuotaStatus: Sendable, Equatable, Hashable, Comparable {
         }
     }
 
-    /// Creates a pace-aware status from the projected end-of-period usage
-    /// (usage% / timeElapsed%): under 70% healthy, 70-90% warning, 90%+ critical.
-    /// Before 15% of the period has elapsed, once it is over, or with nothing
-    /// used yet, falls back to used% thresholds: under 70% healthy, 70-90%
-    /// warning, 90%+ critical. Depleted stays absolute.
-    ///
-    /// - Parameters:
-    ///   - percentRemaining: The percentage of quota remaining (0-100)
-    ///   - percentTimeElapsed: How much of the reset period has elapsed (0-100)
-    ///   - burnRateThreshold: Unused; kept for source compatibility with the burn-rate setting
-    public static func from(
-        percentRemaining: Double,
-        percentTimeElapsed: Double,
-        burnRateThreshold: Double
-    ) -> QuotaStatus {
-        if percentRemaining <= 0 { return .depleted }
-
-        let percentUsed = 100 - percentRemaining
-
-        // Project end-of-period usage once enough of the period has elapsed
-        if percentTimeElapsed >= 15, percentTimeElapsed < 100, percentUsed > 0 {
-            let projected = percentUsed / percentTimeElapsed
-            switch projected {
-            case ..<0.70: return .healthy
-            case 0.70..<0.90: return .warning
-            default: return .critical
-            }
-        }
-
-        switch percentUsed {
-        case ..<70: return .healthy
-        case 70..<90: return .warning
-        default: return .critical
-        }
-    }
-
     // MARK: - Status Behavior
 
     /// Whether this status indicates a problem that needs attention

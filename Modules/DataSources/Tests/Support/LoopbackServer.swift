@@ -1,6 +1,8 @@
 import Foundation
 #if os(Windows)
 import WinSDK
+#elseif canImport(Glibc)
+import Glibc
 #endif
 
 /// A plain-HTTP server on 127.0.0.1, on a port the OS picks, for a test that
@@ -135,11 +137,18 @@ private enum Socket {
     static let invalid: Handle = -1
     static let addressLength = socklen_t(MemoryLayout<sockaddr_in>.size)
     static func start() {}
+    #if canImport(Glibc)
+    static func open() -> Handle { socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0) }
+    static func close(_ handle: Handle) { _ = Glibc.close(handle) }
+    #else
     static func open() -> Handle { socket(AF_INET, SOCK_STREAM, 0) }
     static func close(_ handle: Handle) { _ = Darwin.close(handle) }
+    #endif
     static func loopback(port: UInt16) -> sockaddr_in {
         var address = sockaddr_in()
+        #if canImport(Darwin)
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        #endif
         address.sin_family = sa_family_t(AF_INET)
         address.sin_port = port.bigEndian
         address.sin_addr.s_addr = UInt32(0x7F00_0001).bigEndian
@@ -149,7 +158,11 @@ private enum Socket {
         buffer.withUnsafeMutableBytes { recv(handle, $0.baseAddress, $0.count, 0) }
     }
     static func send(_ bytes: [UInt8], on handle: Handle) {
+        #if canImport(Glibc)
+        bytes.withUnsafeBytes { _ = Glibc.send(handle, $0.baseAddress, $0.count, 0) }
+        #else
         bytes.withUnsafeBytes { _ = Darwin.send(handle, $0.baseAddress, $0.count, 0) }
+        #endif
     }
     #endif
 }

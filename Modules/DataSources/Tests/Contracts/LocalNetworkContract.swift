@@ -9,8 +9,10 @@ import FoundationNetworking
 /// platform's adapter: it finds the program this test runs in by its path,
 /// its command line and a port it listens on, and asks a server on
 /// 127.0.0.1, over plain HTTP and over TLS with a certificate made for
-/// another name.
-@Suite(.serialized)
+/// another name. Linux has no adapter yet (MODULAR_DESIGN §10, phase 6), so
+/// it is skipped there, saying why.
+@Suite(.serialized, .enabled(if: Platform.current.localServers != nil,
+                             "asks a local server: \(Platform.current.name) has no LocalNetwork adapter yet"))
 struct LocalNetworkContract {
     private static let own = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
     private static let pid = Int(ProcessInfo.processInfo.processIdentifier)

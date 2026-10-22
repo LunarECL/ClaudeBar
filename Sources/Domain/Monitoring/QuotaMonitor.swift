@@ -14,7 +14,8 @@ public enum MonitoringEvent: Sendable {
 
 /// The main domain service that coordinates quota monitoring across AI providers.
 /// Providers are rich domain models that own their own snapshots.
-/// QuotaMonitor coordinates refreshes and alerts users when status changes.
+/// QuotaMonitor coordinates refreshes; whatever follows a refresh — alerts
+/// among them — observes it through `onRefreshed`.
 ///
 /// Isolated to `@MainActor` because its `@Observable` state (`isMonitoring`,
 /// `selectedProviderId`, …) is consumed by SwiftUI. This keeps the background
@@ -28,9 +29,6 @@ public final class QuotaMonitor {
     /// (CANONICAL §1). The Monitor reads them and watches; adding,
     /// deleting and ordering them is `Providers`' (TARGET §2.1).
     public let providers: Providers
-
-    /// Optional alerter for quota changes (e.g., system notifications)
-    private let alerter: (any QuotaAlerter)?
 
     /// Clock for scheduling intervals (injectable for tests)
     private let clock: any Clock
@@ -46,9 +44,6 @@ public final class QuotaMonitor {
     /// The person's status policy, read live — every status the monitor
     /// reports, and every alert it sends, is under it.
     private let readStatusPolicy: @MainActor () -> StatusPolicy
-
-    /// Previous status for change detection
-    private var previousStatuses: [String: QuotaStatus] = [:]
 
     /// Current monitoring task
     private var monitoringTask: Task<Void, Never>?
@@ -69,14 +64,12 @@ public final class QuotaMonitor {
     /// Automatically validates the selected provider on initialization.
     public init(
         providers: Providers,
-        alerter: (any QuotaAlerter)? = nil,
         clock: any Clock,
         settingsRepository: (any ProviderSettingsRepository)? = nil,
         powerStateProvider: (any PowerStateProvider)? = nil,
         statusPolicy: @escaping @MainActor () -> StatusPolicy = { .absolute }
     ) {
         self.providers = providers
-        self.alerter = alerter
         self.clock = clock
         self.powerStateProvider = powerStateProvider
         self.settingsRepository = settingsRepository
@@ -167,7 +160,7 @@ public final class QuotaMonitor {
     /// usage is read with it — the moment the page is on screen (CANONICAL §1).
     /// Who is fetched is decided here, so a page draws and calls.
     public func refresh(_ tab: ProductTab, kind: RefreshKind = .interactive) async {
-        await refresh(tab.unpaused, kind: kind) { await $0.usageHistory?.read() }
+        await refresh(tab.unpaused, kind: kind) { await Self.read($0.usageHistory) }
     }
 
     /// *TODAY'S USAGE* for every unpaused login — what the *All* page and the
@@ -175,9 +168,15 @@ public final class QuotaMonitor {
     public func readToday() async {
         await withTaskGroup(of: Void.self) { group in
             for login in lineup {
-                group.addTask { await login.usageHistory?.read() }
+                group.addTask { await Self.read(login.usageHistory) }
             }
         }
+    }
+
+    /// Today and the thirty days. The year is read only when a section that
+    /// shows it is on screen, which tells the history itself (`readYear`).
+    private static func read(_ history: UsageHistory?) async {
+        await history?.read()
     }
 
     /// The logins, refreshed together — one place, whether it is the whole
@@ -208,32 +207,18 @@ public final class QuotaMonitor {
         do {
             // A paused login's fetch is refused — before it starts, or as it
             // lands — so nothing is recorded and there is nothing to publish.
-            let snapshot = try await product.refresh(provider, kind)
-            await handleSnapshotUpdate(provider: provider, snapshot: snapshot)
+            _ = try await product.refresh(provider, kind)
+            await refreshed(provider)
         } catch {
             // The refusal (.paused) and every failure: the login holds both, in
             // `lastError`. No external observer is told.
         }
     }
 
-    /// Handles snapshot update and alerts user if status changed
-    private func handleSnapshotUpdate(provider: Account, snapshot: UsageSnapshot) async {
-        let previousStatus = previousStatuses[provider.id] ?? .healthy
-        // A quota the person hid doesn't page them.
-        let newStatus = snapshot.hiding(hiddenQuotaKeys(for: provider)).overallStatus(under: statusPolicy)
-
-        previousStatuses[provider.id] = newStatus
-
-        // Alert user only if status changed
-        if previousStatus != newStatus, let alerter = alerter {
-            await alerter.alert(
-                providerId: provider.id,
-                previousStatus: previousStatus,
-                currentStatus: newStatus
-            )
-        }
+    /// Tells whatever follows refreshes that `login` was refreshed.
+    private func refreshed(_ login: Account) async {
         for observer in refreshObservers {
-            await observer(provider)
+            await observer(login)
         }
     }
 
@@ -308,9 +293,7 @@ public final class QuotaMonitor {
     public func menuBarPercentageDisplay(
         providerId: String,
         quotaKey: String,
-        mode: UsageDisplayMode,
-        burnRateWarningEnabled: Bool = false,
-        burnRateThreshold: Double = 1.5
+        mode: UsageDisplayMode
     ) -> MenuBarPercentageDisplay? {
         guard let quota = quota(providerId: providerId, quotaKey: quotaKey) else {
             return nil
@@ -319,8 +302,7 @@ public final class QuotaMonitor {
         return MenuBarPercentageDisplay(
             quota: quota,
             mode: mode,
-            burnRateWarningEnabled: burnRateWarningEnabled,
-            burnRateThreshold: burnRateThreshold
+            policy: statusPolicy
         )
     }
 
@@ -328,9 +310,7 @@ public final class QuotaMonitor {
     /// Sibling to `menuBarPercentageDisplay`; both use the same selectors.
     public func menuBarDurationDisplay(
         providerId: String,
-        quotaKey: String,
-        burnRateWarningEnabled: Bool = false,
-        burnRateThreshold: Double = 1.5
+        quotaKey: String
     ) -> MenuBarDurationDisplay? {
         guard let quota = quota(providerId: providerId, quotaKey: quotaKey) else {
             return nil
@@ -338,8 +318,7 @@ public final class QuotaMonitor {
 
         return MenuBarDurationDisplay(
             quota: quota,
-            burnRateWarningEnabled: burnRateWarningEnabled,
-            burnRateThreshold: burnRateThreshold
+            policy: statusPolicy
         )
     }
 
@@ -350,9 +329,7 @@ public final class QuotaMonitor {
         configurations: [String: MenuBarProviderSettings] = [:],
         showPercentage: Bool,
         showDuration: Bool,
-        mode: UsageDisplayMode,
-        burnRateWarningEnabled: Bool = false,
-        burnRateThreshold: Double = 1.5
+        mode: UsageDisplayMode
     ) -> [MenuBarProviderLabel] {
         guard showPercentage || showDuration else { return [] }
         var seen = Set<String>()
@@ -365,8 +342,7 @@ public final class QuotaMonitor {
                   let label = menuBarLabel(
                     providerId: id, primaryQuotaKey: key, secondaryQuotaKey: config.secondaryQuotaKey,
                     showPercentage: showPercentage, showDuration: showDuration,
-                    mode: mode, burnRateWarningEnabled: burnRateWarningEnabled,
-                    burnRateThreshold: burnRateThreshold
+                    mode: mode
                   ) else {
                 return MenuBarProviderLabel(providerId: id, providerName: lineupName(of: provider),
                                             label: MenuBarLabel(text: "—", status: .healthy))
@@ -396,9 +372,7 @@ public final class QuotaMonitor {
         secondaryQuotaKey: String = "",
         showPercentage: Bool,
         showDuration: Bool,
-        mode: UsageDisplayMode,
-        burnRateWarningEnabled: Bool = false,
-        burnRateThreshold: Double = 1.5
+        mode: UsageDisplayMode
     ) -> MenuBarLabel? {
         let primaryQuotaKey = primaryQuotaKey.isEmpty
             ? (lineup.first { $0.id == providerId }.flatMap { usage(of: $0) }?.quotas.first?.quotaType.quotaKey ?? "")
@@ -408,17 +382,13 @@ public final class QuotaMonitor {
                 ? menuBarPercentageDisplay(
                     providerId: providerId,
                     quotaKey: quotaKey,
-                    mode: mode,
-                    burnRateWarningEnabled: burnRateWarningEnabled,
-                    burnRateThreshold: burnRateThreshold
+                    mode: mode
                 )
                 : nil
             let duration = showDuration
                 ? menuBarDurationDisplay(
                     providerId: providerId,
-                    quotaKey: quotaKey,
-                    burnRateWarningEnabled: burnRateWarningEnabled,
-                    burnRateThreshold: burnRateThreshold
+                    quotaKey: quotaKey
                 )
                 : nil
 

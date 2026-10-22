@@ -29,6 +29,9 @@ struct ClaudeBarApp: App {
     /// *Quota alerts* — the person's own percentages (#68).
     @State private var quotaAlerts: QuotaAlerts
 
+    /// *Webhooks* — the person's URLs that hear every alert, beside this Mac.
+    @State private var webhooks: Webhooks
+
     /// Monitors Claude Code sessions via hook events
     @State private var sessionMonitor: SessionMonitor
 
@@ -47,6 +50,8 @@ struct ClaudeBarApp: App {
     /// with `notify.enabled`; does nothing until a device is linked.
     private let notifyDriver: NotifyPublishDriver
     private let leaderboard: AppLeaderboard
+    /// *WEEKLY RECAP*'s two weeks across the lineup, read by the All page.
+    private let weeklyRecaps: WeeklyRecaps
 
     /// Binding required by `.menuBarExtraAccess`; also enables programmatic
     /// dropdown control if ever needed.
@@ -69,8 +74,9 @@ struct ClaudeBarApp: App {
     /// How often ClaudeBar checks that each session's Claude Code process still exists.
     private static let sessionSweepInterval: Duration = .seconds(30)
 
-    /// Alerts users when quota status degrades
-    private let quotaAlerter = NotificationAlerter(accountSettings: JSONSettingsRepository.shared)
+    /// This Mac's notifications: a destination for every alert, and the
+    /// permission to show them.
+    private let notifications = Notifications()
 
     /// Sends session start/end notifications
     private let sessionAlertSender = SystemAlertSender()
@@ -80,6 +86,8 @@ struct ClaudeBarApp: App {
     @State private var sparkleUpdater = SparkleUpdater()
     #endif
 
+    /// Wires every domain, the monitor and each destination. A launch's startup
+    /// work lives here, so a test host starts nothing.
     init() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
@@ -127,30 +135,34 @@ struct ClaudeBarApp: App {
                                       announcer: InUseNotifications())
         self.newSessions = newSessions
 
-        // Initialize the domain service with quota alerter
+        // Initialize the domain service
         // QuotaMonitor automatically validates selected provider on init
         // The settings repository carries the user's provider order (issue #141),
         // so the popover, overview and ⌘1–⌘9 follow it.
-        // Alerts and every status follow the person's burn-rate setting (#357).
+        // Alerts and every status follow the person's status policy (#357).
         // Hidden quotas (#140) are read from the same settings, per product.
         let monitor = QuotaMonitor(
             providers: Providers(providers, settings: settingsRepository, vault: vault, make: { definition in
                 ProviderFactory.make(definition, engine: engine)
             }),
-            alerter: quotaAlerter,
             settingsRepository: settingsRepository,
             statusPolicy: { AppSettings.shared.statusPolicy }
         )
         self.monitor = monitor
         // *In use* follows every refresh: Switch when low, or a login worth moving to.
         monitor.onRefreshed { refreshed in await newSessions.review(refreshed) }
+        // *Webhooks*: kept in settings.json, each URL a destination's secret.
+        let webhooks = Webhooks(settings: settingsRepository, secrets: settingsRepository.destinationSecrets,
+                                sender: WebhookClient())
+        self.webhooks = webhooks
+        // Every alert goes to every destination; neither decider knows who hears it.
+        let destinations = AlertDestinations([notifications, webhooks])
         // *Quota alerts* follow every refresh too, on what the person sees.
-        let quotaAlerts = QuotaAlerts(settings: settingsRepository, announcer: QuotaAlertNotifications())
+        let quotaAlerts = QuotaAlerts(settings: settingsRepository, destination: destinations)
         self.quotaAlerts = quotaAlerts
-        monitor.onRefreshed { [weak monitor] refreshed in
-            guard let monitor else { return }
-            await quotaAlerts.review(refreshed.id, named: monitor.lineupName(of: refreshed), usage: monitor.usage(of: refreshed))
-        }
+        quotaAlerts.follow(monitor)
+        // *Status alerts* follow every refresh: a login's status got worse under the policy.
+        StatusAlerts(destination: destinations).follow(monitor)
         AppLog.monitor.info("QuotaMonitor initialized")
 
         let sessionMonitor = SessionMonitor()
@@ -200,6 +212,10 @@ struct ClaudeBarApp: App {
         // Uploads only once the user joined; until then it reads nothing.
         leaderboard = AppLeaderboard(monitor: monitor)
         leaderboard.start()
+
+        // The weekly recap reads the lineup's usage history when the All page
+        // asks; it decides for itself when it is stale.
+        weeklyRecaps = WeeklyRecaps(monitor: monitor, calendar: DataSources.calendar())
 
         // Start hook server if hooks are enabled
         if settingsRepository.isHookEnabled() {
@@ -345,14 +361,14 @@ struct ClaudeBarApp: App {
         MenuBarExtra {
             Group {
                 #if ENABLE_SPARKLE
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, leaderboard: leaderboard, onClose: { isMenuPresented = false }) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, notifications: notifications, leaderboard: leaderboard, weeklyRecaps: weeklyRecaps, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)
                     .environment(\.popoverTextSize, settings.popoverTextSize)
                     .environment(\.sparkleUpdater, sparkleUpdater)
                 #else
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter, leaderboard: leaderboard, onClose: { isMenuPresented = false }) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, notifications: notifications, leaderboard: leaderboard, weeklyRecaps: weeklyRecaps, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)
@@ -408,6 +424,7 @@ struct ClaudeBarApp: App {
             }
             .environment(newSessions)
             .environment(quotaAlerts)
+            .environment(webhooks)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 980, height: 660)

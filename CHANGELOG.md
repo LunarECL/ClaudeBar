@@ -8,7 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- **An app's own server on Windows**: a provider reading an app's server on this machine, as Antigravity's `local` source does, now reads it on Windows, running no program to find it. Mac quotas are unchanged. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-two-platforms) ([#590](https://github.com/tddworks/ClaudeBar/pull/590))
+- **An app's own server on Windows**: a provider reading an app's server on this machine, as Antigravity's `local` source does, now reads it on Windows, running no program to find it. Mac quotas are unchanged. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms) ([#590](https://github.com/tddworks/ClaudeBar/pull/590))
+- **A quota turns low when it will run out before it resets**: with the warning on, colours and alerts follow the forecast, so a quota on pace is never marked low and the threshold setting is gone. ([#613](https://github.com/tddworks/ClaudeBar/pull/613)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/quota/status-colors/README.md)
+
+### Fixed
+- **Alibaba shows the Alibaba Cloud logo**: the provider's card, popover and menu bar carried a question-mark placeholder; now the official mark sits on the brand-orange tile, in light and dark. ([#622](https://github.com/tddworks/ClaudeBar/pull/622))
+
+---
+
+## [0.5.19] - 2026-10-22
+
+### Changed
+- **Choose the popover's usage sections**: Settings → General now has a switch per section — Today, Last 30 days, Last year, Model mix, Weekly recap. Last year and Model mix start off, so the popover stays short. ([#609](https://github.com/tddworks/ClaudeBar/pull/609)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/settings.md)
+- **The popover stops at a comfortable height**: a provider's page shows up to 560 points of cards, then scrolls, so turning on every usage section never makes it as tall as the screen; the action bar stays in view. ([#608](https://github.com/tddworks/ClaudeBar/pull/608)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/insights/README.md)
+- **Pace waits for the window to get going**: in a window's first 3% (nine minutes of a 5-hour session) a quota reads no pace instead of guessing *Running hot* from a minute of use. ([#596](https://github.com/tddworks/ClaudeBar/pull/596)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/monitoring/forecast/README.md)
+- **The daily chart's chip decides all it shows** — the 30-day total, the hovered day and each model; a login that prices nothing (OpenCode Go) drops Cost for tokens. ([#566](https://github.com/tddworks/ClaudeBar/issues/566)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/daily-usage/README.md)
+
+### Fixed
+- **An extension's API key field shows in Settings**: a `"type": "secret"` config field was left out of the form, so its key could never be saved and the script failed. ([#602](https://github.com/tddworks/ClaudeBar/issues/602))
+- **OpenCode daily usage showed no output and a 30-day total of 0**: reasoning tokens now count as output, and the Tokens chip totals tokens rather than the (zero) cost. ([#566](https://github.com/tddworks/ClaudeBar/issues/566))
+- **Claude's token refresh no longer narrows your login**: a renewed token asks for the scopes your login already has, not a fixed three, so it keeps every capability the old one had (e.g. `user:mcp_servers`). ([#593](https://github.com/tddworks/ClaudeBar/issues/593)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/claude/design.md)
+- **Antigravity's quota shows while `agy` is open in a terminal**: ClaudeBar asks the running app, instead of failing with "Authentication required" when the `agy` session had started first. ([#594](https://github.com/tddworks/ClaudeBar/pull/594))
+
+### Added
+- **Quota cards forecast the run-out**: a line under *Resets in…* says whether the window lasts until it refills at the pace it has been spent — *Runs out in 38m — 34m before it resets*, or *Lasts until it resets*. ([#596](https://github.com/tddworks/ClaudeBar/pull/596)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/monitoring/forecast/README.md)
+- **Linux builds**: ClaudeBar's modules build and pass their tests on Linux, so a client there can reuse them. ([#600](https://github.com/tddworks/ClaudeBar/pull/600)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms)
+- **The popover shows the shape of a login's year**: below the 30-day chart, *Usage — last year* shades a cell a day by how full it was, and *Model Mix — last year* shows which models you lean on, largest first. ([#598](https://github.com/tddworks/ClaudeBar/pull/598)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/insights/README.md)
+- **A weekly recap on the All page**: the week across every provider — total, split by provider, top model, biggest day, cache saved — against the week before, in dollars or in tokens when a provider prices nothing. ([#597](https://github.com/tddworks/ClaudeBar/pull/597)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/recap/README.md)
+- **Webhooks: send your quota alerts to Slack or a URL you own**: the same alerts this Mac shows (a quota below your percent, and if you choose, a status that got worse) are POSTed as a Slack message or a JSON body. Settings → Sync & Alerts → Webhooks. ([#599](https://github.com/tddworks/ClaudeBar/pull/599)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/alerting/webhooks/README.md)
 
 ---
 
@@ -27,8 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Each added account shows only its own sign-in**: a second account never reads this Mac's keys, logs or database, and an added Codex account now falls back to its own terminal too. ([#577](https://github.com/tddworks/ClaudeBar/issues/577)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/providers/multi-account/design.md#what-an-accounts-sign-in-reaches)
-- **One script engine and SQLite everywhere**: provider scripts run in a bundled QuickJS instead of JavaScriptCore, and app databases through a bundled SQLite, so Windows runs them too. Mac quotas are unchanged. ([#571](https://github.com/tddworks/ClaudeBar/pull/571), [#570](https://github.com/tddworks/ClaudeBar/issues/570)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10-one-package-two-platforms)
-- **Commands and scripts on Windows**: providers that run a command, a script or a JSON-RPC CLI now run on Windows, on the Mac's pipe runner. An extension's script must be a `.cmd`, `.bat` or `.exe` there. ([#580](https://github.com/tddworks/ClaudeBar/pull/580), [#579](https://github.com/tddworks/ClaudeBar/issues/579)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10-one-package-two-platforms)
+- **One script engine and SQLite everywhere**: provider scripts run in a bundled QuickJS instead of JavaScriptCore, and app databases through a bundled SQLite, so Windows runs them too. Mac quotas are unchanged. ([#571](https://github.com/tddworks/ClaudeBar/pull/571), [#570](https://github.com/tddworks/ClaudeBar/issues/570)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10-one-package-three-platforms)
+- **Commands and scripts on Windows**: providers that run a command, a script or a JSON-RPC CLI now run on Windows, on the Mac's pipe runner. An extension's script must be a `.cmd`, `.bat` or `.exe` there. ([#580](https://github.com/tddworks/ClaudeBar/pull/580), [#579](https://github.com/tddworks/ClaudeBar/issues/579)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10-one-package-three-platforms)
 
 ### Fixed
 - **A provider's API key can no longer be sent anywhere but its own site**: a redirect to another address is not followed, and a key can no longer reach the log file through a failed request either — registered keys are scrubbed from every log line. ([#585](https://github.com/tddworks/ClaudeBar/pull/585))
@@ -48,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **One empty account no longer turns its provider DEPLETED**: a provider's accounts are interchangeable, so its header, its All card and Settings read its healthiest account. Each account still shows its own status and reset. ([#568](https://github.com/tddworks/ClaudeBar/pull/568), [#564](https://github.com/tddworks/ClaudeBar/pull/564)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/providers/multi-account/README.md)
 
 ### Fixed
-- **Windows Leaderboard days**: a day of usage is counted in your own time zone, as Windows has it, instead of GMT, so in Korea a day no longer ends at 09:00. The Mac app is unchanged. ([#567](https://github.com/tddworks/ClaudeBar/pull/567), [#565](https://github.com/tddworks/ClaudeBar/issues/565)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10-one-package-two-platforms)
+- **Windows Leaderboard days**: a day of usage is counted in your own time zone, as Windows has it, instead of GMT, so in Korea a day no longer ends at 09:00. The Mac app is unchanged. ([#567](https://github.com/tddworks/ClaudeBar/pull/567), [#565](https://github.com/tddworks/ClaudeBar/issues/565)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10-one-package-three-platforms)
 - **Oh My Pi, Antigravity**: each card says which models it counts, Gemini or Claude & GPT, instead of "Antigravity Weekly (2)", and the pool Claude and GPT share shows once, not twice. A menu-bar pick of an Antigravity quota needs choosing again. ([#562](https://github.com/tddworks/ClaudeBar/pull/562)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/omp/design.md)
 - **Stuck on Syncing... again**: stopping a CLI at its deadline no longer waits forever when the CLI is still running after being killed. ClaudeBar gives it 2 seconds, then logs a warning naming it and its process id, and moves on to the fallback. ([#561](https://github.com/tddworks/ClaudeBar/pull/561), [#550](https://github.com/tddworks/ClaudeBar/issues/550)) -> [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/codex/design.md)
 - **OpenCode daily usage**: the 30 days a query kept for itself now come from the range you asked for, so an older day is counted on its own day instead of read as empty and kept that way. ([#559](https://github.com/tddworks/ClaudeBar/pull/559)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/opencode-go/README.md)
@@ -123,7 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Leaderboard uploads**: a day the server refuses on its own, such as one over the daily cap, no longer holds back the rest: the other days go through, and that day is sent again with each upload until it's taken or 30 days old. ([#522](https://github.com/tddworks/ClaudeBar/pull/522)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/leaderboard/README.md#gotchas)
-- **"Rate limited" message**: the wait until the retry is rounded to the nearest minute, hour or day, so 29 min 59 s reads "Retrying in 30 minutes", not "in 29 minutes". ([#523](https://github.com/tddworks/ClaudeBar/pull/523)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-two-platforms)
+- **"Rate limited" message**: the wait until the retry is rounded to the nearest minute, hour or day, so 29 min 59 s reads "Retrying in 30 minutes", not "in 29 minutes". ([#523](https://github.com/tddworks/ClaudeBar/pull/523)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms)
 
 ### Fixed
 - **Codex stuck on *Syncing…***: when `codex app-server` stops answering, ClaudeBar gives up after 15 seconds, tries the terminal instead and keeps refreshing, so usage no longer freezes until you relaunch. ([#517](https://github.com/tddworks/ClaudeBar/issues/517))
@@ -302,7 +329,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.18...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.19...HEAD
+[0.5.19]: https://github.com/tddworks/ClaudeBar/compare/v0.5.18...v0.5.19
 [0.5.18]: https://github.com/tddworks/ClaudeBar/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/tddworks/ClaudeBar/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/tddworks/ClaudeBar/compare/v0.5.15...v0.5.16

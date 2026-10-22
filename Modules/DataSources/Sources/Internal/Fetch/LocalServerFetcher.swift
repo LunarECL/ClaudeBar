@@ -21,23 +21,26 @@ struct LocalServerFetcher: Fetching {
     }
 
     func fetch(with credential: Credential?) async throws -> Response {
-        guard let program = await servers.commandLines.commandLines(naming: call.process.names)
-            .first(where: { Self.isApp($0.text, call.process) }) else {
+        let running = await servers.commandLines.commandLines(naming: call.process.names)
+            .filter { Self.isApp($0.text, call.process) }
+            .sorted { $0.pid < $1.pid }
+            .map { (pid: $0.pid, values: values(in: $0.text, with: credential)) }
+        guard let first = running.first else {
             AppLog.probes.info("\(call.app) isn't running")
             throw CLIMissingError(cli: call.app)
         }
 
-        var values = credential ?? Credential([:])
-        for (name, pattern) in call.values {
-            if let value = Self.firstGroup(pattern, in: program.text), values[name] == nil { values[name] = value }
-        }
-        for name in call.required where values[name] == nil {
-            // Never the value; only that it is missing.
-            AppLog.probes.error("\(call.app) is running without its \(name)")
+        // The first one, by PID, started with every required value: a CLI of
+        // the same name can run beside the app without them.
+        guard let (pid, values) = running.first(where: { process in call.required.allSatisfy { process.values[$0] != nil } }) else {
+            if let name = call.required.first(where: { first.values[$0] == nil }) {
+                // Never the value; only that it is missing.
+                AppLog.probes.error("\(call.app) is running without its \(name)")
+            }
             throw UsageError.authenticationRequired
         }
 
-        var tries = await servers.ports.ports(of: program.pid).map { ("https", $0) }
+        var tries = await servers.ports.ports(of: pid).map { ("https", $0) }
         if let name = call.plainHTTPPort, let port = values[name].flatMap(Int.init) { tries.append(("http", port)) }
         guard !tries.isEmpty else { throw UsageError.executionFailed("\(call.app) isn't listening on any port") }
 
@@ -47,6 +50,16 @@ struct LocalServerFetcher: Fetching {
             }
         }
         throw UsageError.executionFailed("Could not connect to \(call.app)")
+    }
+
+    /// What a process was started with, read from its command line; the
+    /// credential's own values come first.
+    private func values(in commandLine: String, with credential: Credential?) -> Credential {
+        var values = credential ?? Credential([:])
+        for (name, pattern) in call.values {
+            if let value = Self.firstGroup(pattern, in: commandLine), values[name] == nil { values[name] = value }
+        }
+        return values
     }
 
     /// One request; `nil` unless it answered 200.
