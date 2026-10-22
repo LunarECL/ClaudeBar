@@ -1,19 +1,28 @@
-#if os(macOS)
+#if canImport(Darwin) || canImport(Glibc)
 import Quotas
 import Foundation
 import Testing
 
 @testable import DataSources
 
+#if canImport(Darwin)
+/// Seconds on the process' clock, Darwin's `CFAbsoluteTimeGetCurrent`.
+private func nowSeconds() -> Double { CFAbsoluteTimeGetCurrent() }
+#else
+/// Linux has no CoreFoundation; Foundation's reference date answers with the
+/// same 2001 epoch, so only durations are ever taken from it.
+private func nowSeconds() -> Double { Date.timeIntervalSinceReferenceDate }
+#endif
+
 /// End-to-end cover for the PTY executor now that `execute` is async and hops
 /// off the cooperative pool. Runs real binaries through a real pseudo-terminal —
 /// the continuation/thread-hop plumbing is precisely what mocks would skip.
-@Suite("DefaultCLIExecutor")
+@Suite("DefaultCLIExecutor", .needsTerminal)
 struct DefaultCLIExecutorTests {
 
     @Test
     func `should show what a CLI printed and its success in a terminal`() async throws {
-        let result = try await DefaultCLIExecutor().execute(
+        let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal).execute(
             binary: "/bin/echo",
             args: ["pty-hello"],
             input: "",
@@ -30,7 +39,7 @@ struct DefaultCLIExecutorTests {
     func `should wait past a quiet spell while Claude's usage screen is still filling in (#271)`() async throws {
         // issue #271: `claude /usage` paints a placeholder, goes quiet longer
         // than the idle cutoff, then appends the quota bars.
-        let result = try await DefaultCLIExecutor(completionRule: .claudeUsage).execute(
+        let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal, completionRule: .claudeUsage).execute(
             binary: "/bin/sh",
             args: ["-c", "printf 'Loading usage data...'; sleep 5; printf 'Current session 1%% used'"],
             input: "",
@@ -46,7 +55,7 @@ struct DefaultCLIExecutorTests {
     func `should still deliver typed input after the stated delay`() async throws {
         // /bin/cat echoes back whatever it reads; the delay must not lose the
         // input, and the session must stay open long enough to receive it.
-        let result = try await DefaultCLIExecutor(inputDelay: 1.0).execute(
+        let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal, inputDelay: 1.0).execute(
             binary: "/bin/cat",
             args: [],
             input: "delayed-hello",
@@ -61,7 +70,7 @@ struct DefaultCLIExecutorTests {
     @Test
     func `should fail when the CLI can't be found`() async {
         await #expect(throws: (any Error).self) {
-            try await DefaultCLIExecutor().execute(
+            try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal).execute(
                 binary: "claudebar-missing-cli-xyz",
                 args: [],
                 input: "",
@@ -74,7 +83,7 @@ struct DefaultCLIExecutorTests {
 
     @Test
     func `should run the CLI in the folder it is given`() async throws {
-        let result = try await DefaultCLIExecutor().execute(
+        let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal).execute(
             binary: "/bin/pwd",
             args: [],
             input: "",
@@ -89,6 +98,8 @@ struct DefaultCLIExecutorTests {
     @Test
     func `should start the CLI with the extra environment values it is given`() async throws {
         let result = try await DefaultCLIExecutor(
+            installed: PlatformTerminal.installed,
+            terminal: PlatformTerminal.terminal,
             environmentAdditions: ["CLAUDEBAR_PROBE": "1"]
         ).execute(
             binary: "/bin/sh",
@@ -108,12 +119,12 @@ struct DefaultCLIExecutorTests {
         // pool: several providers refresh at once without serialising. Each
         // command sleeps, so a serialised implementation would take N x 1s.
         let count = 4
-        let start = CFAbsoluteTimeGetCurrent()
+        let start = nowSeconds()
 
         try await withThrowingTaskGroup(of: CLIResult.self) { group in
             for _ in 0..<count {
                 group.addTask {
-                    try await DefaultCLIExecutor().execute(
+                    try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal).execute(
                         binary: "/bin/sh",
                         args: ["-c", "sleep 1; echo done"],
                         input: "",
@@ -128,7 +139,7 @@ struct DefaultCLIExecutorTests {
             }
         }
 
-        let elapsed = CFAbsoluteTimeGetCurrent() - start
+        let elapsed = nowSeconds() - start
         // Generous bound: parallel is ~1s plus PTY setup, serial would be ~4s+.
         #expect(elapsed < 3.0)
     }
