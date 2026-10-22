@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Claude's token refresh no longer narrows your login**: a renewed token asks for the scopes your login already has, not a fixed three, so it keeps every capability the old one had (e.g. `user:mcp_servers`). ([#593](https://github.com/tddworks/ClaudeBar/issues/593)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/claude/design.md)
 - **Antigravity's quota shows while `agy` is open in a terminal**: ClaudeBar asks the running app, instead of failing with "Authentication required" when the `agy` session had started first. ([#594](https://github.com/tddworks/ClaudeBar/pull/594))
 
+### Added
+- **The popover shows the shape of a login's year**: below the 30-day chart, *Usage — last year* shades a cell a day by how full it was, and *Model Mix — last year* shows which models you lean on, largest first. ([#598](https://github.com/tddworks/ClaudeBar/pull/598)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/insights/README.md)
+
 ---
 
 ## [0.5.18] - 2026-10-21
