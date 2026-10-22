@@ -14,7 +14,9 @@ extension Platform {
             processes: Processes(linux),
             screenRenderer: { TerminalRenderer(cols: 160, rows: 50).render($0) },
             applicationData: { home, environment in
-                if let data = environment("XDG_DATA_HOME"), !data.isEmpty {
+                // The spec answers absolute paths only; a relative value is
+                // invalid and is ignored, the home's local share stepping in.
+                if let data = environment("XDG_DATA_HOME"), data.hasPrefix("/") {
                     return URL(fileURLWithPath: data, isDirectory: true)
                 }
                 return home.appendingPathComponent(".local/share", isDirectory: true)
