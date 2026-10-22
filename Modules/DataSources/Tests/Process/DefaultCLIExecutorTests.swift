@@ -5,14 +5,9 @@ import Testing
 
 @testable import DataSources
 
-#if canImport(Darwin)
-/// Seconds on the process' clock, Darwin's `CFAbsoluteTimeGetCurrent`.
-private func nowSeconds() -> Double { CFAbsoluteTimeGetCurrent() }
-#else
-/// Linux has no CoreFoundation; Foundation's reference date answers with the
-/// same 2001 epoch, so only durations are ever taken from it.
+/// Seconds since Foundation's reference date; only durations are ever taken
+/// from it.
 private func nowSeconds() -> Double { Date.timeIntervalSinceReferenceDate }
-#endif
 
 /// End-to-end cover for the PTY executor now that `execute` is async and hops
 /// off the cooperative pool. Runs real binaries through a real pseudo-terminal —
