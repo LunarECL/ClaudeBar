@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Quota cards forecast the run-out**: a line under *Resets in…* says whether the window lasts until it refills at the pace it has been spent — *Runs out in 38m — 34m before it resets*, or *Lasts until it resets*. ([#596](https://github.com/tddworks/ClaudeBar/pull/596)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/monitoring/forecast/README.md)
 - **Linux builds**: ClaudeBar's modules build and pass their tests on Linux, so a client there can reuse them. ([#600](https://github.com/tddworks/ClaudeBar/pull/600)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms)
 - **The popover shows the shape of a login's year**: below the 30-day chart, *Usage — last year* shades a cell a day by how full it was, and *Model Mix — last year* shows which models you lean on, largest first. ([#598](https://github.com/tddworks/ClaudeBar/pull/598)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/insights/README.md)
+- **A weekly recap on the All page**: the week across every provider — total, split by provider, top model, biggest day, cache saved — against the week before, in dollars or in tokens when a provider prices nothing. ([#597](https://github.com/tddworks/ClaudeBar/pull/597)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/recap/README.md)
 
 ---
 

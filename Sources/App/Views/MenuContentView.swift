@@ -13,6 +13,8 @@ struct MenuContentView: View {
     let sessionMonitor: SessionMonitor
     let quotaAlerter: QuotaAlerter
     let leaderboard: AppLeaderboard
+    /// *WEEKLY RECAP*'s two weeks, read with the All page.
+    let weeklyRecaps: WeeklyRecaps
     /// Closes the popover (Escape). The presentation binding lives on the App.
     var onClose: (() -> Void)?
     var onHookSettingsChanged: ((Bool) -> Void)?
@@ -224,7 +226,7 @@ struct MenuContentView: View {
             // domain's — All is everyone, a tab is its unpaused logins.
             if showsAll {
                 await monitor.refreshAll(kind: .passive)
-                await monitor.readToday()
+                await readUsage()
             } else {
                 await refreshPage(kind: .passive)
             }
@@ -248,7 +250,7 @@ struct MenuContentView: View {
             if newPage == .all {
                 Task {
                     await monitor.refreshAll(kind: .passive)
-                    await monitor.readToday()
+                    await readUsage()
                 }
             }
         }
@@ -430,7 +432,7 @@ struct MenuContentView: View {
         if showsAll {
             Task {
                 await monitor.refreshAll()
-                await monitor.readToday()
+                await readUsage()
             }
         } else {
             Task { await refreshPage() }
@@ -696,11 +698,27 @@ struct MenuContentView: View {
     /// bars (docs/features/monitoring/all-providers/design.md).
     @ViewBuilder
     private var allPage: some View {
-        if settings.allPageStyle == .bars {
-            OverviewBarsPageView(overview: overview, open: openCard)
-        } else {
-            OverviewPageView(overview: overview, open: openCard)
+        VStack(spacing: 12) {
+            if settings.allPageStyle == .bars {
+                OverviewBarsPageView(overview: overview, open: openCard)
+            } else {
+                OverviewPageView(overview: overview, open: openCard)
+            }
+            // The week's story, across every provider at once — the one read
+            // that adds logins up, so it lives on the one page that is about
+            // them all. It reads the same days as the daily usage cards.
+            if settings.showDailyUsageCards {
+                RecapCardView(recaps: weeklyRecaps.recaps) { monitor.providers.provider(id: $0)?.name ?? $0 }
+                    .task { await weeklyRecaps.readIfStale() }
+            }
         }
+    }
+
+    /// Every login's usage read again, then the recap told so — it reads
+    /// again only when the week turned or a login's days changed.
+    private func readUsage() async {
+        await monitor.readToday()
+        if settings.showDailyUsageCards { await weeklyRecaps.readIfStale() }
     }
 
     /// A tap on a card or a row opens the provider on its first login.
