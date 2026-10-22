@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Linux runs a CLI fetch on a pseudo-terminal**: Claude's and Kimi's CLI sources and Codex's tty fallback read their screen there as the Mac does — the Mac's interactive session became one copy, and Linux answers it with a pty of its own. ([#PR]) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms)
+
 ---
 
 ## [0.5.19] - 2026-10-22
