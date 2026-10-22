@@ -11,7 +11,7 @@ import Sparkle
 struct MenuContentView: View {
     let monitor: QuotaMonitor
     let sessionMonitor: SessionMonitor
-    let quotaAlerter: QuotaAlerter
+    let notifications: Notifications
     let leaderboard: AppLeaderboard
     /// *WEEKLY RECAP*'s two weeks, read with the All page.
     let weeklyRecaps: WeeklyRecaps
@@ -210,7 +210,7 @@ struct MenuContentView: View {
             // Request alert permission once (after app run loop is active)
             if !hasRequestedNotificationPermission {
                 hasRequestedNotificationPermission = true
-                let granted = await quotaAlerter.requestPermission()
+                let granted = await notifications.requestPermission()
                 AppLog.notifications.info("Alert permission request result: \(granted ? "granted" : "denied")")
             }
 
