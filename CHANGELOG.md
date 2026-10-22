@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.19] - 2026-10-22
+
 ### Changed
 - **Choose the popover's usage sections**: Settings → General now has a switch per section — Today, Last 30 days, Last year, Model mix, Weekly recap. Last year and Model mix start off, so the popover stays short. ([#609](https://github.com/tddworks/ClaudeBar/pull/609)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/settings.md)
 - **The popover stops at a comfortable height**: a provider's page shows up to 560 points of cards, then scrolls, so turning on every usage section never makes it as tall as the screen; the action bar stays in view. ([#608](https://github.com/tddworks/ClaudeBar/pull/608)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/insights/README.md)
@@ -317,7 +321,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.18...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.19...HEAD
+[0.5.19]: https://github.com/tddworks/ClaudeBar/compare/v0.5.18...v0.5.19
 [0.5.18]: https://github.com/tddworks/ClaudeBar/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/tddworks/ClaudeBar/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/tddworks/ClaudeBar/compare/v0.5.15...v0.5.16
