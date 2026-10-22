@@ -1890,6 +1890,15 @@ struct WrappedStatCard: View {
             } else if showsPaceBadge {
                 HStack { Spacer(); PaceBadge(pace: quota.pace) }
             }
+
+            // The forecast, under the reset countdown: whether this window
+            // lasts until it refills at the pace it has been spent. The quota
+            // answers whether there is one; the card prints its words. It is
+            // independent of `showsReset`: when a grid hoists the shared
+            // countdown above its cards, each card still prints its own.
+            if let forecast = QuotaCardText.forecastLine(for: quota) {
+                forecastLine(forecast)
+            }
         }
         .padding(12)
         .background(
@@ -1945,6 +1954,23 @@ struct WrappedStatCard: View {
                 .foregroundStyle(theme.textTertiary)
             resetLine(line)
         }
+    }
+
+    /// The forecast sentence under the reset line — "Runs out in 38m — 34m
+    /// before it resets". Muted, one row, and it carries *at this pace* as its
+    /// tooltip: the number is the window's average, never a promise.
+    private func forecastLine(_ text: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: "hourglass")
+                .popoverFont(7)
+                .foregroundStyle(theme.textTertiary)
+
+            Text(text)
+                .font(theme.font(size: 8, weight: .medium))
+                .foregroundStyle(theme.textTertiary)
+        }
+        .lineLimit(1)
+        .help(QuotaCardText.forecastQualifier)
     }
 
     /// The reset time and, on the right, the pace badge, on one row.

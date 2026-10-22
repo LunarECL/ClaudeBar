@@ -235,8 +235,14 @@ Usage  ◇                                    "Fetching usage data…" — WHAT 
 │       │                                     money(Money, of: Money?)  "$12.40 remaining", "of $50"
 │       ├── window: Window?                 WHEN IT REFILLS — length + resetsAt. "Resets in 2h 5m".
 │       │                                   A prepaid balance has none
-│       ├── status                          DERIVED — Left × StatusPolicy (× Window, when pace-aware)
-│       └── pace                            DERIVED — needs a Window; otherwise unknown
+│       ├── rate: SpendRate?     DERIVED    HOW FAST IT IS SPENT — used share ÷ share of the window
+│       │                                   gone. nil without a length + reset, for a balance with
+│       │                                   no ceiling, and under 3% of the window (noise)
+│       ├── forecast: Forecast?  DERIVED    "Lasts until it resets" or "Runs out in 38m — 34m before
+│       │                                   it resets": the rate carried forward to zero. nil
+│       │                                   without a rate, and once the quota is used up
+│       ├── status                          DERIVED — Left × StatusPolicy (× rate, when pace-aware)
+│       └── pace                            DERIVED — reads the rate; otherwise unknown
 ├── cost: Cost?  ◇                          MONEY GONE — "API COST" or "EXTRA USAGE", over a period.
 │                                           Judged by a Budget, never by a Quota
 └── account facts                           email · organization · plan, when the data source learns them —
@@ -398,6 +404,8 @@ usage.quota(named:)                  → Quota?
 usage.isStale                        → Bool         older than 5 minutes
 quota.status(under: StatusPolicy)    → Status
 quota.pace                           → Pace         unknown without a window
+quota.rate                           → SpendRate?   how fast it is spent against its window
+quota.forecast                       → Forecast?    lasts until it resets, or runs out N before it
 quota.window?.timeUntilReset         → Duration?    "Resets in 2h 5m"
 account.budgetStatus                 → BudgetStatus? ON TRACK · NEAR LIMIT · OVER BUDGET —
                                                     usage.cost judged by account.budget
@@ -447,6 +455,11 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | money keeps its currency; two currencies are never added or compared | `Money` |
 | **a window's length is the provider's word**, never guessed from a quota's name — the Codex RPC's primary window can be the weekly one | `Window` |
 | pace exists only inside a window with a reset; outside it is `unknown`, never `onPace` | `Quota.pace` |
+| **ONE rate per quota**: how fast it is spent against its window — one used share (from `left`, so a capped money quota by its money), one noise floor (3% of the window) — and pace, the pace tick, the pace-aware status and the forecast all read it, never their own copy | `SpendRate` · `Quota.rate` |
+| a quota runs out before its reset ⇔ it is used more than 5 points ahead of the share of its window gone; within 5 either side it is on the line. ONE rule, read by Pace and the forecast | `SpendRate.runsOutBeforeReset` |
+| a forecast is a READ of the rate over the CURRENT window — never stored on `Usage`; it lasts until the reset unless it runs out first, and *Running hot* ⇔ it runs out first, so a card never says both *On track* and *Runs out* | `Forecast` · `UsagePace` |
+| no forecast without a rate, or once the quota is used up — it has already run out; never a number invented from nothing | `Forecast` |
+| a forecast is said *at this pace*: the window's average, not the next burst | `QuotaCardText` |
 | depleted at 0, critical under 20 — ABSOLUTE, whatever the policy; pace-aware only decides WARNING vs HEALTHY between 20% and 50% left | `StatusPolicy` |
 | ONE status per quota: the menu bar, the cards, the Touch Bar, the notch, the status export and the notifications all read `quota.status(under: monitor.statusPolicy)` — never their own copy of the rule | `StatusPolicy` · `Monitor` |
 | a quota is the vendor's ceiling; a budget is the user's. A Cost is judged by a Budget, never shown as a Quota. A budget judges ONE account's cost — two logins' spend is never summed against it | `Cost` · `Account.budget` |
@@ -584,7 +597,7 @@ test first. Findings that need a decision first are in §9.
 | Context | The code today | Moves to |
 |---|---|---|
 | Quota | pace-aware `QuotaStatus.from` returns *critical* at 60% left and *warning* at 15%, breaking the absolute floor; the person's burn-rate threshold is never read | `StatusPolicy` owns status: the absolute bands first, pace decides only between 20% and 50%, against the threshold |
-| Quota | pace graded three ways (`UsagePace` ±5 points, `PaceLevel`'s six levels, the status's 0.7/0.9), so one quota can read *Room to spare*, a warm tick and WARNING at once | one `Pace` from the `Window`; the words and the tick are views of it |
+| Quota | one `SpendRate` is graded three ways (`UsagePace`'s words, `PaceLevel`'s six levels, the status's 0.7/0.9), so one quota can read *On track*, a warm tick and WARNING at once | one `Pace` from the rate; the words and the tick are views of it |
 | Quota | the share left of a money quota computed twice, once across currencies (`QuotaAlerts.lowestShare`); `<` compares `percentRemaining`, where a balance is 100 | `Left.share`, `nil` for a balance or mixed currencies, read by every comparison |
 | Quota · Providers | a login's status has two owners: `Account.status` / `Accounts.status` ignore the policy and hidden quotas, `QuotaMonitor.status(of:)` and `Overview` apply both | `accounts.status(under:)`; the Monitor and the overview delegate |
 | Monitoring | the menu-bar quota reads `snapshot` directly, so a hidden quota still colours the menu bar | read through the watched usage |
