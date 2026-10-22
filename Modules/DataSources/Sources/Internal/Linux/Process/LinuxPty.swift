@@ -26,7 +26,7 @@ struct LinuxPty: PseudoTerminal {
             close(session)
             throw PseudoTerminalError.couldNotOpen
         }
-        let child = Glibc.open(String(decoding: name.prefix(while: { $0 != 0 }).map({ UInt8(bitPattern: $0) }), as: UTF8.self), O_RDWR)
+        let child = Glibc.open(name, O_RDWR | O_NOCTTY)
         guard child >= 0 else {
             close(session)
             throw PseudoTerminalError.couldNotOpen
