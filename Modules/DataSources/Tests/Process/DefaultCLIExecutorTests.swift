@@ -111,15 +111,17 @@ struct DefaultCLIExecutorTests {
     @Test
     func `should let several CLIs run at once without waiting on each other`() async throws {
         // The whole point of moving the blocking PTY run off the cooperative
-        // pool: several providers refresh at once without serialising. Each
-        // command sleeps, so a serialised implementation would take N x 1s.
+        // pool: several providers refresh at once without serialising. The
+        // four runs must share a moment — the last to begin starts before the
+        // first to end — which holds on any machine at any speed, and fails
+        // the moment the runs wait on each other.
         let count = 4
-        let start = nowSeconds()
 
-        try await withThrowingTaskGroup(of: CLIResult.self) { group in
+        let runs = try await withThrowingTaskGroup(of: (CLIResult, Double, Double).self) { group in
             for _ in 0..<count {
                 group.addTask {
-                    try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal).execute(
+                    let began = nowSeconds()
+                    let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal).execute(
                         binary: "/bin/sh",
                         args: ["-c", "sleep 1; echo done"],
                         input: "",
@@ -127,16 +129,20 @@ struct DefaultCLIExecutorTests {
                         workingDirectory: nil,
                         autoResponses: [:]
                     )
+                    return (result, began, nowSeconds())
                 }
             }
-            for try await result in group {
-                #expect(result.output.contains("done"))
+            var collected: [(CLIResult, Double, Double)] = []
+            for try await run in group {
+                #expect(run.0.output.contains("done"))
+                collected.append(run)
             }
+            return collected
         }
 
-        let elapsed = nowSeconds() - start
-        // Generous bound: parallel is ~1s plus PTY setup, serial would be ~4s+.
-        #expect(elapsed < 3.0)
+        let lastToBegin = try #require(runs.map(\.1).max())
+        let firstToEnd = try #require(runs.map(\.2).min())
+        #expect(lastToBegin < firstToEnd)
     }
 }
 #endif
