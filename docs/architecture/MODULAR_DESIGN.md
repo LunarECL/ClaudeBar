@@ -165,8 +165,10 @@ Modules/DataSources/
 │       │              log source, each knowing its own) · LogFileFinder (behind the file
 │       │              readers) · DayAggregator · PriceList · LocalEndpoint
 │       ├── Process/   PipeCLIExecutor · PipeConversation · SubprocessSupport ·
-│       │              DefaultCLIExecutor · InteractiveRunner · PtySession · BinaryLocator ·
-│       │              LoginShellEnvironment · RunningProcesses · TerminalRenderer
+│       │              DefaultCLIExecutor · InteractiveRunner · ChildTeardown ·
+│       │              BinaryLocator · LoginShellEnvironment · RunningProcesses ·
+│       │              TerminalRenderer; PtySession, the Mac's and Linux' shared
+│       │              pty adapter, under its POSIX guard
 │       └── Network/   URLSessionNetworkClient · LocalServers · LoopbackClient
 └── Tests/
     ├── Fetch/JSONRPCFetcherTests.swift
@@ -461,14 +463,21 @@ it reads and writes through what it started:
 ```text
 NEUTRAL, one copy
   DefaultCLIExecutor   off the cooperative pool, the call's environment and ready markers
-  InteractiveRunner    the input delay, autoResponses, the quiet spell, readyWhen
-  TerminalRenderer     SwiftTerm's headless screen
+  InteractiveRunner    the input delay, autoResponses, the quiet spell, readyWhen;
+                       the session's environment: ChildLaunch's, then the terminal's
+                       PATH, then HOME TERM COLORTERM CI (and LANG) where the app has
+                       none, then the call's additions
+  TerminalRenderer     SwiftTerm's headless screen, and the screen's size (160×50) the
+                       runner opens the terminal at
+  ChildTeardown        ask, wait, kill, wait: a child's end within a bound
 PORT, Ports/Terminal.swift
-  PseudoTerminal   start(launch) → TerminalSession · environment(for:)
+  PseudoTerminal   start(launch) → TerminalSession · sessionPath() · fallbackLocale
+                   Mac: the login shell's PATH, en_US.UTF-8 │ Linux: C.UTF-8 │ Windows: neither
   TerminalSession  read() · write(_:) · isRunning · exitCode · end()
                    Mac, Linux: PtySession over openpty │ posix_openpt, SIGTERM then SIGKILL
                    Windows:    ConPtySession — CreatePseudoConsole, CreateProcessW with
-                               null standard handles, a job, a thread draining the output
+                               null standard handles, a job, a thread draining the output;
+                               ChildTeardown with no step before the kill
 ```
 
 - **The child gets the console and nothing else.** An app whose own standard

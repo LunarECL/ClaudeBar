@@ -16,10 +16,14 @@ protocol PseudoTerminal: Sendable {
     /// it. Throws `PseudoTerminalError` when either step fails.
     func start(_ launch: TerminalLaunch) throws -> any TerminalSession
 
-    /// The environment a CLI session here starts with: the app's, with a
-    /// `PATH` that finds the person's tools and `change` applied — additions
-    /// last, so they win.
-    func environment(for path: String, _ change: ProcessEnvironment) -> [String: String]
+    /// The `PATH` a session starts with, where this OS's terminal differs
+    /// from a program's over pipes (`ChildLaunch`): the Mac's login shell's.
+    /// `nil` keeps the program's.
+    func sessionPath() -> String?
+
+    /// The locale (`LANG`) a session falls back to when the app has none;
+    /// `nil` where the OS reads no such variable.
+    var fallbackLocale: String? { get }
 }
 
 /// What to start in a pseudo-terminal, and its size. It sits beside the

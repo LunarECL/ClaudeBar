@@ -1,4 +1,3 @@
-#if canImport(Darwin) || canImport(Glibc)
 import Diagnostics
 #if canImport(Darwin)
 import Darwin
@@ -9,34 +8,21 @@ import Foundation
 
 /// Ends a child a fetch started, within a bound (#550).
 ///
-/// The child is asked to stop (`SIGTERM`), made to after `grace` (`SIGKILL`),
-/// and given `afterKill` more to be gone. A child still there after that is
-/// left, logged by name and pid: a refresh's deadline closes the CLI it
-/// started, so waiting on such a child without a bound held that refresh,
-/// and every later one joining it, on "Syncing..." until a relaunch.
+/// The child is asked to stop, made to after `grace`, and given `afterKill`
+/// more to be gone. A child still there after that is left, logged by name:
+/// a refresh's deadline closes the CLI it started, so waiting on such a child
+/// without a bound held that refresh, and every later one joining it, on
+/// "Syncing..." until a relaunch.
 ///
-/// Nothing needs to wait for the exit to reap it: `Process` reaps its own
-/// child when it sees it end.
+/// The steps are the same on every platform; what "ask" and "make" are is
+/// the caller's: `SIGTERM` and `SIGKILL` on POSIX, ending the job at once on
+/// Windows, which has no step a GUI app should take before the last kill.
 enum ChildTeardown {
-    /// Ends `process`. Answers whether it is gone.
+    /// The steps over any child, so the bound holds whatever the child does.
+    /// Answers whether it is gone; one still running is logged as `name`.
     @discardableResult
-    static func end(_ process: Process, named name: String, grace: TimeInterval = 2, afterKill: TimeInterval = 2) -> Bool {
-        let pid = process.processIdentifier
-        let ended = end(
-            isRunning: { process.isRunning },
-            terminate: { process.terminate() },
-            kill: { _ = kill(pid, SIGKILL) },
-            grace: grace,
-            afterKill: afterKill
-        )
-        if !ended {
-            AppLog.probes.warning("\(name) (pid \(pid)) was still running \(Int(afterKill))s after SIGKILL; leaving it so the fetch can end")
-        }
-        return ended
-    }
-
-    /// The same steps over any child, so the bound holds whatever the child does.
     static func end(
+        named name: String,
         isRunning: () -> Bool,
         terminate: () -> Void,
         kill: () -> Void,
@@ -47,7 +33,9 @@ enum ChildTeardown {
         terminate()
         if waitForExit(isRunning, within: grace) { return true }
         kill()
-        return waitForExit(isRunning, within: afterKill)
+        if waitForExit(isRunning, within: afterKill) { return true }
+        AppLog.probes.warning("\(name) was still running \(Int(afterKill))s after it was killed; leaving it so the fetch can end")
+        return false
     }
 
     private static func waitForExit(_ isRunning: () -> Bool, within seconds: TimeInterval) -> Bool {
@@ -56,9 +44,30 @@ enum ChildTeardown {
         let deadline = clock.now.advanced(by: .seconds(seconds))
         while isRunning() {
             guard clock.now < deadline else { return false }
-            usleep(20_000)
+            Thread.sleep(forTimeInterval: 0.02)
         }
         return true
+    }
+}
+
+#if canImport(Darwin) || canImport(Glibc)
+extension ChildTeardown {
+    /// Ends `process`: `SIGTERM`, then `SIGKILL` after `grace`. Answers
+    /// whether it is gone.
+    ///
+    /// Nothing needs to wait for the exit to reap it: `Process` reaps its own
+    /// child when it sees it end.
+    @discardableResult
+    static func end(_ process: Process, named name: String, grace: TimeInterval = 2, afterKill: TimeInterval = 2) -> Bool {
+        let pid = process.processIdentifier
+        return end(
+            named: "\(name) (pid \(pid))",
+            isRunning: { process.isRunning },
+            terminate: { process.terminate() },
+            kill: { _ = kill(pid, SIGKILL) },
+            grace: grace,
+            afterKill: afterKill
+        )
     }
 }
 #endif

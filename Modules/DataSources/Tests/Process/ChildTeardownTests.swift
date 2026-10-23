@@ -1,11 +1,11 @@
-#if canImport(Darwin) || canImport(Glibc)
 import Testing
 import Foundation
 @testable import DataSources
 
 /// Ending a child a fetch started has a bound (#550): a refresh's deadline
-/// closes the CLI it started, and a child still there after `SIGKILL` used to
-/// hold that close, the refresh, and every later one, on "Syncing..." forever.
+/// closes the CLI it started, and a child still there after it was killed
+/// used to hold that close, the refresh, and every later one, on
+/// "Syncing..." forever. The steps run on every platform; the real child is POSIX's.
 @Suite(.timeLimit(.minutes(1)))
 struct ChildTeardownTests {
     /// A child that is asked, then made, to stop, and never does.
@@ -16,11 +16,12 @@ struct ChildTeardownTests {
         func record(_ signal: String) { lock.lock(); asked.append(signal); lock.unlock() }
     }
 
-    @Test func `should give up on a child that outlives SIGKILL, after asking and then making it stop`() {
+    @Test func `should give up on a child that outlives its kill, after asking and then making it stop`() {
         let child = StuckChild()
         let started = Date()
 
         let ended = ChildTeardown.end(
+            named: "stuck child",
             isRunning: { true },
             terminate: { child.record("TERM") },
             kill: { child.record("KILL") },
@@ -33,6 +34,7 @@ struct ChildTeardownTests {
         #expect(Date().timeIntervalSince(started) < 2)
     }
 
+    #if canImport(Darwin) || canImport(Glibc)
     @Test func `should make a real child stop when it ignores the request to`() throws {
         let process = Process()
         let ready = Pipe()
@@ -52,11 +54,13 @@ struct ChildTeardownTests {
         #expect(process.terminationReason == .uncaughtSignal)
         #expect(process.terminationStatus == SIGKILL)
     }
+    #endif
 
     @Test func `should not signal a child that has already exited`() {
         let child = StuckChild()
 
         let ended = ChildTeardown.end(
+            named: "ended child",
             isRunning: { false },
             terminate: { child.record("TERM") },
             kill: { child.record("KILL") },
@@ -68,4 +72,3 @@ struct ChildTeardownTests {
         #expect(child.signals.isEmpty)
     }
 }
-#endif
