@@ -449,7 +449,7 @@ a `localServer` fetch is one `LocalServerFetcher` on every platform too: the
 OS answers what is running, its command lines and listening ports, and
 sends one request trusting the certificate a server on this machine
 presents. Windows reads them from the kernel and asks through WinHTTP, with
-no program run. Windows still has no pseudo-terminal (slice 4).
+no program run, and runs a `cli` fetch in a pseudo console (slice 4).
 
 ```text
 "path": ["{{platform.appData}}/JetBrains/*/options/AIAssistantQuotaManager2.xml",

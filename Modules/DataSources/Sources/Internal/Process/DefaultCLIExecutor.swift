@@ -1,4 +1,3 @@
-#if canImport(Darwin) || canImport(Glibc)
 import Foundation
 
 /// Default CLIExecutor that uses InteractiveRunner on this platform's terminal,
@@ -74,7 +73,7 @@ public struct DefaultCLIExecutor: CLIExecutor {
         )
         let inputText = input ?? ""
 
-        // `InteractiveRunner.run` polls with `usleep` and blocks for up to
+        // `InteractiveRunner.run` polls with `Thread.sleep` and blocks for up to
         // `timeout`. Running it on the cooperative pool would park a thread that
         // every other provider's refresh needs, so hop to a dedicated queue.
         return try await withCheckedThrowingContinuation { continuation in
@@ -125,4 +124,3 @@ extension CLIFetcher {
         }
     }
 }
-#endif

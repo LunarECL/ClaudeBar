@@ -165,7 +165,7 @@ Modules/DataSources/
 │       │              log source, each knowing its own) · LogFileFinder (behind the file
 │       │              readers) · DayAggregator · PriceList · LocalEndpoint
 │       ├── Process/   PipeCLIExecutor · PipeConversation · SubprocessSupport ·
-│       │              DefaultCLIExecutor · InteractiveRunner · BinaryLocator ·
+│       │              DefaultCLIExecutor · InteractiveRunner · PtySession · BinaryLocator ·
 │       │              LoginShellEnvironment · RunningProcesses · TerminalRenderer
 │       └── Network/   URLSessionNetworkClient · LocalServers · LoopbackClient
 └── Tests/
@@ -365,7 +365,7 @@ there, and the ports whose slice hasn't come (`Terminal`, `Secrets`,
 | `TimeZone` | (new) | `TimeZone.current` | the zone's registry key, through CLDR: built ([#567](https://github.com/tddworks/ClaudeBar/pull/567)) | the zone Foundation reads from `/etc/localtime`: built ([#600](https://github.com/tddworks/ClaudeBar/pull/600)) |
 | `Processes` | `runCommand` · `rpcTransport` · `processList` · `binaryLocator` · `scriptCommand` · `loginShellCommand` | the login shell's `PATH`, `sh` for a script, `SIGTERM` then `SIGKILL`, `$SHELL -l -i` | `PATH` + `PATHEXT`, a script run as the file itself, `TerminateProcess`, the PowerShell profile: built ([#580](https://github.com/tddworks/ClaudeBar/pull/580)). The OS answers four facts; finding, running, talking and reporting are one neutral copy ([below](#processes-a-program-the-person-has)) | `PATH`, `/bin/sh` for a script, `SIGTERM` then `SIGKILL` after 2 s: built ([#600](https://github.com/tddworks/ClaudeBar/pull/600)) |
 | `LocalNetwork` | `localNetwork` · `localServer` · `localServerCommands` | `proc_listallpids`, `pgrep`, `lsof`, `URLSession` trusting this machine's certificate | `EnumProcesses`, each process's command line from its process information, the TCP listener table, WinHTTP with the certificate checks off on that request: built ([#588](https://github.com/tddworks/ClaudeBar/issues/588)). The OS answers four facts; finding the app and asking it are one neutral copy ([below](#localnetwork-an-apps-own-server)) | not yet: `/proc/<pid>/cmdline` and `/proc/net/tcp` with socket inodes, its own follow-up; `LocalNetworkContract` is skipped, saying why |
-| `Terminal` | `runCLI` · `screenRenderer` | SwiftTerm on a pty | the console's pseudo-terminal (ConPTY) | a pty (`posix_openpt`), the same neutral session and SwiftTerm's core |
+| `Terminal` | `runCLI` · `screenRenderer` | a pty (`openpty`, one at a time), its CLI started and read by `PtySession`; SwiftTerm renders | a pseudo console (ConPTY), the CLI created attached to it in a job that ends its whole tree; SwiftTerm renders: built ([#625](https://github.com/tddworks/ClaudeBar/pull/625)). The OS starts the CLI in its terminal; typing, reading until the screen settles and rendering are one neutral copy ([below](#terminal-a-clis-screen)) | a pty (`posix_openpt`) through the same `PtySession`, and SwiftTerm's core |
 | `Secrets` | `keychain` · `browserCookies` · `browserStorage` | Keychain, SweetCookieKit | Credential Manager; cookies and storage `Unavailable` in phase 5 | `secret-tool`, the way the leaderboard's key store proved; cookies and storage `Unavailable` |
 | `Places` | `applicationData` · `pathSeparator` | `~/Library/Application Support`, `/` | `APPDATA`, `\` (phase 4) | `$XDG_DATA_HOME`, else `~/.local/share`, `/`: built ([#600](https://github.com/tddworks/ClaudeBar/pull/600)) |
 
@@ -449,6 +449,38 @@ PORTS, Ports/LocalNetwork.swift                    Mac                     │ W
 - **A test hands in the running, not the facts.** The stubbed `make` takes
   `running: [RunningProgram]` (path, command line, ports), so Antigravity's
   tests run on every platform.
+
+#### Terminal: a CLI's screen
+
+A `cli` fetch runs a TUI as a person would, types into it and reads the
+screen it draws. A POSIX pty is two file descriptors the child is given as
+its standard files; a Windows pseudo console is attached to the child as it
+is created. So starting the child is the OS's answer, and the session above
+it reads and writes through what it started:
+
+```text
+NEUTRAL, one copy
+  DefaultCLIExecutor   off the cooperative pool, the call's environment and ready markers
+  InteractiveRunner    the input delay, autoResponses, the quiet spell, readyWhen
+  TerminalRenderer     SwiftTerm's headless screen
+PORT, Ports/Terminal.swift
+  PseudoTerminal   start(launch) → TerminalSession · environment(for:)
+  TerminalSession  read() · write(_:) · isRunning · exitCode · end()
+                   Mac, Linux: PtySession over openpty │ posix_openpt, SIGTERM then SIGKILL
+                   Windows:    ConPtySession — CreatePseudoConsole, CreateProcessW with
+                               null standard handles, a job, a thread draining the output
+```
+
+- **The child gets the console and nothing else.** An app whose own standard
+  files are redirected (a GUI app, a test runner) would hand them to the
+  child, which then writes past the console; null standard handles keep it
+  in the console.
+- **A session runs until its last frame is in.** The console paints after
+  the program writes, so a Windows session counts as running until it has
+  been quiet for 300 ms after the program ended.
+- **The whole tree ends.** `claude.cmd` starts `node`: the child starts
+  suspended and joins a job before it runs, and ending the session ends the
+  job.
 
 ### The shape
 
@@ -679,7 +711,7 @@ Phase 5's slices, each its own issue and PR
 | 1 | **Vendor QuickJS and SQLite; one engine everywhere.** `QuickJSEngine` replaces JavaScriptCore on the Mac and is the engine on Windows; one `ReadOnlyQuery` on bundled SQLite | Windows no longer skips a test for a script engine or SQLite (−391); the Mac's numbers don't change; release-build timing, the size added to the Mac app, and scripts in definitions people wrote checked — built ([#571](https://github.com/tddworks/ClaudeBar/pull/571)) |
 | 2 | **`Processes`**: port, contract, Windows adapter | its tests run on Windows — built ([#580](https://github.com/tddworks/ClaudeBar/pull/580)): `command`, `script` and `jsonRpc` fetches, `command` logs and the login-shell lookup run on Windows |
 | 3 | **`LocalNetwork`**, with the localhost-certificate spike | its tests run on Windows — built ([#588](https://github.com/tddworks/ClaudeBar/issues/588)): a `localServer` fetch (Antigravity's `local` source) runs on Windows |
-| 4 | **`Terminal`**, with the SwiftTerm-on-Windows spike | its tests run on Windows |
+| 4 | **`Terminal`**, with the SwiftTerm-on-Windows spike | its tests run on Windows — built ([#625](https://github.com/tddworks/ClaudeBar/pull/625)): `cli` fetches read a CLI's screen through a pseudo console, and the runner's own suites run on all three platforms |
 | 5 | **`Secrets`**: Credential Manager; browser cookies and storage stay `Unavailable` | its tests run on Windows |
 | 6 | **`Monitoring` into the package**, so no platform rewrites refresh scheduling and alert logic; the menu bar and Notify! stay in the Mac app | its own design review first, since it reshapes the domain's root |
 

@@ -1,10 +1,4 @@
-#if canImport(Darwin) || canImport(Glibc)
 import Diagnostics
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 import Quotas
 import Foundation
 
@@ -17,8 +11,9 @@ private func nowSeconds() -> Double { Date.timeIntervalSinceReferenceDate }
 /// Many CLI tools (like Claude, Codex, Gemini) detect when they're not running in a
 /// real terminal and change their behavior. This runner simulates a terminal session
 /// so these tools produce their normal, parseable output. What a terminal is here —
-/// the pty and the session's environment — this platform's `PseudoTerminal`
-/// answers (MODULAR_DESIGN §10); finding the CLI is the `InstalledPrograms` fact.
+/// the pty or pseudo console, starting the CLI in it, and the session's environment —
+/// this platform's `PseudoTerminal` answers (MODULAR_DESIGN §10); finding the CLI is
+/// the `InstalledPrograms` fact. Everything else here is the same on every platform.
 ///
 /// Usage:
 /// ```swift
@@ -153,56 +148,19 @@ public struct InteractiveRunner: Sendable {
         let findElapsed = nowSeconds() - findStart
         AppLog.probes.debug("InteractiveRunner: findExecutable('\(binary)') took \(String(format: "%.3f", findElapsed))s")
 
-        let ends = try openTerminal()
-        let primaryFD = ends.session
-        let secondaryFD = ends.child
-
-        _ = fcntl(primaryFD, F_SETFL, O_NONBLOCK)
-
-        let primaryHandle = FileHandle(fileDescriptor: primaryFD, closeOnDealloc: true)
-        let secondaryHandle = FileHandle(fileDescriptor: secondaryFD, closeOnDealloc: true)
-
-        let process = createProcess(
-            executablePath: executablePath,
-            options: options,
-            terminalHandle: secondaryHandle
-        )
-
-        var cleanedUp = false
-        var didLaunch = false
-
-        func cleanup() {
-            guard !cleanedUp else { return }
-            cleanedUp = true
-
-            try? primaryHandle.close()
-            try? secondaryHandle.close()
-
-            if didLaunch {
-                ChildTeardown.end(process, named: process.executableURL?.lastPathComponent ?? "terminal child")
-            }
-        }
-
-        defer { cleanup() }
-
         let runStart = nowSeconds()
-        try process.run()
-        didLaunch = true
+        let session = try start(executablePath, options: options)
+        defer { session.end() }
 
         // Allow the process to initialize; `inputDelay` gives TUIs time to finish
         // their startup paint before typed input lands (see Options.inputDelay).
-        usleep(UInt32(max(0, options.inputDelay) * 1_000_000))
+        Thread.sleep(forTimeInterval: max(0, options.inputDelay))
 
         // Send the input command
-        try sendInput(input, to: primaryHandle)
+        try sendInput(input, to: session)
 
         // Read output, handling any prompts automatically
-        let buffer = try captureOutput(
-            from: primaryFD,
-            handle: primaryHandle,
-            process: process,
-            options: options
-        )
+        let buffer = captureOutput(from: session, options: options)
         let runElapsed = nowSeconds() - runStart
         AppLog.probes.debug("InteractiveRunner: process execution took \(String(format: "%.3f", runElapsed))s")
 
@@ -213,8 +171,7 @@ public struct InteractiveRunner: Sendable {
         let totalElapsed = nowSeconds() - totalStart
         AppLog.probes.debug("InteractiveRunner: total run() took \(String(format: "%.3f", totalElapsed))s for '\(binary)'")
 
-        let exitCode: Int32 = process.isRunning ? -1 : process.terminationStatus
-        return Result(output: text, exitCode: exitCode)
+        return Result(output: text, exitCode: session.exitCode ?? -1)
     }
 
     // MARK: - Private Helpers
@@ -230,62 +187,41 @@ public struct InteractiveRunner: Sendable {
         throw RunError.binaryNotFound(binary)
     }
 
-    /// Opens the terminal this session runs in.
-    private func openTerminal() throws -> Ends {
-        do {
-            return try terminal.open(rows: Self.terminalRows, cols: Self.terminalCols)
-        } catch {
-            throw RunError.launchFailed("Could not create terminal session")
-        }
-    }
-
-    /// Creates and configures the process to run.
-    private func createProcess(
-        executablePath: String,
-        options: Options,
-        terminalHandle: FileHandle
-    ) -> Process {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executablePath)
-        process.arguments = options.arguments
-        process.standardInput = terminalHandle
-        process.standardOutput = terminalHandle
-        process.standardError = terminalHandle
-        process.environment = terminal.environment(
-            for: executablePath,
-            ProcessEnvironment(
-                unset: options.environmentExclusions,
-                set: options.environmentAdditions
-            )
+    /// Starts the CLI in a new terminal, in its session's environment.
+    private func start(_ executablePath: String, options: Options) throws -> any TerminalSession {
+        let launch = TerminalLaunch(
+            executable: executablePath,
+            arguments: options.arguments,
+            environment: terminal.environment(
+                for: executablePath,
+                ProcessEnvironment(unset: options.environmentExclusions, set: options.environmentAdditions)
+            ),
+            directory: options.workingDirectory,
+            rows: Self.terminalRows,
+            cols: Self.terminalCols,
+            // Carry the fetch QoS captured when `Options` was built: the
+            // background monitoring loop binds `.utility` (issue #204).
+            qualityOfService: options.qualityOfService
         )
-        // Carry the fetch QoS captured when `Options` was built: the background
-        // monitoring loop binds `.utility` so the spawned CLI tree runs on
-        // efficiency cores / throttled, cutting idle heat (issue #204).
-        // Interactive runs stay `.default`.
-        process.qualityOfService = options.qualityOfService
-
-        if let workingDirectory = options.workingDirectory {
-            process.currentDirectoryURL = workingDirectory
+        do {
+            return try terminal.start(launch)
+        } catch PseudoTerminalError.couldNotOpen {
+            throw RunError.launchFailed("Could not create terminal session")
+        } catch PseudoTerminalError.couldNotStart(let reason) {
+            throw RunError.launchFailed(reason)
         }
-
-        return process
     }
 
     /// Sends input text to the running command.
-    private func sendInput(_ input: String, to handle: FileHandle) throws {
+    private func sendInput(_ input: String, to session: any TerminalSession) throws {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         guard let data = (trimmed + "\r").data(using: .utf8) else { return }
-        try handle.write(contentsOf: data)
+        try session.write(data)
     }
 
     /// Captures output from the command, automatically responding to known prompts.
-    private func captureOutput(
-        from fd: Int32,
-        handle: FileHandle,
-        process: Process,
-        options: Options
-    ) throws -> Data {
+    private func captureOutput(from session: any TerminalSession, options: Options) -> Data {
         let deadline = Date().addingTimeInterval(options.timeout)
         var buffer = Data()
         var lastMeaningfulDataTime = Date()
@@ -298,7 +234,7 @@ public struct InteractiveRunner: Sendable {
 
         while Date() < deadline {
             let previousSize = buffer.count
-            readAvailableData(from: fd, into: &buffer)
+            buffer.append(session.read())
 
             // Track when we last received MEANINGFUL data (not just OSC/escape sequences)
             if buffer.count > previousSize {
@@ -311,14 +247,14 @@ public struct InteractiveRunner: Sendable {
             // Auto-respond to any recognized prompts
             for item in promptResponses where !respondedPrompts.contains(item.prompt) {
                 if buffer.range(of: item.prompt) != nil {
-                    try? handle.write(contentsOf: item.response)
+                    try? session.write(item.response)
                     respondedPrompts.insert(item.prompt)
                     lastMeaningfulDataTime = Date()  // Reset idle timer after responding
                 }
             }
 
             // Exit if process stopped
-            if !process.isRunning { break }
+            if !session.isRunning { break }
 
             // Exit if we have meaningful output and no new meaningful data for
             // idleTimeout — unless the screen says it is still filling in, in
@@ -329,11 +265,11 @@ public struct InteractiveRunner: Sendable {
                 break
             }
 
-            usleep(60000)
+            Thread.sleep(forTimeInterval: 0.06)
         }
 
         // Capture any remaining output
-        readAvailableData(from: fd, into: &buffer)
+        buffer.append(session.read())
         return buffer
     }
 
@@ -435,18 +371,4 @@ public struct InteractiveRunner: Sendable {
         return !meaningful.isEmpty
     }
 
-    /// Reads all currently available data from a file descriptor.
-    private func readAvailableData(from fd: Int32, into buffer: inout Data) {
-        var chunk = [UInt8](repeating: 0, count: 8192)
-        while true {
-            let bytesRead = read(fd, &chunk, chunk.count)
-            if bytesRead > 0 {
-                buffer.append(contentsOf: chunk.prefix(bytesRead))
-            } else {
-                break
-            }
-        }
-    }
-
 }
-#endif

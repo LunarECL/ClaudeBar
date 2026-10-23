@@ -1,4 +1,3 @@
-#if canImport(Darwin) || canImport(Glibc)
 import Quotas
 import Foundation
 import Testing
@@ -17,4 +16,3 @@ struct DefaultCLIExecutorMissingTests {
         }
     }
 }
-#endif
