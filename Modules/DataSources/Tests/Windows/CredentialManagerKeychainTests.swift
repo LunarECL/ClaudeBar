@@ -53,7 +53,23 @@ struct CredentialManagerKeychainTests {
         #expect(Self.targets(startingWith: service) == [service + ":"])
     }
 
-    // MARK: - Credential Manager, asked directly
+    @Test func `should keep every change when several threads change items at once`() {
+        let prefix = service + "-"
+        defer { for name in Self.targets(startingWith: prefix) { Self.delete(name) } }
+
+        DispatchQueue.concurrentPerform(iterations: 8) { thread in
+            for round in 0..<20 {
+                let item = prefix + "\(thread)-\(round)"
+                _ = keychain.save("first", service: item, account: "octocat")
+                _ = keychain.save("second", service: item, account: "octocat")
+                Self.delete(item + ":octocat")
+            }
+        }
+
+        #expect(Self.targets(startingWith: prefix).isEmpty)
+    }
+
+    // MARK: - Credential Manager, asked directly, one call at a time as the store asks it
 
     private static func write(target: String, userName: String?, blob: [UInt8]) throws {
         var name = Array(target.utf16) + [0]
@@ -69,7 +85,7 @@ struct CredentialManagerKeychainTests {
                     credential.CredentialBlobSize = DWORD(bytes.count)
                     credential.CredentialBlob = bytes.baseAddress
                     credential.Persist = DWORD(CRED_PERSIST_LOCAL_MACHINE)
-                    return CredWriteW(&credential, 0)
+                    return CredentialManagerKeychain.oneAtATime.withLock { CredWriteW(&credential, 0) }
                 }
             }
         }
@@ -82,13 +98,17 @@ struct CredentialManagerKeychainTests {
     }
 
     private static func delete(_ target: String) {
-        _ = target.withCString(encodedAs: UTF16.self) { CredDeleteW($0, DWORD(CRED_TYPE_GENERIC), 0) }
+        _ = CredentialManagerKeychain.oneAtATime.withLock {
+            target.withCString(encodedAs: UTF16.self) { CredDeleteW($0, DWORD(CRED_TYPE_GENERIC), 0) }
+        }
     }
 
     private static func targets(startingWith prefix: String) -> [String] {
         var count: DWORD = 0
         var credentials: UnsafeMutablePointer<PCREDENTIALW?>?
-        let found = (prefix + "*").withCString(encodedAs: UTF16.self) { CredEnumerateW($0, 0, &count, &credentials) }
+        let found = CredentialManagerKeychain.oneAtATime.withLock {
+            (prefix + "*").withCString(encodedAs: UTF16.self) { CredEnumerateW($0, 0, &count, &credentials) }
+        }
         guard found, let credentials else { return [] }
         defer { CredFree(credentials) }
         return (0..<Int(count)).compactMap { credentials[$0]?.pointee.TargetName.map { String(decodingCString: $0, as: UTF16.self) } }
