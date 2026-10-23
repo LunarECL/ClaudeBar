@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Windows reads a login from Credential Manager**: a provider that finds its login in the Keychain on the Mac, as Copilot finds the GitHub CLI's, finds it in Credential Manager on Windows, and a renewed token is saved to the same item. Mac logins are read and saved as before. (PRNUM) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms)
+- **Windows reads a login from Credential Manager**: a provider that finds its login in the Keychain on the Mac, as Copilot finds the GitHub CLI's, finds it in Credential Manager on Windows, and a renewed token is saved to the same item. Mac logins are read and saved as before. ([#641](https://github.com/tddworks/ClaudeBar/pull/641)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms)
 
 ---
 
