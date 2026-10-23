@@ -84,10 +84,16 @@ struct LocalNetworkContract {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let key = folder.appendingPathComponent("key.pem").path, certificate = folder.appendingPathComponent("cert.pem").path
-        let made = try Self.run(openssl, ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", certificate,
-                                          "-days", "1", "-subj", "/CN=not-localhost"])
-        made.waitUntilExit()
-        try #require(made.terminationStatus == 0, "openssl couldn't make a certificate")
+        // openssl runs as the app runs a program, never through
+        // `Foundation.Process`: on Windows that hands every child the files the
+        // test process has open, failing `ProcessesContract` running beside it (#586).
+        let processes = try #require(Platform.current.processes)
+        let made = try await SubprocessSupport.run(
+            executablePath: openssl,
+            arguments: ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", certificate,
+                        "-days", "1", "-subj", "/CN=not-localhost"]
+        )
+        try #require(made.exitCode == 0, "openssl couldn't make a certificate")
 
         let port = try LoopbackServer.freePort()
         #if os(Windows)
@@ -95,13 +101,10 @@ struct LocalNetworkContract {
         #else
         let accept = "\(port)"
         #endif
-        let input = Pipe()
-        let server = try Self.run(openssl, ["s_server", "-accept", accept, "-cert", certificate, "-key", key, "-www", "-quiet"],
-                                  input: input)
-        defer {
-            server.terminate()
-            server.waitUntilExit()
-        }
+        let server = try processes.conversation(
+            openssl, ["s_server", "-accept", accept, "-cert", certificate, "-key", key, "-www", "-quiet"], nil, nil
+        )
+        defer { server.close() }
         var request = URLRequest(url: URL(string: "https://127.0.0.1:\(port)/")!)
         request.timeoutInterval = 5
 
@@ -131,16 +134,5 @@ struct LocalNetworkContract {
         #else
         return FileManager.default.isExecutableFile(atPath: "/usr/bin/openssl") ? "/usr/bin/openssl" : nil
         #endif
-    }
-
-    private static func run(_ executable: String, _ arguments: [String], input: Pipe? = nil) throws -> Process {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.standardInput = input ?? FileHandle.nullDevice
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        return process
     }
 }
