@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Alibaba shows the Alibaba Cloud logo**: the provider's card, popover and menu bar carried a question-mark placeholder; now the official mark sits on the brand-orange tile, in light and dark. ([#622](https://github.com/tddworks/ClaudeBar/pull/622))
 
 ### Added
-- **Windows reads a CLI's screen**: Claude's and Kimi's CLI sources and Codex's tty fallback run in a pseudo console there, typed into and rendered as on the Mac. (PRNUM) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#terminal-a-clis-screen)
+- **Windows reads a CLI's screen**: Claude's and Kimi's CLI sources and Codex's tty fallback run in a pseudo console there, typed into and rendered as on the Mac. ([#625](https://github.com/tddworks/ClaudeBar/pull/625)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#terminal-a-clis-screen)
 - **Linux runs a CLI fetch on a pseudo-terminal**: Claude's and Kimi's CLI sources and Codex's tty fallback read their screen there as the Mac does — the Mac's interactive session became one copy, and Linux answers it with a pty of its own. ([#615](https://github.com/tddworks/ClaudeBar/pull/615)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms)
 
 ---
