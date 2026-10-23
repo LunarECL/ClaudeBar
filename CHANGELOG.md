@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.20] - 2026-10-23
+
 ### Changed
 - **An app's own server on Windows**: a provider reading an app's server on this machine, as Antigravity's `local` source does, now reads it on Windows, running no program to find it. Mac quotas are unchanged. → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms) ([#590](https://github.com/tddworks/ClaudeBar/pull/590))
 - **A quota turns low when it will run out before it resets**: with the warning on, colours and alerts follow the forecast, so a quota on pace is never marked low and the threshold setting is gone. ([#613](https://github.com/tddworks/ClaudeBar/pull/613)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/quota/status-colors/README.md)
@@ -342,7 +346,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.19...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.20...HEAD
+[0.5.20]: https://github.com/tddworks/ClaudeBar/compare/v0.5.19...v0.5.20
 [0.5.19]: https://github.com/tddworks/ClaudeBar/compare/v0.5.18...v0.5.19
 [0.5.18]: https://github.com/tddworks/ClaudeBar/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/tddworks/ClaudeBar/compare/v0.5.16...v0.5.17
