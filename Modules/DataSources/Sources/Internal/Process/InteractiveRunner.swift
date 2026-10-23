@@ -11,13 +11,16 @@ private func nowSeconds() -> Double { Date.timeIntervalSinceReferenceDate }
 /// Many CLI tools (like Claude, Codex, Gemini) detect when they're not running in a
 /// real terminal and change their behavior. This runner simulates a terminal session
 /// so these tools produce their normal, parseable output. What a terminal is here —
-/// the pty or pseudo console, starting the CLI in it, and the session's environment —
-/// this platform's `PseudoTerminal` answers (MODULAR_DESIGN §10); finding the CLI is
-/// the `InstalledPrograms` fact. Everything else here is the same on every platform.
+/// the pty or pseudo console, starting the CLI in it, and what its session's
+/// environment differs in — this platform's `PseudoTerminal` answers (MODULAR_DESIGN
+/// §10); finding the CLI and the environment a program starts with are the
+/// `InstalledPrograms` and `ChildLaunch` facts. Everything else here is the same on
+/// every platform: the terminal defaults a CLI gets, the screen's size, typing and
+/// reading.
 ///
 /// Usage:
 /// ```swift
-/// let runner = InteractiveRunner(terminal: MacPty(), installed: MacProcesses())
+/// let runner = InteractiveRunner(terminal: MacPty(), installed: MacProcesses(), launch: MacProcesses())
 /// let result = try runner.run(binary: "claude", input: "/usage")
 /// print(result.output)
 /// ```
@@ -27,6 +30,8 @@ public struct InteractiveRunner: Sendable {
     private let terminal: any PseudoTerminal
     /// Finds the CLI, as this OS finds a program.
     private let installed: any InstalledPrograms
+    /// The environment the CLI starts with, as any program this OS starts.
+    private let launch: any ChildLaunch
 
     /// The result of running a command.
     public struct Result: Sendable {
@@ -119,13 +124,10 @@ public struct InteractiveRunner: Sendable {
         }
     }
 
-    // Terminal size for the simulated session
-    private static let terminalRows: UInt16 = 50
-    private static let terminalCols: UInt16 = 160
-
-    init(terminal: any PseudoTerminal, installed: any InstalledPrograms) {
+    init(terminal: any PseudoTerminal, installed: any InstalledPrograms, launch: any ChildLaunch) {
         self.terminal = terminal
         self.installed = installed
+        self.launch = launch
     }
 
     /// Runs a command and captures its output.
@@ -192,13 +194,13 @@ public struct InteractiveRunner: Sendable {
         let launch = TerminalLaunch(
             executable: executablePath,
             arguments: options.arguments,
-            environment: terminal.environment(
+            environment: sessionEnvironment(
                 for: executablePath,
                 ProcessEnvironment(unset: options.environmentExclusions, set: options.environmentAdditions)
             ),
             directory: options.workingDirectory,
-            rows: Self.terminalRows,
-            cols: Self.terminalCols,
+            rows: UInt16(TerminalRenderer.rows),
+            cols: UInt16(TerminalRenderer.cols),
             // Carry the fetch QoS captured when `Options` was built: the
             // background monitoring loop binds `.utility` (issue #204).
             qualityOfService: options.qualityOfService
@@ -210,6 +212,34 @@ public struct InteractiveRunner: Sendable {
         } catch PseudoTerminalError.couldNotStart(let reason) {
             throw RunError.launchFailed(reason)
         }
+    }
+
+    /// A session's environment, each part with one owner: the program's
+    /// (`ChildLaunch`: the app's, with the call's changes), then what this
+    /// OS's terminal differs in, then the terminal defaults every CLI gets
+    /// where the app has none, and the call's additions last, so they win.
+    /// A name is matched as the OS matches it: exactly on POSIX, in any case
+    /// on Windows, whose names ignore case.
+    private func sessionEnvironment(for path: String, _ change: ProcessEnvironment) -> [String: String] {
+        var environment = launch.environment(for: path, change)
+        func named(_ name: String) -> String? {
+            #if os(Windows)
+            environment.keys.first { $0.caseInsensitiveCompare(name) == .orderedSame }
+            #else
+            environment[name] == nil ? nil : name
+            #endif
+        }
+        func set(_ name: String, _ value: String) {
+            environment[named(name) ?? name] = value
+        }
+        if let path = terminal.sessionPath() { set("PATH", path) }
+        var defaults = ["HOME": NSHomeDirectory(), "TERM": "xterm-256color", "COLORTERM": "truecolor", "CI": "0"]
+        defaults["LANG"] = terminal.fallbackLocale
+        for (name, value) in defaults where named(name) == nil {
+            environment[name] = value
+        }
+        for (name, value) in change.set { set(name, value) }
+        return environment
     }
 
     /// Sends input text to the running command.
