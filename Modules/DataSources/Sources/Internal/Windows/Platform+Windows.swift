@@ -2,12 +2,15 @@
 import Foundation
 
 extension Platform {
-    /// File paths, CLI discovery and programs over pipes are available; the
-    /// rest stays absent until its phase 5 slice and fails at its named step.
+    /// File paths, CLI discovery, programs over pipes and in a pseudo
+    /// console are available; the rest stays absent until its phase 5 slice
+    /// and fails at its named step.
     static let current = Platform(
         name: "Windows",
         timeZone: WindowsTimeZone(),
+        runCLI: CLIFetcher.system(installed: WindowsProcesses(), terminal: ConPty()),
         processes: Processes(WindowsProcesses()),
+        screenRenderer: { TerminalRenderer(cols: 160, rows: 50).render($0) },
         applicationData: { home, environment in
             if let path = environment("APPDATA"), !path.isEmpty {
                 return URL(fileURLWithPath: path, isDirectory: true)

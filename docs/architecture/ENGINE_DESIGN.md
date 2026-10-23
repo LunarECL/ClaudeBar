@@ -444,8 +444,9 @@ the folder from its app-data root; missing connections still fail as named
 copy for every platform, while each OS answers only how a CLI is found, how
 a script starts, how its login is read, how a child is launched and ended,
 and what is running (MODULAR_DESIGN §10). Windows runs a script as the file
-itself and reads a login variable through the PowerShell profile. Windows still has no
-pseudo-terminal or local-server discovery (slices 3 and 4).
+itself and reads a login variable through the PowerShell profile, and runs a
+`cli` fetch in a pseudo console (slice 4). Windows still has no local-server
+discovery (slice 3).
 
 ```text
 "path": ["{{platform.appData}}/JetBrains/*/options/AIAssistantQuotaManager2.xml",

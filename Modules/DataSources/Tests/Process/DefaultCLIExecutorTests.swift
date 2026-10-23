@@ -1,4 +1,3 @@
-#if canImport(Darwin) || canImport(Glibc)
 import Quotas
 import Foundation
 import Testing
@@ -17,16 +16,17 @@ struct DefaultCLIExecutorTests {
 
     @Test
     func `should show what a CLI printed and its success in a terminal`() async throws {
+        let echo = ShellProgram(sh: "echo pty-hello", powershell: "'pty-hello'")
         let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal).execute(
-            binary: "/bin/echo",
-            args: ["pty-hello"],
+            binary: echo.binary,
+            args: echo.arguments,
             input: "",
             timeout: 20,
             workingDirectory: nil,
             autoResponses: [:]
         )
 
-        #expect(result.output.contains("pty-hello"))
+        #expect(PlatformTerminal.screen(result.output).contains("pty-hello"))
         #expect(result.exitCode == 0)
     }
 
@@ -34,32 +34,37 @@ struct DefaultCLIExecutorTests {
     func `should wait past a quiet spell while Claude's usage screen is still filling in (#271)`() async throws {
         // issue #271: `claude /usage` paints a placeholder, goes quiet longer
         // than the idle cutoff, then appends the quota bars.
+        let program = ShellProgram(
+            sh: "printf 'Loading usage data...'; sleep 5; printf 'Current session 1%% used'",
+            powershell: "[Console]::Write('Loading usage data...'); Start-Sleep 5; [Console]::Write('Current session 1% used')"
+        )
         let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal, completionRule: .claudeUsage).execute(
-            binary: "/bin/sh",
-            args: ["-c", "printf 'Loading usage data...'; sleep 5; printf 'Current session 1%% used'"],
+            binary: program.binary,
+            args: program.arguments,
             input: "",
             timeout: 20,
             workingDirectory: nil,
             autoResponses: [:]
         )
 
-        #expect(result.output.contains("Current session"))
+        #expect(PlatformTerminal.screen(result.output).contains("Current session"))
     }
 
     @Test
     func `should still deliver typed input after the stated delay`() async throws {
-        // /bin/cat echoes back whatever it reads; the delay must not lose the
-        // input, and the session must stay open long enough to receive it.
+        // The program echoes back the line it reads; the delay must not lose
+        // the input, and the session must stay open long enough to receive it.
+        let echo = ShellProgram(sh: "cat", powershell: "'got ' + [Console]::ReadLine()")
         let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal, inputDelay: 1.0).execute(
-            binary: "/bin/cat",
-            args: [],
+            binary: echo.binary,
+            args: echo.arguments,
             input: "delayed-hello",
             timeout: 10,
             workingDirectory: nil,
             autoResponses: [:]
         )
 
-        #expect(result.output.contains("delayed-hello"))
+        #expect(PlatformTerminal.screen(result.output).contains("delayed-hello"))
     }
 
     @Test
@@ -78,34 +83,44 @@ struct DefaultCLIExecutorTests {
 
     @Test
     func `should run the CLI in the folder it is given`() async throws {
+        let name = "cli-folder-\(UUID().uuidString.prefix(8))"
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let pwd = ShellProgram(sh: "pwd", powershell: "(Get-Location).Path")
+
         let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal).execute(
-            binary: "/bin/pwd",
-            args: [],
+            binary: pwd.binary,
+            args: pwd.arguments,
             input: "",
             timeout: 20,
-            workingDirectory: URL(fileURLWithPath: "/tmp"),
+            workingDirectory: folder,
             autoResponses: [:]
         )
 
-        #expect(result.output.contains("tmp"))
+        #expect(PlatformTerminal.screen(result.output).contains(name))
     }
 
     @Test
     func `should start the CLI with the extra environment values it is given`() async throws {
+        let probe = ShellProgram(
+            sh: "test \"$CLAUDEBAR_PROBE\" = 1 && echo marked",
+            powershell: "if ($env:CLAUDEBAR_PROBE -eq 1) { 'marked' }"
+        )
         let result = try await DefaultCLIExecutor(
             installed: PlatformTerminal.installed,
             terminal: PlatformTerminal.terminal,
             environmentAdditions: ["CLAUDEBAR_PROBE": "1"]
         ).execute(
-            binary: "/bin/sh",
-            args: ["-c", "test \"$CLAUDEBAR_PROBE\" = 1 && echo marked"],
+            binary: probe.binary,
+            args: probe.arguments,
             input: "",
             timeout: 20,
             workingDirectory: nil,
             autoResponses: [:]
         )
 
-        #expect(result.output.contains("marked"))
+        #expect(PlatformTerminal.screen(result.output).contains("marked"))
     }
 
     @Test
@@ -121,9 +136,10 @@ struct DefaultCLIExecutorTests {
             for _ in 0..<count {
                 group.addTask {
                     let began = nowSeconds()
+                    let program = ShellProgram(sh: "sleep 1; echo done", powershell: "Start-Sleep 1; 'done'")
                     let result = try await DefaultCLIExecutor(installed: PlatformTerminal.installed, terminal: PlatformTerminal.terminal).execute(
-                        binary: "/bin/sh",
-                        args: ["-c", "sleep 1; echo done"],
+                        binary: program.binary,
+                        args: program.arguments,
                         input: "",
                         timeout: 20,
                         workingDirectory: nil,
@@ -134,7 +150,7 @@ struct DefaultCLIExecutorTests {
             }
             var collected: [(CLIResult, Double, Double)] = []
             for try await run in group {
-                #expect(run.0.output.contains("done"))
+                #expect(PlatformTerminal.screen(run.0.output).contains("done"))
                 collected.append(run)
             }
             return collected
@@ -145,4 +161,3 @@ struct DefaultCLIExecutorTests {
         #expect(lastToBegin < firstToEnd)
     }
 }
-#endif
