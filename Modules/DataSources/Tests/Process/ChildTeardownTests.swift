@@ -25,8 +25,8 @@ struct ChildTeardownTests {
             isRunning: { true },
             terminate: { child.record("TERM") },
             kill: { child.record("KILL") },
-            grace: 0.2,
-            afterKill: 0.2
+            grace: .milliseconds(200),
+            afterKill: .milliseconds(200)
         )
 
         #expect(!ended)
@@ -48,7 +48,7 @@ struct ChildTeardownTests {
         defer { if process.isRunning { kill(process.processIdentifier, SIGKILL) } }
         #expect(try ready.fileHandleForReading.read(upToCount: 1) == Data("r".utf8))
 
-        #expect(ChildTeardown.end(process, named: "test child", grace: 0.2))
+        #expect(ChildTeardown.end(process, named: "test child", grace: .milliseconds(200)))
         try #require(!process.isRunning)
         // Only SIGKILL ended it: the request to stop alone did not.
         #expect(process.terminationReason == .uncaughtSignal)
@@ -64,11 +64,27 @@ struct ChildTeardownTests {
             isRunning: { false },
             terminate: { child.record("TERM") },
             kill: { child.record("KILL") },
-            grace: 0.2,
-            afterKill: 0.2
+            grace: .milliseconds(200),
+            afterKill: .milliseconds(200)
         )
 
         #expect(ended)
         #expect(child.signals.isEmpty)
+    }
+
+    @Test func `should make a child stop at once, without asking, where its OS gives no grace`() {
+        let child = StuckChild()
+
+        let ended = ChildTeardown.end(
+            named: "stuck child",
+            isRunning: { true },
+            terminate: { child.record("TERM") },
+            kill: { child.record("KILL") },
+            grace: nil,
+            afterKill: .milliseconds(200)
+        )
+
+        #expect(!ended)
+        #expect(child.signals == ["KILL"])
     }
 }

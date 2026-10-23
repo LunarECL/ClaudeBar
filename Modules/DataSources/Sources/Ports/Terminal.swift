@@ -40,6 +40,9 @@ struct TerminalLaunch: Sendable {
     /// The fetch's quality of service, where the OS has one for a process
     /// tree (#204).
     let qualityOfService: QualityOfService
+    /// How long the program is given to stop once asked, at the session's
+    /// end: its OS's `ChildLaunch.stopGrace`.
+    let stopGrace: Duration?
 }
 
 /// One program running in a pseudo-terminal: what it has drawn, what is typed
