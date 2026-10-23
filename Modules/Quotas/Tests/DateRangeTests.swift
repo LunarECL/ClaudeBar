@@ -73,4 +73,22 @@ struct DateRangeTests {
 
         #expect(lastWeek == DateRange.week(containing: date(2026, 10, 15), calendar: calendar))
     }
+
+    // MARK: - The month
+
+    /// A month is the calendar's own: from its first day to its last, however
+    /// long it runs.
+    @Test func `should name the calendar month that holds a day`() {
+        let month = DateRange.month(containing: date(2026, 10, 22), calendar: calendar)
+
+        #expect(month.first == date(2026, 10, 1))
+        #expect(month.last == date(2026, 10, 31))
+        #expect(month.days(in: calendar).count == 31)
+    }
+
+    /// Any day in the month names the same month.
+    @Test func `should name the same month from any day in it`() {
+        #expect(DateRange.month(containing: date(2026, 10, 1), calendar: calendar)
+            == DateRange.month(containing: date(2026, 10, 31), calendar: calendar))
+    }
 }

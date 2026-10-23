@@ -109,7 +109,7 @@ private extension UsageSection {
         case .lastYear: "Last year"
         case .modelMix: "Model mix"
         case .projectMix: "Projects"
-        case .weeklyRecap: "Weekly recap"
+        case .weeklyRecap: "Recap"
         }
     }
 
@@ -120,7 +120,7 @@ private extension UsageSection {
         case .lastYear: "The year as a heatmap"
         case .modelMix: "Which models you lean on"
         case .projectMix: "Where your usage went, by folder"
-        case .weeklyRecap: "The week's story, on the All page"
+        case .weeklyRecap: "The week's and month's story, on the All page"
         }
     }
 }

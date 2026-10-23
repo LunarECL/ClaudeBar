@@ -1,19 +1,23 @@
 import SwiftUI
 import Domain
 
-/// *WEEKLY RECAP* — the week's story across every provider: the total, the
-/// split by provider, the top model, the biggest day, what caching saved, and
-/// the week before it. A range choice picks the week. It renders what `Recap`
-/// says, in the recap's own unit, and never counts; a week that holds nothing
-/// says so, and the choice stays while either week has something.
+/// *RECAP* — the week's or month's story across every provider: the total,
+/// the split by provider, the top model, the biggest day, what caching saved,
+/// and the range before it. A range choice picks the range. It renders what
+/// `Recap` says, in the recap's own unit, and never counts; a range that holds
+/// nothing says so, and the choice stays while any range has something. The
+/// export button tells `ReportSaver` to save the recap as one HTML report, and
+/// the card shows a save that failed.
 struct RecapCardView: View {
-    /// Both weeks the card offers, read by the page.
+    /// Every range the card offers, read by the page.
     let recaps: [RecapRange: Recap]
     /// A provider's name, from its id.
     let name: (String) -> String
 
     @Environment(\.appTheme) private var theme
-    @State private var range: RecapRange = .thisWeek
+    @State private var range: RecapRange = .this(.week)
+    /// Where a report leaves the app; it holds a save that failed.
+    @State private var saver = ReportSaver()
 
     var body: some View {
         if recaps.values.contains(where: { !$0.isEmpty }), let recap = recaps[range] {
@@ -24,11 +28,12 @@ struct RecapCardView: View {
     // MARK: - The card
 
     /// The card for one range: the header, then either its highlights or the
-    /// note that the week held nothing.
+    /// note that the range held nothing.
     @ViewBuilder
     private func card(_ recap: Recap) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             header
+            chips
             if recap.isEmpty {
                 Text(range.emptyNote)
                     .popoverFont(9, weight: .medium)
@@ -49,6 +54,14 @@ struct RecapCardView: View {
             }
         )
         .themeRivets()
+        .alert("The report could not be saved", isPresented: Binding(
+            get: { saver.failure != nil },
+            set: { if !$0 { saver.dismissFailure() } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saver.failure ?? "")
+        }
     }
 
     private var header: some View {
@@ -57,18 +70,43 @@ struct RecapCardView: View {
                 Image(systemName: "calendar")
                     .popoverFont(9, weight: .bold)
                     .foregroundStyle(theme.textSecondary)
-                Text("WEEKLY RECAP")
+                Text("RECAP")
                     .popoverFont(8, weight: .medium)
                     .foregroundStyle(theme.textSecondary)
                     .tracking(0.3)
             }
             Spacer(minLength: 4)
-            HStack(spacing: 4) {
-                ForEach(RecapRange.allCases) { choice in
-                    chip(choice)
-                }
+            if let chosen = recaps[range], !chosen.isEmpty {
+                exportButton
             }
         }
+    }
+
+    /// The ranges the card offers, as chips.
+    private var chips: some View {
+        HStack(spacing: 4) {
+            ForEach(RecapRange.allCases) { choice in
+                chip(choice)
+            }
+        }
+    }
+
+    /// The person's one gesture: the recap on screen, told to the saver as
+    /// an HTML report.
+    private var exportButton: some View {
+        Button {
+            guard let recap = recaps[range] else { return }
+            saver.save(RecapHTMLReport(recap: recap, range: range, name: name))
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .popoverFont(9, weight: .medium)
+                .foregroundStyle(theme.textTertiary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Save as HTML report")
     }
 
     /// One range choice, drawn on when it is the one chosen.
@@ -143,7 +181,7 @@ struct RecapCardView: View {
             ForEach(Array(recap.providers.enumerated()), id: \.element.provider) { index, part in
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(Self.palette[index % Self.palette.count])
+                        .fill(ModelColors.color(at: index))
                         .frame(width: 6, height: 6)
                     Text(name(part.provider))
                         .popoverFont(9, weight: .medium)
@@ -192,8 +230,4 @@ struct RecapCardView: View {
                 .lineLimit(1)
         }
     }
-
-    /// The providers' colours — hues far apart, cycled when the range spans
-    /// more providers than the palette holds.
-    private static let palette: [Color] = [.purple, .green, .blue, .orange, .pink, .cyan, .indigo, .mint, .red]
 }

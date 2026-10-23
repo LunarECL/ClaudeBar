@@ -64,8 +64,8 @@ struct ClaudeBarApp: App {
     /// with `notify.enabled`; does nothing until a device is linked.
     private let notifyDriver: NotifyPublishDriver
     private let leaderboard: AppLeaderboard
-    /// *WEEKLY RECAP*'s two weeks across the lineup, read by the All page.
-    private let weeklyRecaps: WeeklyRecaps
+    /// *WEEKLY RECAP*'s ranges across the lineup, read by the All page.
+    private let recaps: Recaps
 
     /// Binding required by `.menuBarExtraAccess`; also enables programmatic
     /// dropdown control if ever needed.
@@ -185,10 +185,10 @@ struct ClaudeBarApp: App {
         StatusAlerts(destination: destinations).follow(monitor)
         // The weekly recap reads the lineup's usage history when the All page
         // asks; it decides for itself when it is stale.
-        weeklyRecaps = WeeklyRecaps(monitor: monitor, calendar: DataSources.calendar())
+        recaps = Recaps(monitor: monitor, calendar: DataSources.calendar())
         // *Recap alerts* follow every refresh too: the calendar week turned,
         // and the closed week's recap goes to the webhooks that want it.
-        RecapAlerts(destination: webhooks, recaps: weeklyRecaps,
+        RecapAlerts(destination: webhooks, recaps: recaps,
                     names: { [weak monitor] in
                         Dictionary((monitor?.providers.all ?? []).map { ($0.id, $0.name) },
                                    uniquingKeysWith: { first, _ in first })
@@ -439,14 +439,14 @@ struct ClaudeBarApp: App {
         MenuBarExtra {
             Group {
                 #if ENABLE_SPARKLE
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, notifications: notifications, leaderboard: leaderboard, weeklyRecaps: weeklyRecaps, onClose: { isMenuPresented = false }) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, notifications: notifications, leaderboard: leaderboard, recaps: recaps, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)
                     .environment(\.popoverTextSize, settings.popoverTextSize)
                     .environment(\.sparkleUpdater, sparkleUpdater)
                 #else
-                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, notifications: notifications, leaderboard: leaderboard, weeklyRecaps: weeklyRecaps, onClose: { isMenuPresented = false }) { enabled in
+                MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, notifications: notifications, leaderboard: leaderboard, recaps: recaps, onClose: { isMenuPresented = false }) { enabled in
                         if enabled { startHookServer() } else { stopHookServer() }
                     }
                     .appThemeProvider(themeModeId: settings.themeMode)

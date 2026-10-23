@@ -5,7 +5,7 @@ import Foundation
 /// Every day is counted in the calendar the caller gives, never `.current`:
 /// `Quotas` has no platform, and on Windows Foundation's zone is GMT (#565).
 /// Callers pass `DataSources.calendar()` or a log's own `calendar`.
-public struct DateRange: Sendable, Equatable {
+public struct DateRange: Sendable, Hashable {
     /// The start of the first day.
     public let first: Date
     /// The start of the last day.
@@ -31,6 +31,15 @@ public struct DateRange: Sendable, Equatable {
     public static func week(containing day: Date, calendar: Calendar) -> DateRange {
         let first = calendar.dateInterval(of: .weekOfYear, for: day)?.start ?? calendar.startOfDay(for: day)
         let last = calendar.date(byAdding: .day, value: 6, to: first) ?? first
+        return DateRange(first: first, last: last, calendar: calendar)
+    }
+
+    /// The calendar's month that holds `day`: from its first day to its last,
+    /// however long it runs.
+    public static func month(containing day: Date, calendar: Calendar) -> DateRange {
+        let first = calendar.dateInterval(of: .month, for: day)?.start ?? calendar.startOfDay(for: day)
+        let count = calendar.range(of: .day, in: .month, for: day)?.count ?? 1
+        let last = calendar.date(byAdding: .day, value: count - 1, to: first) ?? first
         return DateRange(first: first, last: last, calendar: calendar)
     }
 
