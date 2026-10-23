@@ -218,11 +218,16 @@ public struct InteractiveRunner: Sendable {
     /// (`ChildLaunch`: the app's, with the call's changes), then what this
     /// OS's terminal differs in, then the terminal defaults every CLI gets
     /// where the app has none, and the call's additions last, so they win.
-    /// A name already set in any case is kept: Windows' names ignore case.
+    /// A name is matched as the OS matches it: exactly on POSIX, in any case
+    /// on Windows, whose names ignore case.
     private func sessionEnvironment(for path: String, _ change: ProcessEnvironment) -> [String: String] {
         var environment = launch.environment(for: path, change)
         func named(_ name: String) -> String? {
+            #if os(Windows)
             environment.keys.first { $0.caseInsensitiveCompare(name) == .orderedSame }
+            #else
+            environment[name] == nil ? nil : name
+            #endif
         }
         func set(_ name: String, _ value: String) {
             environment[named(name) ?? name] = value
