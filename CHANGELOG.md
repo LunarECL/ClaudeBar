@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Alibaba shows the Alibaba Cloud logo**: the provider's card, popover and menu bar carried a question-mark placeholder; now the official mark sits on the brand-orange tile, in light and dark. ([#622](https://github.com/tddworks/ClaudeBar/pull/622))
 
+### Added
+- **Recap by webhook**: at the first refresh after your week turns, the weekly recap travels to your webhooks — a one-line Slack message or a full JSON body, next to your quota alerts. Same Webhooks settings, a new "Weekly recap" tick. ([#620](https://github.com/tddworks/ClaudeBar/pull/620)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/alerting/recap-alerts/README.md)
+- **Linux runs a CLI fetch on a pseudo-terminal**: Claude's and Kimi's CLI sources and Codex's tty fallback read their screen there as the Mac does — the Mac's interactive session became one copy, and Linux answers it with a pty of its own. ([#615](https://github.com/tddworks/ClaudeBar/pull/615)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms)
+- **A product's logins sum to one pool**: from two logins, the popover adds what its logins have left — "340% left across 3 logins". ([#617](https://github.com/tddworks/ClaudeBar/pull/617)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/providers/quota-pools/README.md)
+
 ---
 
 ## [0.5.19] - 2026-10-22
