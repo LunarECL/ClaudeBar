@@ -187,7 +187,8 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │   │   │   │               read-only query of the app's own database · format (a
 │       │       │   │   │   │               JSON object per line, or per file) · the record's shape
 │       │       │   │   │   │               in the mapping's path language (when, which model,
-│       │       │   │   │   │               tokens by kind, its own cost, its identity), or its
+│       │       │   │   │   │               tokens by kind, its own cost, its identity, its
+│       │       │   │   │   │               project — the field of the working directory), or its
 │       │       │   │   │   │               `shapes` when the log writes it more than one way,
 │       │       │   │   │   │               each read whole
 │       │       │   │   ├── prices: PriceList   WHAT A TOKEN COSTS — a price file beside the
@@ -202,7 +203,8 @@ Monitor  ◆                                  THE ROOT — what the menu bar is 
 │       │       │                           per model, a line holding what the day holds — tokens
 │       │       │                           input · output · cache write · cache read · cost
 │       │       │                           (ESTIMATED unless the log states it); records with no
-│       │       │                           model form one unnamed line · sessions · working
+│       │       │                           model form one unnamed line · one line per project
+│       │       │                           when the log names the working directory · sessions ·
 │       │       │                           time · cache savings
 │       │       ├── guestPasses: GuestPasses?   CAPABILITY — "share a trial": declared `"guestPasses": {}`,
 │       │       │                           run by the engine; `nil` when not declared
@@ -523,12 +525,14 @@ definition.missingSettings           → [Setting]    Import: "Key needed"
 | a day closes a fixed while after it ends; a closed day is summed once, kept, and never read from the logs again. Today, and the day before until it closes, are read every time | `DayLedger` |
 | a day is THE SUM OF ITS LINES: one line per model, a line holding what the day holds — the model's tokens by kind and its cost. The log's own cost wins; otherwise cost is ESTIMATED from the price catalog, and says so. A model served on this Mac costs nothing; an unknown model gets the catalog's fallback price, never zero by omission. Records with no model form one unnamed line, so the lines always add up to the day | `Day.lines` · `PriceList` |
 | a range of days answers the page's questions — which models, in order; a day's lines, largest first; its total in a unit; which units it offers — so a view renders and tells. The unit is the view's choice (cost, tokens, cache), and COST is offered only when the log prices its records and a day holds a cost: a log that writes zero everywhere has nothing to say in dollars ; what caching saved over the range | `Days` |
-| two lines of one model add up to one line: every count and the cost, so a sum over days never drops a field | `ModelUsageLine` |
-| a range's mix is each model summed over it, largest first, the unnamed line included so the parts add up; each part carries its share — a page that needs a top model reads it here, and the unnamed line is never the top model | `ModelMix` |
+| what a part of a day spent — tokens by kind and their cost — adds up field by field, so a sum over days never drops a field, and reads itself in a unit | `Spend` |
+| a line of a day's split is its key and its spend — a model (`ModelUsageLine`) or a project (`ProjectUsageLine`); two lines of one key add up to one | `UsageLine` |
+| a range's mix is each line summed over it, largest first, the unnamed part included so the parts add up; each part carries its share — a page that needs a top model or project reads it here, and the unnamed part is never the top. `ModelMix` and `ByProject` are this one mix, each with its own key | `UsageMix` |
+| a day keeps its named project lines only, each named by its working directory's last path component; its project split is those and the remainder — the day less them, when that is anything — so the parts add up to the day, and a day that names no project is all remainder; a path is never kept or shown, only its last component ([quota-by-project](../features/usage-history/quota-by-project/design.md)) | `DailyUsageStat` (`projects`, `projectSplit`) · `ProjectUsageLine` |
 | a day's share is its value against the range's busiest; a range with nothing used has no busiest day, and every share is 0. The shading band a heatmap draws is the App's | `DayActivity` |
 | usage history is per login: an added login reads its own folder's logs; two logins' days are never summed | `Account.usageHistory` |
 | a week is the calendar's week holding a day, from the calendar's own first weekday; the range before a range is the same length, one run earlier | `DateRange` (`week`, `before`) |
-| two days of one date add up to one day: every count, the cost, the time, the savings, one line per model — so several ranges read as one (`Days.merged`) never drop a field | `DailyUsageStat` (`+`) |
+| two days of one date add up to one day: every count, the cost, the time, the savings, one line per model, one per named project — so several ranges read as one (`Days.merged`) never drop a field, and a day with a split added to one without keeps the other's spend in its remainder | `DailyUsageStat` (`+`) |
 | a RECAP is the one read that sums across logins, for the person's total, and names the providers it spans — two logins of one provider are one part; a login's own chart stays its own. It reads in the unit every range offers: cost only when every provider that used anything, this range or the one before, offers cost, tokens otherwise; its change is against the range before, in that unit, and none when nothing was used before; its top model is `ModelMix`'s and its biggest day `DayActivity`'s, over the providers' days merged | `Recap` |
 | the weekly recap is read again only when the week turned or a login's days were read again since its last read; the page tells it when usage was read and never decides | `WeeklyRecaps` |
 | a week's recap goes out once, at the first refresh after the calendar's week turned, for the week that closed; the due answer is pure (`now`, the last send, the calendar), the send is read through `WeeklyRecaps`, and a week that added up to nothing says nothing ([design](../features/alerting/recap-alerts/design.md)) | `RecapDue` · `RecapAlerts` |

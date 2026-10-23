@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An empty product can rest**: turn on *Rest when empty* per product and, while every login has run out, its pill and menu-bar readout dim with a RESTING label until a refresh shows room. Its switch stays yours. ([#619](https://github.com/tddworks/ClaudeBar/pull/619)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/monitoring/rest-when-empty/README.md)
 - **Recap by webhook**: at the first refresh after your week turns, the weekly recap travels to your webhooks — a one-line Slack message or a full JSON body, next to your quota alerts. Same Webhooks settings, a new "Weekly recap" tick. ([#620](https://github.com/tddworks/ClaudeBar/pull/620)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/alerting/recap-alerts/README.md)
 - **Windows reads a CLI's screen**: Claude's and Kimi's CLI sources and Codex's tty fallback run in a pseudo console there, typed into and rendered as on the Mac. ([#625](https://github.com/tddworks/ClaudeBar/pull/625)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#terminal-a-clis-screen)
+- **Usage by project**: the year's card splits usage by folder — *marron 41%, api 33%* — from each line's working directory. ([#616](https://github.com/tddworks/ClaudeBar/pull/616)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/quota-by-project/README.md)
 
 ---
 
