@@ -82,8 +82,10 @@ struct LocalServerFetcher: Fetching {
         return Response(status: 200, headers: headers, body: data)
     }
 
+    /// A path's separators read as `/`, so a definition's path pattern
+    /// (`/antigravity/`) matches Windows' `\` paths too.
     static func isApp(_ commandLine: String, _ process: LocalServerCall.Process) -> Bool {
-        let lower = commandLine.lowercased()
+        let lower = commandLine.lowercased().replacingOccurrences(of: "\\", with: "/")
         guard process.names.contains(where: { lower.contains($0.lowercased()) }) else { return false }
         return process.match.isEmpty || process.match.contains { lower.range(of: $0, options: .regularExpression) != nil }
     }
