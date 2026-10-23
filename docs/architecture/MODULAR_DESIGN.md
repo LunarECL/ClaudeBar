@@ -398,7 +398,7 @@ PORTS, Ports/Processes.swift: what each OS answers, one question each
   ScriptStart         command(path) → argv        sh 'exec "$1"'            │ the file itself
   LoginShell          command(printing:between:)  $SHELL -l -i              │ PowerShell profile
   ChildLaunch         environment(for:) ·         PATH + tool folders,      │ names ignoring case,
-                      teardown                    SIGTERM, kill after 2s    │ TerminateProcess
+                      stopGrace                   exact names; 2s           │ none: the job is ended
 ```
 
 - **Each piece changes for one reason.** How a CLI is found changes
@@ -466,12 +466,14 @@ it reads and writes through what it started:
 NEUTRAL, one copy
   DefaultCLIExecutor   off the cooperative pool, the call's environment and ready markers
   InteractiveRunner    the input delay, autoResponses, the quiet spell, readyWhen;
-                       the session's environment: ChildLaunch's, then the terminal's
-                       PATH, then HOME TERM COLORTERM CI (and LANG) where the app has
-                       none, then the call's additions
+                       the session's one change, applied by ChildLaunch under the OS's
+                       name rule: the call's exclusions out, HOME TERM COLORTERM CI
+                       (and LANG) as defaults where the app has none, the terminal's
+                       PATH and the call's additions set over both
   TerminalRenderer     SwiftTerm's headless screen, and the screen's size (160×50) the
                        runner opens the terminal at
-  ChildTeardown        ask, wait, kill, wait: a child's end within a bound
+  ChildTeardown        ask, wait, kill, wait: a child's end within a bound; the wait
+                       before the kill is ChildLaunch's stopGrace, none means kill at once
 PORT, Ports/Terminal.swift
   PseudoTerminal   start(launch) → TerminalSession · sessionPath() · fallbackLocale
                    Mac: the login shell's PATH, en_US.UTF-8 │ Linux: C.UTF-8 │ Windows: neither
@@ -479,7 +481,7 @@ PORT, Ports/Terminal.swift
                    Mac, Linux: PtySession over openpty │ posix_openpt, SIGTERM then SIGKILL
                    Windows:    ConPtySession — CreatePseudoConsole, CreateProcessW with
                                null standard handles, a job, a thread draining the output;
-                               ChildTeardown with no step before the kill
+                               ChildTeardown with no grace, so the job is ended at once
 ```
 
 - **The child gets the console and nothing else.** An app whose own standard

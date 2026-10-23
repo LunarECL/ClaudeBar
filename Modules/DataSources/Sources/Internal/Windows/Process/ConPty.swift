@@ -28,9 +28,9 @@ struct ConPty: PseudoTerminal {
 /// - **Read.** A thread drains the console's output into a buffer `read()`
 ///   empties, so the console never waits on a full pipe — not even while it
 ///   closes, which waits for its last frame to be read.
-/// - **End.** `ChildTeardown`'s steps, with no request to stop first, as
-///   `WindowsProcesses.teardown` answers: Windows' graceful step attaches to
-///   the child's console, which a GUI app shouldn't do. The job is ended,
+/// - **End.** `ChildTeardown`'s steps with the launch's grace, which
+///   `WindowsProcesses.stopGrace` leaves out: Windows' graceful step attaches
+///   to the child's console, which a GUI app shouldn't do. The job is ended,
 ///   then the console closes, which ends the reader.
 final class ConPtySession: TerminalSession, @unchecked Sendable {
     private let console: HPCON
@@ -39,6 +39,7 @@ final class ConPtySession: TerminalSession, @unchecked Sendable {
     private let process: HANDLE
     private let job: HANDLE
     private let name: String
+    private let stopGrace: Duration?
 
     private let lock = NSLock()
     private var pending = Data()
@@ -52,13 +53,15 @@ final class ConPtySession: TerminalSession, @unchecked Sendable {
     /// session counts as running until it has been quiet this long since then.
     private static let lastFrameQuiet: Duration = .milliseconds(300)
 
-    private init(console: HPCON, input: HANDLE, output: HANDLE, process: HANDLE, job: HANDLE, name: String) {
+    private init(console: HPCON, input: HANDLE, output: HANDLE, process: HANDLE, job: HANDLE, name: String,
+                 stopGrace: Duration?) {
         self.console = console
         self.input = input
         self.output = output
         self.process = process
         self.job = job
         self.name = name
+        self.stopGrace = stopGrace
         self.lastSeen = ContinuousClock.now
         Thread.detachNewThread { [self] in self.drain() }
     }
@@ -94,7 +97,7 @@ final class ConPtySession: TerminalSession, @unchecked Sendable {
         }
         let name = URL(fileURLWithPath: launch.executable).lastPathComponent
         return ConPtySession(console: console, input: input, output: output,
-                             process: child.process, job: child.job, name: name)
+                             process: child.process, job: child.job, name: name, stopGrace: launch.stopGrace)
     }
 
     // MARK: - The session
@@ -149,10 +152,11 @@ final class ConPtySession: TerminalSession, @unchecked Sendable {
         ChildTeardown.end(
             named: name,
             isRunning: { WaitForSingleObject(process, 0) == WAIT_TIMEOUT },
+            // Nothing a GUI app should send asks a console child to stop.
             terminate: {},
             kill: { TerminateJobObject(job, 1) },
-            grace: 0,
-            afterKill: 2
+            grace: stopGrace,
+            afterKill: .seconds(2)
         )
         ClosePseudoConsole(console)
         CloseHandle(input)
