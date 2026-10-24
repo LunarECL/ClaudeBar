@@ -2305,6 +2305,7 @@ struct PulsingStatusDot: View {
     let isSyncing: Bool
 
     @State private var pulsePhase: CGFloat = 0
+    @State private var isShown = false
 
     var body: some View {
         ZStack {
@@ -2320,6 +2321,10 @@ struct PulsingStatusDot: View {
                     .frame(width: 16, height: 16)
                     .scaleEffect(1 + pulsePhase * 0.5)
                     .opacity(1 - pulsePhase)
+                    // Scoped to the ring: a `withAnimation(...repeatForever...)` transaction
+                    // can ride along with other state changes in the same update (the
+                    // popover's measured height) and animate them forever.
+                    .animation(isShown ? .easeOut(duration: 1.0).repeatForever(autoreverses: false) : nil, value: pulsePhase)
             } else {
                 // Static ring when not syncing
                 Circle()
@@ -2336,23 +2341,27 @@ struct PulsingStatusDot: View {
             }
         }
         .onAppear {
+            isShown = true
             if isSyncing {
                 startPulsing()
             }
         }
+        // The popover's content outlives a close, so a refresh still running would keep the
+        // ring repeating in a hidden window. Without the animation the phase just resets.
+        .onDisappear {
+            isShown = false
+            stopPulsing()
+        }
     }
 
     private func startPulsing() {
-        pulsePhase = 0
-        withAnimation(.easeOut(duration: 1.0).repeatForever(autoreverses: false)) {
-            pulsePhase = 1
-        }
+        // Hidden: leave the phase at 0, or the ring would sit at 1 (invisible) and `onAppear` would not change it.
+        guard isShown else { return }
+        pulsePhase = 1
     }
 
     private func stopPulsing() {
-        withAnimation(.easeOut(duration: 0.3)) {
-            pulsePhase = 0
-        }
+        pulsePhase = 0
     }
 }
 
