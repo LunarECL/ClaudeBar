@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.21] - 2026-10-24
+
 ### Fixed
 - **The popover no longer pins a CPU core**: with the popover open during a refresh, it could redraw nonstop and take over half a core. The header's pulsing dot no longer does that. ([#643](https://github.com/tddworks/ClaudeBar/issues/643))
 
@@ -349,7 +353,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.20...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.21...HEAD
+[0.5.21]: https://github.com/tddworks/ClaudeBar/compare/v0.5.20...v0.5.21
 [0.5.20]: https://github.com/tddworks/ClaudeBar/compare/v0.5.19...v0.5.20
 [0.5.19]: https://github.com/tddworks/ClaudeBar/compare/v0.5.18...v0.5.19
 [0.5.18]: https://github.com/tddworks/ClaudeBar/compare/v0.5.17...v0.5.18
