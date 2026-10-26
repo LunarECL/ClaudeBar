@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.23] - 2026-10-26
+
 ### Added
 - **Windows reads a login from Credential Manager**: a provider that finds its login in the Keychain on the Mac, as Copilot finds the GitHub CLI's, finds it in Credential Manager on Windows; a login ClaudeBar renews is saved back to its item. Mac logins are unchanged. ([#641](https://github.com/tddworks/ClaudeBar/pull/641)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/MODULAR_DESIGN.md#10--one-package-three-platforms)
 
@@ -364,7 +368,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.22...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.23...HEAD
+[0.5.23]: https://github.com/tddworks/ClaudeBar/compare/v0.5.22...v0.5.23
 [0.5.22]: https://github.com/tddworks/ClaudeBar/compare/v0.5.21...v0.5.22
 [0.5.21]: https://github.com/tddworks/ClaudeBar/compare/v0.5.20...v0.5.21
 [0.5.20]: https://github.com/tddworks/ClaudeBar/compare/v0.5.19...v0.5.20
