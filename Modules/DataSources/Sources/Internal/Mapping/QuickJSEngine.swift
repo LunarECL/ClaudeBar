@@ -15,28 +15,56 @@ struct QuickJSEngine: ScriptEngine {
     /// Below the thread's stack, so a runaway recursion fails the mapping
     /// (a `RangeError`) instead of the process.
     static let stackLimit = 6 << 20
+    /// A run's time, from the start of `evaluate`: far above the slowest real
+    /// mapping (one `omp` read takes about 3 ms in a release build), so only a
+    /// script that never ends reaches it (#573).
+    static let deadline: TimeInterval = 5
+    /// A run's memory: far above a mapping's parsed answer, so only a script
+    /// that grows without end reaches it, and fails instead of the process.
+    static let memoryLimit = 256 << 20
+    /// How long past the deadline the caller waits for the run to stop itself.
+    /// QuickJS asks for the deadline once every 10,000 steps, so a loop whose
+    /// every step is slow (a large `JSON.parse`, a big `BigInt`) stops long
+    /// after it; the caller has its answer here instead, and the run ends on
+    /// its own thread at its next check.
+    static let grace: TimeInterval = 1
 
     func evaluate(_ expression: String, after scripts: [String], strings: [String: String],
                   functions: [String: ScriptFunction], localTime: TimeZone) throws -> String? {
+        let end = DispatchTime.now().uptimeNanoseconds + UInt64(Self.deadline * 1_000_000_000)
         let outcome = Outcome()
         let done = DispatchSemaphore(value: 0)
         let thread = Thread {
             outcome.result = Result {
-                try Self.run(expression, after: scripts, strings: strings, functions: functions, localTime: localTime)
+                try Self.run(expression, after: scripts, strings: strings, functions: functions, localTime: localTime,
+                             until: end, whenLoaded: { outcome.loaded = true })
             }
             done.signal()
         }
         thread.stackSize = Self.threadStack
         thread.start()
-        done.wait()
+        guard done.wait(timeout: DispatchTime(uptimeNanoseconds: end) + Self.grace) == .success else {
+            let interrupted = "InternalError: interrupted"
+            throw outcome.loaded ? ScriptEngineError.run(interrupted) : ScriptEngineError.load(interrupted)
+        }
         return try outcome.result!.get()
     }
 
     private static func run(_ expression: String, after scripts: [String], strings: [String: String],
-                            functions: [String: ScriptFunction], localTime: TimeZone) throws -> String? {
+                            functions: [String: ScriptFunction], localTime: TimeZone, until end: UInt64,
+                            whenLoaded: () -> Void) throws -> String? {
+        let deadline = Unmanaged.passRetained(Deadline(end: end))
+        defer { deadline.release() }
         guard let runtime = JS_NewRuntime() else { throw UsageError.executionFailed("QuickJS is unavailable") }
         defer { JS_FreeRuntime(runtime) }
         JS_SetMaxStackSize(runtime, stackLimit)
+        JS_SetMemoryLimit(runtime, memoryLimit)
+        // Asked now and then while a script runs; past the deadline, QuickJS
+        // throws an `InternalError: interrupted` no script can catch.
+        JS_SetInterruptHandler(runtime, { _, opaque in
+            guard let opaque else { return 0 }
+            return DispatchTime.now().uptimeNanoseconds >= Unmanaged<Deadline>.fromOpaque(opaque).takeUnretainedValue().end ? 1 : 0
+        }, deadline.toOpaque())
         guard let context = JS_NewContext(runtime) else { throw UsageError.executionFailed("QuickJS is unavailable") }
         defer { JS_FreeContext(context) }
 
@@ -62,8 +90,15 @@ struct QuickJSEngine: ScriptEngine {
             let call = JS_NewCFunctionData(context, { context, _, count, arguments, index, _ in
                 guard let context, let opaque = JS_GetContextOpaque(context) else { return cqjs_undefined() }
                 let host = Unmanaged<Host>.fromOpaque(opaque).takeUnretainedValue()
-                let argument = count > 0 ? arguments.flatMap { QuickJSEngine.text(context, $0[0]) } : nil
-                guard let number = host.functions[Int(index)](argument ?? "") else { return cqjs_null() }
+                var argument = ""
+                if count > 0, let arguments {
+                    // An argument that can't become text threw while it was
+                    // read (interrupted, out of memory): that stays the call's
+                    // answer, so a run's deadline is never lost in a host call.
+                    guard let text = QuickJSEngine.text(context, arguments[0]) else { return cqjs_exception() }
+                    argument = text
+                }
+                guard let number = host.functions[Int(index)](argument) else { return cqjs_null() }
                 return JS_NewFloat64(context, number)
             }, 1, Int32(index), 0, nil)
             JS_SetPropertyStr(context, global, function.key, call)
@@ -74,6 +109,7 @@ struct QuickJSEngine: ScriptEngine {
             defer { JS_FreeValue(context, loaded) }
             if JS_IsException(loaded) { throw ScriptEngineError.load(exception(context)) }
         }
+        whenLoaded()
         let value = JS_Eval(context, expression, expression.utf8.count, "<expression>", Int32(JS_EVAL_TYPE_GLOBAL))
         defer { JS_FreeValue(context, value) }
         if JS_IsException(value) { throw ScriptEngineError.run(exception(context)) }
@@ -100,8 +136,23 @@ struct QuickJSEngine: ScriptEngine {
         init(functions: [ScriptFunction]) { self.functions = functions }
     }
 
-    /// A run's answer, handed from its thread back to the caller.
+    /// When a run must stop, on the uptime clock, for the interrupt handler.
+    private final class Deadline {
+        let end: UInt64
+        init(end: UInt64) { self.end = end }
+    }
+
+    /// A run's answer, handed from its thread back to the caller; read only
+    /// once the run signalled, so a run the caller stopped waiting for writes
+    /// it for no one. Whether its scripts had loaded is read without waiting,
+    /// so it is locked.
     private final class Outcome: @unchecked Sendable {
         var result: Result<String?, any Error>?
+        private let lock = NSLock()
+        private var scriptsLoaded = false
+        var loaded: Bool {
+            get { lock.withLock { scriptsLoaded } }
+            set { lock.withLock { scriptsLoaded = newValue } }
+        }
     }
 }
