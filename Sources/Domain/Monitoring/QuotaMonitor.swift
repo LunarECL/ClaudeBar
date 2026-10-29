@@ -197,12 +197,13 @@ public final class QuotaMonitor {
         }
     }
 
-    /// Refreshes a single provider.
+    /// Refreshes a single provider, answering whether it was refreshed.
     /// `kind` defaults to `.interactive`; the background monitoring loop passes
     /// `.background` so providers can skip non-glanceable work (issue #204).
-    private func refreshProvider(_ provider: Account, kind: RefreshKind = .interactive) async {
+    @discardableResult
+    private func refreshProvider(_ provider: Account, kind: RefreshKind = .interactive) async -> Bool {
         guard let product = providers.provider(of: provider), await product.isAvailable(provider) else {
-            return
+            return false
         }
 
         do {
@@ -210,12 +211,14 @@ public final class QuotaMonitor {
             // lands — so nothing is recorded and there is nothing to publish.
             _ = try await product.refresh(provider, kind)
             await refreshed(provider)
+            return true
         } catch {
             // Every failure is the login's, in `lastError`. A paused login's
             // refusal, or a fetch that landed after a pause, records nothing
             // and tells no one (CANONICAL §5).
-            guard !provider.isPaused else { return }
+            guard !provider.isPaused else { return false }
             await failed(provider)
+            return false
         }
     }
 
@@ -262,17 +265,24 @@ public final class QuotaMonitor {
 
     /// Refreshes the given providers once, preserving order and removing duplicates.
     public func refresh(providerIds: [String], kind: RefreshKind = .interactive) async {
-        var seen = Set<String>()
-        let uniqueProviderIds = providerIds.filter { providerId in
-            seen.insert(providerId).inserted
-        }
+        _ = await refreshAnswering(providerIds, kind: kind)
+    }
 
-        await withTaskGroup(of: Void.self) { group in
-            for providerId in uniqueProviderIds {
+    /// Refreshes the given logins once, de-duplicated, at once, and answers
+    /// the ids that were refreshed: a failed or paused login keeps its last
+    /// snapshot, which the background loop must not read as this tick's (#642).
+    private func refreshAnswering(_ providerIds: [String], kind: RefreshKind) async -> Set<String> {
+        var seen = Set<String>()
+        let logins = providerIds.filter { seen.insert($0).inserted }.compactMap(login(id:))
+        return await withTaskGroup(of: String?.self) { group in
+            for login in logins {
                 group.addTask {
-                    await self.refresh(providerId: providerId, kind: kind)
+                    await self.refreshProvider(login, kind: kind) ? login.id : nil
                 }
             }
+            var refreshed = Set<String>()
+            for await id in group { if let id { refreshed.insert(id) } }
+            return refreshed
         }
     }
 
@@ -595,7 +605,7 @@ public final class QuotaMonitor {
 
     /// The hard lower bound on the monitoring interval. Background refresh must
     /// never poll faster than once a minute (energy — issue #67).
-    public static let minimumInterval: Duration = .seconds(60)
+    nonisolated public static let minimumInterval: Duration = .seconds(60)
 
     /// How much to stretch the background cadence while on battery, to reduce
     /// drain when unplugged (issue #204). Applied on top of the effective
@@ -636,16 +646,36 @@ public final class QuotaMonitor {
         return ids.compactMap { login(id: $0).flatMap(product(of:))?.backgroundRefreshFloor }
     }
 
+    /// What the logins this tick refreshed show now, keyed by login and quota,
+    /// for *Refresh faster while a quota moves* (#642). A login whose refresh
+    /// failed or was paused is left out: it still holds an older snapshot,
+    /// perhaps one an interactive refresh read. A hidden quota is left out,
+    /// as it sets no status or alert either.
+    private func readings(of refreshed: Set<String>) -> [String: AdaptiveCadence.Reading] {
+        var readings: [String: AdaptiveCadence.Reading] = [:]
+        for id in refreshed {
+            guard let login = login(id: id), let usage = usage(of: login) else { continue }
+            for quota in usage.quotas {
+                readings["\(id)/\(quota.quotaType.quotaKey)"] =
+                    AdaptiveCadence.Reading(percentUsed: quota.percentUsed, resetsAt: quota.resetsAt)
+            }
+        }
+        return readings
+    }
+
     /// Starts continuous monitoring at the specified interval.
     /// By default, refreshes the currently selected provider each cycle to minimize energy usage.
     /// When provider IDs are supplied, refreshes that de-duplicated provider set each cycle.
     /// The effective cadence is the requested interval clamped to a 1-minute
     /// floor, then raised to the slowest provider-imposed `backgroundRefreshFloor`
     /// in the active set (recomputed each tick so a live probe-mode switch is
-    /// honored without restarting). Returns an AsyncStream of monitoring events.
+    /// honored without restarting). With `adaptive`, the requested interval is
+    /// `AdaptiveCadence`'s: shorter while a quota moves, never past `interval`
+    /// (#642). Returns an AsyncStream of monitoring events.
     public func startMonitoring(
         interval: Duration = .seconds(60),
-        providerIds: [String]? = nil
+        providerIds: [String]? = nil,
+        adaptive: Bool = false
     ) -> AsyncStream<MonitoringEvent> {
         // Stop any existing monitoring
         monitoringTask?.cancel()
@@ -658,6 +688,7 @@ public final class QuotaMonitor {
                 // disabled (no power provider), so the loop below behaves exactly
                 // like the plain timed loop in that case.
                 var powerEvents = self.powerStateProvider?.events().makeAsyncIterator()
+                var cadence = adaptive ? AdaptiveCadence(ceiling: interval) : nil
 
                 while !Task.isCancelled {
                     // Energy awareness: while the display/system is asleep, pause
@@ -680,21 +711,19 @@ public final class QuotaMonitor {
                     // bind a low (`.utility`) QoS so any CLI subprocess spawned
                     // during the refresh runs on efficiency cores / throttled —
                     // both keep idle energy use low (issue #204).
-                    await FetchContext.$qualityOfService.withValue(.utility) {
-                        if let providerIds {
-                            await self.refresh(providerIds: providerIds, kind: .background)
-                        } else {
-                            await self.refreshSelected(kind: .background)
-                        }
+                    let refreshed = await FetchContext.$qualityOfService.withValue(.utility) {
+                        await self.refreshAnswering(providerIds ?? [self.selectedProviderId], kind: .background)
                     }
                     continuation.yield(.refreshed)
 
-                    // Compute the sleep each tick: the requested interval clamped
-                    // to the 1-minute floor, then raised to any provider-imposed
+                    // Compute the sleep each tick: the requested interval (the
+                    // adaptive one while a quota moves, #642) clamped to the
+                    // 1-minute floor, then raised to any provider-imposed
                     // background floor (e.g. Claude API → 15 min). Resolved per
                     // tick so a live CLI↔API switch is honored without restarting.
+                    let requested = cadence?.next(after: self.readings(of: refreshed)) ?? interval
                     let floors = self.backgroundRefreshFloors(for: providerIds)
-                    var sleepInterval = Self.effectiveInterval(requested: interval, floors: floors)
+                    var sleepInterval = Self.effectiveInterval(requested: requested, floors: floors)
 
                     // Stretch the cadence while on battery to reduce drain (#204).
                     if self.powerStateProvider?.isOnBattery == true {

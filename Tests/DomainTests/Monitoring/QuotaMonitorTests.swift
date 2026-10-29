@@ -1208,6 +1208,161 @@ struct QuotaMonitorTests {
         #expect(clock.durations == [.seconds(600)])
     }
 
+    // MARK: - Refresh faster while a quota moves (#642)
+
+    /// Answers each probe with the next used percentage of a script.
+    private final class ScriptedUsageProbe: UsageProbe, @unchecked Sendable {
+        private let lock = NSLock()
+        private var used: [Double]
+
+        init(used: [Double]) { self.used = used }
+
+        func probe() async throws -> UsageSnapshot {
+            let next = lock.withLock { used.count > 1 ? used.removeFirst() : used[0] }
+            return UsageSnapshot(
+                providerId: "claude",
+                quotas: [UsageQuota(percentRemaining: 100 - next, quotaType: .session, providerId: "claude")],
+                capturedAt: Date()
+            )
+        }
+
+        func isAvailable() async -> Bool { true }
+    }
+
+    /// Records each sleep and ends the loop after `ticks` of them.
+    private final class TickingClock: Clock, @unchecked Sendable {
+        private let lock = NSLock()
+        private let ticks: Int
+        private var _durations: [Duration] = []
+
+        init(ticks: Int) { self.ticks = ticks }
+
+        var durations: [Duration] { lock.withLock { _durations } }
+
+        func sleep(for duration: Duration) async throws {
+            let count = lock.withLock { _durations.append(duration); return _durations.count }
+            if count >= ticks { throw CancellationError() }
+        }
+
+        func sleep(nanoseconds: UInt64) async throws {
+            try await sleep(for: .nanoseconds(Int64(nanoseconds)))
+        }
+    }
+
+    @Test
+    func `should halve the wait while a quota moves and double it once quiet (#642)`() async {
+        let settings = makeSettingsRepository()
+        let probe = ScriptedUsageProbe(used: [10, 15, 20, 20, 20])
+        let clock = TickingClock(ticks: 5)
+        let monitor = QuotaMonitor(providers: kept([stubbedProduct("claude", probe: probe, settings: settings)]), clock: clock)
+
+        let stream = monitor.startMonitoring(interval: .seconds(600), adaptive: true)
+        for await _ in stream {}
+
+        #expect(clock.durations == [.seconds(600), .seconds(300), .seconds(150), .seconds(300), .seconds(600)])
+    }
+
+    /// Answers 10% used, then 15%, then fails every probe.
+    private final class FailingAfterTwoProbe: UsageProbe, @unchecked Sendable {
+        private let lock = NSLock()
+        private var calls = 0
+
+        func probe() async throws -> UsageSnapshot {
+            let call = lock.withLock { calls += 1; return calls }
+            if call > 2 { throw UsageError.executionFailed("HTTP error: 500") }
+            return UsageSnapshot(
+                providerId: "claude",
+                quotas: [UsageQuota(percentRemaining: call == 1 ? 90 : 85, quotaType: .session, providerId: "claude")],
+                capturedAt: Date()
+            )
+        }
+
+        func isAvailable() async -> Bool { true }
+    }
+
+    /// Lets the test act between the first and second background ticks.
+    private final class GatedClock: Clock, @unchecked Sendable {
+        private let lock = NSLock()
+        private var _durations: [Duration] = []
+        private var gate: CheckedContinuation<Void, Never>?
+        private var parked: CheckedContinuation<Void, Never>?
+
+        var durations: [Duration] { lock.withLock { _durations } }
+
+        func sleep(for duration: Duration) async throws {
+            let count = lock.withLock { _durations.append(duration); return _durations.count }
+            if count == 1 {
+                await withCheckedContinuation { cont in
+                    let waiter = lock.withLock { gate = cont; let w = parked; parked = nil; return w }
+                    waiter?.resume()
+                }
+            } else {
+                throw CancellationError()
+            }
+        }
+
+        func sleep(nanoseconds: UInt64) async throws {
+            try await sleep(for: .nanoseconds(Int64(nanoseconds)))
+        }
+
+        /// Waits until the loop sleeps after its first tick.
+        func waitUntilParked() async {
+            await withCheckedContinuation { cont in
+                let ready = lock.withLock { gate != nil ? true : { parked = cont; return false }() }
+                if ready { cont.resume() }
+            }
+        }
+
+        func release() { lock.withLock { let g = gate; gate = nil; return g }?.resume() }
+    }
+
+    @Test
+    func `should not shorten the wait after a background tick that failed (#642)`() async {
+        let settings = makeSettingsRepository()
+        let probe = FailingAfterTwoProbe()
+        let product = stubbedProduct("claude", probe: probe, settings: settings)
+        let clock = GatedClock()
+        let monitor = QuotaMonitor(providers: kept([product]), clock: clock)
+
+        let stream = monitor.startMonitoring(interval: .seconds(600), adaptive: true)
+        await clock.waitUntilParked()
+        // An interactive refresh between ticks reads 15% used; the next
+        // background tick fails and keeps that snapshot.
+        await monitor.refresh(providerId: "claude")
+        #expect(monitor.login(id: "claude")?.snapshot?.quotas.first?.percentUsed == 15)
+        clock.release()
+        for await _ in stream {}
+
+        #expect(clock.durations == [.seconds(600), .seconds(600)])
+    }
+
+    @Test
+    func `should keep a provider's floor while a quota moves (#642)`() async {
+        let settings = makeSettingsRepository()
+        let probe = ScriptedUsageProbe(used: [10, 15, 20])
+        let clock = TickingClock(ticks: 3)
+        let product = stubbedProduct("claude", probe: probe, settings: settings, backgroundRefreshFloor: .seconds(900))
+        let monitor = QuotaMonitor(providers: kept([product]), clock: clock)
+
+        let stream = monitor.startMonitoring(interval: .seconds(600), adaptive: true)
+        for await _ in stream {}
+
+        #expect(clock.durations == [.seconds(900), .seconds(900), .seconds(900)])
+    }
+
+    @Test
+    func `should keep the chosen interval while a quota moves when the setting is off`() async {
+        let settings = makeSettingsRepository()
+        let probe = ScriptedUsageProbe(used: [10, 15, 20])
+        let clock = TickingClock(ticks: 3)
+        let monitor = QuotaMonitor(providers: kept([stubbedProduct("claude", probe: probe, settings: settings)]), clock: clock)
+
+        let stream = monitor.startMonitoring(interval: .seconds(600))
+        for await _ in stream {}
+
+        #expect(clock.durations == [.seconds(600), .seconds(600), .seconds(600)])
+    }
+
     // MARK: - Provider Collections
 
     @Test
