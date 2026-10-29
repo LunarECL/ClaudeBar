@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.24] - 2026-10-29
+
 ### Fixed
 - **Cursor shows usage again after its October update**: newer Cursor seals its sign-in, and cursor.com said "Session expired". ClaudeBar opens it with Cursor's own key: the Keychain item “Cursor Safe Storage” on the Mac (macOS asks to allow it), `Local State` on Windows. ([#655](https://github.com/tddworks/ClaudeBar/issues/655)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/cursor/README.md)
 - **A mapping script that never ends no longer stalls its provider**: a script gets 5 seconds and 256 MB; past either, that refresh fails with the error instead of hanging or filling memory. ([#651](https://github.com/tddworks/ClaudeBar/pull/651)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/architecture/ENGINE_DESIGN.md)
@@ -375,7 +379,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4](docs/changelog/0.4.md) · [0.3](docs/changelog/0.3.md) · [0.2](docs/changelog/0.2.md) · [0.1](docs/changelog/0.1.md)
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.23...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.5.24...HEAD
+[0.5.24]: https://github.com/tddworks/ClaudeBar/compare/v0.5.23...v0.5.24
 [0.5.23]: https://github.com/tddworks/ClaudeBar/compare/v0.5.22...v0.5.23
 [0.5.22]: https://github.com/tddworks/ClaudeBar/compare/v0.5.21...v0.5.22
 [0.5.21]: https://github.com/tddworks/ClaudeBar/compare/v0.5.20...v0.5.21
