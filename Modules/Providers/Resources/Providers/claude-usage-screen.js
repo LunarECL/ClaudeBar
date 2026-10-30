@@ -27,9 +27,14 @@ function read(response, context) {
     return { error: error };
   }
 
-  var plan = planFrom(lower);
+  var plan = planFrom(lower, account);
   var session = percent(lines, ["Current session"]);
-  if (session === null) {
+  var weekly = percent(lines, ["Current week (all models)"]);
+  // A verified Ultra account has no 5-hour limit: the screen has no session
+  // row at all, only the weekly ones. A session row without its number is a
+  // screen still loading, not a missing limit.
+  var noSessionLimit = session === null && weekly !== null && !hasRow(lines, "Current session");
+  if (session === null && !noSessionLimit) {
     if (lower.indexOf("loading usage data") !== -1) {
       return { error: { executionFailed: "Claude usage data did not finish loading — the usage endpoint may be rate limited. Try again in a moment." } };
     }
@@ -43,11 +48,9 @@ function read(response, context) {
     return { error: { parseFailed: "Could not find session usage" } };
   }
 
-  var sessionReset = resetText(lines, "Current session");
   var weeklyReset = resetText(lines, "Current week");
-  var quotas = [quota("session", null, session, sessionReset)];
-
-  var weekly = percent(lines, ["Current week (all models)"]);
+  var quotas = [];
+  if (session !== null) quotas.push(quota("session", null, session, resetText(lines, "Current session")));
   if (weekly !== null) quotas.push(quota("weekly", null, weekly, weeklyReset));
 
   var opus = percent(lines, ["Current week (Opus)"]);
@@ -98,10 +101,39 @@ function usageError(lower) {
   return null;
 }
 
-// The header names the plan; a screen without one is a Max subscription.
-function planFrom(lower) {
-  if (lower.indexOf("· claude pro") !== -1 || lower.indexOf("·claude pro") !== -1) return "claudePro";
-  return "claudeMax";
+// The plan the header names ("· Claude Pro", "· Claude Ultra", "· Claude Team").
+// Claude Code prints "Claude Max" for an Ultra account until it has the plan's
+// new name, so Max, and a screen with no header, take the plan from the
+// account `~/.claude.json` describes; with neither, a Max subscription.
+function planFrom(lower, account) {
+  var named = /·\s*claude (pro|max|ultra|team|enterprise)\b/.exec(lower);
+  var word = named ? named[1] : null;
+  if (word === "pro") return "claudePro";
+  if (word === "ultra") return "ULTRA";
+  if (word === "team") return "TEAM";
+  if (word === "enterprise") return "ENTERPRISE";
+  return planFromAccount(account) || "claudeMax";
+}
+
+// `oauthAccount.organizationType` and `organizationRateLimitTier`: Ultra is the
+// old Max 20x, a Max organization on the 20x limits.
+function planFromAccount(account) {
+  switch (account.organizationType) {
+    case "claude_max": return account.rateLimitTier === "default_claude_max_20x" ? "ULTRA" : "claudeMax";
+    case "claude_team": return "TEAM";
+    case "claude_enterprise": return "ENTERPRISE";
+    default: return null;
+  }
+}
+
+// A row that starts with `label`, as the TUI paints a section label — not the
+// same words inside a sentence, such as a hook's "the current session will…".
+function hasRow(lines, label) {
+  var wanted = label.toLowerCase();
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].trim().toLowerCase().indexOf(wanted) === 0) return true;
+  }
+  return false;
 }
 
 // The first "NN% used|left" within 12 lines of a label, as percent left.

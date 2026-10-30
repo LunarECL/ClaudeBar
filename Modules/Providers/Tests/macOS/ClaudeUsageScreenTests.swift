@@ -1173,6 +1173,79 @@ struct ClaudeUsageScreenTests {
         #expect(snapshot.weeklyQuota?.percentRemaining == 40)
     }
 
+    // MARK: - Ultra (the old Max 20x), Max (5x) and team seats
+
+    /// [Inferred] `/usage` for a verified Ultra account: Claude says "If you
+    /// don't see a Current session bar, your account is verified"
+    /// (support.claude.com/en/articles/17728952), so only the weekly bars remain.
+    static let verifiedUltraOutput = """
+    Claude Code v2.1.301
+    Opus 5.5 · Claude Ultra · user@example.com's Organization
+
+    Current week (all models)
+    █░░░░░░░░░░░░░░░░░░░ 3% used
+    Resets Nov 6 at 1pm (UTC)
+
+    Current week (Fable)
+    ░░░░░░░░░░░░░░░░░░░░ 0% used
+    Resets Nov 6 at 1pm (UTC)
+    """
+
+    @Test
+    func `should show only the weekly and Fable limits when a verified Ultra account has no session bar`() throws {
+        let snapshot = try read(Self.verifiedUltraOutput)
+
+        #expect(snapshot.quotas.map(\.quotaType) == [.weekly, .modelSpecific("fable")])
+        #expect(snapshot.sessionQuota == nil)
+        #expect(snapshot.weeklyQuota?.percentRemaining == 97)
+        #expect(snapshot.quota(for: .modelSpecific("fable"))?.percentRemaining == 100)
+        #expect(snapshot.accountTier == .custom("ULTRA"))
+    }
+
+    @Test
+    func `should still say the usage was not found when the screen has neither a session nor a weekly bar`() {
+        #expect(throws: UsageError.parseFailed("Could not find session usage")) {
+            try read("Opus 5.5 · Claude Ultra · Organization\n\nNothing to show")
+        }
+    }
+
+    /// `~/.claude.json` as Claude Code keeps it after reading the profile.
+    private func account(_ organizationType: String, _ tier: String) -> String {
+        #"{"oauthAccount":{"billingType":"stripe_subscription","organizationType":"\#(organizationType)","organizationRateLimitTier":"\#(tier)"}}"#
+    }
+
+    @Test
+    func `should badge ULTRA when the header says Max but the account is on the Ultra (20x) limits`() throws {
+        // Claude Code prints "Claude Max" for an Ultra account until it has the plan's new name.
+        let snapshot = try read(Self.maxHeaderOutput, config: account("claude_max", "default_claude_max_20x"))
+
+        #expect(snapshot.accountTier == .custom("ULTRA"))
+    }
+
+    @Test
+    func `should badge MAX for a Max 5x account`() throws {
+        let snapshot = try read(Self.maxHeaderOutput, config: account("claude_max", "default_claude_max_5x"))
+
+        #expect(snapshot.accountTier == .claudeMax)
+    }
+
+    @Test
+    func `should badge TEAM, not MAX, for a team premium seat on the Max 5x limits`() throws {
+        let output = """
+        Opus 5.5 · Claude Team · Example Org
+
+        Current session
+        ████ 25% used
+
+        Current week (all models)
+        ████ 60% used
+        """
+
+        let snapshot = try read(output, config: account("claude_team", "default_claude_max_5x"))
+
+        #expect(snapshot.accountTier == .custom("TEAM"))
+    }
+
     // MARK: - Helpers
 
     /// The screen as the `cli` data source reads it: rendered, then scripted,
