@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Usage history no longer re-reads today's logs after a relaunch**: what a scan read is kept in `~/.claudebar/usage-history/scans/`, so a new process reads only what was added since. On Windows the hourly upload's read went from 117 s to 3 s. ([#659](https://github.com/tddworks/ClaudeBar/pull/659)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/daily-usage/README.md)
 
+### Fixed
+- **Codex Pro's weekly limit is called Weekly, not Session**: Pro has no 5-hour limit. RPC mode now shows your plan too, and a card shows how many usage limit resets you have. ([#664](https://github.com/tddworks/ClaudeBar/pull/664)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/codex/README.md)
+
 ---
 
 ## [0.5.24] - 2026-10-29
