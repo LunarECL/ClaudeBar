@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Grok shows full remaining for periods without usage, and Kiro parses ISO dates**: an unmetered Grok period displays 100% remaining with countdown, Kiro parses YYYY-MM-DD dates, and empty snapshots show a fallback message. ([#667](https://github.com/tddworks/ClaudeBar/issues/667)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/grok/README.md)
 
+### Fixed
+- **Claude badges Ultra, the plan that was Max 20x**: Max 5x stays MAX, team seats read TEAM, Share stays on Ultra, and a verified Ultra account, with no 5-hour limit, shows its weekly and Fable limits, not an error. Sonnet 5.5 cache reads and Haiku 5.5 cost what Anthropic lists. ([#666](https://github.com/tddworks/ClaudeBar/pull/666)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/claude/README.md)
+
 ---
 
 ## [0.5.24] - 2026-10-29
