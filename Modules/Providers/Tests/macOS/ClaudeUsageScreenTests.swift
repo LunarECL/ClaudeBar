@@ -1209,6 +1209,44 @@ struct ClaudeUsageScreenTests {
         }
     }
 
+    @Test
+    func `should not take the weekly bar's number for a session row that has none yet`() {
+        // The session row is painted, its bar not filled yet; the weekly bar below has its number.
+        let output = """
+        Opus 5.5 · Claude Max · Organization
+
+        Current session
+        ░░░░░░░░░░░░░░░░░░░░
+
+        Current week (all models)
+        █████░░░░░░░░░░░░░░░ 25% used
+        Resets Nov 6 at 1pm (UTC)
+        """
+
+        #expect(throws: UsageError.parseFailed("Could not find session usage")) {
+            try read(output)
+        }
+    }
+
+    @Test
+    func `should not give the session the weekly reset when the session prints none`() throws {
+        let output = """
+        Current session
+        █████░░░░░░░░░░░░░░░ 25% used
+
+        Current week (all models)
+        ████████████░░░░░░░░ 60% used
+        Resets Nov 6 at 1pm (UTC)
+        """
+
+        let snapshot = try read(output)
+
+        #expect(snapshot.sessionQuota?.percentRemaining == 75)
+        #expect(snapshot.sessionQuota?.resetText == nil)
+        #expect(snapshot.sessionQuota?.resetsAt == nil)
+        #expect(snapshot.weeklyQuota?.resetText?.contains("Nov 6") == true)
+    }
+
     /// `~/.claude.json` as Claude Code keeps it after reading the profile.
     private func account(_ organizationType: String, _ tier: String) -> String {
         #"{"oauthAccount":{"billingType":"stripe_subscription","organizationType":"\#(organizationType)","organizationRateLimitTier":"\#(tier)"}}"#

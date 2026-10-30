@@ -136,13 +136,27 @@ function hasRow(lines, label) {
   return false;
 }
 
-// The first "NN% used|left" within 12 lines of a label, as percent left.
+// The rows the TUI paints as a section's label: where the section above ends.
+var SECTION_STARTS = ["current session", "current week", "extra usage"];
+
+function isSectionStart(line) {
+  var row = line.trim().toLowerCase();
+  for (var k = 0; k < SECTION_STARTS.length; k++) {
+    if (row.indexOf(SECTION_STARTS[k]) === 0) return true;
+  }
+  return false;
+}
+
+// The first "NN% used|left" within 12 lines of a label, and before the next
+// section's label — a row still waiting for its number never borrows the
+// next bar's — as percent left.
 function percent(lines, labels) {
   for (var l = 0; l < labels.length; l++) {
     var label = labels[l].toLowerCase();
     for (var i = 0; i < lines.length; i++) {
       if (lines[i].toLowerCase().indexOf(label) === -1) continue;
       for (var j = i; j < Math.min(lines.length, i + 12); j++) {
+        if (j > i && isSectionStart(lines[j])) break;
         var match = /([0-9]{1,3})\s*%\s*(used|left)/i.exec(lines[j]);
         if (match) {
           var value = parseInt(match[1], 10);
@@ -154,12 +168,14 @@ function percent(lines, labels) {
   return null;
 }
 
-// The reset line within 14 lines of a label, without a redraw's repeats.
+// The reset line within 14 lines of a label and before the next section's
+// label, without a redraw's repeats.
 function resetText(lines, labelText) {
   var label = labelText.toLowerCase();
   for (var i = 0; i < lines.length; i++) {
     if (lines[i].toLowerCase().indexOf(label) === -1) continue;
     for (var j = i; j < Math.min(lines.length, i + 14); j++) {
+      if (j > i && isSectionStart(lines[j])) break;
       var lower = lines[j].toLowerCase();
       if (lower.indexOf("reset") !== -1 ||
           (lower.indexOf("in") !== -1 && (lower.indexOf("h") !== -1 || lower.indexOf("m") !== -1))) {
