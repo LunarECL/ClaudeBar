@@ -194,12 +194,7 @@ final class AWSBedrockPricingService: BedrockPricingService, @unchecked Sendable
             return model.displayName
         }
 
-        // Normalize: strip regional prefix (us., eu., etc.) for cross-region inference
-        let normalizedId = modelId.replacingOccurrences(
-            of: "^(us|eu|ap|sa|ca|me|af)\\.",
-            with: "",
-            options: .regularExpression
-        )
+        let normalizedId = DefaultBedrockPricing.baseModelId(modelId)
 
         // Parse model ID format: provider.model-name-version:variant
         // e.g., "anthropic.claude-opus-4-5-20251101-v1:0"
@@ -218,12 +213,7 @@ final class AWSBedrockPricingService: BedrockPricingService, @unchecked Sendable
     }
 
     private func extractVendor(from modelId: String) -> String {
-        // Normalize: strip regional prefix (us., eu., etc.) for cross-region inference
-        let normalizedId = modelId.replacingOccurrences(
-            of: "^(us|eu|ap|sa|ca|me|af)\\.",
-            with: "",
-            options: .regularExpression
-        )
+        let normalizedId = DefaultBedrockPricing.baseModelId(modelId)
 
         let parts = normalizedId.split(separator: ".")
         guard let vendor = parts.first else { return "Unknown" }
@@ -254,15 +244,16 @@ enum PricingError: Error {
 /// Updated periodically - serves as fallback when Pricing API is unavailable
 enum DefaultBedrockPricing {
 
+    /// The base model an ID names: an inference profile's prefix dropped.
+    /// CloudWatch reports the ID that was called ("global.anthropic.claude-…",
+    /// "us.anthropic.claude-…"); prices are kept per base model.
+    static func baseModelId(_ modelId: String) -> String {
+        modelId.replacingOccurrences(of: "^(global|us|eu|jp|apac|au|ap|sa|ca|me|af)\\.", with: "", options: .regularExpression)
+    }
+
     /// Returns bundled pricing for known models, nil for unknown models
     static func model(for modelId: String) -> BedrockModel? {
-        // Normalize model ID: strip regional prefix (us., eu., ap., etc.) for cross-region inference
-        // CloudWatch returns "us.anthropic.claude-..." but pricing uses "anthropic.claude-..."
-        let normalizedId = modelId.replacingOccurrences(
-            of: "^(us|eu|ap|sa|ca|me|af)\\.",
-            with: "",
-            options: .regularExpression
-        )
+        let normalizedId = baseModelId(modelId)
 
         // Check exact match first (with normalized ID)
         if let model = models[normalizedId] {
@@ -291,13 +282,65 @@ enum DefaultBedrockPricing {
     }
 
     private static let models: [String: BedrockModel] = [
-        // Anthropic Claude models (as of Jan 2025)
+        // Anthropic Claude 4.5 and later: Bedrock's on-demand global prices
+        // (Global Cross-region Inference, us-east-1, AWS price list of 2026-10-12).
+        // Regional and geographic profiles cost 10% more.
+        "anthropic.claude-fable-5-1": BedrockModel(
+            id: "anthropic.claude-fable-5-1",
+            displayName: "Claude Fable 5.1",
+            vendor: "Anthropic",
+            inputPricePer1M: 10.00,
+            outputPricePer1M: 50.00
+        ),
+        "anthropic.claude-fable-5": BedrockModel(
+            id: "anthropic.claude-fable-5",
+            displayName: "Claude Fable 5",
+            vendor: "Anthropic",
+            inputPricePer1M: 10.00,
+            outputPricePer1M: 50.00
+        ),
+        "anthropic.claude-opus-5-5": BedrockModel(
+            id: "anthropic.claude-opus-5-5",
+            displayName: "Claude Opus 5.5",
+            vendor: "Anthropic",
+            inputPricePer1M: 4.00,
+            outputPricePer1M: 20.00
+        ),
+        "anthropic.claude-opus-5": BedrockModel(
+            id: "anthropic.claude-opus-5",
+            displayName: "Claude Opus 5",
+            vendor: "Anthropic",
+            inputPricePer1M: 5.00,
+            outputPricePer1M: 25.00
+        ),
+        "anthropic.claude-sonnet-5-5": BedrockModel(
+            id: "anthropic.claude-sonnet-5-5",
+            displayName: "Claude Sonnet 5.5",
+            vendor: "Anthropic",
+            inputPricePer1M: 2.00,
+            outputPricePer1M: 10.00
+        ),
+        "anthropic.claude-sonnet-5": BedrockModel(
+            id: "anthropic.claude-sonnet-5",
+            displayName: "Claude Sonnet 5",
+            vendor: "Anthropic",
+            inputPricePer1M: 2.00,
+            outputPricePer1M: 10.00
+        ),
+        // Prompts over 100,000 tokens cost five times more; one price per model.
+        "anthropic.claude-haiku-5-5": BedrockModel(
+            id: "anthropic.claude-haiku-5-5",
+            displayName: "Claude Haiku 5.5",
+            vendor: "Anthropic",
+            inputPricePer1M: 0.10,
+            outputPricePer1M: 0.50
+        ),
         "anthropic.claude-opus-4-5-20251101-v1:0": BedrockModel(
             id: "anthropic.claude-opus-4-5-20251101-v1:0",
             displayName: "Claude Opus 4.5",
             vendor: "Anthropic",
-            inputPricePer1M: 15.00,
-            outputPricePer1M: 75.00
+            inputPricePer1M: 5.00,
+            outputPricePer1M: 25.00
         ),
         "anthropic.claude-haiku-4-5-20251001-v1:0": BedrockModel(
             id: "anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -306,6 +349,7 @@ enum DefaultBedrockPricing {
             inputPricePer1M: 1.00,
             outputPricePer1M: 5.00
         ),
+        // Older Claude models (as of Jan 2025)
         "anthropic.claude-sonnet-4-20250514-v1:0": BedrockModel(
             id: "anthropic.claude-sonnet-4-20250514-v1:0",
             displayName: "Claude Sonnet 4",
