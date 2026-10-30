@@ -302,6 +302,9 @@ public enum ErrorRef: Sendable, Equatable, Codable {
 public struct JSONMapping: Sendable, Equatable, Codable {
     public let plan: PlanRule?
     public let quotas: [QuotaRule]
+    /// Counts the answer sends that are not limits — nothing is left of them
+    /// and nothing refills — each shown as a note beside the quotas.
+    public let notes: [NoteRule]
     /// The first that answers — one rule, or a list of shapes a provider
     /// has used over time.
     public let cost: [CostRule]
@@ -315,6 +318,7 @@ public struct JSONMapping: Sendable, Equatable, Codable {
     public init(
         plan: PlanRule? = nil,
         quotas: [QuotaRule],
+        notes: [NoteRule] = [],
         cost: [CostRule] = [],
         whenEmpty: EmptyRule? = nil,
         email: [String] = [],
@@ -322,6 +326,7 @@ public struct JSONMapping: Sendable, Equatable, Codable {
     ) {
         self.plan = plan
         self.quotas = quotas
+        self.notes = notes
         self.cost = cost
         self.whenEmpty = whenEmpty
         self.email = email
@@ -332,6 +337,7 @@ public struct JSONMapping: Sendable, Equatable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         plan = try container.decodeIfPresent(PlanRule.self, forKey: .plan)
         quotas = try container.decodeIfPresent([QuotaRule].self, forKey: .quotas) ?? []
+        notes = try container.decodeIfPresent([NoteRule].self, forKey: .notes) ?? []
         if let list = try? container.decodeIfPresent([CostRule].self, forKey: .cost) {
             cost = list
         } else {
@@ -344,6 +350,33 @@ public struct JSONMapping: Sendable, Equatable, Codable {
         } else {
             email = try container.decodeIfPresent([String].self, forKey: .email) ?? []
         }
+    }
+}
+
+/// `{ "label": "Usage limit resets", "value": "$.count", "unit": "available" }` —
+/// a number or text the answer sends, shown as a note under its label. No
+/// note when no path answers: an absent count is unknown, not zero.
+public struct NoteRule: Sendable, Equatable, Codable {
+    public let label: String
+    /// The first that answers.
+    public let value: [String]
+    public let unit: String
+
+    public init(label: String, value: [String], unit: String = "") {
+        self.label = label
+        self.value = value
+        self.unit = unit
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        label = try container.decode(String.self, forKey: .label)
+        if let one = try? container.decode(String.self, forKey: .value) {
+            value = [one]
+        } else {
+            value = try container.decode([String].self, forKey: .value)
+        }
+        unit = try container.decodeIfPresent(String.self, forKey: .unit) ?? ""
     }
 }
 
@@ -383,7 +416,11 @@ public struct QuotaRule: Sendable, Equatable, Codable {
     /// The first that answers — what the response states, then a length the
     /// provider is known for.
     public let window: [DurationRef]
-    /// Fixed text in place of the reset countdown ("Free plan").
+    /// The kind the window's length says, in place of `kind`: the last entry
+    /// the length reaches wins. A provider can list the same windows in a
+    /// different order per plan, so the place a window has in the answer
+    /// does not say which one it is.
+    public let kindByWindow: [KindByWindow]
     public let resetText: String?
     /// With `each`: only the elements where this holds.
     public let `where`: Match?
@@ -398,6 +435,37 @@ public struct QuotaRule: Sendable, Equatable, Codable {
     /// Money in place of a percentage — "$12.40 remaining", "of $50.00".
     /// Without `of` it is a balance: no percentage at all.
     public let left: MoneyLeft?
+
+    /// `{ "atLeast": { "days": 7 }, "kind": "weekly" }` — a fixed length, never
+    /// a path: it is the definition's word for where one kind ends.
+    public struct KindByWindow: Sendable, Equatable, Codable {
+        /// In seconds.
+        public let atLeast: TimeInterval
+        public let kind: QuotaKind
+
+        public init(atLeast: TimeInterval, kind: QuotaKind) {
+            self.atLeast = atLeast
+            self.kind = kind
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            guard case .fixed(let length) = try container.decode(DurationRef.self, forKey: .atLeast) else {
+                throw DecodingError.dataCorruptedError(forKey: .atLeast, in: container,
+                                                       debugDescription: "kindByWindow's atLeast is a fixed length, not a path")
+            }
+            atLeast = length
+            kind = try container.decode(QuotaKind.self, forKey: .kind)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(DurationRef.fixed(atLeast), forKey: .atLeast)
+            try container.encode(kind, forKey: .kind)
+        }
+
+        private enum CodingKeys: String, CodingKey { case atLeast, kind }
+    }
 
     /// `{ "money": "$.remaining", "of": "$.limit", "currency": "USD" }`.
     public struct MoneyLeft: Sendable, Equatable, Codable {
@@ -420,7 +488,7 @@ public struct QuotaRule: Sendable, Equatable, Codable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case kind, name, at, each, skipKeys, windows, usedPercent, leftPercent, resetsAt, window, resetText
+        case kind, name, at, each, skipKeys, windows, usedPercent, leftPercent, resetsAt, window, kindByWindow, resetText
         case `where`, overLimit, countdown, unique, left
     }
 
@@ -435,6 +503,7 @@ public struct QuotaRule: Sendable, Equatable, Codable {
         leftPercent: [ValueRef] = [],
         resetsAt: [ResetRef] = [],
         window: [DurationRef] = [],
+        kindByWindow: [KindByWindow] = [],
         resetText: String? = nil,
         where condition: Match? = nil,
         overLimit: Bool = false,
@@ -452,6 +521,7 @@ public struct QuotaRule: Sendable, Equatable, Codable {
         self.leftPercent = leftPercent
         self.resetsAt = resetsAt
         self.window = window
+        self.kindByWindow = kindByWindow
         self.resetText = resetText
         self.where = condition
         self.overLimit = overLimit
@@ -472,6 +542,7 @@ public struct QuotaRule: Sendable, Equatable, Codable {
         leftPercent = try Self.decodeList(ValueRef.self, container, .leftPercent)
         resetsAt = try Self.decodeList(ResetRef.self, container, .resetsAt)
         window = try Self.decodeList(DurationRef.self, container, .window)
+        kindByWindow = try container.decodeIfPresent([KindByWindow].self, forKey: .kindByWindow) ?? []
         resetText = try container.decodeIfPresent(String.self, forKey: .resetText)
         self.where = try container.decodeIfPresent(Match.self, forKey: .where)
         overLimit = try container.decodeIfPresent(Bool.self, forKey: .overLimit) ?? false

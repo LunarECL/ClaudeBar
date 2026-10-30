@@ -4,7 +4,7 @@ description: Track Codex 5-hour and weekly limits through the codex app-server R
 
 # Codex
 
-Shows your OpenAI Codex rate-limit windows (usually the 5-hour session and weekly limits) with reset countdowns. API mode also shows your Codex credits balance when ChatGPT reports one. Separate preview buckets such as GPT-5.3-Codex-Spark appear as extra rows after your main windows.
+Shows your OpenAI Codex rate-limit windows with reset countdowns: the 5-hour session and the weekly limit, or only the weekly one on plans without a 5-hour limit, such as Pro. Each window is called Session or Weekly by its length. Your plan shows as a badge in both modes, and **Usage limit resets** shows how many saved resets your account has to use. API mode also shows your Codex credits balance when ChatGPT reports one. Separate preview buckets such as GPT-5.3-Codex-Spark appear as extra rows after your main windows.
 
 ## Setup
 
@@ -39,7 +39,8 @@ A shell alias or function (`alias c=…`) can't be used: ClaudeBar starts a prog
 - **Sign in with ChatGPT, not an API key.** API mode reads only the OAuth tokens in `~/.codex/auth.json`. `OPENAI_API_KEY` isn't used. If the pane says "No OAuth credentials found", run `codex` and sign in.
 - **"No rate limits available yet - make some API calls first"** means Codex hasn't reported a window for this account yet. Use Codex once, then refresh. Free plans without limits show 100% with "Free plan".
 - **No countdown after a fallback.** When `app-server` fails and ClaudeBar reads the `/status` screen instead, it gets percentages but no reset times. Check the log for "Codex RPC failed".
-- **The first window may be weekly.** Some plans report a weekly window as Codex's primary window. ClaudeBar uses the window's real length for pace and burn rate, but the card may still be labelled Session.
+- **Only a Weekly card on Pro.** Pro plans have no 5-hour limit, so Codex reports one window, a week long. ClaudeBar calls it Weekly; through 0.5.24 it was labelled Session. If you pinned or hid that Session quota, pin or hide Weekly instead.
+- **Usage limit resets** is how many saved resets Codex says your account has. ClaudeBar only shows the count; you use a reset in Codex. No card means Codex didn't send a count.
 - **"Could not find usage limits in Codex output" on ClaudeBar before 0.4.84.** Newer Codex CLIs removed the `untrusted` approval policy that older ClaudeBar versions passed, so both paths failed ([#259](https://github.com/tddworks/ClaudeBar/issues/259)). Update ClaudeBar.
 - **"Session expired. Run `codex` in terminal to log in again."** (API mode) means the refresh token was expired, reused or revoked. Sign in again with `codex`.
 
