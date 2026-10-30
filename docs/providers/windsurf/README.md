@@ -1,5 +1,5 @@
 ---
-description: Track Windsurf's daily and weekly quota, or its message and flow-action allowances, from the plan the Windsurf app saves locally. Use when setting up Windsurf or when its numbers look old.
+description: Track Windsurf's daily and weekly quota, or its message and flow-action allowances, from the plan Devin Desktop (formerly Windsurf) saves locally. Use when setting up Windsurf or Devin Desktop or when its numbers look old.
 ---
 
 # Windsurf
@@ -8,10 +8,10 @@ Shows how much of your Windsurf daily and weekly quota is left and when each res
 
 ## Setup
 
-1. Open the Windsurf app and sign in once.
+1. Open Devin Desktop (Windsurf's new name since June 2026) or the Windsurf app, and sign in once.
 2. Settings → Providers → Windsurf: turn it on. It's **off by default**. There's no key to paste.
 
-ClaudeBar reads the plan Windsurf saves in its app-data folder, read-only: `~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb` on macOS, `%APPDATA%\Windsurf\User\globalStorage\state.vscdb` on Windows (or `~/AppData/Roaming` if `APPDATA` is empty or unset). It runs nothing and sends nothing anywhere.
+ClaudeBar reads the plan the app saves in its app-data folder, read-only: `~/Library/Application Support/Devin/User/globalStorage/state.vscdb` (Devin Desktop) or `~/Library/Application Support/Windsurf/User/globalStorage/state.vscdb` (Windsurf) on macOS, `%APPDATA%\Devin\…` or `%APPDATA%\Windsurf\…` on Windows (or `~/AppData/Roaming` if `APPDATA` is empty or unset). When both are there, it reads the one changed last, so after Devin Desktop's **Migrate from Windsurf** the old copy is ignored. It runs nothing and sends nothing anywhere.
 
 ## Gotchas
 

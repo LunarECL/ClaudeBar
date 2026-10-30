@@ -34,7 +34,7 @@ Start with the [README](../README.md). Something broken? See [troubleshooting](t
 | [openrouter](providers/openrouter/README.md) | Track your OpenRouter credit balance (total credits minus usage, in USD) with an OpenRouter Management key. Use when setting up OpenRouter or when its key is rejected. |
 | [vercel-gateway](providers/vercel-gateway/README.md) | Show your Vercel AI Gateway credit balance in dollars, using an AI Gateway API key stored in the Keychain or an environment variable. Use when setting up Vercel Gateway or when the connection test fails. |
 | [warp](providers/warp/README.md) | Track Warp's monthly AI credits and add-on credits with a Warp API key. Use when setting up Warp or when its key is rejected. |
-| [windsurf](providers/windsurf/README.md) | Track Windsurf's daily and weekly quota, or its message and flow-action allowances, from the plan the Windsurf app saves locally. Use when setting up Windsurf or when its numbers look old. |
+| [windsurf](providers/windsurf/README.md) | Track Windsurf's daily and weekly quota, or its message and flow-action allowances, from the plan Devin Desktop (formerly Windsurf) saves locally. Use when setting up Windsurf or Devin Desktop or when its numbers look old. |
 | [zai](providers/zai/README.md) | Track the Z.ai / Zhipu GLM Coding Plan 5-hour, weekly and MCP quotas, from a saved key or Claude Code's settings. Use when setting up Z.ai or when it shows "Key needed". |
 
 ## Features, by context
