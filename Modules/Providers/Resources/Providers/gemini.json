@@ -125,6 +125,14 @@
         "script": {
           "file": "gemini-quota.js"
         }
+      },
+      "errors": {
+        "http.401": {
+          "sessionExpired": "Google retired the Gemini CLI's Login with Google for personal, Google AI Pro and Ultra accounts on 2026-06-18. A Code Assist Standard or Enterprise login still works; otherwise use Antigravity. https://developers.google.com/gemini-code-assist/docs/deprecations/code-assist-individuals"
+        },
+        "http.403": {
+          "sessionExpired": "Google retired the Gemini CLI's Login with Google for personal, Google AI Pro and Ultra accounts on 2026-06-18. A Code Assist Standard or Enterprise login still works; otherwise use Antigravity. https://developers.google.com/gemini-code-assist/docs/deprecations/code-assist-individuals"
+        }
       }
     }
   ],
