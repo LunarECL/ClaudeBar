@@ -8,7 +8,7 @@ description: OpenRouter as data — its definition, credits mapping, settings, a
 
 ## Source
 
-`GET https://openrouter.ai/api/v1/credits` with `Authorization: Bearer <key>`, `Accept: application/json` and a 30-second timeout, as the old probe sent it. 401/403 is *Authentication required*; a 429 is a rate limit; any other non-2xx is an HTTP error at the fetch step.
+`GET https://openrouter.ai/api/v1/credits` with `Authorization: Bearer <key>`, `Accept: application/json` and a 30-second timeout, as the old probe sent it. The endpoint needs a [Management key](https://openrouter.ai/docs/guides/overview/auth/management-api-keys): a regular API key gets `403 "Only management keys can perform this operation"` ([reference](https://openrouter.ai/docs/api/api-reference/credits/get-remaining-credits)), which the definition's `errors.http.403` words as that, at the fetch step. A 401 is *Authentication required*; a 429 is a rate limit; any other non-2xx is an HTTP error at the fetch step.
 
 ## Mapping
 

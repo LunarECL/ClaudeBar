@@ -96,8 +96,18 @@ struct OpenRouterDefinitionTests {
         #expect(account.lastFailedStep == .mapping)
     }
 
-    @Test(arguments: [401, 403]) func `should ask to sign in again when OpenRouter refuses the key`(_ status: Int) async throws {
-        await #expect(throws: UsageError.authenticationRequired) { try await make(status: status).refreshPlain() }
+    @Test func `should ask to sign in again when OpenRouter refuses the key`() async throws {
+        await #expect(throws: UsageError.authenticationRequired) { try await make(status: 401).refreshPlain() }
+    }
+
+    @Test func `should say the credits need a Management key when OpenRouter forbids a regular key`() async throws {
+        let product = try make(body: #"{"error":{"code":403,"message":"Only management keys can perform this operation"}}"#, status: 403)
+        let account = product.defaultAccount
+        await #expect(throws: UsageError.executionFailed(
+            "OpenRouter shows credits only to a Management key; a regular API key gets 403. Create one at openrouter.ai/settings/management-keys and paste it as the key.")) {
+            try await product.refresh(account)
+        }
+        #expect(account.lastFailedStep == .fetch)
     }
 
     @Test(arguments: [429, 500]) func `should fail at fetching when OpenRouter is rate-limiting or down`(_ status: Int) async throws {
