@@ -15,19 +15,30 @@ function read(response, context) {
     }
     const credits = text.match(/Credits \(([\d.]+) of ([\d.]+)/);
     if (credits && Number(credits[2]) > 0) {
-        const reset = text.match(/resets on (\d{2})\/(\d{2})/);
-        let date = null, windowSeconds = null;
+        // `resets on 2026-11-01` from kiro-cli 2.x, `resets on 11/01` before it.
+        const reset = text.match(/resets on (\d{4})-(\d{2})-(\d{2})/) || text.match(/resets on (\d{2})\/(\d{2})/);
+        let date = null, windowSeconds = null, resetText = null;
         if (reset) {
-            date = new Date(now.getFullYear(), Number(reset[1]) - 1, Number(reset[2]));
-            if (date < now) date = new Date(now.getFullYear() + 1, Number(reset[1]) - 1, Number(reset[2]));
-            // The month that ends on the reset date — its real length.
-            const start = new Date(date.getFullYear(), date.getMonth() - 1, date.getDate());
-            windowSeconds = (date.getTime() - start.getTime()) / 1000;
+            const full = reset.length > 3;
+            const year = full ? Number(reset[1]) : now.getFullYear();
+            const month = Number(reset[full ? 2 : 1]) - 1;
+            const day = Number(reset[full ? 3 : 2]);
+            let candidate = new Date(year, month, day);
+            if (!full && candidate < now) candidate = new Date(year + 1, month, day);
+            const targetYear = full ? year : candidate.getFullYear();
+            if (candidate.getFullYear() === targetYear && candidate.getMonth() === month && candidate.getDate() === day) {
+                date = candidate;
+                // The month that ends on the reset date — its real length.
+                const start = new Date(date.getFullYear(), date.getMonth() - 1, date.getDate());
+                windowSeconds = (date.getTime() - start.getTime()) / 1000;
+                const pad = n => (n < 10 ? "0" : "") + n;
+                resetText = "Resets on " + pad(month + 1) + "/" + pad(day);
+            }
         }
         quotas.push({type: "time", name: "Monthly",
             percentRemaining: Math.max(0, (Number(credits[2]) - Number(credits[1])) / Number(credits[2]) * 100),
             resetsAt: date ? date.getTime() / 1000 : null,
-            resetText: reset ? "Resets on " + reset[1] + "/" + reset[2] : null, windowSeconds: windowSeconds});
+            resetText: resetText, windowSeconds: windowSeconds});
     }
     return quotas.length ? {quotas: quotas} : {error: {parseFailed: "No quota data found in Kiro CLI output"}};
 }

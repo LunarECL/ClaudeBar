@@ -13,7 +13,7 @@ A `command`: `kiro-cli` over pipes, given `/usage\n/quit\n` on stdin, with a 30-
 ## Mapping
 
 - `Bonus credits: X/Y …, expires in N days` → a **Bonus credits** quota, Y−X of Y left, resetting N days from now. It is a grant that expires, not a window that refills, so it states **no window length** (the old probe called it weekly and gave it 7 days).
-- `Credits (X of Y covered in plan)` with `resets on MM/DD` → a **Monthly** quota. The reset date has no year: a date already past this year is next year's. Its window is **the month that ends on that date**, measured in the Mac's own calendar, rather than the old 30-day guess. With no reset date it states no window.
+- `Credits (X of Y covered in plan)` with `resets on MM/DD` or `resets on YYYY-MM-DD` → a **Monthly** quota. Without a year, a date already past this year is next year's; a full date is taken as it is. Its window is **the month that ends on that date**, measured in the Mac's own calendar, rather than the old 30-day guess. With no reset date it states no window.
 - Neither line → *No quota data found in Kiro CLI output*.
 
 ## Accounts

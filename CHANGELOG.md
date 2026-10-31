@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Antigravity restores Gemini Weekly and Argon quota pools**: uses the official CLI User-Agent to retrieve Gemini rolling pools and the dedicated Argon Weekly bucket. ([#646](https://github.com/tddworks/ClaudeBar/issues/646)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/antigravity/README.md)
 
+### Fixed
+- **Grok shows full remaining for periods without usage, and Kiro parses ISO dates**: an unmetered Grok period displays 100% remaining with countdown, Kiro parses YYYY-MM-DD dates, and empty snapshots show a fallback message. ([#667](https://github.com/tddworks/ClaudeBar/issues/667)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/grok/README.md)
+
 ---
 
 ## [0.5.24] - 2026-10-29

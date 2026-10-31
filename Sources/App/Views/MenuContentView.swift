@@ -1237,6 +1237,25 @@ struct MenuContentView: View {
         .padding(.horizontal, 4)
     }
 
+    /// Whether this page would otherwise draw nothing at all: no quota, no
+    /// cost, no metric, no usage history and no custom card. The empty state
+    /// is for that page alone.
+    private func hasNothingToShow(_ snapshot: UsageSnapshot) -> Bool {
+        guard snapshot.hasNoQuotaData else { return false }
+        if settings.provider.customCardURL(forProvider: snapshot.providerId) != nil { return false }
+        let history = monitor.login(id: snapshot.providerId)?.usageHistory
+        if settings.isShown(.today) && (history?.hasUsage == true || snapshot.dailyUsageReport != nil) { return false }
+        if settings.isShown(.lastThirtyDays) && history?.lastThirtyDays != nil { return false }
+        if settings.isShown(.lastYear) && history?.lastYear != nil { return false }
+        if settings.isShown(.modelMix) && history?.lastYear?.hasModels == true { return false }
+        if settings.isShown(.projectMix),
+           let year = history?.lastYear,
+           !ByProject(of: year, in: year.defaultUnit).isEmpty {
+            return false
+        }
+        return true
+    }
+
     @ViewBuilder
     private func statsGrid(snapshot: UsageSnapshot) -> some View {
         VStack(spacing: 10) {
@@ -1244,6 +1263,16 @@ struct MenuContentView: View {
             // account lacks quota data (note-only sections must still render).
             if snapshot.hasQuotaGroups {
                 quotaGroupSections(snapshot: snapshot)
+            }
+
+            // A provider that reported no quota at all — Grok without a live
+            // usage percent, say — says so, rather than showing a blank page.
+            if hasNothingToShow(snapshot) {
+                Text("No usage data")
+                    .popoverFont(10, weight: .medium)
+                    .foregroundStyle(theme.textTertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
             }
 
             if !snapshot.hasQuotaGroups, !snapshot.quotas.isEmpty {

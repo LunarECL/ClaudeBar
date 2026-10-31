@@ -492,6 +492,26 @@ struct UsageSnapshotTests {
         #expect(snapshot.quotaGroups.isEmpty)
     }
 
+    @Test
+    func `should say a provider reported no quota data only when it drew nothing at all`() {
+        let empty = UsageSnapshot(providerId: "grok", quotas: [], capturedAt: Date())
+        #expect(empty.hasNoQuotaData)
+
+        let oneQuota = UsageSnapshot(providerId: "grok", quotas: [
+            UsageQuota(percentRemaining: 50, quotaType: .weekly, providerId: "grok"),
+        ], capturedAt: Date())
+        #expect(!oneQuota.hasNoQuotaData)
+
+        let priced = UsageSnapshot(providerId: "claude", quotas: [], capturedAt: Date(), costUsage: CostUsage(
+            totalCost: Decimal(string: "1.20")!, apiDuration: 60, providerId: "claude"))
+        #expect(!priced.hasNoQuotaData)
+
+        let metric = UsageSnapshot(providerId: "ext", quotas: [], capturedAt: Date(), extensionMetrics: [
+            ExtensionMetric(label: "Health", value: "OK", unit: ""),
+        ])
+        #expect(!metric.hasNoQuotaData)
+    }
+
     // MARK: - Hiding quotas (issue #140)
 
     private func gemini(flashLeft: Double = 60) -> UsageSnapshot {

@@ -181,6 +181,14 @@ public struct UsageSnapshot: Sendable, Equatable {
 
     // MARK: - Freshness
 
+    /// Whether the provider reported nothing to draw: no quota rows, no
+    /// groups, no cost and no extension metric. Grok without a live usage
+    /// percent answers like this, and its page says so instead of staying
+    /// blank.
+    public var hasNoQuotaData: Bool {
+        !hasQuotaGroups && quotas.isEmpty && costUsage == nil && (extensionMetrics ?? []).isEmpty
+    }
+
     /// How many seconds ago this snapshot was captured
     public var age: TimeInterval {
         Date().timeIntervalSince(capturedAt)
