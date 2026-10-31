@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Windsurf reads Devin Desktop's plan**: since Windsurf became Devin Desktop, the plan is saved in a `Devin` folder; the card showed the old Windsurf copy or nothing. ([#665](https://github.com/tddworks/ClaudeBar/pull/665)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/windsurf/README.md)
 - **Gemini says the personal login was retired**: since 2026-06-18 Google refuses the Gemini CLI's Login with Google for personal, AI Pro and Ultra accounts. The card now says so and points to Code Assist Standard/Enterprise or Antigravity. ([#665](https://github.com/tddworks/ClaudeBar/pull/665)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/gemini/README.md)
 
+### Fixed
+- **Antigravity restores Gemini Weekly and Argon quota pools**: uses the official CLI User-Agent to retrieve Gemini rolling pools and the dedicated Argon Weekly bucket. ([#646](https://github.com/tddworks/ClaudeBar/issues/646)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/antigravity/README.md)
+
 ---
 
 ## [0.5.24] - 2026-10-29
