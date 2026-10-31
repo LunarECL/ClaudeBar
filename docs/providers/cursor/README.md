@@ -23,6 +23,7 @@ Shows your Cursor plan's included usage for the current billing month as separat
 - **On-demand and team cards only appear when that usage is enabled and has a limit.** Uncapped on-demand spend doesn't get a card.
 - **An unlimited plan shows its plan and no quota.** There is no ceiling to measure against, so ClaudeBar no longer shows a "100%" card for it.
 - **"No usage data found in Cursor response"** means the account reported no plan usage, on-demand limit, team credits or unlimited flag. Some free accounts look like this.
+- **On The X Subscription, check usage at grok.com.** Cursor joined The X Subscription on 2026-10-12: its included usage is one weekly pool shared with Grok, shown under **Usage** at [grok.com/dashboard](https://grok.com/dashboard). A legacy Cursor plan keeps its monthly pools, on the [Spending](https://cursor.com/dashboard/spending) tab ([Cursor's usage limits](https://cursor.com/help/models-and-usage/usage-limits)). ClaudeBar reads the monthly figures; what cursor.com reports for an X Subscription account hasn't been checked, so its card may not match the weekly pool.
 - **Windows path support does not yet supply SQLite or mapping scripts.** Until those connections are implemented, the source reports *Unavailable* rather than reading through a Mac command.
 
 ## See also

@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Codex Pro's weekly limit is called Weekly, not Session**: Pro has no 5-hour limit. RPC mode now shows your plan too, and a card shows how many usage limit resets you have. ([#664](https://github.com/tddworks/ClaudeBar/pull/664)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/codex/README.md)
 
+### Fixed
+- **OpenRouter says when a key can't read credits**: OpenRouter now shows the balance only to a Management key, and a regular API key's 403 read as "Authentication required". The card now says to create a Management key. ([#665](https://github.com/tddworks/ClaudeBar/pull/665)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/openrouter/README.md)
+- **Bedrock prices Claude through `global.` profiles, and Claude 5 and 5.5**: they cost $0 before, and Opus 4.5 was priced at $15/$75 instead of $5/$25. ([#665](https://github.com/tddworks/ClaudeBar/pull/665)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/bedrock/README.md)
+- **Windsurf reads Devin Desktop's plan**: since Windsurf became Devin Desktop, the plan is saved in a `Devin` folder; the card showed the old Windsurf copy or nothing. ([#665](https://github.com/tddworks/ClaudeBar/pull/665)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/windsurf/README.md)
+- **Gemini says the personal login was retired**: since 2026-06-18 Google refuses the Gemini CLI's Login with Google for personal, AI Pro and Ultra accounts. The card now says so and points to Code Assist Standard/Enterprise or Antigravity. ([#665](https://github.com/tddworks/ClaudeBar/pull/665)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/gemini/README.md)
+
 ---
 
 ## [0.5.24] - 2026-10-29

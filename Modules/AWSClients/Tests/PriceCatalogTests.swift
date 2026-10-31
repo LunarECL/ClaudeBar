@@ -28,12 +28,33 @@ struct PriceCatalogTests {
         #expect(await SDKPriceCatalog(pricing: Prices(models: [:])).prices(service: "AmazonEC2", ids: ["x"]).isEmpty)
     }
 
-    @Test func `should price a cross-region model like its base model in the bundled price table`() throws {
-        let regional = try #require(DefaultBedrockPricing.model(for: "us.anthropic.claude-opus-4-5-20251101-v1:0"))
-        let base = try #require(DefaultBedrockPricing.model(for: "anthropic.claude-opus-4-5-20251101-v1:0"))
-        #expect(regional.inputPricePer1M == base.inputPricePer1M)
-        #expect(regional.outputPricePer1M == base.outputPricePer1M)
-        #expect(regional.inputPricePer1M > 0)
+    @Test(arguments: ["global", "us", "eu", "jp", "apac", "au"])
+    func `should price an inference profile like its base model in the bundled price table`(_ profile: String) throws {
+        let routed = try #require(DefaultBedrockPricing.model(for: "\(profile).anthropic.claude-opus-4-5-20251101-v1:0"))
+        #expect(routed.id == "\(profile).anthropic.claude-opus-4-5-20251101-v1:0")
+        #expect(routed.displayName == "Claude Opus 4.5")
+        #expect(routed.inputPricePer1M == 5)
+        #expect(routed.outputPricePer1M == 25)
+    }
+
+    @Test(arguments: [
+        ("anthropic.claude-fable-5-1", "Claude Fable 5.1", "10", "50"),
+        ("anthropic.claude-fable-5", "Claude Fable 5", "10", "50"),
+        ("anthropic.claude-opus-5-5", "Claude Opus 5.5", "4", "20"),
+        ("anthropic.claude-opus-5", "Claude Opus 5", "5", "25"),
+        ("anthropic.claude-sonnet-5-5", "Claude Sonnet 5.5", "2", "10"),
+        ("anthropic.claude-sonnet-5", "Claude Sonnet 5", "2", "10"),
+        ("anthropic.claude-haiku-5-5", "Claude Haiku 5.5", "0.10", "0.50"),
+    ])
+    func `should price the Claude 5 and 5.5 models at Bedrock's global prices when the price list can't answer`(
+        _ id: String, _ name: String, _ input: String, _ output: String) throws {
+        for modelId in [id, "global.\(id)"] {
+            let model = try #require(DefaultBedrockPricing.model(for: modelId))
+            #expect(model.displayName == name)
+            #expect(model.vendor == "Anthropic")
+            #expect(model.inputPricePer1M == Decimal(string: input)!)
+            #expect(model.outputPricePer1M == Decimal(string: output)!)
+        }
     }
 }
 

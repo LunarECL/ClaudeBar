@@ -5,8 +5,8 @@ import Providers
 import Quotas
 import Testing
 
-/// Windsurf as data: the plan Windsurf caches in its own database, read
-/// read-only and mapped by `windsurf-plan.js`.
+/// Windsurf as data: the plan Windsurf, now Devin Desktop, caches in its own
+/// database, read read-only and mapped by `windsurf-plan.js`.
 @MainActor @Suite
 struct WindsurfDefinitionTests {
     static let plan = #"{"planName":"Pro","startTimestamp":1771610750000,"endTimestamp":1774029950000,"usage":{"messages":50000,"usedMessages":35650,"remainingMessages":14350,"flowActions":150000,"usedFlowActions":0,"remainingFlowActions":150000},"quotaUsage":{"dailyRemainingPercent":9,"weeklyRemainingPercent":54,"dailyResetAtUnix":1774080000,"weeklyResetAtUnix":1774166400}}"#
@@ -15,19 +15,30 @@ struct WindsurfDefinitionTests {
     /// stored as Windsurf stores it; no database at all when `plan` is nil.
     private func home(_ plan: String?) throws -> URL {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let folder = home.appendingPathComponent("Library/Application Support/Windsurf/User/globalStorage")
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        guard let plan else { return home }
-        let quoted = plan.replacingOccurrences(of: "'", with: "''")
-        let insert = plan.isEmpty ? "" : "INSERT INTO ItemTable VALUES ('windsurf.settings.cachedPlanInfo', CAST('\(quoted)' AS BLOB));"
-        try SQLiteFiles.make(at: folder.appendingPathComponent("state.vscdb"),
-                             "CREATE TABLE ItemTable(key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB); \(insert)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("Library/Application Support/Windsurf/User/globalStorage"),
+                                                withIntermediateDirectories: true)
+        if let plan { try save(plan, app: "Windsurf", in: home) }
         return home
     }
 
+    /// `plan` saved by the app whose data folder is `app`, the database last
+    /// changed at `changed` when given.
+    private func save(_ plan: String, app: String, in home: URL, changed: Date? = nil) throws {
+        let folder = home.appendingPathComponent("Library/Application Support/\(app)/User/globalStorage")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let quoted = plan.replacingOccurrences(of: "'", with: "''")
+        let insert = plan.isEmpty ? "" : "INSERT INTO ItemTable VALUES ('windsurf.settings.cachedPlanInfo', CAST('\(quoted)' AS BLOB));"
+        let database = folder.appendingPathComponent("state.vscdb")
+        try SQLiteFiles.make(at: database, "CREATE TABLE ItemTable(key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB); \(insert)")
+        if let changed { try FileManager.default.setAttributes([.modificationDate: changed], ofItemAtPath: database.path) }
+    }
+
     private func make(_ plan: String? = Self.plan, now: Date = Date(timeIntervalSince1970: 1773000000)) throws -> Provider {
+        try make(home: try home(plan), now: now)
+    }
+
+    private func make(home folder: URL, now: Date = Date(timeIntervalSince1970: 1773000000)) throws -> Provider {
         let definition = try ProviderFactory.builtIn("windsurf")
-        let folder = try home(plan)
         var platform = Platform.current
         platform.applicationData = { home, _ in home.appendingPathComponent("Library/Application Support") }
         let fixturePlatform = platform
@@ -109,5 +120,25 @@ struct WindsurfDefinitionTests {
     func `should not be set up when Windsurf has never run on this Mac`() async throws {
         let windsurf = try make(nil)
         #expect(await windsurf.isAvailable(windsurf.defaultAccount) == false)
+    }
+
+    @Test
+    func `should read the plan Devin Desktop saves, now that Windsurf has become Devin Desktop`() async throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try save(Self.plan, app: "Devin", in: home)
+        let windsurf = try make(home: home)
+        #expect(await windsurf.isAvailable(windsurf.defaultAccount))
+        let usage = try await windsurf.refreshPlain()
+        #expect(usage.quota(for: .weekly)?.percentRemaining == 54)
+    }
+
+    @Test
+    func `should read Devin Desktop's plan, not the older copy Windsurf left behind`() async throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let left = Self.plan.replacingOccurrences(of: #""weeklyRemainingPercent":54"#, with: #""weeklyRemainingPercent":10"#)
+        try save(left, app: "Windsurf", in: home, changed: Date(timeIntervalSince1970: 1772000000))
+        try save(Self.plan, app: "Devin", in: home)
+        let usage = try await make(home: home).refreshPlain()
+        #expect(usage.quota(for: .weekly)?.percentRemaining == 54)
     }
 }

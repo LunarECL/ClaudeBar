@@ -33,7 +33,10 @@
           "timeout": 30
         }
       },
-      "mapping": { "script": { "file": "openrouter-credits.js" } }
+      "mapping": { "script": { "file": "openrouter-credits.js" } },
+      "errors": {
+        "http.403": { "executionFailed": "OpenRouter shows credits only to a Management key; a regular API key gets 403. Create one at openrouter.ai/settings/management-keys and paste it as the key." }
+      }
     }
   ]
 }

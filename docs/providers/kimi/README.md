@@ -35,6 +35,7 @@ Kimi runs two separate platforms: **kimi.com** (China) and **kimi.ai** (internat
 
 ## Gotchas
 
+- **New Kimi plans have no weekly limit.** Kimi renamed its tiers to Go, Plus, Pro, Max and Ultra: a plan bought since then has only the rolling 5-hour window and Kimi's monthly total quota, and Go has no Kimi Code at all. Legacy plans (Andante, Moderato, Allegretto, Allegro) keep their weekly quota ([Kimi's membership page](https://www.kimi.com/code/docs/en/kimi-code/membership.html)). So on a new plan the CLI's plan row is monthly and the API shows it as "Plan". The Extra Usage balance isn't shown.
 - **The API with no cookie shows nothing, not an error.** If ClaudeBar can't find a `kimi-auth` cookie for the selected region (or Full Disk Access is missing), Kimi is skipped silently. Sign in to kimi.com (or kimi.ai, if that's your region) in your browser, grant Full Disk Access, or switch to CLI mode.
 - **`KIMI_AUTH_TOKEN` must be in ClaudeBar's own environment.** It's read from the app process, so a variable exported only in `~/.zshrc` isn't seen when ClaudeBar starts from Finder or at login.
 - **"Run `kimi` and sign in with /login"** means the CLI answered `/usage` with "Authorization failed". Sign in again in a terminal.

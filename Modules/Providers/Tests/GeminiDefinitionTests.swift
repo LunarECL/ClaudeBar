@@ -27,9 +27,11 @@ struct GeminiDefinitionTests {
     }
 
     /// `answers` by path suffix: `(status, body)`; a token other than
-    /// `fresh` is refused when `refuse` says so.
-    private func make(token: String? = "fresh", quota: String = tiers, project: (Int, String) = (200, #"{"cloudaicompanionProject":"gen-lang-client-1"}"#),
-                      refuseStale: Bool = false, located: Bool = true, seen: Seen = Seen()) throws -> (Provider, URL) {
+    /// `fresh` is refused when `refuse` says so, and `gemini` renews the
+    /// login only when `renews` says so.
+    private func make(token: String? = "fresh", quota: String = tiers, quotaStatus: Int = 200,
+                      project: (Int, String) = (200, #"{"cloudaicompanionProject":"gen-lang-client-1"}"#),
+                      refuseStale: Bool = false, located: Bool = true, renews: Bool = true, seen: Seen = Seen()) throws -> (Provider, URL) {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let file = home.appendingPathComponent(".gemini/oauth_creds.json")
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -39,13 +41,13 @@ struct GeminiDefinitionTests {
             seen.add(request)
             if refuseStale, request.value(forHTTPHeaderField: "Authorization") != "Bearer fresh" { return (Data(), StubbedProvider.response(401)) }
             if request.url?.path.hasSuffix(":loadCodeAssist") == true { return (Data(project.1.utf8), StubbedProvider.response(project.0)) }
-            return (Data(quota.utf8), StubbedProvider.response(200))
+            return (Data(quota.utf8), StubbedProvider.response(quotaStatus))
         }
         let cli = MockCLIExecutor()
         given(cli).locate(.any).willReturn(located ? "/opt/homebrew/bin/gemini" : nil)
         given(cli).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
             .willProduce { @Sendable _, _, _, _, _, _ in
-                try? Data(#"{"access_token":"fresh","refresh_token":"r"}"#.utf8).write(to: file)
+                if renews { try? Data(#"{"access_token":"fresh","refresh_token":"r"}"#.utf8).write(to: file) }
                 return CLIResult(output: "")
             }
         let definition = try ProviderFactory.builtIn("gemini")
@@ -139,6 +141,20 @@ struct GeminiDefinitionTests {
     @Test func `should ask to sign in again when the login is refused and the Gemini CLI isn't installed`() async throws {
         let (provider, _) = try make(token: "stale", refuseStale: true, located: false)
         await #expect(throws: UsageError.authenticationRequired) { try await provider.refreshPlain() }
+    }
+
+    nonisolated static let retired = "Session expired. Google retired the Gemini CLI's Login with Google for personal, Google AI Pro and Ultra accounts on 2026-06-18. A Code Assist Standard or Enterprise login still works; otherwise use Antigravity. https://developers.google.com/gemini-code-assist/docs/deprecations/code-assist-individuals"
+
+    @Test func `should say Google retired the personal login when Code Assist forbids it`() async throws {
+        let (provider, _) = try make(quotaStatus: 403)
+        let error = await #expect(throws: UsageError.self) { try await provider.refreshPlain() }
+        #expect(error?.errorDescription == Self.retired)
+    }
+
+    @Test func `should say Google retired the personal login when renewing it with the Gemini CLI doesn't help`() async throws {
+        let (provider, _) = try make(token: "stale", refuseStale: true, renews: false)
+        let error = await #expect(throws: UsageError.self) { try await provider.refreshPlain() }
+        #expect(error?.errorDescription == Self.retired)
     }
 
     @Test func `should read an added login from its own Gemini home, renewed by the Gemini CLI there`() async throws {
