@@ -58,17 +58,65 @@
       }
     },
     {
-      "id": "monthlyLimit",
-      "label": "Monthly AI Credits",
+      "id": "plan",
+      "label": "Copilot Plan",
       "scope": "account",
       "for": [
         "billing"
       ],
-      "default": "50",
+      "default": "pro",
       "kind": {
-        "text": {
-          "pattern": "^[1-9][0-9]*$"
-        }
+        "choice": [
+          {
+            "id": "pro",
+            "label": "Pro (1,500 AI credits)",
+            "allowance": "1500",
+            "report": "ai_credit",
+            "unit": "AI credits"
+          },
+          {
+            "id": "proPlus",
+            "label": "Pro+ (7,000 AI credits)",
+            "allowance": "7000",
+            "report": "ai_credit",
+            "unit": "AI credits"
+          },
+          {
+            "id": "max",
+            "label": "Max (20,000 AI credits)",
+            "allowance": "20000",
+            "report": "ai_credit",
+            "unit": "AI credits"
+          },
+          {
+            "id": "business",
+            "label": "Business (1,900 AI credits)",
+            "allowance": "1900",
+            "report": "ai_credit",
+            "unit": "AI credits"
+          },
+          {
+            "id": "enterprise",
+            "label": "Enterprise (3,900 AI credits)",
+            "allowance": "3900",
+            "report": "ai_credit",
+            "unit": "AI credits"
+          },
+          {
+            "id": "proAnnual",
+            "label": "Pro, annual on premium requests (300)",
+            "allowance": "300",
+            "report": "premium_request",
+            "unit": "premium requests"
+          },
+          {
+            "id": "proPlusAnnual",
+            "label": "Pro+, annual on premium requests (1,500)",
+            "allowance": "1500",
+            "report": "premium_request",
+            "unit": "premium requests"
+          }
+        ]
       }
     },
     {
@@ -94,7 +142,7 @@
     {
       "kind": "billing",
       "label": "Billing API",
-      "summary": "Reads this month's AI credits from GitHub billing with a fine-grained token",
+      "summary": "Reads this month's AI credits from GitHub billing with a fine-grained token, against your plan's allowance",
       "credential": {
         "firstOf": [
           {
@@ -113,12 +161,12 @@
       },
       "fetch": {
         "http": {
-          "url": "https://api.github.com/users/{{username}}/settings/billing/premium_request/usage",
+          "url": "https://api.github.com/users/{{username}}/settings/billing/{{setting.plan.report}}/usage",
           "timeout": 30,
           "headers": {
             "Authorization": "Bearer {{token}}",
             "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28"
+            "X-GitHub-Api-Version": "2026-03-10"
           }
         }
       },
@@ -137,7 +185,8 @@
             "username"
           ],
           "values": {
-            "monthlyLimit": "{{setting.monthlyLimit}}",
+            "allowance": "{{setting.plan.allowance}}",
+            "unit": "{{setting.plan.unit}}",
             "manualUsage": "{{setting.manualUsage}}"
           }
         }

@@ -6,11 +6,12 @@ import Quotas
 import Testing
 
 /// Copilot as data: GitHub's billing API (a fine-grained token and the
-/// username it bills) or the Copilot API (a classic token), each read by its
-/// own script — the old probes' fixtures, quota for quota.
+/// username it bills, measured against the plan the person picks) or the
+/// Copilot API (a classic token), each read by its own script.
 @MainActor @Suite
 struct CopilotDefinitionTests {
-    nonisolated static func billing(_ items: String = #"[{"product":"Copilot","model":"Claude Sonnet 4","grossQuantity":10.0},{"product":"Copilot","model":"GPT-5","grossQuantity":5.0},{"product":"Actions","grossQuantity":99}]"#) -> String {
+    /// The AI credit usage report's shape, as GitHub documents it: fractional credits per model.
+    nonisolated static func billing(_ items: String = #"[{"product":"Copilot","sku":"Copilot AI Credits","model":"Claude Sonnet 4.6","unitType":"ai-credits","pricePerUnit":0.01,"grossQuantity":10.4},{"product":"Copilot","sku":"Copilot AI Credits","model":"GPT-5.2","unitType":"ai-credits","pricePerUnit":0.01,"grossQuantity":4.6},{"product":"Actions","grossQuantity":99}]"#) -> String {
         #"{"timePeriod":{"year":2025,"month":12},"user":"octocat","usageItems":\#(items)}"#
     }
     nonisolated static let user = #"{"copilot_plan":"business","quota_snapshots":{"premium_interactions":{"entitlement":300,"percent_remaining":99.3,"remaining":298,"unlimited":false}},"quota_reset_date_utc":"2026-03-01T00:00:00.000Z"}"#
@@ -18,11 +19,12 @@ struct CopilotDefinitionTests {
     final class Seen: @unchecked Sendable {
         var url: String?
         var authorization: String?
+        var apiVersion: String?
     }
 
     /// Copilot with its old card's settings where it kept them.
     private func make(mode: String? = nil, body: String? = nil, status: Int = 200, username: String? = "octocat",
-                      limit: String? = nil, manual: String? = nil, envVar: String? = nil,
+                      plan: String? = nil, manual: String? = nil, envVar: String? = nil,
                       vault: MemoryVault = MemoryVault(["copilot.token": "saved"]), environment: [String: String] = [:],
                       ghLogin: String? = nil, refuse: Set<String> = [], seen: Seen = Seen()) throws -> Provider {
         let network = MockNetworkClient()
@@ -31,6 +33,7 @@ struct CopilotDefinitionTests {
         given(network).request(.any).willProduce { @Sendable request in
             seen.url = request.url?.absoluteString
             seen.authorization = request.value(forHTTPHeaderField: "Authorization")
+            seen.apiVersion = request.value(forHTTPHeaderField: "X-GitHub-Api-Version")
             if let key = seen.authorization, refuse.contains(key) { return (Data(), StubbedProvider.response(401)) }
             if request.url?.path == "/copilot_internal/user" { return (Data(userAnswer.utf8), StubbedProvider.response(status)) }
             return (Data(answer.utf8), StubbedProvider.response(status))
@@ -38,7 +41,7 @@ struct CopilotDefinitionTests {
         let settings = InMemoryProviderSettings()
         if let mode { settings.setDataSourceKind(mode, forProvider: "copilot") }
         settings.setValue(username, "username", forProvider: "copilot")
-        settings.setValue(limit, "monthlyLimit", forProvider: "copilot")
+        settings.setValue(plan, "plan", forProvider: "copilot")
         settings.setValue(manual, "manualUsage", forProvider: "copilot")
         settings.setValue(envVar, "authEnvVar", forProvider: "copilot")
         let definition = try ProviderFactory.builtIn("copilot")
@@ -65,16 +68,17 @@ struct CopilotDefinitionTests {
 
     // MARK: - Billing API
 
-    @Test func `should show this month's Copilot AI credits against the limit when read from GitHub billing`() async throws {
+    @Test func `should show this month's Copilot AI credits against Pro's allowance when read from GitHub billing`() async throws {
         let seen = Seen()
         let snapshot = try await make(seen: seen).refreshPlain()
         let quota = try #require(snapshot.quotas.first)
         #expect(snapshot.quotas.count == 1)
         #expect(quota.quotaType == .timeLimit("Monthly"))
-        #expect(quota.percentRemaining == 70)
-        #expect(quota.resetText == "15/50 AI credits")
+        #expect(quota.percentRemaining == 99)
+        #expect(quota.resetText == "15/1500 AI credits")
         #expect(snapshot.accountEmail == "octocat")
-        #expect(seen.url == "https://api.github.com/users/octocat/settings/billing/premium_request/usage")
+        #expect(seen.url == "https://api.github.com/users/octocat/settings/billing/ai_credit/usage")
+        #expect(seen.apiVersion == "2026-03-10")
         #expect(seen.authorization == "Bearer saved")
     }
 
@@ -84,23 +88,31 @@ struct CopilotDefinitionTests {
         #expect(quota.window?.length == TimeInterval(31 * 86400))
     }
 
-    @Test func `should measure the credits against the person's monthly limit`() async throws {
-        let quota = try #require(try await make(limit: "300").refreshPlain().quotas.first)
-        #expect(quota.resetText == "15/300 AI credits")
-        #expect(quota.percentRemaining == 95)
+    @Test(arguments: [("pro", "15/1500 AI credits"), ("proPlus", "15/7000 AI credits"), ("max", "15/20000 AI credits"),
+                      ("business", "15/1900 AI credits"), ("enterprise", "15/3900 AI credits")])
+    func `should measure the credits against the allowance of the plan the person picked`(_ plan: String, _ text: String) async throws {
+        let seen = Seen()
+        let quota = try #require(try await make(plan: plan, seen: seen).refreshPlain().quotas.first)
+        #expect(quota.resetText == text)
+        #expect(seen.url == "https://api.github.com/users/octocat/settings/billing/ai_credit/usage")
     }
 
-    @Test func `should keep the monthly limit the old card saved as a number`() throws {
-        #expect(Setting(id: "monthlyLimit", label: "", kind: .text(pattern: "^[1-9][0-9]*$"), default: "50").value(from: "300") == "300")
+    @Test(arguments: [("proAnnual", "15/300 premium requests", 95.0), ("proPlusAnnual", "15/1500 premium requests", 99.0)])
+    func `should count premium requests for an annual plan still billed by request`(_ plan: String, _ text: String, _ left: Double) async throws {
+        let seen = Seen()
+        let quota = try #require(try await make(plan: plan, seen: seen).refreshPlain().quotas.first)
+        #expect(seen.url == "https://api.github.com/users/octocat/settings/billing/premium_request/usage")
+        #expect(quota.resetText == text)
+        #expect(quota.percentRemaining == left)
     }
 
     @Test func `should show nothing used yet when GitHub bills no Copilot requests`() async throws {
         let quota = try #require(try await make(body: Self.billing("[]")).refreshPlain().quotas.first)
         #expect(quota.percentRemaining == 100)
-        #expect(quota.resetText == "0/50 AI credits")
+        #expect(quota.resetText == "0/1500 AI credits")
     }
 
-    @Test(arguments: [("20", 60.0, "20/50 AI credits (manual)"), ("40%", 60.0, "20/50 AI credits (manual)")])
+    @Test(arguments: [("600", 60.0, "600/1500 AI credits (manual)"), ("40%", 60.0, "600/1500 AI credits (manual)")])
     func `should show the usage the person entered when an organization seat bills nothing`(_ manual: String, _ left: Double, _ text: String) async throws {
         let quota = try #require(try await make(body: Self.billing("[]"), manual: manual).refreshPlain().quotas.first)
         #expect(quota.percentRemaining == left)
@@ -114,7 +126,7 @@ struct CopilotDefinitionTests {
 
     @Test func `should show GitHub's own numbers over the usage the person entered`() async throws {
         let quota = try #require(try await make(manual: "40").refreshPlain().quotas.first)
-        #expect(quota.resetText == "15/50 AI credits")
+        #expect(quota.resetText == "15/1500 AI credits")
     }
 
     @Test func `should read the Copilot API when billing has no username`() async throws {
@@ -203,21 +215,21 @@ struct CopilotDefinitionTests {
 
     // MARK: - Accounts
 
-    @Test func `should ask an added login on billing for its token, username and monthly limit`() throws {
-        #expect(try make().accounts.form.map(\.id) == ["token", "username", "monthlyLimit"])
+    @Test func `should ask an added login on billing for its token, username and plan`() throws {
+        #expect(try make().accounts.form.map(\.id) == ["token", "username", "plan"])
     }
 
     @Test func `should ask an added login on the Copilot API only for its token`() throws {
         #expect(try make(mode: "copilotAPI").accounts.form.map(\.id) == ["token"])
     }
 
-    @Test func `should read an added login with its own token, username and limit, never the environment's token`() async throws {
+    @Test func `should read an added login with its own token, username and plan, never the environment's token`() async throws {
         let seen = Seen()
         let provider = try make(vault: MemoryVault(), environment: ["COPILOT_TOKEN": "env"], seen: seen)
-        let work = try provider.accounts.add(filling: ["token": "work", "username": "hubot", "monthlyLimit": "300"])
+        let work = try provider.accounts.add(filling: ["token": "work", "username": "hubot", "plan": "business"])
         let quota = try #require(try await provider.refresh(work).quotas.first)
         #expect(seen.authorization == "Bearer work")
-        #expect(seen.url == "https://api.github.com/users/hubot/settings/billing/premium_request/usage")
-        #expect(quota.resetText == "15/300 AI credits")
+        #expect(seen.url == "https://api.github.com/users/hubot/settings/billing/ai_credit/usage")
+        #expect(quota.resetText == "15/1900 AI credits")
     }
 }

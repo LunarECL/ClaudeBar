@@ -6,7 +6,10 @@ function read(response, context) {
         return failure('Failed to parse billing response');
     }
     const items = json.usageItems.filter(item => item && typeof item.product === 'string' && item.product.toLowerCase().includes('copilot'));
-    const limit = Number(context.values.monthlyLimit || 50) > 0 ? Number(context.values.monthlyLimit || 50) : 50;
+    // The plan the person picked carries its monthly allowance and unit:
+    // AI credits, or premium requests for an annual plan still billed by request.
+    const limit = Number(context.values.allowance), unit = context.values.unit;
+    if (!(limit > 0) || !unit) return failure('No monthly allowance for this Copilot plan');
 
     // No items is nothing used yet — or a seat an organization pays for,
     // which GitHub doesn't report here. For that, the person enters what
@@ -26,7 +29,7 @@ function read(response, context) {
         // Below zero shows how far over the limit this month is.
         percentRemaining: Math.min(100, (limit - used) / limit * 100),
         resetsAt: end, windowSeconds: end - start,
-        resetText: Math.round(used) + '/' + Math.round(limit) + ' AI credits' + (manual ? ' (manual)' : '')
+        resetText: Math.round(used) + '/' + Math.round(limit) + ' ' + unit + (manual ? ' (manual)' : '')
     };
     const result = {quotas: [quota]};
     if (context.credential.username) result.account = {email: context.credential.username};
