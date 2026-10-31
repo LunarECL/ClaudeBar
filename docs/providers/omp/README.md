@@ -24,10 +24,12 @@ There are no Oh My Pi-specific settings. ClaudeBar reads what `omp usage` report
 ## Gotchas
 
 - **"No usage reported"** under an account means `omp` holds a sign-in for it but produced no usable quota: an expired session, a failed fetch, or a provider with no quota API (Ollama, for example). Fix it inside `omp`, then refresh.
+- **"Signed out · … · run omp login"** under an account means omp signed it out because its sign-in could no longer be renewed. A Claude sign-in ends about 30 days after login. The middle part is the reason the provider gave, for example "Refresh token not found or invalid". Run `omp login` for that account; the row goes away once omp reports it again.
 - **Qwen Cloud (Token Plan) says "No usage · check omp's console cookie"**: omp reads that plan's 5-hour and weekly credits only through the Qwen Cloud console's cookie, which `omp login` asks for after the API key and lets you skip. Skipped, or expired with the console session, is the usual cause: sign in again in `omp` (`/login` → *QwenCloud Token Plan*), paste the key, then at *Optional quota reporting* follow omp's steps to copy the `Cookie` request header from home.qwencloud.com and paste it. If a fresh cookie still shows no usage, omp couldn't read the quota for another reason: update omp, and run `omp usage` to see its warning.
 - **Oh My Pi refreshes at most every 5 minutes.** `omp usage` caches upstream reports and each run starts a Bun process, so faster polling would only repeat the same data. Within 5 minutes, clicking refresh shows the same report. If Oh My Pi is one of the providers refreshed in the background, the whole background cycle slows to 5 minutes.
 - **Several accounts on one upstream provider** get a short account tag in their labels ("Claude 7d · jkjk987").
-- A USD limit with no cap shows as a note ("$X spent · no cap"), not as a percentage.
+- A USD limit with no cap shows as a note ("$X spent · no cap"), not as a percentage. A balance with no limit (Command Code or Charm Hyper credits) shows as a note too ("94 credits left").
+- **Saved resets** (Codex, Claude) show as a note under their account: how many, how many you can use now if fewer, and when the next one expires ("1 saved reset · next expires Nov 6"). Spend one with `omp usage reset`.
 - Error messages never include `omp`'s raw output, because it contains account emails and ids. Run `omp usage --json` yourself to see what failed.
 - **No daily usage cards** with omp running: ClaudeBar reads `~/.omp/agent/sessions` unless `PI_CODING_AGENT_DIR` is in ClaudeBar's own environment. A variable exported only in `~/.zshrc` isn't seen when the app starts from Finder or at login. Named profiles, an XDG data folder and `--session-dir` aren't read.
 

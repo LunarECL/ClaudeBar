@@ -592,33 +592,290 @@ struct OmpDefinitionTests {
         #expect(snapshot.quotas.map(\.percentRemaining) == [50, 40])
     }
 
-    // MARK: - Card Title Humanization
+    // MARK: - One Quota Reported Twice
 
     /// Modeled on live `omp usage --json` output for `kimi-code` (omp
-    /// v17.0.2): the reporter emits machine window ids alongside human
-    /// labels. All values are synthetic.
+    /// v18.14.0). omp builds the weekly row `7d` from Kimi's `usage` summary
+    /// and the 5-hour row from its `limits`, then adds each `usages`
+    /// aggregate but `limit_5h`, which repeats the 5-hour row; so `limit_7d`,
+    /// the same weekly quota with the same reset, arrives a second time.
+    /// All values are synthetic.
     static let kimiResponse = """
     { "reports": [ {
         "provider": "kimi-code",
         "limits": [
           {
             "id": "kimi-code:0",
-            "label": "Total quota",
-            "scope": { "provider": "kimi-code", "windowId": "default", "shared": true },
-            "window": { "id": "default", "label": "Usage window", "resetsAt": 1784828755000 },
-            "amount": { "unit": "unknown", "limit": 100, "used": 16, "remaining": 84, "usedFraction": 0.16, "remainingFraction": 0.84 }
+            "label": "Weekly limit",
+            "scope": { "provider": "kimi-code", "windowId": "7d", "shared": true },
+            "window": { "id": "7d", "label": "7 Day", "resetsAt": 1793781471222 },
+            "amount": { "unit": "unknown", "limit": 100, "used": 12, "remaining": 88, "usedFraction": 0.12, "remainingFraction": 0.88 }
           },
           {
             "id": "kimi-code:1",
             "label": "5h limit",
-            "scope": { "provider": "kimi-code", "windowId": "300time_unit_minute", "shared": true },
-            "window": { "id": "300time_unit_minute", "label": "5h limit", "durationMs": 18000000 },
-            "amount": { "unit": "unknown", "limit": 100, "used": 81, "remaining": 19, "usedFraction": 0.81, "remainingFraction": 0.19 }
+            "scope": { "provider": "kimi-code", "windowId": "5h", "shared": true },
+            "window": { "id": "5h", "label": "5h limit", "durationMs": 18000000, "resetsAt": 1793403471222 },
+            "amount": { "unit": "unknown", "limit": 100, "used": 3, "remaining": 97, "usedFraction": 0.03, "remainingFraction": 0.97 }
+          },
+          {
+            "id": "kimi-code:2",
+            "label": "limit_7d",
+            "scope": { "provider": "kimi-code", "windowId": "limit_7d", "shared": true },
+            "window": { "id": "limit_7d", "label": "limit_7d", "resetsAt": 1793781470000 },
+            "amount": { "unit": "percent", "limit": 100, "used": 12.39, "remaining": 87.61, "usedFraction": 0.1239, "remainingFraction": 0.8761 }
           }
         ],
         "metadata": { "endpoint": "https://api.kimi.com/coding/v1/usages" }
     } ] }
     """
+
+    @Test
+    func `should show Kimi's weekly quota once, from its 7d row, when Kimi repeats it as limit_7d`() throws {
+        let snapshot = try OmpFixtures.parse(Self.kimiResponse)
+
+        #expect(snapshot.quotas.map(\.quotaType.displayName) == ["Kimi 7d", "Kimi 5h"])
+        #expect(snapshot.quota(for: .timeLimit("Kimi 7d"))?.percentRemaining == 88)
+    }
+
+    @Test
+    func `should keep an aggregate quota when no other row reports its window`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "kimi-code",
+            "limits": [
+              { "label": "5h limit", "scope": { "windowId": "5h" }, "amount": { "remainingFraction": 0.97 } },
+              { "label": "limit_7d", "scope": { "windowId": "limit_7d" }, "amount": { "unit": "percent", "remainingFraction": 0.8761 } }
+            ]
+        } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(snapshot.quotas.map(\.quotaType.displayName) == ["Kimi 5h", "Kimi limit_7d"])
+    }
+
+    /// Devin's three credit buckets as omp v18.14.0's `devin.ts` builds
+    /// them: one plan tier, one monthly window, `unit: "unknown"`.
+    @Test
+    func `should never name a quota after an unknown unit`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "devin",
+            "limits": [
+              { "label": "Prompt Credits", "scope": { "tier": "Pro", "windowId": "monthly" },
+                "amount": { "used": 100, "remaining": 400, "limit": 500, "usedFraction": 0.2, "remainingFraction": 0.8, "unit": "unknown" } },
+              { "label": "Flow Credits", "scope": { "tier": "Pro", "windowId": "monthly" },
+                "amount": { "used": 300, "remaining": 700, "limit": 1000, "usedFraction": 0.3, "remainingFraction": 0.7, "unit": "unknown" } },
+              { "label": "Flex Credits", "scope": { "tier": "Pro", "windowId": "monthly" },
+                "amount": { "used": 0, "remaining": 50, "limit": 50, "usedFraction": 0, "remainingFraction": 1, "unit": "unknown" } }
+            ]
+        } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(snapshot.quotas.map(\.quotaType.displayName)
+            == ["Devin Pro Prompt Credits monthly", "Devin Pro Flow Credits monthly", "Devin Pro Flex Credits monthly"])
+    }
+
+    // MARK: - Balances
+
+    /// Command Code's pay-as-you-go account as omp v18.14.0's
+    /// `commandcode.ts` reports it: a credit balance and no limit.
+    @Test
+    func `should show a credit balance with no limit as the credits left`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "commandcode",
+            "limits": [ {
+              "id": "commandcode:balance", "label": "Credit balance",
+              "scope": { "provider": "commandcode", "windowId": "balance", "shared": true },
+              "amount": { "remaining": 1234.5, "unit": "credits" }
+            } ]
+        } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(snapshot.quotas.isEmpty)
+        let metrics = try #require(snapshot.extensionMetrics)
+        #expect(metrics.map(\.label) == ["Command Code Credit balance"])
+        #expect(metrics.map(\.value) == ["1,234.5 credits left"])
+        #expect(metrics.map(\.group) == ["Command Code"])
+    }
+
+    @Test
+    func `should show a balance in an unknown unit as a bare number left`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "devin",
+            "limits": [ { "label": "Flex Credits", "scope": { "windowId": "monthly" }, "amount": { "used": 0, "remaining": 120, "unit": "unknown" } } ]
+        } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(try #require(snapshot.extensionMetrics).map(\.value) == ["120 left"])
+    }
+
+    @Test
+    func `should show a dollar balance with no limit as dollars left`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "cursor",
+            "limits": [ { "label": "Prepaid", "scope": { "windowId": "prepaid" }, "amount": { "remaining": 12.5, "unit": "usd" } } ]
+        } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(try #require(snapshot.extensionMetrics).map(\.value) == ["$12.50 left"])
+    }
+
+    @Test
+    func `should show a balance beside the windows of the same account`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "commandcode",
+            "limits": [
+              { "label": "5-hour limit", "scope": { "windowId": "5h" }, "window": { "id": "5h", "durationMs": 18000000 },
+                "amount": { "used": 20, "limit": 100, "usedFraction": 0.2, "unit": "credits" } },
+              { "label": "Credit balance", "scope": { "windowId": "balance" }, "amount": { "remaining": 94, "unit": "credits" } }
+            ]
+        } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(snapshot.quotas.map(\.quotaType.displayName) == ["Command Code 5h"])
+        #expect(try #require(snapshot.extensionMetrics).map(\.value) == ["94 credits left"])
+    }
+
+    // MARK: - Saved Resets
+
+    /// The day a saved reset expires, on the person's clock.
+    static func day(_ iso: String) throws -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: try #require(ISO8601DateFormatter().date(from: iso)))
+    }
+
+    /// Codex's saved reset as omp v18.14.0 reports it (`resetCredits`, a
+    /// report field), beside a Claude account with none.
+    @Test
+    func `should show an account's saved resets and when the next one expires`() throws {
+        let json = """
+        { "reports": [
+          { "provider": "openai-codex",
+            "limits": [ { "scope": { "windowId": "7d" }, "amount": { "remainingFraction": 0.9 } } ],
+            "resetCredits": { "availableCount": 1, "credits": [
+              { "grantedAt": "2099-10-07T23:37:12.034262Z", "expiresAt": "2099-11-06T12:00:00.000000Z", "status": "available" } ] } },
+          { "provider": "anthropic",
+            "limits": [ { "scope": { "windowId": "5h" }, "amount": { "remainingFraction": 0.9 } } ],
+            "resetCredits": { "availableCount": 0, "redeemableCount": 0, "eligible": false, "reason": "no_grant", "credits": [] } }
+        ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        let metrics = try #require(snapshot.extensionMetrics)
+        #expect(metrics.map(\.label) == ["Codex Saved resets"])
+        #expect(metrics.map(\.value) == ["1 saved reset · next expires \(try Self.day("2099-11-06T12:00:00Z"))"])
+        #expect(metrics.map(\.group) == ["Codex"])
+    }
+
+    @Test
+    func `should say how many saved resets can be used now, and expire next, when some can't be used`() throws {
+        let json = """
+        { "reports": [ { "provider": "anthropic", "limits": [],
+            "resetCredits": { "availableCount": 2, "redeemableCount": 1, "credits": [
+              { "expiresAt": "2000-01-01T12:00:00Z" },
+              { "expiresAt": "2099-12-24T12:00:00Z" },
+              { "expiresAt": "2099-12-03T12:00:00Z" } ] } } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        let metrics = try #require(snapshot.extensionMetrics)
+        #expect(metrics.map(\.value) == ["2 saved resets · 1 usable now · next expires \(try Self.day("2099-12-03T12:00:00Z"))"])
+    }
+
+    @Test
+    func `should show an account's saved resets, not no usage, when it reported nothing else`() throws {
+        let json = """
+        { "reports": [ { "provider": "anthropic", "limits": [], "resetCredits": { "availableCount": 1 } } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(try #require(snapshot.extensionMetrics).map(\.value) == ["1 saved reset"])
+    }
+
+    @Test
+    func `should tell apart the saved resets of two accounts on one provider`() throws {
+        let json = """
+        { "reports": [
+          { "provider": "openai-codex", "limits": [], "metadata": { "email": "work@example.com" }, "resetCredits": { "availableCount": 1 } },
+          { "provider": "openai-codex", "limits": [], "metadata": { "email": "home@example.com" }, "resetCredits": { "availableCount": 1 } }
+        ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        let metrics = try #require(snapshot.extensionMetrics)
+        #expect(metrics.map(\.label) == ["Codex Saved resets · work", "Codex Saved resets · home"])
+        #expect(metrics.map(\.group) == ["Codex · work", "Codex · home"])
+    }
+
+    // MARK: - Signed-Out Accounts
+
+    /// Josh's real cause, a refresh omp's Anthropic sign-in could no longer
+    /// make, with its URLs kept and its stack cut.
+    static let refreshFailure = #"oauth refresh failed: OAuthError: Anthropic token refresh request failed. url=https://api.anthropic.com/v1/oauth/token; details=ProviderHttpError: HTTP request failed. status=400; url=https://api.anthropic.com/v1/oauth/token; body={\"error\": \"invalid_grant\", \"error_description\": \"Refresh token not found or invalid\"}"#
+
+    @Test
+    func `should show an account omp signed out, and why, instead of dropping it`() throws {
+        let json = """
+        { "reports": [ { "provider": "anthropic", "limits": [ { "scope": { "windowId": "5h" }, "amount": { "remainingFraction": 0.9 } } ],
+                         "metadata": { "email": "active@example.com" } } ],
+          "accountsWithoutUsage": [],
+          "disabledCredentials": [
+            { "id": 7, "provider": "anthropic", "type": "oauth", "email": "lapsed@example.com", "cause": "\(Self.refreshFailure)", "disabledAtMs": 1793000000000 }
+          ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(snapshot.quotas.map(\.group) == ["Claude"])
+        let metrics = try #require(snapshot.extensionMetrics)
+        #expect(metrics.map(\.label) == ["Claude · lapsed@example.com"])
+        #expect(metrics.map(\.value) == ["Signed out · Refresh token not found or invalid · run omp login"])
+        #expect(metrics.map(\.group) == ["Claude · lapsed"])
+        #expect(snapshot.accountEmail == "active@example.com")
+    }
+
+    @Test(arguments: [
+        ("upstream reported invalidated OAuth token", "Signed out · upstream reported invalidated OAuth token · run omp login"),
+        ("oauth refresh failed: OAuthError: Anthropic token refresh request failed. url=https://api.anthropic.com/v1/oauth/token; details=timeout",
+         "Signed out · Anthropic token refresh request failed · run omp login"),
+        ("", "Signed out · run omp login"),
+    ])
+    func `should say in a few words why omp signed an account out`(cause: String, expected: String) throws {
+        let json = """
+        { "reports": [], "disabledCredentials": [ { "provider": "openai-codex", "type": "oauth", "accountId": "acct-1", "cause": "\(cause)" } ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        #expect(try #require(snapshot.extensionMetrics).map(\.value) == [expected])
+    }
+
+    @Test
+    func `should show one row for an account omp signed out twice`() throws {
+        let json = """
+        { "reports": [], "disabledCredentials": [
+            { "provider": "anthropic", "type": "oauth", "email": "lapsed@example.com", "cause": "upstream reported invalidated OAuth token" },
+            { "provider": "anthropic", "type": "oauth", "email": "Lapsed@example.com", "cause": "upstream reported invalidated OAuth token" },
+            { "provider": "anthropic", "type": "oauth", "email": "lapsed@example.com", "orgId": "org-team", "orgName": "Team", "cause": "upstream reported invalidated OAuth token" }
+        ] }
+        """
+        let snapshot = try OmpFixtures.parse(json)
+
+        let metrics = try #require(snapshot.extensionMetrics)
+        #expect(metrics.map(\.label) == ["Claude · lapsed@example.com", "Claude · lapsed@example.com · Team"])
+        #expect(snapshot.accountEmail == nil)
+    }
 
     // MARK: - Accounts Without Usage
 
@@ -1453,7 +1710,7 @@ struct OmpDefinitionTests {
     // MARK: - Upstream Display Names
 
     @Test(arguments: [
-        // Every id omp v18.10's usage registry emits (@oh-my-pi/pi-ai/src/usage/*).
+        // Every id omp v18.14's usage registry emits (@oh-my-pi/pi-ai/src/usage/*).
         ("alibaba-token-plan", "Qwen Cloud"),
         ("anthropic", "Claude"),
         ("openai-codex", "Codex"),
@@ -1471,6 +1728,12 @@ struct OmpDefinitionTests {
         ("synthetic", "Synthetic"),
         ("umans", "Umans"),
         ("xai-oauth", "Grok"),
+        ("commandcode", "Command Code"),
+        ("cline-pass", "ClinePass"),
+        ("charm-hyper", "Charm Hyper"),
+        ("devin", "Devin"),
+        ("factory-droid", "Factory Droid"),
+        ("muse-code", "Muse Code"),
     ])
     func `should show every provider omp reports by its display name`(id: String, expected: String) throws {
         #expect(try OmpFixtures.displayName(id) == expected)

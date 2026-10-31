@@ -8,7 +8,7 @@ Oh My Pi is `Modules/Providers/Resources/Providers/omp.json` and `omp-usage.js`,
 
 - **A `command` fetch** runs `omp usage --json` over pipes; a non-zero exit is `cli.nonzero`, which never carries the output (it holds account emails and ids). The script slices the first `{` to the last `}` and reads numbers as exact texts (`jsonDecimal`).
 - **Each limit is a quota with its `group`** — the provider, and the account tag when one provider has several. A capped USD limit is money left of its cap (`left: {money, of}`), its share following the cents shown.
-- **`notes`** carry what has nothing to measure: an account with no usage, and spend with no cap. Each is a row under its group, named by its own `label`.
+- **`notes`** carry what has nothing to measure: an account with no usage, spend with no cap, a balance with no limit, saved resets, and an account omp signed out. Each is a row under its group, named by its own `label`.
 - **Not taken:** card and menu-bar titles (`compactTitle`, `menuBarTitle`), which are the page's. The 5-minute floor is `cache.ttl: 300`, so a click within 5 minutes shows the cached report too.
 
 ## Source
@@ -47,17 +47,38 @@ The provider declares a 5-minute `backgroundRefreshFloor`: `omp usage` caches up
 - Percent remaining prefers `remainingFraction`, then `1 - usedFraction`, then `(limit - used) / limit`.
 - `window.resetsAt` and `durationMs` are epoch **milliseconds**. `durationMs` feeds pace/burn-rate math directly, so a `timeLimit` quota doesn't fall back to the default 7-day assumption.
 - Identity is spread out: `metadata.email` → `metadata.accountId` → `metadata.projectId`, then a limit's `scope.accountId` / `scope.projectId` (Gemini and Kimi carry identity in limit scopes). This mirrors omp's own `reportAccountLabel`.
-- Upstream ids mapped to short names: `anthropic` Claude, `openai-codex` Codex, `zai` Z.ai, `google-gemini-cli` Gemini, `google-antigravity` Antigravity, `github-copilot` Copilot, `kimi-code` Kimi, `minimax-code` MiniMax, `minimax-code-cn` MiniMax CN, `opencode-go` OpenCode Go, `alibaba-token-plan` Qwen Cloud (omp's *QwenCloud Token Plan*, which the id alone would call Alibaba), `xai-oauth` Grok. With the title-cased rest (`cursor`, `synthetic`, `umans`, `ollama`, `ollama-cloud`), that's every id omp v18.10's usage registry (`@oh-my-pi/pi-ai/src/usage/*`) emits; unknown ids are title-cased.
+- Upstream ids mapped to short names: `anthropic` Claude, `openai-codex` Codex, `zai` Z.ai, `google-gemini-cli` Gemini, `google-antigravity` Antigravity, `github-copilot` Copilot, `kimi-code` Kimi, `minimax-code` MiniMax, `minimax-code-cn` MiniMax CN, `opencode-go` OpenCode Go, `alibaba-token-plan` Qwen Cloud (omp's *QwenCloud Token Plan*, which the id alone would call Alibaba), `xai-oauth` Grok, and `commandcode` Command Code and `cline-pass` ClinePass, the names omp's own login list gives them. With the title-cased rest (`cursor`, `synthetic`, `umans`, `ollama`, `ollama-cloud`, `charm-hyper`, `devin`, `factory-droid`, `muse-code`), that's every id omp v18.14's usage registry (`packages/ai/src/usage/registry.ts`) emits; unknown ids are title-cased.
 - An account in `accountsWithoutUsage` reads "No usage reported", except where one cause is the usual one: `alibaba-token-plan` has a quota only through the Qwen Cloud console's cookie, an optional step of `omp login`, and the cookie ends with the console session, so it reads "No usage · check omp's console cookie". It names the likely cause, not a certain one: a fetch that failed for another reason reads the same.
+
+### Fields omp added since (seen with omp v18.14.0)
+
+```json
+{
+  "reports": [{
+    "provider": "openai-codex",
+    "limits": [ … ],
+    "resetCredits": { "availableCount": 1, "redeemableCount": 1, "credits": [{ "expiresAt": "2026-11-06T23:37:12.034262Z", "status": "available" }] },
+    "notes": [ "…" ],
+    "metadata": { "planType": "pro", … }
+  }],
+  "disabledCredentials": [{ "provider": "anthropic", "type": "oauth", "email": "…", "orgId": "…", "orgName": "…", "cause": "oauth refresh failed: … \"error_description\": \"Refresh token not found or invalid\" …", "disabledAtMs": 1793000000000 }],
+  "capacity": { "anthropic": [{ "window": "5h", "accounts": 3, "usedAccounts": 0.4, "remainingAccounts": 2.6 }] }
+}
+```
+
+- **`resetCredits`** (read): the saved resets Codex and Claude let an account spend on a usage window. A note when `availableCount > 0`: "1 saved reset · next expires Nov 6", adding "N usable now" when `redeemableCount` differs, and the soonest `credits[].expiresAt` still ahead as a day on the person's clock. omp sends the block on every Claude report, with `availableCount: 0` until a grant arrives; that shows nothing. ClaudeBar never spends one (`omp usage reset` does).
+- **`disabledCredentials`** (read): accounts omp signed out itself because their sign-in couldn't be renewed, a Claude grant about 30 days after login being the usual one. They are neither a report nor in `accountsWithoutUsage`, so without a row they'd vanish. Each reads `Signed out · <cause> · run omp login` in its own group. The cause is the provider's `error_description` when the text carries one ("Refresh token not found or invalid"), else its first clause without omp's `oauth refresh failed:` and error-class prefixes. omp already leaves out rows the person replaced or deleted and accounts signed in again; one identity (provider, email or account id, organization) signed out twice is one row.
+- **Not read:** `reports[].notes` (provider-wide sentences: Factory Droid's "no quota windows are exposed", Devin's overage balance, Ollama's "no standalone quota usage API"), `metadata.planType` / `metadata.tier` (raw plan ids such as Codex's `chatgpt_plan_type` or Command Code's `planId`, not names), the per-account `policy` object, and `capacity`.
 
 ## Labels are keys
 
 Each limit becomes a `timeLimit` quota labelled `"<Provider> [Tier] [Meter] [Name] <window> [· account]"`, e.g. "Claude 5h", "Codex Spark 7d", "Z.ai Tokens 5h", "Antigravity Gemini 5h". **The label is the persisted quota key** (menu-bar selections, Notify! gauge), so it must be unique and stable:
 
 - **Account discriminator** only when several reports share one upstream provider: the email local part (≤16 chars) or the first 8 chars of an opaque id, else `#<index>`.
-- **Meter** only when two limits share a (tier, window) on one account, e.g. Z.ai's token and request quotas are both `5h`. The meter is `amount.unit` capitalised, unless it's `percent`.
+- **Meter** only when two limits share a (tier, window) on one account, e.g. Z.ai's token and request quotas are both `5h`. The meter is `amount.unit` capitalised, unless it's `percent` or `unknown`, which name no unit (Devin's credit buckets and Kimi's rows are `unknown`).
 - **Name** only when limits share a (tier, window, meter) on one account and omp's own `label`s differ, e.g. Antigravity's "Gemini" beside "Claude & GPT (shared)" (omp v18.11). Spend rows keep their names.
 - **One pool, one quota**: limits with the same `scope.sharedGroup` are one pool, and only the first is shown. Antigravity reports the pool Claude and GPT share once per model family.
+- **One quota reported twice, once**: a row whose window is `limit_<window>` beside a row for that `<window>` isn't shown. omp builds Kimi's `7d` row from Kimi's weekly summary and also passes on Kimi's aggregate `limit_7d`, the same quota with the same reset (omp drops the 5-hour aggregate, `limit_5h`, itself: `kimi.ts`, omp v18.14). The `7d` row stays, so "Kimi 7d" keeps its key. An aggregate with no matching row (`limit_month_total`) is kept.
 - **Final guard**: any remaining collision gets ` (2)`, ` (3)`…
 - The raw window token (`scope.windowId` → `window.id` → `window.label`) is never humanised in the label.
 
@@ -74,9 +95,13 @@ Presentation is separate and may change freely:
 - With a positive `limit`: a spend meter, "$used of $cap", still driven by percent. `used`/`limit` decode as `Decimal` straight from the JSON token, so 1.005 rounds to $1.01, not $1.00.
 - With no `limit`: an account note "`<token>` usage $X spent · no cap". No percentage is invented.
 
+## Balances
+
+A limit with `amount.remaining` but no limit to measure it against (Command Code's and Charm Hyper's "Credit balance", a Devin credit bucket with no monthly allowance) is a note `<remaining> <unit> left`, e.g. "1,234.5 credits left", "120 left" when the unit is `unknown`, "$12.50 left" in `usd`. Before, it had no percent and was dropped, leaving "No usage reported".
+
 ## Accounts without usage
 
-- A report with zero usable limits (Ollama has no quota API) still gets a "No usage reported" row.
+- A report with nothing to show (no usable limit, balance or saved reset; Ollama has no quota API) still gets a "No usage reported" row.
 - An `accountsWithoutUsage` entry gets one unless it matches an account that did report. Matching is per upstream provider: normalised email when both sides have one, else exact account id. **Org-scoped entries are never merged**, since an org is a distinct limit pool. Duplicate org-less entries collapse into one row (0.4.72).
 - Nothing at all to show → `ProbeError.noData`.
 

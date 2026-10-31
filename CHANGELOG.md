@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Usage history no longer re-reads today's logs after a relaunch**: what a scan read is kept in `~/.claudebar/usage-history/scans/`, so a new process reads only what was added since. On Windows the hourly upload's read went from 117 s to 3 s. ([#659](https://github.com/tddworks/ClaudeBar/pull/659)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/features/usage-history/daily-usage/README.md)
 - **Copilot measures your AI credits against your plan**: Billing reads GitHub's AI credit report and asks for your Copilot plan (Pro 1,500 credits, Pro+ 7,000, Max 20,000, Business 1,900, Enterprise 3,900) instead of a number that defaulted to 50. ([#662](https://github.com/tddworks/ClaudeBar/pull/662)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/copilot/README.md)
 
+### Fixed
+- **Oh My Pi no longer drops what omp reports**: an account omp signed out reads "Signed out" and why, a balance with no limit shows what's left, saved resets show with their expiry, and Kimi's weekly quota is listed once. ([#663](https://github.com/tddworks/ClaudeBar/pull/663)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/omp/README.md)
+
 ---
 
 ## [0.5.24] - 2026-10-29
