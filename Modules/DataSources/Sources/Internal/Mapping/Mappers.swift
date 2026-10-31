@@ -36,6 +36,10 @@ struct JSONMapper: Reading {
         // Nothing answering is not a failure unless `whenEmpty` says so: a
         // provider that has no usage yet reports none (*No usage data*).
         let cost = mapping.cost.lazy.compactMap { self.cost(for: $0, in: scope, providerId: providerId) }.first
+        let notes = mapping.notes.compactMap { rule -> ExtensionMetric? in
+            guard let text = rule.value.lazy.compactMap({ Self.noteText(scope.value($0)) }).first else { return nil }
+            return ExtensionMetric(label: rule.label, value: text, unit: rule.unit)
+        }
 
         return UsageSnapshot(
             providerId: providerId,
@@ -43,7 +47,8 @@ struct JSONMapper: Reading {
             capturedAt: now(),
             accountEmail: mapping.email.lazy.compactMap { scope.string($0) }.first { !$0.isEmpty },
             accountTier: mapping.plan.flatMap { plan(for: $0, in: scope) },
-            costUsage: cost
+            costUsage: cost,
+            extensionMetrics: notes.isEmpty ? nil : notes
         )
     }
 
@@ -96,7 +101,7 @@ struct JSONMapper: Reading {
         let resetsAt = rule.resetsAt.lazy.compactMap { self.date($0, in: scope) }.first
         let windowDuration = windowLength(rule, in: scope)
 
-        guard let type = Self.quotaType(rule.kind, name: name) else { return nil }
+        guard let type = Self.quotaType(kind(rule, window: windowDuration), name: name) else { return nil }
         return UsageQuota(
             percentRemaining: left,
             quotaType: type,
@@ -116,7 +121,8 @@ struct JSONMapper: Reading {
 
     /// Money left — of a ceiling, or a balance with no percentage at all.
     private func moneyQuota(_ rule: QuotaRule.MoneyLeft, for quotaRule: QuotaRule, named name: String?, in scope: JSONScope, providerId: String) -> UsageQuota? {
-        guard let type = Self.quotaType(quotaRule.kind, name: name),
+        let windowDuration = windowLength(quotaRule, in: scope)
+        guard let type = Self.quotaType(kind(quotaRule, window: windowDuration), name: name),
               let remaining = money(rule.money, in: scope) else { return nil }
         let currency = rule.currency ?? "USD"
         var ceiling: Money?
@@ -131,7 +137,7 @@ struct JSONMapper: Reading {
             providerId: providerId,
             resetsAt: resetsAt,
             resetText: quotaRule.resetText ?? resetsAt.flatMap { countdown(quotaRule.countdown, until: $0) },
-            windowDuration: windowLength(quotaRule, in: scope)
+            windowDuration: windowDuration
         )
     }
 
@@ -143,6 +149,22 @@ struct JSONMapper: Reading {
             case .fixed(let seconds): seconds
             }
         }.first
+    }
+
+    /// The kind the window's length says, when the rule lets it; otherwise the
+    /// rule's own.
+    private func kind(_ rule: QuotaRule, window: TimeInterval?) -> QuotaKind {
+        guard let window else { return rule.kind }
+        return rule.kindByWindow.last { window >= $0.atLeast }?.kind ?? rule.kind
+    }
+
+    /// A note's text: words as sent, or a number — never a flag.
+    static func noteText(_ value: Any?) -> String? {
+        switch value {
+        case let text as String: text.isEmpty ? nil : text
+        case let number as NSNumber where !number.isBoolean: number.stringValue
+        default: nil
+        }
     }
 
     static func quotaType(_ kind: QuotaKind, name: String?) -> QuotaType? {

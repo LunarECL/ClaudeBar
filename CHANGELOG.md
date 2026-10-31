@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Oh My Pi no longer drops what omp reports**: an account omp signed out reads "Signed out" and why, a balance with no limit shows what's left, saved resets show with their expiry, and Kimi's weekly quota is listed once. ([#663](https://github.com/tddworks/ClaudeBar/pull/663)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/omp/README.md)
 
+### Fixed
+- **Codex Pro's weekly limit is called Weekly, not Session**: Pro has no 5-hour limit. RPC mode now shows your plan too, and a card shows how many usage limit resets you have. ([#664](https://github.com/tddworks/ClaudeBar/pull/664)) → [docs](https://github.com/tddworks/ClaudeBar/blob/main/docs/providers/codex/README.md)
+
 ---
 
 ## [0.5.24] - 2026-10-29

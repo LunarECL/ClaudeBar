@@ -44,6 +44,8 @@ needs; each became a generic piece, never a vendor type:
 | a GraphQL read scoped to the account the token sees, from this month's start; a refused billing step that must not stop the usage (Cloudflare AI) | `{{system.month.<format>}}`; `http.steps` with `keep` and a POST body; `acceptedStatuses` on an optional step, so the script reads the refusal |
 | a key exported only in the login shell (Z.ai, #170) | `"loginShell": true` on an `environment` lookup — the engine's login-shell port, asked only by a lookup that says so |
 | a variable name the person chose (DeepSeek) | a setting with a default, `{{setting.authEnvVar}}` in the lookup — a blank one means the default |
+| a plan whose only window is a week, listed where the 5-hour one usually is (Codex Pro) | `kindByWindow` on a quota rule: `[{"atLeast": {"days": 7}, "kind": "weekly"}, …]`, the last entry the window's length reaches names the quota, never its place in the answer |
+| a count the answer sends that is not a limit (Codex's usage limit resets) | `notes` on a JSON mapping: `{label, value, unit}`, the first path that answers, shown as a note beside the quotas; none when no path answers, so unknown never reads as zero |
 
 ## 2 · The engine
 
