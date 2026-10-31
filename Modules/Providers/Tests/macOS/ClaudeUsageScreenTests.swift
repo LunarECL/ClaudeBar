@@ -1210,6 +1210,78 @@ struct ClaudeUsageScreenTests {
     }
 
     @Test
+    func `should show an Ultra account without a session bar when only Claude Code's config names Ultra`() throws {
+        // The header still says Max; `~/.claude.json` has the account on the Ultra (20x) limits.
+        let output = Self.verifiedUltraOutput.replacingOccurrences(of: "Claude Ultra", with: "Claude Max")
+
+        let snapshot = try read(output, config: account("claude_max", "default_claude_max_20x"))
+
+        #expect(snapshot.quotas.map(\.quotaType) == [.weekly, .modelSpecific("fable")])
+        #expect(snapshot.accountTier == .custom("ULTRA"))
+    }
+
+    @Test
+    func `should still say the session was not found when a Max screen has a weekly bar but no session row yet`() {
+        // A capture taken before the session row was painted: only Ultra has no 5-hour limit.
+        let output = Self.verifiedUltraOutput.replacingOccurrences(of: "Claude Ultra", with: "Claude Max")
+
+        #expect(throws: UsageError.parseFailed("Could not find session usage")) {
+            try read(output, config: account("claude_max", "default_claude_max_5x"))
+        }
+    }
+
+    @Test
+    func `should still say the session was not found when a Pro screen has a weekly bar but no session row yet`() {
+        let output = Self.verifiedUltraOutput.replacingOccurrences(of: "Claude Ultra", with: "Claude Pro")
+
+        #expect(throws: UsageError.parseFailed("Could not find session usage")) {
+            try read(output)
+        }
+    }
+
+    @Test
+    func `should not take a number from the contributing-usage section for a weekly row that has none yet`() throws {
+        let output = """
+        Opus 5.5 · Claude Max · Organization
+
+        Current session
+        █████░░░░░░░░░░░░░░░ 25% used
+        Resets 3:59pm (UTC)
+
+        Current week (all models)
+        ░░░░░░░░░░░░░░░░░░░░
+
+        What's contributing to your limits usage?
+        Approximate, based on local sessions on this machine
+        Subagents  40% used
+        """
+
+        let snapshot = try read(output)
+
+        #expect(snapshot.sessionQuota?.percentRemaining == 75)
+        #expect(snapshot.weeklyQuota == nil)
+    }
+
+    @Test
+    func `should not take the contributing-usage heading for the weekly reset when the weekly row prints none`() throws {
+        let output = """
+        Current session
+        █████░░░░░░░░░░░░░░░ 25% used
+
+        Current week (all models)
+        ████████████░░░░░░░░ 60% used
+
+        what's contributing to your limits usage?
+        Approximate, based on local sessions on this machine
+        """
+
+        let snapshot = try read(output)
+
+        #expect(snapshot.weeklyQuota?.percentRemaining == 40)
+        #expect(snapshot.weeklyQuota?.resetText == nil)
+    }
+
+    @Test
     func `should not take the weekly bar's number for a session row that has none yet`() {
         // The session row is painted, its bar not filled yet; the weekly bar below has its number.
         let output = """

@@ -31,9 +31,9 @@ function read(response, context) {
   var session = percent(lines, ["Current session"]);
   var weekly = percent(lines, ["Current week (all models)"]);
   // A verified Ultra account has no 5-hour limit: the screen has no session
-  // row at all, only the weekly ones. A session row without its number is a
-  // screen still loading, not a missing limit.
-  var noSessionLimit = session === null && weekly !== null && !hasRow(lines, "Current session");
+  // row at all, only the weekly ones. Pro and Max always have one, so on their
+  // screens, as on a session row without its number, the row is still loading.
+  var noSessionLimit = plan === "ULTRA" && session === null && weekly !== null && !hasRow(lines, "Current session");
   if (session === null && !noSessionLimit) {
     if (lower.indexOf("loading usage data") !== -1) {
       return { error: { executionFailed: "Claude usage data did not finish loading — the usage endpoint may be rate limited. Try again in a moment." } };
@@ -137,7 +137,8 @@ function hasRow(lines, label) {
 }
 
 // The rows the TUI paints as a section's label: where the section above ends.
-var SECTION_STARTS = ["current session", "current week", "extra usage"];
+// "What's contributing to your limits usage?" heads the advice below the bars.
+var SECTION_STARTS = ["current session", "current week", "extra usage", "what's contributing to your limits usage"];
 
 function isSectionStart(line) {
   var row = line.trim().toLowerCase();
